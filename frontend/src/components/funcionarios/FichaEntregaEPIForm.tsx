@@ -17,6 +17,7 @@ import { EmployeeCombobox } from '../ui/employee-combobox';
 
 import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
+import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { caepiService, CAEPIResponse } from '@/services/caepiService';
@@ -794,7 +795,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                       ...prev,
                       funcionarioId: emp.id,
                       empresaId: cid || prev.empresaId,
-                      employeeWorkSector: buildWorkSectorSnapshot(emp)
+                      employeeWorkSector: buildWorkSectorSnapshot(emp),
+                      dataEntrega: employeeAdmissionIsoDateOrToday(emp.hireDate),
                     }));
                   }}
                 />

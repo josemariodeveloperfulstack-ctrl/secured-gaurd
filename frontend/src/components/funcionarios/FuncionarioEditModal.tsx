@@ -36,7 +36,7 @@ import { Search, User as UserIcon, Building, Briefcase, Plus, FileText } from 'l
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import { useToast } from '@/hooks/use-toast';
 import workPostService, { WorkPost } from '@/services/workPostService';
-import departmentService, { Department } from '@/services/departmentService';
+import departmentService, { Department, filterCompanyDepartments } from '@/services/departmentService';
 import { clientService, Client as ClientDTO } from '@/services/clientService';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -555,7 +555,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             let id = wp?.id ?? (employeeData as any).workPostId;
             return (id != null && id !== '') ? String(id) : '';
           })(),
-          departmentId: (employeeData as any).department?.id || (employeeData as any).departmentId || '',
+          departmentId: String((employeeData as any).department?.id || (employeeData as any).departmentId || ''),
 
           // Explicitly set fields that might be overwritten by `...employeeData` if they are objects or need specific formatting
           address: addressValue, // Ensure address is handled correctly
@@ -977,7 +977,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       setFilteredUsers(usersData);
       setCompanies(companiesData);
       setWorkPosts(workPostsData);
-      setDepartments(departmentsData);
+      setDepartments(filterCompanyDepartments(departmentsData));
       setClients(clientsData);
       
       // Carregar médicos
@@ -3331,7 +3331,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Informações Profissionais</h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Número de Registro</span>
@@ -3367,7 +3367,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 </Select>
               </div>
                         {form.status === 'TERMINATED' && (
-                          <div className="md:col-span-2 bg-red-900/20 border border-red-500/40 rounded-lg p-3 sm:p-4">
+                          <div className="md:col-span-3 bg-red-900/20 border border-red-500/40 rounded-lg p-3 sm:p-4">
                             <p className="text-red-300 text-sm sm:text-base flex items-center gap-2">
                               <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                               Ao definir o status como Demitido, é obrigatório informar a Data de Demissão na seção de Dados de Cadastro / Admissão.
@@ -3389,6 +3389,25 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
               </div>
               <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Departamento</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                            <SearchableSelect
+                              options={departments.map((d) => ({
+                                value: String(d.id),
+                                label: d.name,
+                                description: d.description || '',
+                              }))}
+                              value={form.departmentId || ''}
+                              onChange={(val) => setForm(prev => ({ ...prev, departmentId: val || undefined }))}
+                              placeholder={loadingData ? 'Carregando departamentos...' : 'Selecione um departamento'}
+                              searchPlaceholder="Buscar departamento..."
+                              emptyPlaceholder={loadingData ? 'Carregando...' : 'Nenhum departamento cadastrado'}
+                              disabled={loadingData}
+                            />
+              </div>
+              <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Cliente</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
@@ -3401,7 +3420,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               value={selectedClientId}
                               onChange={async (val) => {
                                 setSelectedClientId(val);
-                                setForm(prev => ({ ...(prev as any), departmentId: '' }));
+                                setForm(prev => ({ ...prev, workPostId: '' }));
                                 setFilteredWorkPosts([]);
                                 if (val) {
                                   setLoadingWorkPosts(true);
@@ -3438,8 +3457,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                 label: wp.name,
                                 description: wp.clientName ? `Cliente: ${wp.clientName}` : (wp.address || '')
                               }))}
-                              value={(form as any).departmentId || ''}
-                              onChange={(val) => setForm(prev => ({ ...(prev as any), departmentId: val }))}
+                              value={form.workPostId || ''}
+                              onChange={(val) => setForm(prev => ({ ...prev, workPostId: val || undefined }))}
                               placeholder={loadingWorkPosts ? 'Carregando setores...' : (selectedClientId ? 'Selecione o setor de trabalho' : 'Selecione um cliente primeiro')}
                               emptyMessage={selectedClientId ? 'Nenhum setor encontrado para este cliente' : 'Selecione um cliente para listar os setores'}
                             />

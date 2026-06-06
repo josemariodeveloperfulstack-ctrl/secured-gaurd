@@ -14,6 +14,7 @@ import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class AccountingFormStandardPdfService {
         private final CompanyRepository companyRepository;
         private final StandardReportLayoutService standardReportLayoutService;
         private final ExcelReportLayoutService excelReportLayoutService;
+        private final EmployeeDocumentDateResolver documentDateResolver;
 
         @Transactional(readOnly = true)
         public byte[] generateAccountingFormPdf(UUID employeeId) throws Exception {
@@ -53,15 +55,16 @@ public class AccountingFormStandardPdfService {
                 try {
                         UUID companyId = resolveCompanyId(company);
                         PdfWriter writer = new PdfWriter(baos);
-                        ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                        var layoutBuilder = ReportLayoutConfig.builder()
                                         .companyId(companyId)
                                         .reportTitle("FICHA DE CADASTRO DE FUNCIONÁRIO")
                                         .reportSubTitle("Para Departamento de Contabilidade")
                                         .topMargin(108f)
                                         .bottomMargin(60f)
                                         .leftMargin(22f)
-                                        .rightMargin(22f)
-                                        .build();
+                                        .rightMargin(22f);
+                        documentDateResolver.applyAdmissionDateFooter(layoutBuilder, employeeId);
+                        ReportLayoutConfig layoutConfig = layoutBuilder.build();
                         DocumentWithPdf docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
                         Document document = docWithPdf.getDocument();
 

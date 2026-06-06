@@ -44,7 +44,7 @@ public class NppsPdfController {
             UUID employeeId = request != null ? request.employeeId() : null;
             String employeeName = request != null ? request.employeeName() : null;
             String employeeCpf = request != null ? request.employeeCpf() : null;
-            byte[] pdf = nppsStandardPdfService.generatePdf(companyId, employeeName, employeeCpf);
+            byte[] pdf = nppsStandardPdfService.generatePdf(companyId, employeeId, employeeName, employeeCpf);
 
             Map<String, Object> dados = new LinkedHashMap<>();
             if (employeeName != null) dados.put("employeeName", employeeName);
@@ -77,9 +77,10 @@ public class NppsPdfController {
     public ResponseEntity<byte[]> previewPdf(@RequestBody(required = false) NppsRequest request) throws IOException {
         try {
             UUID companyId = request != null ? request.companyId() : null;
+            UUID employeeId = request != null ? request.employeeId() : null;
             String employeeName = request != null ? request.employeeName() : null;
             String employeeCpf = request != null ? request.employeeCpf() : null;
-            byte[] pdf = nppsStandardPdfService.generatePdf(companyId, employeeName, employeeCpf);
+            byte[] pdf = nppsStandardPdfService.generatePdf(companyId, employeeId, employeeName, employeeCpf);
 
 
             return ResponseEntity.ok()

@@ -37,10 +37,6 @@ public class LGPDConsentPdfController {
     public ResponseEntity<byte[]> generatePdf(@RequestBody LGPDConsentRequest request) throws IOException {
         log.info("📄 PDF LGPD - Employee: {}, Company: {}", request.getEmployeeId(), request.getCompanyId());
 
-        if (request.getConsentDate() == null) {
-            request.setConsentDate(LocalDate.now());
-        }
-
         byte[] pdfBytes = lgpdConsentPdfService.generatePdf(request);
         String filename = "termo-lgpd-" + LocalDate.now() + ".pdf";
 
@@ -63,10 +59,6 @@ public class LGPDConsentPdfController {
     @PostMapping("/preview-pdf")
     @Operation(summary = "Visualizar PDF do Termo LGPD")
     public ResponseEntity<byte[]> previewPdf(@RequestBody LGPDConsentRequest request) throws IOException {
-        if (request.getConsentDate() == null) {
-            request.setConsentDate(LocalDate.now());
-        }
-
         byte[] pdfBytes = lgpdConsentPdfService.generatePdf(request);
 
         return ResponseEntity.ok()
@@ -78,10 +70,6 @@ public class LGPDConsentPdfController {
     @PostMapping("/generate-excel")
     @Operation(summary = "Gerar Excel do Termo LGPD")
     public ResponseEntity<byte[]> generateExcel(@RequestBody LGPDConsentRequest request) throws IOException {
-        if (request.getConsentDate() == null) {
-            request.setConsentDate(LocalDate.now());
-        }
-
         byte[] excelBytes = lgpdConsentPdfService.generateExcel(request);
         String filename = "termo-lgpd-" + LocalDate.now() + ".xlsx";
 

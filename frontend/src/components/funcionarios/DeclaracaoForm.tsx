@@ -18,6 +18,7 @@ import { SimpleEmployee } from '@/services/employeeService';
 
 import api from '@/lib/axios';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
+import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 
 interface DeclaracaoFormProps {
   employeeId?: string;
@@ -32,7 +33,7 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
     dataFim: '',
     ultimoDiaTrabalho: '',
     cidadeEmissao: 'Contagem',
-    dataEmissao: new Date().toISOString().split('T')[0],
+    dataEmissao: employeeAdmissionIsoDateOrToday(),
     observacoes: '',
     tipoDeclaracao: 'CIPA_TRANSPES', // Default type
   });
@@ -272,7 +273,8 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
                     setForm(prev => ({
                       ...prev,
                       funcionarioId: emp.id,
-                      empresaId: emp.companyId || prev.empresaId
+                      empresaId: emp.companyId || prev.empresaId,
+                      dataEmissao: employeeAdmissionIsoDateOrToday(emp.hireDate),
                     }));
                   }}
                 />

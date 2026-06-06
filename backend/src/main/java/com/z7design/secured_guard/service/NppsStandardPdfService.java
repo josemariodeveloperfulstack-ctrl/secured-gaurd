@@ -10,6 +10,7 @@ import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -32,21 +33,24 @@ public class NppsStandardPdfService {
 
     private final StandardReportLayoutService standardReportLayoutService;
     private final CompanyRepository companyRepository;
+    private final EmployeeDocumentDateResolver documentDateResolver;
 
     private static final String REPORT_TITLE = "NPPS – Norma e Procedimento do Posto de Serviço";
 
-    public byte[] generatePdf(UUID companyId, String employeeName, String employeeCpf) {
+    public byte[] generatePdf(UUID companyId, UUID employeeId, String employeeName, String employeeCpf) {
 
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             PdfWriter writer = new PdfWriter(outputStream);
 
             UUID resolvedCompanyId = resolveCompanyId(companyId);
+            LocalDate documentDate = documentDateResolver.resolveDocumentDateOrToday(employeeId, null);
 
-            ReportLayoutConfig config = ReportLayoutConfig.builder()
+            var configBuilder = ReportLayoutConfig.builder()
                     .companyId(resolvedCompanyId)
                     .reportTitle(REPORT_TITLE)
-                    .includeEmailInFooter(true)
-                    .build();
+                    .includeEmailInFooter(true);
+            documentDateResolver.applyAdmissionDateFooter(configBuilder, employeeId);
+            ReportLayoutConfig config = configBuilder.build();
 
             StandardReportLayoutService.DocumentWithPdf docWithPdf =
                     standardReportLayoutService.createDocumentWithLayout(writer, config);
@@ -54,7 +58,7 @@ public class NppsStandardPdfService {
             Document document = docWithPdf.getDocument();
             Company company = docWithPdf.getCompany();
 
-            addContent(document, company, employeeName, employeeCpf);
+            addContent(document, company, employeeName, employeeCpf, documentDate);
 
 
             document.close();
@@ -83,7 +87,8 @@ public class NppsStandardPdfService {
         throw new RuntimeException("Não foi possível determinar a empresa para o relatório NPPS.");
     }
 
-    private void addContent(Document document, Company company, String employeeName, String employeeCpf) {
+    private void addContent(Document document, Company company, String employeeName, String employeeCpf,
+            LocalDate documentDate) {
 
         // Prefácio
         document.add(createSectionHeader("Prefácio"));
@@ -213,8 +218,10 @@ public class NppsStandardPdfService {
         String city = company != null && company.getCity() != null
                 ? company.getCity()
                 : "________________";
-        String date = LocalDate.now().format(
+        LocalDate effectiveDate = documentDate != null ? documentDate : LocalDate.now();
+        String date = effectiveDate.format(
                 DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new Locale("pt", "BR")));
+        String shortDate = effectiveDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy", new Locale("pt", "BR")));
 
         Paragraph dateLoc = new Paragraph(city + ", " + date)
                 .setTextAlignment(TextAlignment.RIGHT)
@@ -235,7 +242,8 @@ public class NppsStandardPdfService {
                     .add(new Paragraph("_________________________________").setTextAlignment(TextAlignment.CENTER))
                     .add(new Paragraph("Nome: " + nameVal).setTextAlignment(TextAlignment.CENTER).setFontSize(8))
                     .add(new Paragraph("CPF n.º: " + cpfVal).setTextAlignment(TextAlignment.CENTER).setFontSize(8))
-                    .add(new Paragraph("Data: ____/____/______").setTextAlignment(TextAlignment.CENTER).setFontSize(8));
+                    .add(new Paragraph("Data: " + (i == 0 ? shortDate : "____/____/______"))
+                            .setTextAlignment(TextAlignment.CENTER).setFontSize(8));
             signatures.addCell(p.setMarginTop(5).setMarginBottom(10));
         }
 

@@ -24,6 +24,7 @@ import api from '@/lib/axios';
 import { resolveCompanySigningCity } from '@/utils/resolveCompanySigningCity';
 import { formatEmployeeFullAddress } from '@/utils/formatEmployeeAddress';
 import { useInvalidateDocumentosGerados } from '@/hooks/queries/useDocumentosGerados';
+import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 
 interface ContratosTrabalhoFormProps {
   employeeId?: string;
@@ -387,7 +388,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
       workHoursDescription: '44 horas semanais', // Placeholder or add form field if exists
       workSchedule: form.workSchedule || 'a definir',
       city: cidadeContrato,
-      contractDate: new Date().toISOString().split('T')[0],
+      contractDate: form.startDate || employeeAdmissionIsoDateOrToday(fullEmployee.hireDate),
       contractKind: pdfKind,
       experienceDurationDays: isExperiencia && form.experienceDuration
         ? parseInt(form.experienceDuration, 10)

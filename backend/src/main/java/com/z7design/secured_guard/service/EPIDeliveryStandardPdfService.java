@@ -20,6 +20,7 @@ import com.z7design.secured_guard.model.EPIDeliveryForm;
 import com.z7design.secured_guard.model.EPIDeliveryFormItem;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,7 @@ public class EPIDeliveryStandardPdfService {
         private final CompanyRepository companyRepository;
         private final StandardReportLayoutService standardReportLayoutService;
         private final ExcelReportLayoutService excelReportLayoutService;
+        private final EmployeeDocumentDateResolver documentDateResolver;
 
         public byte[] generateEPIDeliveryPdf(UUID employeeId, UUID companyId, LocalDate deliveryDate,
                         UUID responsibleEmployeeId, String observations) throws Exception {
@@ -71,14 +73,15 @@ public class EPIDeliveryStandardPdfService {
 
                 try {
                         PdfWriter writer = new PdfWriter(baos);
-                        ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                        var layoutBuilder = ReportLayoutConfig.builder()
                                         .companyId(company.getId())
                                         .reportTitle("FICHA DE ENTREGA DE EPI")
                                         .topMargin(120f)
                                         .bottomMargin(80f)
                                         .leftMargin(50f)
-                                        .rightMargin(50f)
-                                        .build();
+                                        .rightMargin(50f);
+                        documentDateResolver.applyAdmissionDateFooter(layoutBuilder, employeeId);
+                        ReportLayoutConfig layoutConfig = layoutBuilder.build();
 
                         docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
                         Document document = docWithPdf.getDocument();
@@ -133,8 +136,10 @@ public class EPIDeliveryStandardPdfService {
                                 document.add(obs);
                         }
 
+                        LocalDate emissionDate = documentDateResolver.resolveDocumentDateOrToday(
+                                        employeeId, employee.getHireDate());
                         Paragraph date = new Paragraph(
-                                        "Data de Emissão: " + LocalDate.now()
+                                        "Data de Emissão: " + emissionDate
                                                         .format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
                                         .setFontSize(9)
                                         .setTextAlignment(TextAlignment.RIGHT)
@@ -163,15 +168,16 @@ public class EPIDeliveryStandardPdfService {
 
                 try {
                         PdfWriter writer = new PdfWriter(baos);
-                        ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                        var layoutBuilder = ReportLayoutConfig.builder()
                                         .companyId(company.getId())
                                         .reportTitle(null) // Título manual para seguir a imagem
                                         .topMargin(40f)
                                         .bottomMargin(40f)
                                         .leftMargin(40f)
                                         .rightMargin(40f)
-                                        .includeEmailInFooter(true)
-                                        .build();
+                                        .includeEmailInFooter(true);
+                        documentDateResolver.applyAdmissionDateFooter(layoutBuilder, employee.getId());
+                        ReportLayoutConfig layoutConfig = layoutBuilder.build();
 
                         docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
                         Document document = docWithPdf.getDocument();
@@ -482,15 +488,16 @@ public class EPIDeliveryStandardPdfService {
 
                 try {
                         PdfWriter writer = new PdfWriter(baos);
-                        ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                        var layoutBuilder = ReportLayoutConfig.builder()
                                         .companyId(company.getId())
                                         .reportTitle(null)
                                         .topMargin(40f)
                                         .bottomMargin(40f)
                                         .leftMargin(40f)
                                         .rightMargin(40f)
-                                        .includeEmailInFooter(true)
-                                        .build();
+                                        .includeEmailInFooter(true);
+                        documentDateResolver.applyAdmissionDateFooter(layoutBuilder, employeeId);
+                        ReportLayoutConfig layoutConfig = layoutBuilder.build();
 
                         docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
                         Document document = docWithPdf.getDocument();

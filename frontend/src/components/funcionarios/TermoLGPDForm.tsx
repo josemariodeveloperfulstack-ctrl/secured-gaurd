@@ -24,6 +24,7 @@ import {
   formatEmployeeAddressForLgpdVig,
   isVigilanciaCompany,
 } from '@/utils/formatEmployeeAddress';
+import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 
 interface TermoLGPDFormProps {
   employeeId?: string;
@@ -39,7 +40,7 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
     dataUsage: '',
     dataRetention: '',
     additionalInfo: '',
-    consentDate: new Date().toISOString().split('T')[0],
+    consentDate: employeeAdmissionIsoDateOrToday(),
   });
 
   const [loading, setLoading] = useState(false);
@@ -85,6 +86,10 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
               escalaTrabalho: emp.escalaTrabalho,
               horarioTrabalho: emp.horarioTrabalho,
             } as SimpleEmployee);
+            setFormData(prev => ({
+              ...prev,
+              consentDate: employeeAdmissionIsoDateOrToday(emp.hireDate),
+            }));
           }
         } catch (error) {
           console.error("Erro ao carregar dados iniciais do funcionário:", error);
@@ -325,7 +330,8 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
                     setFormData(prev => ({
                       ...prev,
                       funcionarioId: emp.id,
-                      empresaId: emp.companyId || prev.empresaId
+                      empresaId: emp.companyId || prev.empresaId,
+                      consentDate: employeeAdmissionIsoDateOrToday(emp.hireDate),
                     }));
                   }}
                 />

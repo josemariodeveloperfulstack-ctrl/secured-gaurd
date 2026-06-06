@@ -11,6 +11,7 @@ import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.OperationalServiceOrderRequest;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.extern.slf4j.Slf4j;
@@ -26,23 +27,30 @@ import java.util.Locale;
 public class OsStandardPdfService {
 
         private final StandardReportLayoutService pdfLayoutService;
+        private final EmployeeDocumentDateResolver documentDateResolver;
 
-        public OsStandardPdfService(StandardReportLayoutService pdfLayoutService) {
+        public OsStandardPdfService(StandardReportLayoutService pdfLayoutService,
+                        EmployeeDocumentDateResolver documentDateResolver) {
                 this.pdfLayoutService = pdfLayoutService;
+                this.documentDateResolver = documentDateResolver;
         }
 
         private static final String REPORT_TITLE = "ORDEM DE SERVIÇO";
 
         public byte[] generatePdf(OperationalServiceOrderRequest request) {
+                LocalDate documentDate = documentDateResolver.resolveDocumentDateOrToday(
+                                request.getEmployeeId(), request.getDocumentDate());
+                request.setDocumentDate(documentDate);
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                         PdfWriter writer = new PdfWriter(outputStream);
 
-                        ReportLayoutConfig config = ReportLayoutConfig.builder()
+                        var configBuilder = ReportLayoutConfig.builder()
                                         .companyId(request.getCompanyId())
                                         .reportTitle(REPORT_TITLE)
                                         .includeEmailInFooter(true)
-                                        .marginExtraTop(-35f)
-                                        .build();
+                                        .marginExtraTop(-35f);
+                        documentDateResolver.applyAdmissionDateFooter(configBuilder, request.getEmployeeId());
+                        ReportLayoutConfig config = configBuilder.build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
                         Document document = docWithPdf.getDocument();
@@ -193,7 +201,8 @@ public class OsStandardPdfService {
                 String city = request.getCity() != null ? request.getCity()
                                 : (company.getCity() != null ? company.getCity() : "_______________");
                 String date = formatDate(
-                                request.getDocumentDate() != null ? request.getDocumentDate() : LocalDate.now());
+                                documentDateResolver.resolveDocumentDateOrToday(
+                                                request.getEmployeeId(), request.getDocumentDate()));
 
                 Paragraph dateLoc = new Paragraph(city + ", " + date)
                                 .setTextAlignment(TextAlignment.LEFT)

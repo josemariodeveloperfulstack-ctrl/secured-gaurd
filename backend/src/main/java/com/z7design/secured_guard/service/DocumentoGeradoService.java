@@ -296,7 +296,9 @@ public class DocumentoGeradoService {
         // Dados da empresa
         dadosCompletos.put("empresa", "Secure Guard"); // TODO: Buscar da configuração
         dadosCompletos.put("cnpj", "00.000.000/0001-00"); // TODO: Buscar da configuração
-        dadosCompletos.put("data_atual", LocalDateTime.now().toLocalDate());
+        dadosCompletos.put("data_atual", funcionario.getHireDate() != null
+                ? funcionario.getHireDate()
+                : LocalDateTime.now().toLocalDate());
 
         // Sobrescrever com dados manuais se fornecidos
         if (dadosManuais != null) {

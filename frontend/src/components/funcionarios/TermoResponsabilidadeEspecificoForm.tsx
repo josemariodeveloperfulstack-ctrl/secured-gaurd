@@ -13,6 +13,7 @@ import { Company } from '@/types/company';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
+import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 
 
 const documentTypes = [
@@ -33,7 +34,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
         empresaId: companyId || '',
         documentTypeId: 'BH_BUS',
         identificador: '', // Número do cartão
-        dataEntrega: new Date().toISOString().split('T')[0],
+        dataEntrega: employeeAdmissionIsoDateOrToday(),
     });
 
     const [loading, setLoading] = useState(false);
@@ -281,9 +282,12 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                                 }}
                                 onEmployeeSelect={(emp) => {
                                     setSelectedEmployeeData(emp);
-                                    if (emp.companyId) {
-                                        setForm(prev => ({ ...prev, empresaId: emp.companyId! }));
-                                    }
+                                    setForm(prev => ({
+                                        ...prev,
+                                        funcionarioId: emp.id,
+                                        dataEntrega: employeeAdmissionIsoDateOrToday(emp.hireDate),
+                                        ...(emp.companyId ? { empresaId: emp.companyId } : {}),
+                                    }));
                                 }}
                             />
                             {selectedFunc && (

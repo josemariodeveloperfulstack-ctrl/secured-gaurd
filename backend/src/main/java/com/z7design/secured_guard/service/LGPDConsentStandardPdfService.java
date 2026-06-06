@@ -19,6 +19,7 @@ import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.util.EmployeeDataFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,20 +44,25 @@ public class LGPDConsentStandardPdfService {
         private final ExcelReportLayoutService excelLayoutService;
         private final CompanyRepository companyRepository;
         private final EmployeeRepository employeeRepository;
+        private final EmployeeDocumentDateResolver documentDateResolver;
 
         private static final String REPORT_TITLE = "";
         private static final String VARIANT_VIGILANCIA = "VIGILANCIA";
 
         public byte[] generatePdf(LGPDConsentRequest request) {
                 enrichFromEmployee(request);
+                LocalDate documentDate = documentDateResolver.resolveDocumentDateOrToday(
+                                request.getEmployeeId(), request.getConsentDate());
+                request.setConsentDate(documentDate);
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                         PdfWriter writer = new PdfWriter(outputStream);
 
-                        ReportLayoutConfig config = ReportLayoutConfig.builder()
+                        var configBuilder = ReportLayoutConfig.builder()
                                         .companyId(request.getCompanyId())
                                         .reportTitle(REPORT_TITLE)
-                                        .includeEmailInFooter(true)
-                                        .build();
+                                        .includeEmailInFooter(true);
+                        documentDateResolver.applyAdmissionDateFooter(configBuilder, request.getEmployeeId());
+                        ReportLayoutConfig config = configBuilder.build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
                         Document document = docWithPdf.getDocument();
@@ -134,6 +140,9 @@ public class LGPDConsentStandardPdfService {
                 }
                 if (request.getEmployeeFullAddress() == null || request.getEmployeeFullAddress().isBlank()) {
                         request.setEmployeeFullAddress(EmployeeDataFormatter.formatAddressForLgpdVig(employee));
+                }
+                if (employee.getHireDate() != null) {
+                        request.setConsentDate(employee.getHireDate());
                 }
         }
 
@@ -376,7 +385,8 @@ public class LGPDConsentStandardPdfService {
                                 : (company != null && company.getCity() != null ? company.getCity()
                                                 : "Contagem");
 
-                LocalDate dateObj = request.getDate() != null ? request.getDate() : LocalDate.now();
+                LocalDate dateObj = documentDateResolver.resolveDocumentDateOrToday(
+                                request.getEmployeeId(), request.getDate());
                 String dateStr = dateObj.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
 
                 document.add(new Paragraph(city + ", " + dateStr)

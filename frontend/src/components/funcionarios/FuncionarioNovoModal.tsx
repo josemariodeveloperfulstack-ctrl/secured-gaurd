@@ -10,7 +10,7 @@ import { employeeService } from '@/services/employeeService';
 import { CreateEmployeeDTO, Employee } from '@/types/employee';
 import { positionService, Position } from '@/services/positionService';
 import workPostService, { WorkPost } from '@/services/workPostService';
-import departmentService, { Department } from '@/services/departmentService';
+import departmentService, { Department, filterCompanyDepartments } from '@/services/departmentService';
 import { unitService, Unit } from '@/services/unitService';
 import { userService } from '@/services/userService';
 import { User } from '@/types/user';
@@ -24,7 +24,7 @@ import { DependentFormModal } from '@/components/dependentes/DependentFormModal'
 import dependentService from '@/services/dependentService';
 import { Dependent, DependentCreateRequest } from '@/types/dependent';
 import { useToast } from '@/hooks/use-toast';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/hooks/queries';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
@@ -45,6 +45,7 @@ import { hasPermission } from '@/utils/permissions';
 import { employeeChangeHistoryService, EmployeeChangeHistoryPage } from '@/services/employeeChangeHistoryService';
 import { DismissalReasonSelect } from '@/components/funcionarios/DismissalReasonSelect';
 import { DatePicker } from '@/components/ui/date-picker';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { parseDateFromBackend, formatDateForBackend } from '@/utils/dateUtils';
 import { useDebounce } from '@/hooks/use-debounce';
 import {
@@ -136,7 +137,8 @@ const initialState: CreateEmployeeDTO = {
   // Campos da planilha
   rgUf: '',
   racaCor: '',
-  tipoSalarioContratual: ''
+  tipoSalarioContratual: '',
+  departmentId: '',
 };
 
 const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClose, onCreated, employeeToEdit }) => {
@@ -314,8 +316,13 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [loadingData, setLoadingData] = useState(false);
+  const { data: departments = [], isLoading: departmentsLoading } = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => departmentService.listActive(),
+    enabled: open,
+    select: filterCompanyDepartments,
+  });
 
   // Estados para busca e filtros
   const [userSearchTerm, setUserSearchTerm] = useState('');
@@ -691,7 +698,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
         // Campos relacionais - workPost pode vir como objeto { id, name } ou workPostId
         workPostId: (employeeToEdit as any).workPostId || (employeeToEdit as any).workPost?.id || '',
-        departmentId: (employeeToEdit as any).departmentId || (employeeToEdit as any).department?.id || ''
+        departmentId: String((employeeToEdit as any).departmentId || (employeeToEdit as any).department?.id || '')
       });
 
       setTemIntervaloAlmoco(employeeToEdit.horarioTrabalhoIntervalo ? 'sim' : 'nao');
@@ -823,19 +830,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       loadDoctors();
     }
   }, [open]);
-
-  // Carregar Departamentos
-  useEffect(() => {
-    const loadDepartments = async () => {
-      try {
-        const deps = await departmentService.listActive();
-        setDepartments(deps);
-      } catch (e) {
-        console.error('Erro ao carregar departamentos', e);
-      }
-    };
-    loadDepartments();
-  }, []);
 
   // Função para carregar Postos de Trabalho (pode ser filtrado por empresa)
   const loadWorkPostsData = async (companyId?: string) => {
@@ -3716,7 +3710,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Informações Profissionais</h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Número de Registro</span>
@@ -3752,7 +3746,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                           </Select>
                         </div>
                         {form.status === 'TERMINATED' && (
-                          <div className="md:col-span-2 bg-red-900/20 border border-red-500/40 rounded-lg p-3 sm:p-4">
+                          <div className="md:col-span-3 bg-red-900/20 border border-red-500/40 rounded-lg p-3 sm:p-4">
                             <p className="text-red-300 text-sm sm:text-base flex items-center gap-2">
                               <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                               Ao definir o status como Demitido, é obrigatório informar a Data de Demissão na seção de Dados de Cadastro / Admissão.
@@ -3777,21 +3771,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             <span className="truncate">Departamento</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Select
-                            value={(form as any).departmentId || ''}
-                            onValueChange={(value) => setForm(prev => ({ ...(prev as any), departmentId: value }))}
-                          >
-                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                              <SelectValue placeholder="Selecione um departamento" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                              {departments.map((d) => (
-                                <SelectItem key={d.id} value={d.id} className="hover:bg-gray-700">
-                                  {d.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <SearchableSelect
+                            options={departments.map((d: Department) => ({
+                              value: String(d.id),
+                              label: d.name,
+                              description: d.description || '',
+                            }))}
+                            value={form.departmentId || ''}
+                            onChange={(value) => setForm(prev => ({ ...prev, departmentId: value || undefined }))}
+                            placeholder={departmentsLoading ? 'Carregando departamentos...' : 'Selecione um departamento'}
+                            searchPlaceholder="Buscar departamento..."
+                            emptyPlaceholder={departmentsLoading ? 'Carregando...' : 'Nenhum departamento cadastrado'}
+                            disabled={departmentsLoading}
+                          />
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">

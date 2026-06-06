@@ -9,6 +9,26 @@ export interface Department {
   isActive?: boolean;
 }
 
+/** Nomes que não devem aparecer como departamento (dados legados/incorretos). */
+const INVALID_DEPARTMENT_NAMES = new Set([
+  'SOLTEIRO',
+  'CASADO',
+  'DIVORCIADO',
+  'VIUVO',
+  'VIÚVO',
+  'UNIAO ESTAVEL',
+  'UNIÃO ESTÁVEL',
+  'SEPARADO',
+  'OUTROS',
+]);
+
+export function filterCompanyDepartments(departments: Department[]): Department[] {
+  return departments.filter((department) => {
+    const name = department.name?.trim().toUpperCase() ?? '';
+    return name.length > 0 && !INVALID_DEPARTMENT_NAMES.has(name);
+  });
+}
+
 export const departmentService = {
   async listActive(): Promise<Department[]> {
     const { data } = await api.get('/api/departments/active');

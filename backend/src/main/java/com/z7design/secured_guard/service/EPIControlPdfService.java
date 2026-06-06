@@ -20,6 +20,7 @@ import com.z7design.secured_guard.model.PersonalProtectiveEquipment;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EPIDeliveryRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,7 @@ public class EPIControlPdfService {
     private final EmployeeRepository employeeRepository;
     private final CompanyRepository companyRepository;
     private final StandardReportLayoutService standardReportLayoutService;
+    private final EmployeeDocumentDateResolver documentDateResolver;
 
     /**
      * Gera PDF de controle/recibo de EPI para um registro (grupo de entregas).
@@ -77,11 +79,12 @@ public class EPIControlPdfService {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (PdfWriter writer = new PdfWriter(baos)) {
-            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+            var layoutBuilder = ReportLayoutConfig.builder()
                     .companyId(company.getId())
                     .reportTitle("RECIBO DE EQUIPAMENTO DE PROTEÇÃO INDIVIDUAL (EPI)")
-                    .includeEmailInFooter(true)
-                    .build();
+                    .includeEmailInFooter(true);
+            documentDateResolver.applyAdmissionDateFooter(layoutBuilder, employee.getId());
+            ReportLayoutConfig layoutConfig = layoutBuilder.build();
 
             DocumentWithPdf docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
             Document document = docWithPdf.getDocument();
@@ -181,7 +184,8 @@ public class EPIControlPdfService {
 
     private void addSignatures(Document document, Employee employee, Company company) {
         String city = company.getCity() != null ? company.getCity() : "_______________";
-        String date = LocalDate.now()
+        LocalDate docDate = documentDateResolver.resolveDocumentDateOrToday(employee.getId(), null);
+        String date = docDate
                 .format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new Locale("pt", "BR")));
 
         Paragraph dateLoc = new Paragraph(city + ", " + date)

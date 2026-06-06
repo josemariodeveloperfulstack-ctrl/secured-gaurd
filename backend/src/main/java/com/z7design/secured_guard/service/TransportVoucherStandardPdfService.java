@@ -16,6 +16,7 @@ import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,7 @@ public class TransportVoucherStandardPdfService {
     private final ExcelReportLayoutService excelLayoutService;
     private final CompanyRepository companyRepository;
     private final EmployeeRepository employeeRepository;
+    private final EmployeeDocumentDateResolver documentDateResolver;
 
     private static final String REPORT_TITLE = "DECLARAÇÃO E TERMO DE COMPROMISSO\nPARA ADQUIRIR OU NÃO O VALE-TRANSPORTE";
     private static final DateTimeFormatter BR_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy", new Locale("pt", "BR"));
@@ -48,12 +50,13 @@ public class TransportVoucherStandardPdfService {
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             PdfWriter writer = new PdfWriter(outputStream);
 
-            ReportLayoutConfig config = ReportLayoutConfig.builder()
+            var configBuilder = ReportLayoutConfig.builder()
                     .companyId(ctx.companyId())
                     .reportTitle(REPORT_TITLE)
                     .includeEmailInFooter(true)
-                    .topMargin(110f)
-                    .build();
+                    .topMargin(110f);
+            documentDateResolver.applyAdmissionDateFooter(configBuilder, request.getEmployeeId());
+            ReportLayoutConfig config = configBuilder.build();
 
             DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
             Document document = docWithPdf.getDocument();
@@ -196,9 +199,7 @@ public class TransportVoucherStandardPdfService {
             request.setEmployeeAddress(buildEmployeeAddress(employee));
         }
         if (employee.getHireDate() != null) {
-            if (request.getDocumentDate() == null) {
-                request.setDocumentDate(employee.getHireDate());
-            }
+            request.setDocumentDate(employee.getHireDate());
             if (isBlank(request.getHireDate())) {
                 request.setHireDate(employee.getHireDate().toString());
             }
@@ -355,15 +356,18 @@ public class TransportVoucherStandardPdfService {
     }
 
     private LocalDate resolveSignatureDate(TransportVoucherRequest request, Employee employee) {
+        if (employee != null && employee.getHireDate() != null) {
+            return employee.getHireDate();
+        }
+        if (request.getEmployeeId() != null) {
+            return documentDateResolver.resolveDocumentDateOrToday(request.getEmployeeId(), request.getDocumentDate());
+        }
         if (request.getDocumentDate() != null) {
             return request.getDocumentDate();
         }
         LocalDate fromHire = parseFlexibleDate(request.getHireDate());
         if (fromHire != null) {
             return fromHire;
-        }
-        if (employee != null && employee.getHireDate() != null) {
-            return employee.getHireDate();
         }
         return LocalDate.now();
     }

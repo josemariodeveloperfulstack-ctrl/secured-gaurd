@@ -13,6 +13,7 @@ import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.RequiredArgsConstructor;
@@ -38,12 +39,16 @@ public class EquipmentResponsibilityStandardPdfService {
         private final StandardReportLayoutService pdfLayoutService;
         private final ExcelReportLayoutService excelLayoutService;
         private final CompanyRepository companyRepository;
+        private final EmployeeDocumentDateResolver documentDateResolver;
 
         private static final String REPORT_TITLE = "Termo de Responsabilidade - Equipamentos";
         /** Margem superior quando o título fica no corpo (sem título fixo no cabeçalho do layout). */
         private static final float VT_TERM_TOP_MARGIN_PT = 68f;
 
         public byte[] generatePdf(EquipmentResponsibilityRequest request) {
+                LocalDate documentDate = documentDateResolver.resolveDocumentDateOrToday(
+                                request.getEmployeeId(), request.getDocumentDate());
+                request.setDocumentDate(documentDate);
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                         PdfWriter writer = new PdfWriter(outputStream);
 
@@ -61,6 +66,7 @@ public class EquipmentResponsibilityStandardPdfService {
                         if (valeTransporteTerm) {
                                 layoutConfigBuilder.topMargin(VT_TERM_TOP_MARGIN_PT);
                         }
+                        documentDateResolver.applyAdmissionDateFooter(layoutConfigBuilder, request.getEmployeeId());
                         ReportLayoutConfig config = layoutConfigBuilder.build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
@@ -455,7 +461,8 @@ public class EquipmentResponsibilityStandardPdfService {
                 String city = request.getCity() != null ? request.getCity()
                                 : (company.getCity() != null ? company.getCity() : "_______________");
                 String date = formatDateExtended(
-                                request.getDocumentDate() != null ? request.getDocumentDate() : LocalDate.now());
+                                documentDateResolver.resolveDocumentDateOrToday(
+                                                request.getEmployeeId(), request.getDocumentDate()));
 
                 Paragraph dateLoc = new Paragraph(city + ", " + date)
                                 .setTextAlignment(TextAlignment.RIGHT)

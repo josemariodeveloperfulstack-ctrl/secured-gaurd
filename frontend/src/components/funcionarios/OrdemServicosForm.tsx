@@ -19,6 +19,7 @@ import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
+import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 import {
   applyOrdemServicoTemplate,
   findOrdemServicoTemplate,
@@ -251,12 +252,14 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
           location: wpResolved!.address || prev.location,
           position: full.position?.name || prev.position,
           hireDate: full.hireDate ? String(full.hireDate).split('T')[0] : prev.hireDate,
+          documentDate: employeeAdmissionIsoDateOrToday(full.hireDate),
         }));
       } else {
         setResolvedClientPreview(null);
         setForm((prev) => ({
           ...prev,
           hireDate: full.hireDate ? String(full.hireDate).split('T')[0] : prev.hireDate,
+          documentDate: employeeAdmissionIsoDateOrToday(full.hireDate),
         }));
       }
 
@@ -448,7 +451,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       description: form.description,
       observations: form.observations,
       city: form.city || empresa!.city || 'Contagem',
-      documentDate: form.documentDate || todayIso(),
+      documentDate: form.documentDate || employeeAdmissionIsoDateOrToday(fullEmployee.hireDate),
       responsibility: form.responsibility,
       employeeObligations: form.employeeObligations,
       revision: form.revision,

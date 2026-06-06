@@ -16,6 +16,7 @@ import { Company } from '@/types/company';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 import { SimpleEmployee, employeeService } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
+import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 
 
 interface TermoCienciaPrestadorFormProps {
@@ -28,7 +29,7 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
     funcionarioId: employeeId || '',
     empresaId: companyId || '',
     cidadeEmissao: 'Contagem/MG',
-    dataEmissao: new Date().toISOString().split('T')[0],
+    dataEmissao: employeeAdmissionIsoDateOrToday(),
     contractNumber: '',
     representativeName: '',
     observacoes: '',
@@ -239,7 +240,8 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
                     setForm(prev => ({
                       ...prev,
                       funcionarioId: emp.id,
-                      empresaId: emp.companyId || prev.empresaId
+                      empresaId: emp.companyId || prev.empresaId,
+                      dataEmissao: employeeAdmissionIsoDateOrToday(emp.hireDate),
                     }));
                   }}
                 />

@@ -19,6 +19,7 @@ import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
+import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 
 const equipamentosOptions = [
   'Notebook',
@@ -311,7 +312,8 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
                     setForm(prev => ({
                       ...prev,
                       funcionarioId: emp.id,
-                      empresaId: emp.companyId || prev.empresaId
+                      empresaId: emp.companyId || prev.empresaId,
+                      dataEntrega: employeeAdmissionIsoDateOrToday(emp.hireDate),
                     }));
                   }}
                 />

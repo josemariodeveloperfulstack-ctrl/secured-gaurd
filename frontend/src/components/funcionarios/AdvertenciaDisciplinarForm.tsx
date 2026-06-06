@@ -14,6 +14,7 @@ import { documentService } from '@/services/documentService';
 import { useToast } from '../ui/use-toast';
 import api from '@/lib/axios';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
+import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { Company } from '@/types/company';
 import { EmployeeCombobox } from '../ui/employee-combobox';
@@ -42,7 +43,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
     dataFaltas: '',
     dataRetorno: '',
     observacoes: '',
-    dataEmissao: new Date().toISOString().split('T')[0],
+    dataEmissao: employeeAdmissionIsoDateOrToday(),
   });
 
   const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
@@ -289,7 +290,8 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
                       setForm(prev => ({
                         ...prev,
                         funcionarioId: emp.id,
-                        empresaId: emp.companyId || prev.empresaId
+                        empresaId: emp.companyId || prev.empresaId,
+                        dataEmissao: employeeAdmissionIsoDateOrToday(emp.hireDate),
                       }));
                     }}
                   />

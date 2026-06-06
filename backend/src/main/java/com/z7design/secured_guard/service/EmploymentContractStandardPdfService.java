@@ -17,6 +17,7 @@ import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.util.EmployeeDataFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,7 @@ public class EmploymentContractStandardPdfService {
         private final ExcelReportLayoutService excelLayoutService;
         private final CompanyRepository companyRepository;
         private final EmployeeRepository employeeRepository;
+        private final EmployeeDocumentDateResolver documentDateResolver;
         private final ExperienceEmploymentContractTemplateLoader experienceTemplateLoader;
 
         private static final String REPORT_TITLE = "Contrato Individual de Trabalho";
@@ -55,12 +57,18 @@ public class EmploymentContractStandardPdfService {
 
         public byte[] generatePdf(EmploymentContractRequest request) {
                 enrichEmployeeAddress(request);
+                LocalDate admissionDate = documentDateResolver.resolveDocumentDateOrToday(
+                                request.getEmployeeId(),
+                                request.getAdmissionDate() != null ? request.getAdmissionDate()
+                                                : request.getContractDate());
+                request.setAdmissionDate(admissionDate);
+                request.setContractDate(admissionDate);
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                         PdfWriter writer = new PdfWriter(outputStream);
 
                         String reportTitle = resolveReportTitle(request);
 
-                        ReportLayoutConfig config = ReportLayoutConfig.builder()
+                        var configBuilder = ReportLayoutConfig.builder()
                                         .companyId(request.getCompanyId())
                                         .reportTitle(reportTitle)
                                         .topMargin(100f)
@@ -70,8 +78,9 @@ public class EmploymentContractStandardPdfService {
                                         .includeEmailInFooter(true)
                                         .removeBoldFromFooterCompanyName(true)
                                         .useCalibriLightFooter(true)
-                                        .footerCompanyNameFontSize(11f)
-                                        .build();
+                                        .footerCompanyNameFontSize(11f);
+                        documentDateResolver.applyAdmissionDateFooter(configBuilder, request.getEmployeeId());
+                        ReportLayoutConfig config = configBuilder.build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
                         Document document = docWithPdf.getDocument();
@@ -249,7 +258,8 @@ public class EmploymentContractStandardPdfService {
                 } else if (request.getContractDate() != null) {
                         dataContrato = request.getContractDate();
                 } else {
-                        dataContrato = LocalDate.now();
+                        dataContrato = documentDateResolver.resolveDocumentDateOrToday(
+                                        request.getEmployeeId(), null);
                 }
                 String cidade = resolveSigningCity(company, request);
                 String dataAssinatura = formatDate(dataContrato);
@@ -542,7 +552,10 @@ public class EmploymentContractStandardPdfService {
                 String resolved = resolveSigningCity(company, request);
                 String city = resolved.isEmpty() ? "_______________" : resolved;
                 String date = formatDateExtended(
-                                request.getContractDate() != null ? request.getContractDate() : LocalDate.now());
+                                documentDateResolver.resolveDocumentDateOrToday(
+                                                request.getEmployeeId(),
+                                                request.getAdmissionDate() != null ? request.getAdmissionDate()
+                                                                : request.getContractDate()));
 
                 Paragraph dateLoc = new Paragraph(city + ", " + date)
                                 .setTextAlignment(TextAlignment.RIGHT)
@@ -727,6 +740,10 @@ public class EmploymentContractStandardPdfService {
                 String fullAddress = EmployeeDataFormatter.formatFullAddress(employee);
                 if (!fullAddress.isBlank()) {
                         request.setEmployeeAddress(fullAddress);
+                }
+                if (employee.getHireDate() != null) {
+                        request.setAdmissionDate(employee.getHireDate());
+                        request.setContractDate(employee.getHireDate());
                 }
         }
 }

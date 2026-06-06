@@ -13,6 +13,7 @@ import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.RequiredArgsConstructor;
@@ -36,18 +37,23 @@ public class ServiceProviderAwarenessStandardPdfService {
         private final StandardReportLayoutService pdfLayoutService;
         private final ExcelReportLayoutService excelLayoutService;
         private final CompanyRepository companyRepository;
+        private final EmployeeDocumentDateResolver documentDateResolver;
 
         private static final String REPORT_TITLE = "Termo de Ciência - Prestador de Serviços";
 
         public byte[] generatePdf(ServiceProviderAwarenessRequest request) {
+                LocalDate documentDate = documentDateResolver.resolveDocumentDateOrToday(
+                                request.getEmployeeId(), request.getDocumentDate());
+                request.setDocumentDate(documentDate);
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                         PdfWriter writer = new PdfWriter(outputStream);
 
-                        ReportLayoutConfig config = ReportLayoutConfig.builder()
+                        var configBuilder = ReportLayoutConfig.builder()
                                         .companyId(request.getCompanyId())
                                         .reportTitle(REPORT_TITLE)
-                                        .includeEmailInFooter(true)
-                                        .build();
+                                        .includeEmailInFooter(true);
+                        documentDateResolver.applyAdmissionDateFooter(configBuilder, request.getEmployeeId());
+                        ReportLayoutConfig config = configBuilder.build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
                         Document document = docWithPdf.getDocument();
@@ -167,7 +173,8 @@ public class ServiceProviderAwarenessStandardPdfService {
                 String city = request.getCity() != null ? request.getCity()
                                 : (company.getCity() != null ? company.getCity() : "_______________");
                 String date = formatDateExtended(
-                                request.getDocumentDate() != null ? request.getDocumentDate() : LocalDate.now());
+                                documentDateResolver.resolveDocumentDateOrToday(
+                                                request.getEmployeeId(), request.getDocumentDate()));
 
                 Paragraph dateLoc = new Paragraph(city + ", " + date)
                                 .setTextAlignment(TextAlignment.RIGHT)
