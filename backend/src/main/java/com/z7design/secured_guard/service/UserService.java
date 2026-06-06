@@ -8,6 +8,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,7 +29,6 @@ import com.z7design.secured_guard.security.JwtService;
 import com.z7design.secured_guard.dto.ProfileUpdateRequest;
 import com.z7design.secured_guard.dto.CreateUserRequest;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -38,7 +39,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class UserService {
 
@@ -48,6 +48,21 @@ public class UserService {
     private final UserGroupRepository userGroupRepository;
     private final JwtService jwtService;
     private final UserOnlineStatusService userOnlineStatusService;
+
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            RoleRepository roleRepository,
+            UserGroupRepository userGroupRepository,
+            JwtService jwtService,
+            @Lazy UserOnlineStatusService userOnlineStatusService) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.roleRepository = roleRepository;
+        this.userGroupRepository = userGroupRepository;
+        this.jwtService = jwtService;
+        this.userOnlineStatusService = userOnlineStatusService;
+    }
 
     public Optional<User> findById(UUID id) {
         return userRepository.findById(id);

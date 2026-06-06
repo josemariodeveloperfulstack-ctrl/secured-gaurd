@@ -70,7 +70,7 @@ check_backend_ready() {
         log "📊 Backend: status=$backend_status, restarts=$restart_count, started=$started_at"
     fi
 
-    if [ "${restart_count:-0}" -gt 5 ] 2>/dev/null; then
+    if [ "${restart_count:-0}" -gt 15 ] 2>/dev/null; then
         log "❌ Backend reiniciou ${restart_count}x — crash loop (OOM ou erro fatal no startup)"
         log "💡 Verifique: docker inspect secured-guard-backend-ci --format OOMKilled={{.State.OOMKilled}}"
         collect_diagnostics

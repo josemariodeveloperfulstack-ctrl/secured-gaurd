@@ -48,6 +48,7 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
     private UserOnlineStatusService userOnlineStatusService;
 
     @Autowired
+    @Lazy
     private UserService userService;
 
     @Override

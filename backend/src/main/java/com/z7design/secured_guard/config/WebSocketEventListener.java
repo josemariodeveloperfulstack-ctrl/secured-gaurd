@@ -29,6 +29,7 @@ public class WebSocketEventListener {
     private UserOnlineStatusService userOnlineStatusService;
 
     @Autowired
+    @Lazy
     private UserService userService;
 
     /**
