@@ -452,23 +452,30 @@ jobs:
             echo "🚀 Iniciando backend primeiro (reduz contenção de RAM na VPS)..."
             $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing backend-ci
             echo "⏳ Aguardando backend iniciar boot (Flyway + Spring)..."
-            for i in $(seq 1 24); do
+            for i in $(seq 1 36); do
               if curl -sf --max-time 5 http://localhost:8081/api/health >/dev/null 2>&1; then
                 echo "✅ Backend respondeu em localhost:8081!"
                 break
               fi
               RESTARTS=$(docker inspect secured-guard-backend-ci --format '{{.RestartCount}}' 2>/dev/null || echo 0)
-              echo "   tentativa $i/24 — restarts=$RESTARTS"
-              [ "$RESTARTS" -gt 3 ] 2>/dev/null && {
+              echo "   tentativa $i/36 — restarts=$RESTARTS"
+              if docker logs secured-guard-backend-ci 2>&1 | tail -40 | grep -qE 'Application run failed|circular reference|OutOfMemoryError'; then
+                echo "❌ Erro fatal no boot do backend — últimos logs:"
+                docker logs --tail 60 secured-guard-backend-ci 2>&1 || true
+                exit 1
+              fi
+              [ "$RESTARTS" -gt 5 ] 2>/dev/null && {
                 echo "⚠️ Backend reiniciou $RESTARTS vezes — últimos logs:"
-                docker logs --tail 30 secured-guard-backend-ci 2>&1 || true
+                docker logs --tail 40 secured-guard-backend-ci 2>&1 || true
               }
-              [ $i -eq 24 ] && echo "⚠️ Backend ainda não respondeu; subindo demais serviços mesmo assim"
+              [ $i -eq 36 ] && echo "⚠️ Backend ainda não respondeu; subindo demais serviços mesmo assim"
               sleep 15
             done
 
-            echo "🚀 Iniciando frontend, nginx e whatsapp (evolution-api fica opcional — economiza RAM)..."
-            $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing frontend-ci nginx-ci whatsapp-service-ci
+            echo "🚀 Iniciando frontend e nginx (whatsapp só após backend estável — economiza RAM no boot)..."
+            $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing frontend-ci nginx-ci
+            docker stop whatsapp-service-ci 2>/dev/null || true
+            docker rm -f whatsapp-service-ci 2>/dev/null || true
             docker stop evolution-api-ci 2>/dev/null || true
             docker rm -f evolution-api-ci 2>/dev/null || true
             

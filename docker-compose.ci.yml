@@ -108,8 +108,8 @@ services:
       BAILEYS_REST_URL: ${BAILEYS_REST_URL:-http://whatsapp-service-ci:3333}
       BAILEYS_ENABLED: ${BAILEYS_ENABLED:-true}
       BAILEYS_INSTANCE_KEY: ${BAILEYS_INSTANCE_KEY:-securedguard_ci}
-      JAVA_OPTS: "-Xms128m -Xmx448m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:+ExitOnOutOfMemoryError -XX:MaxMetaspaceSize=128m -Djava.security.egd=file:/dev/./urandom"
-    mem_limit: 640m
+      JAVA_OPTS: "-Xms128m -Xmx512m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:+ExitOnOutOfMemoryError -XX:MaxMetaspaceSize=160m -Djava.security.egd=file:/dev/./urandom"
+    mem_limit: 768m
     ports:
       - "8081:8080"
     volumes:

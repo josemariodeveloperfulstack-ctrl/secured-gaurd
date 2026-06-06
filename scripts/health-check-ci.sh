@@ -30,10 +30,10 @@ fi
 
 echo "🏥 Verificando saúde da aplicação CI (VPS: ${CI_BASE_DIR})..."
 
-# Configurações — backend Spring Boot + Flyway no CI pode levar 8–12 min na VPS
-MAX_ATTEMPTS=40
+# Configurações — backend Spring Boot + Flyway no CI pode levar 10–15 min na VPS Contabo
+MAX_ATTEMPTS=50
 ATTEMPT=1
-RETRY_INTERVAL=25
+RETRY_INTERVAL=20
 HEALTH_CHECK_URL="https://ci.z7botsolutions.com.br/api/health"
 INTERNAL_HEALTH_CHECK="http://localhost:8081/api/health"
 # Por omissão o script só termina com sucesso se o health PÚBLICO (Cloudflare) passar.
@@ -77,6 +77,17 @@ check_backend_ready() {
         exit 1
     elif [ "${restart_count:-0}" -gt 2 ] 2>/dev/null; then
         log "⚠️ Backend reiniciou ${restart_count}x — possível OOM ou erro no startup (verifique logs)"
+        if docker logs secured-guard-backend-ci 2>&1 | tail -80 | grep -qE 'Application run failed|circular reference|OutOfMemoryError'; then
+            log "❌ Erro fatal detectado nos logs do backend:"
+            docker logs secured-guard-backend-ci 2>&1 | tail -80 | grep -E 'Application run failed|circular reference|OutOfMemoryError|Caused by:' | tail -15 || true
+            collect_diagnostics
+            exit 1
+        fi
+    fi
+    
+    if docker logs secured-guard-backend-ci 2>&1 | grep -q 'Started SecuredGuardApplication'; then
+        log "✅ Log indica que Spring Boot terminou o boot — aguardando health HTTP..."
+        return 1
     fi
     
     if [ "$backend_status" = "healthy" ]; then
@@ -240,8 +251,11 @@ collect_diagnostics() {
     echo "📋 Diagnóstico do backend:"
     docker inspect secured-guard-backend-ci --format 'Status={{.State.Status}} Health={{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}} Restarts={{.RestartCount}} Started={{.State.StartedAt}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}}' 2>/dev/null || echo "Container não encontrado"
     echo ""
-    echo "📋 Logs do backend (últimas 50 linhas):"
-    docker logs --tail 50 secured-guard-backend-ci 2>&1 | tail -50 || echo "Container não encontrado"
+    echo "📋 Logs do backend (últimas 100 linhas):"
+    docker logs --tail 100 secured-guard-backend-ci 2>&1 | tail -100 || echo "Container não encontrado"
+    echo ""
+    echo "📋 Erros recentes no backend:"
+    docker logs secured-guard-backend-ci 2>&1 | grep -E 'ERROR|Application run failed|circular reference|OutOfMemoryError' | tail -20 || echo "Nenhum erro óbvio"
     
     echo ""
     echo "📋 Logs do nginx (últimas 20 linhas):"

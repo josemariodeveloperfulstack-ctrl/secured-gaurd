@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
@@ -21,6 +22,7 @@ import org.springframework.context.annotation.Lazy;
  * Listener de eventos WebSocket para rastrear conexões e desconexões de usuários
  */
 @Component
+@ConditionalOnProperty(name = "app.websocket.enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 public class WebSocketEventListener {
 

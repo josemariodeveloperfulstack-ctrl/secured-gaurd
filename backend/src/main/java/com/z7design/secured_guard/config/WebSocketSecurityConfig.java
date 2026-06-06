@@ -6,6 +6,7 @@ import com.z7design.secured_guard.service.UserOnlineStatusService;
 import com.z7design.secured_guard.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -33,6 +34,7 @@ import org.springframework.context.annotation.Lazy;
  * Autentica conexões WebSocket usando JWT
  */
 @Configuration
+@ConditionalOnProperty(name = "app.websocket.enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE + 99)
 public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer {
