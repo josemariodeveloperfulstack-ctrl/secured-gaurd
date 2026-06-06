@@ -112,8 +112,12 @@ public class SecurityConfig {
                                                                 return false;
                                                         }
                                                 }).permitAll()
-                                                .requestMatchers("/ws/**").authenticated()
-                                                .requestMatchers("/ws").authenticated()
+                                                // Handshake do WebSocket nativo: o navegador NÃO consegue enviar o
+                                                // header Authorization no upgrade do WS. A autenticação é feita no
+                                                // frame STOMP CONNECT (ChannelInterceptor em WebSocketConfig), por isso
+                                                // o handshake HTTP precisa ser liberado aqui.
+                                                .requestMatchers("/ws/**").permitAll()
+                                                .requestMatchers("/ws").permitAll()
                                                 .requestMatchers("/api/email/test", "/api/email/config").hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMINISTRADOR")
                                                 // WhatsApp controller - restrito a SUPER_ADMIN / ADMINISTRADOR
                                                 .requestMatchers("/api/whatsapp/**").hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMINISTRADOR")

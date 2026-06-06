@@ -56,7 +56,7 @@ public class SmtpMailSendService {
                            String toName,
                            String subject,
                            String htmlBody) throws MessagingException, MailException {
-        return sendHtml(emailLog, toEmail, toName, subject, htmlBody, Collections.emptyList());
+        return sendHtml(emailLog, toEmail, toName, subject, htmlBody, Collections.emptyList(), null);
     }
 
     /**
@@ -68,6 +68,25 @@ public class SmtpMailSendService {
                            String subject,
                            String htmlBody,
                            List<EmailInlineImage> inlineImages) throws MessagingException, MailException {
+        return sendHtml(emailLog, toEmail, toName, subject, htmlBody, inlineImages, null);
+    }
+
+    /**
+     * Envia HTML com imagens embutidas e, quando informado, com cabeçalhos de
+     * descadastro exigidos pelo Google ({@code List-Unsubscribe} e
+     * {@code List-Unsubscribe-Post: List-Unsubscribe=One-Click}).
+     *
+     * @param unsubscribeUrl URL pública HTTPS de descadastro (one-click). Quando
+     *                       {@code null}, em branco ou {@code "#"}, os cabeçalhos
+     *                       não são adicionados.
+     */
+    public String sendHtml(EmailLog emailLog,
+                           String toEmail,
+                           String toName,
+                           String subject,
+                           String htmlBody,
+                           List<EmailInlineImage> inlineImages,
+                           String unsubscribeUrl) throws MessagingException, MailException {
         SmtpSettings cfg = smtpSettingsRepository.findFirstByIsActiveTrueOrderByUpdatedAtDesc()
                 .orElseThrow(() -> new IllegalStateException(
                         "Nenhuma configuração SMTP ativa. Configure em Marketing → SMTP."));
@@ -112,12 +131,23 @@ public class SmtpMailSendService {
             }
         }
 
+        // Cabeçalhos de descadastro exigidos pelo Google para remetentes em
+        // volume: List-Unsubscribe (HTTPS one-click + mailto) e
+        // List-Unsubscribe-Post habilitando o botão de cancelamento do Gmail.
+        if (unsubscribeUrl != null && !unsubscribeUrl.isBlank() && !"#".equals(unsubscribeUrl)
+                && unsubscribeUrl.startsWith("https://")) {
+            String mailtoUnsub = "mailto:" + cfg.getFromEmail() + "?subject=unsubscribe";
+            mime.setHeader("List-Unsubscribe", "<" + unsubscribeUrl + ">, <" + mailtoUnsub + ">");
+            mime.setHeader("List-Unsubscribe-Post", "List-Unsubscribe=One-Click");
+        }
+
         // Carimba o emailLogId no Message-ID para correlacionar com tracking
-        // (mesma estratégia do SendGrid via custom-arg).
+        // (mesma estratégia do SendGrid via custom-arg). O domínio precisa ser o
+        // do remetente para não disparar filtros anti-spam do Gmail.
         String localId = emailLog != null && emailLog.getId() != null
                 ? emailLog.getId().toString()
                 : UUID.randomUUID().toString();
-        String messageId = "<" + localId + "@secured-guard.local>";
+        String messageId = "<" + localId + "@" + senderDomain(cfg) + ">";
         mime.setHeader("Message-ID", messageId);
 
         sender.send(mime);
@@ -150,6 +180,24 @@ public class SmtpMailSendService {
                     cfg.getHost(), cfg.getPort(), cfg.getUsername(), e.getMessage());
             return Optional.of(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * Extrai o domínio do e-mail remetente para compor um {@code Message-ID}
+     * válido. Cai para o host SMTP e, por fim, para um valor seguro.
+     */
+    private static String senderDomain(SmtpSettings cfg) {
+        String from = cfg.getFromEmail();
+        if (from != null) {
+            int at = from.lastIndexOf('@');
+            if (at >= 0 && at < from.length() - 1) {
+                return from.substring(at + 1).trim().toLowerCase();
+            }
+        }
+        if (cfg.getHost() != null && !cfg.getHost().isBlank()) {
+            return cfg.getHost().trim().toLowerCase().replaceFirst("^smtp\\.", "");
+        }
+        return "promovervigilancia.com.br";
     }
 
     private JavaMailSender build(SmtpSettings cfg) {

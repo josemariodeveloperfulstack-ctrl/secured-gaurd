@@ -12,9 +12,12 @@ import com.z7design.secured_guard.dto.EmploymentContractRequest;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
+import com.z7design.secured_guard.util.EmployeeDataFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -36,6 +39,7 @@ public class EmploymentContractStandardPdfService {
         private final StandardReportLayoutService pdfLayoutService;
         private final ExcelReportLayoutService excelLayoutService;
         private final CompanyRepository companyRepository;
+        private final EmployeeRepository employeeRepository;
         private final ExperienceEmploymentContractTemplateLoader experienceTemplateLoader;
 
         private static final String REPORT_TITLE = "Contrato Individual de Trabalho";
@@ -50,6 +54,7 @@ public class EmploymentContractStandardPdfService {
         }
 
         public byte[] generatePdf(EmploymentContractRequest request) {
+                enrichEmployeeAddress(request);
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                         PdfWriter writer = new PdfWriter(outputStream);
 
@@ -83,6 +88,7 @@ public class EmploymentContractStandardPdfService {
         }
 
         public byte[] generateExcel(EmploymentContractRequest request) {
+                enrichEmployeeAddress(request);
                 try (Workbook workbook = new XSSFWorkbook()) {
                         Sheet sheet = workbook.createSheet("Contrato de Trabalho");
                         Company company = companyRepository.findById(request.getCompanyId())
@@ -132,7 +138,7 @@ public class EmploymentContractStandardPdfService {
                 document.add(new Paragraph("").setMarginBottom(14f));
 
                 if (isExperienceContract(request)) {
-                        String raw = experienceTemplateLoader.loadRawTemplate();
+                        String raw = experienceTemplateLoader.loadRawTemplate(isVigilanciaCompany(company));
                         String filled = fillExperiencePlaceholders(raw, request, company);
                         appendMultipagePlainText(document, filled, request, company);
                         return;
@@ -214,6 +220,12 @@ public class EmploymentContractStandardPdfService {
         private static boolean isIndefiniteContract(EmploymentContractRequest request) {
                 return request.getContractKind() != null
                                 && "INDEFINITE".equalsIgnoreCase(request.getContractKind().trim());
+        }
+
+        private static boolean isVigilanciaCompany(Company company) {
+                return company != null
+                                && company.getSigla() != null
+                                && "VIG".equalsIgnoreCase(company.getSigla().trim());
         }
 
         /** Placeholders comuns aos templates longos (experiência e indeterminado). */
@@ -699,5 +711,22 @@ public class EmploymentContractStandardPdfService {
                 int centena = number / 100;
                 int resto = number % 100;
                 return resto == 0 ? CENTENAS[centena] : CENTENAS[centena] + " e " + convertGroupToWords(resto);
+        }
+
+        /**
+         * Garante endereço completo (rua, número, bairro, cidade/UF) a partir do cadastro do funcionário.
+         */
+        private void enrichEmployeeAddress(EmploymentContractRequest request) {
+                if (request.getEmployeeId() == null) {
+                        return;
+                }
+                Employee employee = employeeRepository.findById(request.getEmployeeId()).orElse(null);
+                if (employee == null) {
+                        return;
+                }
+                String fullAddress = EmployeeDataFormatter.formatFullAddress(employee);
+                if (!fullAddress.isBlank()) {
+                        request.setEmployeeAddress(fullAddress);
+                }
         }
 }

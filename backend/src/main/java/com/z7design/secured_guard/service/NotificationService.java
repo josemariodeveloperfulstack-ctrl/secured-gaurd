@@ -36,7 +36,10 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
-    @Value("${app.notification.email.from:noreply@secureguard.com}")
+    // O From DEVE coincidir com a conta SMTP autenticada (spring.mail.username),
+    // caso contrário o servidor de envio recusa/suspende a conta por spoofing
+    // (envelope From != conta autenticada) e o Gmail reprova SPF/DMARC.
+    @Value("${app.notification.email.from:${spring.mail.username:securedguard@z7design.com.br}}")
     private String fromEmail;
 
     @Value("${app.notification.email.enabled:true}")

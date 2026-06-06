@@ -53,4 +53,17 @@ public interface WorkPostAssignmentRepository extends JpaRepository<WorkPostAssi
            "wpa.status IN ('SCHEDULED', 'CONFIRMED')")
     List<WorkPostAssignment> findActiveAssignmentsByDateAndEmployee(@Param("date") LocalDate date,
                                                                    @Param("employeeId") UUID employeeId);
+
+    /**
+     * Atribuições do funcionário ao posto numa data (qualquer status, exceto canceladas),
+     * usado para identificar remanejamentos durante a visita do supervisor.
+     */
+    @Query("SELECT wpa FROM WorkPostAssignment wpa WHERE " +
+           "wpa.employee.id = :employeeId AND " +
+           "wpa.workPost.id = :workPostId AND " +
+           "wpa.assignmentDate = :date AND " +
+           "wpa.status <> 'CANCELLED'")
+    List<WorkPostAssignment> findByEmployeeWorkPostAndDate(@Param("employeeId") UUID employeeId,
+                                                           @Param("workPostId") UUID workPostId,
+                                                           @Param("date") LocalDate date);
 }

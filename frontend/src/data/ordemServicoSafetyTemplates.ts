@@ -12,6 +12,10 @@ export interface OrdemServicoSafetyTemplate {
   matchKeywords: string[];
   label: string;
   responsibility?: string;
+  /** Uma obrigação por linha; quando informado, substitui a lista padrão no PDF */
+  employeeObligations?: string;
+  /** Título da seção de EPI/uniforme no PDF (padrão: UNIFORME DE USO OBRIGATÓRIO) */
+  uniformSectionTitle?: string;
   activities: string;
   risks: string;
   preventiveMeasures: string;
@@ -104,6 +108,38 @@ Riscos Físicos: Radiações não-ionizantes.`,
     uniform:
       '- Calçado de segurança.\n- Uniforme completo.\n- Crachá de identificação.',
     mandatoryTrainings: NR01_TRAININGS,
+  },
+  supervisor: {
+    id: 'supervisor',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: [],
+    label: 'Supervisor',
+    responsibility: 'SUPERVISÃO OPERACIONAL',
+    employeeObligations:
+      'Comunicar todas as condições inseguras presentes no ambiente ao gestor responsável e adotar as medidas cabíveis para sua correção.\n' +
+      'Cumprir e fazer cumprir todas as normas, procedimentos e orientações expedidas pelo Empregador, inclusive esta Ordem de Serviço.\n' +
+      'Supervisionar, orientar e acompanhar a execução das atividades da equipe sob sua responsabilidade, garantindo o cumprimento dos procedimentos operacionais e de segurança.\n' +
+      'Executar e coordenar as tarefas que lhe forem delegadas, assegurando que os colaboradores estejam devidamente treinados para sua realização.\n' +
+      'Manter e promover a ordem, disciplina, higiene e segurança no ambiente de trabalho.\n' +
+      'Participar e incentivar a participação da equipe em treinamentos relacionados à segurança patrimonial, segurança do trabalho e saúde ocupacional.\n' +
+      'Utilizar obrigatoriamente os Equipamentos de Proteção Individual (EPIs) indicados para a função e fiscalizar sua correta utilização pela equipe.\n' +
+      'Colaborar com a empresa na aplicação das Normas Regulamentadoras (NRs), do Programa de Gerenciamento de Riscos (PGR) e do Programa de Controle Médico de Saúde Ocupacional (PCMSO).\n' +
+      'É responsabilidade do empregado utilizar, guardar, conservar e comunicar ao empregador qualquer alteração que torne impróprio o uso dos Equipamentos de Proteção Individual.\n' +
+      'Realizar inspeções periódicas nos postos de serviço, registrando ocorrências e reportando situações de risco ou não conformidades.',
+    uniformSectionTitle: 'EPI DE USO OBRIGATÓRIO',
+    activities:
+      'SUPERVISOR - CBO: 510310\n\n' +
+      'Supervisiona e coordena as atividades da equipe de vigilância patrimonial, orientando e acompanhando a execução dos serviços de segurança. Fiscaliza postos de trabalho, verifica o cumprimento de normas, procedimentos e escalas de serviço, elabora relatórios de ocorrências, presta suporte operacional às equipes e clientes, realiza inspeções preventivas e atua na resolução de situações de risco. Zela pela segurança das pessoas, do patrimônio e pelo cumprimento das diretrizes da empresa e da legislação vigente, mantendo comunicação com colaboradores, clientes e órgãos competentes quando necessário.',
+    risks:
+      'Riscos Ergonômicos: Posturas inadequadas;\n' +
+      'Riscos Físicos: Ruído; Monotonia e Agressão; Batidas contra; Queda do mesmo nível; Disparo acidental; Radiação não-ionizante.',
+    preventiveMeasures:
+      '- Treinamento Introdutório.\n- Adoção de medidas de proteção em ordem: coletivas e individuais.',
+    uniform: '- Uniforme completo\n- CRACHÁ',
+    mandatoryTrainings:
+      '- Treinamento de Ambientação de Segurança do Trabalho;\n' +
+      '- DSS – Diálogo de Segurança e Saúde Ocupacional;\n' +
+      "- Treinamento sobre aspectos legais e técnicos no uso e conservação de EPI's.",
   },
   'auxiliar-administrativo': {
     id: 'auxiliar-administrativo',
@@ -281,6 +317,14 @@ function resolveContextualTemplate(ctx: OrdemServicoTemplateContext): OrdemServi
 
   const haystack = buildContextHaystack(ctx);
 
+  if (
+    pos.includes('SUPERVISOR') ||
+    pos.includes('SUPERVISAO') ||
+    pos.includes('SUPERVISÃO')
+  ) {
+    return CONTEXTUAL_TEMPLATES.supervisor;
+  }
+
   if (isPorteiroCargo(pos)) {
     return CONTEXTUAL_TEMPLATES.porteiro;
   }
@@ -339,6 +383,8 @@ export function applyOrdemServicoTemplate(
   tpl: OrdemServicoSafetyTemplate,
   current: {
     responsibility?: string;
+    employeeObligations?: string;
+    uniformSectionTitle?: string;
     activities?: string;
     risks?: string;
     preventiveMeasures?: string;
@@ -356,6 +402,12 @@ export function applyOrdemServicoTemplate(
     responsibility: tpl.responsibility
       ? pick(tpl.responsibility, current.responsibility)
       : current.responsibility,
+    employeeObligations: tpl.employeeObligations
+      ? pick(tpl.employeeObligations, current.employeeObligations)
+      : current.employeeObligations,
+    uniformSectionTitle: tpl.uniformSectionTitle
+      ? pick(tpl.uniformSectionTitle, current.uniformSectionTitle)
+      : current.uniformSectionTitle,
     activities: pick(tpl.activities, current.activities),
     risks: pick(tpl.risks, current.risks),
     preventiveMeasures: pick(tpl.preventiveMeasures, current.preventiveMeasures),

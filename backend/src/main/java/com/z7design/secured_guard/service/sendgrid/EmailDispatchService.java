@@ -188,11 +188,12 @@ public class EmailDispatchService {
         Map<String, String> context = buildContext(recipient, ctx, campaign);
         String subject = renderer.renderText(ctx.baseSubject, context);
         String html = renderer.renderHtml(ctx.baseHtml, context);
-        html = injectUnsubscribeFooter(html, context.get("unsubscribeUrl"));
+        String unsubscribeUrl = context.get("unsubscribeUrl");
+        html = injectUnsubscribeFooter(html, unsubscribeUrl);
         html = emailTrackingService.injectTracking(html, log.getId());
 
         try {
-            String messageId = dispatchByProvider(campaign, log, recipient, subject, html);
+            String messageId = dispatchByProvider(campaign, log, recipient, subject, html, unsubscribeUrl);
             log.setProviderMessageId(messageId);
             Instant sentAt = Instant.now();
             log.setSentAt(sentAt);
@@ -219,12 +220,13 @@ public class EmailDispatchService {
                                       EmailLog log,
                                       EmailCampaignRecipient recipient,
                                       String subject,
-                                      String html) throws IOException, jakarta.mail.MessagingException {
+                                      String html,
+                                      String unsubscribeUrl) throws IOException, jakarta.mail.MessagingException {
         com.z7design.secured_guard.model.enums.EmailProviderType provider = campaign.getProviderType();
         List<EmailInlineImage> inlineImages = emailMarketingInlineAssetsService.standardMarketingImages();
         if (provider == com.z7design.secured_guard.model.enums.EmailProviderType.SMTP) {
             return smtpMailSendService.sendHtml(
-                    log, recipient.getEmail(), recipient.getName(), subject, html, inlineImages);
+                    log, recipient.getEmail(), recipient.getName(), subject, html, inlineImages, unsubscribeUrl);
         }
         // SENDGRID (default)
         return sendGridMailSendService.sendHtml(

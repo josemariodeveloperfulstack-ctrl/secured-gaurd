@@ -7,6 +7,7 @@ export interface User {
   email: string;
   active: boolean;
   roles: string[];
+  isOnline?: boolean;
 }
 
 export interface CreateUserRequest {

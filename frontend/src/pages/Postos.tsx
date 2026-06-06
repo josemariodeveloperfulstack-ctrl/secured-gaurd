@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   Search, 
@@ -19,7 +19,7 @@ import {
   Play,
   Calendar,
   QrCode,
-  Link as LinkIcon
+  Printer
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +83,11 @@ const Postos: React.FC = () => {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrDescription, setQrDescription] = useState('');
   const [qrRadius, setQrRadius] = useState<number>(100);
+  const [qrImageUrls, setQrImageUrls] = useState<Record<string, string>>({});
+
+  const revokeQrImageUrls = useCallback((urls: Record<string, string>) => {
+    Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
+  }, []);
 
   const { toast } = useToast();
   const { user } = useAuth();
@@ -198,6 +203,47 @@ const Postos: React.FC = () => {
     }
   };
 
+  // Carrega as imagens PNG dos QR Codes (via axios com JWT → blob URL)
+  useEffect(() => {
+    if (!isQrModalOpen || qrCodes.length === 0) {
+      return;
+    }
+    let cancelled = false;
+    const loadImages = async () => {
+      const pairs = await Promise.all(
+        qrCodes.map(async (qr) => {
+          try {
+            const url = await qrCodeService.getQRCodeImage(qr.id);
+            return [qr.id, url] as const;
+          } catch {
+            return [qr.id, ''] as const;
+          }
+        }),
+      );
+      if (cancelled) {
+        pairs.forEach(([, url]) => url && URL.revokeObjectURL(url));
+        return;
+      }
+      setQrImageUrls((prev) => {
+        revokeQrImageUrls(prev);
+        return Object.fromEntries(pairs.filter(([, url]) => url));
+      });
+    };
+    void loadImages();
+    return () => {
+      cancelled = true;
+    };
+  }, [isQrModalOpen, qrCodes, revokeQrImageUrls]);
+
+  useEffect(() => {
+    if (!isQrModalOpen) {
+      setQrImageUrls((prev) => {
+        revokeQrImageUrls(prev);
+        return {};
+      });
+    }
+  }, [isQrModalOpen, revokeQrImageUrls]);
+
   // QR Codes - carregar lista para um posto
   const openQrModalForWorkPost = async (workPost: WorkPost) => {
     setQrSelectedWorkPost(workPost);
@@ -268,14 +314,16 @@ const Postos: React.FC = () => {
 
   const handleDownloadQrImage = async (qr: QRCodeWorkPost) => {
     try {
-      const url = await qrCodeService.getQRCodeImage(qr.id);
+      const url = qrImageUrls[qr.id] ?? (await qrCodeService.getQRCodeImage(qr.id));
       const link = document.createElement('a');
       link.href = url;
       link.download = `qrcode-posto-${qrSelectedWorkPost?.postCode || ''}-${qr.id}.png`;
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(url);
+      if (!qrImageUrls[qr.id]) {
+        URL.revokeObjectURL(url);
+      }
     } catch (error: any) {
       console.error('Erro ao baixar QR Code:', error);
       toast({
@@ -284,6 +332,36 @@ const Postos: React.FC = () => {
         variant: 'destructive',
       });
     }
+  };
+
+  const handlePrintQrImage = (qr: QRCodeWorkPost) => {
+    const url = qrImageUrls[qr.id];
+    if (!url || !qrSelectedWorkPost) {
+      toast({
+        title: 'Imagem indisponível',
+        description: 'Aguarde o carregamento do QR Code ou tente novamente.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const w = window.open('', '_blank', 'width=480,height=560');
+    if (!w) {
+      toast({
+        title: 'Pop-up bloqueado',
+        description: 'Permita pop-ups para imprimir o QR Code.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const title = qr.description || `QR Code - ${qrSelectedWorkPost.name}`;
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
+      <title>${title}</title>
+      <style>body{font-family:Arial,sans-serif;text-align:center;padding:24px}
+      h1{font-size:16px;margin-bottom:16px}img{width:280px;height:280px}</style></head>
+      <body><h1>${qrSelectedWorkPost.name}</h1><p>${title}</p>
+      <img src="${url}" alt="QR Code"/><p style="font-size:12px;color:#666">Raio: ${qr.radiusMeters}m</p></body></html>`);
+    w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
   };
 
   const handleToggleQrActive = async (qr: QRCodeWorkPost) => {
@@ -707,7 +785,7 @@ const Postos: React.FC = () => {
 
         {/* Modal de gestão de QR Codes do posto */}
         <Dialog open={isQrModalOpen} onOpenChange={setIsQrModalOpen}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <QrCode className="h-5 w-5" />
@@ -765,24 +843,45 @@ const Postos: React.FC = () => {
                       {qrCodes.map((qr) => (
                         <div
                           key={qr.id}
-                          className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                          className="flex items-center gap-3 rounded-md border px-3 py-3 text-sm"
                         >
-                          <div className="flex flex-col">
-                            <span className="font-medium">
+                          {qrImageUrls[qr.id] ? (
+                            <img
+                              src={qrImageUrls[qr.id]}
+                              alt={qr.description || 'QR Code do posto'}
+                              className="h-20 w-20 shrink-0 rounded border bg-white p-1"
+                            />
+                          ) : (
+                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded border bg-muted">
+                              <QrCode className="h-8 w-8 text-muted-foreground animate-pulse" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1 flex flex-col">
+                            <span className="font-medium truncate">
                               {qr.description || 'QR Code sem descrição'}
                             </span>
                             <span className="text-xs text-muted-foreground">
                               Raio: {qr.radiusMeters}m • {qr.isActive ? 'Ativo' : 'Inativo'}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex shrink-0 items-center gap-2">
                             <Button
                               variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
+                              size="sm"
+                              className="gap-1"
                               onClick={() => handleDownloadQrImage(qr)}
                             >
-                              <LinkIcon className="h-4 w-4" />
+                              <Download className="h-4 w-4" />
+                              Baixar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => handlePrintQrImage(qr)}
+                            >
+                              <Printer className="h-4 w-4" />
+                              Imprimir
                             </Button>
                             <Button
                               variant="outline"

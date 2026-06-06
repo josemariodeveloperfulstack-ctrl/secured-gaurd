@@ -20,6 +20,10 @@ import { Company } from '@/types/company';
 import api from '@/lib/axios';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 import { formatCNPJ, formatCPF } from '@/utils/validation';
+import {
+  formatEmployeeAddressForLgpdVig,
+  isVigilanciaCompany,
+} from '@/utils/formatEmployeeAddress';
 
 interface TermoLGPDFormProps {
   employeeId?: string;
@@ -113,7 +117,63 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === formData.empresaId);
+  const isVigilanciaTerm = isVigilanciaCompany(empresa);
+  const employeeFullAddress = funcionario
+    ? formatEmployeeAddressForLgpdVig(funcionario)
+    : '';
 
+  const buildPayload = () => {
+    const address = funcionario?.address;
+    let employeeAddress = '';
+    let employeeNumber = '';
+    let employeeComplement = '';
+    let employeeNeighborhood = '';
+    let employeeCity = '';
+    let employeeState = '';
+    let employeeCep = '';
+
+    if (typeof address === 'object' && address !== null) {
+      employeeAddress = (address as any).street || '';
+      employeeNumber = (address as any).number || '';
+      employeeComplement = (address as any).complement || '';
+      employeeNeighborhood = (address as any).neighborhood || '';
+      employeeCity = (address as any).city || '';
+      employeeState = (address as any).state || '';
+      employeeCep = (address as any).zipCode || '';
+    } else {
+      employeeAddress = String(address || '');
+    }
+
+    return {
+      companyId: empresa!.id,
+      employeeId: funcionario!.id,
+      employeeName: funcionario!.name,
+      employeeCpf: funcionario!.cpf || (funcionario as any).document || '',
+      employeeRg: funcionario!.rg || '',
+      employeePosition: (funcionario as any).positionName || (funcionario as any).position?.name || '',
+      employeeAddress,
+      employeeNumber,
+      employeeComplement,
+      employeeNeighborhood,
+      employeeCity,
+      employeeState,
+      employeeCep,
+      employeeFullAddress: isVigilanciaTerm ? employeeFullAddress : undefined,
+      termVariant: isVigilanciaTerm ? 'VIGILANCIA' : 'DEFAULT',
+      consentTypes: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label || id),
+      dataUsagePurpose: formData.dataUsage,
+      retentionPeriod: formData.dataRetention,
+      additionalInformation: formData.additionalInfo,
+      consentDate: formData.consentDate,
+      city: empresa!.city || '',
+    };
+  };
+
+  const isReadyToGenerate = Boolean(
+    funcionario &&
+    empresa &&
+    (isVigilanciaTerm || formData.consentTypes.length > 0)
+  );
 
   const consentOptions = [
     { id: 'data_processing', label: 'Processamento de Dados Pessoais' },
@@ -133,10 +193,12 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
   };
 
   const handleGenerateDocument = async () => {
-    if (!funcionario || !empresa || formData.consentTypes.length === 0) {
+    if (!isReadyToGenerate) {
       toast({
         title: "Erro",
-        description: "Preencha todos os campos obrigatórios e selecione pelo menos um tipo de consentimento.",
+        description: isVigilanciaTerm
+          ? "Selecione funcionário e empresa para gerar o termo."
+          : "Preencha todos os campos obrigatórios e selecione pelo menos um tipo de consentimento.",
         variant: "destructive"
       });
       return;
@@ -144,50 +206,7 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
 
     setLoading(true);
     try {
-      const address = funcionario.address;
-      let employeeAddress = '';
-      let employeeNumber = '';
-      let employeeComplement = '';
-      let employeeNeighborhood = '';
-      let employeeCity = '';
-      let employeeState = '';
-      let employeeCep = '';
-
-      if (typeof address === 'object' && address !== null) {
-        employeeAddress = (address as any).street || '';
-        employeeNumber = (address as any).number || '';
-        employeeComplement = (address as any).complement || '';
-        employeeNeighborhood = (address as any).neighborhood || '';
-        employeeCity = (address as any).city || '';
-        employeeState = (address as any).state || '';
-        employeeCep = (address as any).zipCode || '';
-      } else {
-        employeeAddress = String(address || '');
-      }
-
-
-      const payload = {
-        companyId: empresa.id,
-        employeeId: funcionario.id,
-        employeeName: funcionario.name,
-        employeeCpf: funcionario.cpf || (funcionario as any).document || '',
-        employeeRg: funcionario.rg || '',
-        employeePosition: (funcionario as any).positionName || (funcionario as any).position?.name || '',
-        employeeAddress: employeeAddress,
-        employeeNumber: employeeNumber,
-        employeeComplement: employeeComplement,
-        employeeNeighborhood: employeeNeighborhood,
-        employeeCity: employeeCity,
-        employeeState: employeeState,
-        employeeCep: employeeCep,
-
-        consentTypes: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label || id),
-        dataUsagePurpose: formData.dataUsage,
-        retentionPeriod: formData.dataRetention,
-        additionalInformation: formData.additionalInfo,
-        consentDate: formData.consentDate,
-        city: empresa.city || '',
-      };
+      const payload = buildPayload();
 
       const response = await api.post('/api/lgpd-consent/generate-pdf', payload, {
         responseType: 'blob'
@@ -233,49 +252,7 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
 
     setLoading(true);
     try {
-      const address = funcionario.address;
-      let employeeAddress = '';
-      let employeeNumber = '';
-      let employeeComplement = '';
-      let employeeNeighborhood = '';
-      let employeeCity = '';
-      let employeeState = '';
-      let employeeCep = '';
-
-      if (typeof address === 'object' && address !== null) {
-        employeeAddress = (address as any).street || '';
-        employeeNumber = (address as any).number || '';
-        employeeComplement = (address as any).complement || '';
-        employeeNeighborhood = (address as any).neighborhood || '';
-        employeeCity = (address as any).city || '';
-        employeeState = (address as any).state || '';
-        employeeCep = (address as any).zipCode || '';
-      } else {
-        employeeAddress = String(address || '');
-      }
-
-      const payload = {
-        companyId: empresa.id,
-        employeeId: funcionario.id,
-        employeeName: funcionario.name,
-        employeeCpf: funcionario.cpf || (funcionario as any).document || '',
-        employeeRg: funcionario.rg || '',
-        employeePosition: (funcionario as any).positionName || (funcionario as any).position?.name || '',
-        employeeAddress: employeeAddress,
-        employeeNumber: employeeNumber,
-        employeeComplement: employeeComplement,
-        employeeNeighborhood: employeeNeighborhood,
-        employeeCity: employeeCity,
-        employeeState: employeeState,
-        employeeCep: employeeCep,
-
-        consentTypes: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label || id),
-        dataUsagePurpose: formData.dataUsage,
-        retentionPeriod: formData.dataRetention,
-        additionalInformation: formData.additionalInfo,
-        consentDate: formData.consentDate,
-        city: empresa.city || '',
-      };
+      const payload = buildPayload();
 
       const response = await api.post('/api/lgpd-consent/preview-pdf', payload, {
         responseType: 'blob'
@@ -307,13 +284,15 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-2xl">
                 <FileCheck className="h-6 w-6 text-primary" />
-                Termo de Consentimento LGPD
+                {isVigilanciaTerm ? 'Termo de Proteção de Dados - LGPD' : 'Termo de Consentimento LGPD'}
               </CardTitle>
               <CardDescription>
-                Geração de termo de consentimento para tratamento de dados pessoais (Lei Geral de Proteção de Dados).
+                {isVigilanciaTerm
+                  ? 'Termo de confidencialidade e proteção de dados da Promover Vigilância Patrimonial, conforme modelo oficial.'
+                  : 'Geração de termo de consentimento para tratamento de dados pessoais (Lei Geral de Proteção de Dados).'}
               </CardDescription>
             </div>
-            {(funcionario && empresa && formData.consentTypes.length > 0) && (
+            {isReadyToGenerate && (
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 px-3 py-1">
                 <CheckCircle2 className="h-3 w-3" />
                 Pronto para gerar
@@ -464,6 +443,14 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
                       {funcionario.unitName || (funcionario as any).workPostName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
                     </div>
                   </div>
+                  {isVigilanciaTerm && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço (termo VIG)</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                        {employeeFullAddress || 'Endereço não cadastrado — complete o cadastro do funcionário.'}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -506,76 +493,18 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
 
           {(funcionario || empresa) && <Separator />}
 
-          {/* Tipos de Consentimento */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Shield className="h-4 w-4" />
-              <span>Escopo do Consentimento</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {consentOptions.map((option) => (
-                <div key={option.id} className={`flex items-start space-x-3 p-4 rounded-lg border transition-all ${formData.consentTypes.includes(option.id)
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
-                  }`}>
-                  <Checkbox
-                    id={option.id}
-                    checked={formData.consentTypes.includes(option.id)}
-                    onCheckedChange={(checked) => handleConsentChange(option.id, checked as boolean)}
-                    className="mt-1"
-                  />
-                  <div className="grid gap-1.5 leading-none">
-                    <Label
-                      htmlFor={option.id}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      {option.label}
-                    </Label>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Configurações Adicionais */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Finalidade do Uso dos Dados</Label>
-              <Textarea
-                value={formData.dataUsage}
-                onChange={(e) => setFormData(prev => ({ ...prev, dataUsage: e.target.value }))}
-                className="bg-background resize-none"
-                placeholder="Descreva a finalidade específica..."
-                rows={4}
-              />
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Prazo de Retenção</Label>
-                <Select
-                  value={formData.dataRetention}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, dataRetention: value }))}
-                >
-                  <SelectTrigger className="bg-background h-11">
-                    <SelectValue placeholder="Selecione o prazo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1_ano">1 ano</SelectItem>
-                    <SelectItem value="2_anos">2 anos</SelectItem>
-                    <SelectItem value="3_anos">3 anos</SelectItem>
-                    <SelectItem value="5_anos">5 anos</SelectItem>
-                    <SelectItem value="10_anos">10 anos</SelectItem>
-                    <SelectItem value="indefinido">Indefinido (até rescisão)</SelectItem>
-                  </SelectContent>
-                </Select>
+          {isVigilanciaTerm ? (
+            <div className="space-y-4 rounded-xl border bg-muted/20 p-6">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Shield className="h-4 w-4" />
+                <span>Modelo Vigilância (VIG)</span>
               </div>
-
-              <div className="space-y-2">
-                <Label>Data do Consentimento</Label>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                O PDF seguirá o modelo oficial com cláusulas de confidencialidade (objeto, informações confidenciais,
+                uso, exceções, quebra e vigência de 5 anos), sem necessidade de marcar tipos de consentimento.
+              </p>
+              <div className="space-y-2 max-w-xs">
+                <Label>Data do Termo</Label>
                 <Input
                   type="date"
                   value={formData.consentDate}
@@ -584,20 +513,100 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
                 />
               </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Shield className="h-4 w-4" />
+                  <span>Escopo do Consentimento</span>
+                </div>
 
-          <div className="space-y-2">
-            <Label>Informações Adicionais</Label>
-            <Textarea
-              value={formData.additionalInfo}
-              onChange={(e) => setFormData(prev => ({ ...prev, additionalInfo: e.target.value }))}
-              className="bg-background resize-none"
-              placeholder="Outras observações relevantes..."
-              rows={3}
-            />
-          </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {consentOptions.map((option) => (
+                    <div key={option.id} className={`flex items-start space-x-3 p-4 rounded-lg border transition-all ${formData.consentTypes.includes(option.id)
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                      }`}>
+                      <Checkbox
+                        id={option.id}
+                        checked={formData.consentTypes.includes(option.id)}
+                        onCheckedChange={(checked) => handleConsentChange(option.id, checked as boolean)}
+                        className="mt-1"
+                      />
+                      <div className="grid gap-1.5 leading-none">
+                        <Label
+                          htmlFor={option.id}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          {option.label}
+                        </Label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-          <Separator />
+              <Separator />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label>Finalidade do Uso dos Dados</Label>
+                  <Textarea
+                    value={formData.dataUsage}
+                    onChange={(e) => setFormData(prev => ({ ...prev, dataUsage: e.target.value }))}
+                    className="bg-background resize-none"
+                    placeholder="Descreva a finalidade específica..."
+                    rows={4}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Prazo de Retenção</Label>
+                    <Select
+                      value={formData.dataRetention}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, dataRetention: value }))}
+                    >
+                      <SelectTrigger className="bg-background h-11">
+                        <SelectValue placeholder="Selecione o prazo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1_ano">1 ano</SelectItem>
+                        <SelectItem value="2_anos">2 anos</SelectItem>
+                        <SelectItem value="3_anos">3 anos</SelectItem>
+                        <SelectItem value="5_anos">5 anos</SelectItem>
+                        <SelectItem value="10_anos">10 anos</SelectItem>
+                        <SelectItem value="indefinido">Indefinido (até rescisão)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Data do Consentimento</Label>
+                    <Input
+                      type="date"
+                      value={formData.consentDate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, consentDate: e.target.value }))}
+                      className="bg-background h-11"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Informações Adicionais</Label>
+                <Textarea
+                  value={formData.additionalInfo}
+                  onChange={(e) => setFormData(prev => ({ ...prev, additionalInfo: e.target.value }))}
+                  className="bg-background resize-none"
+                  placeholder="Outras observações relevantes..."
+                  rows={3}
+                />
+              </div>
+
+              <Separator />
+            </>
+          )}
 
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
@@ -613,7 +622,7 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
             <Button
               onClick={handleGenerateDocument}
               className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
-              disabled={loading || !funcionario || !empresa || formData.consentTypes.length === 0}
+              disabled={loading || !isReadyToGenerate}
             >
               {loading ? (
                 <>

@@ -41,6 +41,7 @@ class CBOService {
     { codigo: '5173-25', titulo: 'Segurança de condomínio', sinonimo: 'Segurança, Condomínio' },
     
     // Supervisores
+    { codigo: '5103-10', titulo: 'Supervisor de serviços de vigilância', sinonimo: 'Supervisor, Supervisor operacional' },
     { codigo: '3514-05', titulo: 'Supervisor de segurança', sinonimo: 'Supervisor, Coordenador de segurança' },
     { codigo: '3514-10', titulo: 'Supervisor de vigilância', sinonimo: 'Supervisor, Vigilância' },
     { codigo: '3514-15', titulo: 'Supervisor de portaria', sinonimo: 'Supervisor, Portaria' },

@@ -28,6 +28,12 @@ import {
 
 const todayIso = () => new Date().toISOString().split('T')[0];
 
+type ClientPreview = Pick<Client, 'id' | 'name' | 'cnpj' | 'address'>;
+
+function resolveClientIdFromWorkPost(wp?: { clientId?: string; client?: { id?: string } }): string {
+  return wp?.clientId || wp?.client?.id || '';
+}
+
 interface OrdemServicosFormProps {
   employeeId?: string;
   companyId?: string;
@@ -52,6 +58,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     workPostId: '',
     layoutType: 'STANDARD_NR01' as OsLayoutType,
     responsibility: '',
+    employeeObligations: '',
     revision: '',
     documentDate: todayIso(),
     city: 'Contagem',
@@ -60,6 +67,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     risks: '',
     preventiveMeasures: '',
     uniform: '',
+    uniformSectionTitle: '',
     mandatoryTrainings: '',
     accidentProcedure: '',
   });
@@ -74,15 +82,17 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
   const [workPosts, setWorkPosts] = useState<any[]>([]);
   const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
   const [syncingEmployeeContext, setSyncingEmployeeContext] = useState(false);
+  const [resolvedClientPreview, setResolvedClientPreview] = useState<ClientPreview | null>(null);
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
   const selectedWorkPost = workPosts.find((wp) => wp.id === form.workPostId);
   const cliente = form.clientId ? clients.find((c) => c.id === form.clientId) : undefined;
 
-  /** Exibe cliente da lista ou, enquanto carrega, dados do posto vinculado */
+  /** Exibe cliente da lista, preview resolvido do posto ou dados do posto selecionado */
   const clienteExibicao =
     cliente ??
+    resolvedClientPreview ??
     (selectedWorkPost?.clientName
       ? {
           id: selectedWorkPost.clientId || '',
@@ -148,12 +158,61 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     }));
   }, [employeeId, companyId]);
 
+  const resolveClientFromWorkPost = useCallback(
+    async (
+      wp: Awaited<ReturnType<typeof workPostService.getWorkPostById>>,
+      clientsList: Client[],
+    ): Promise<ClientPreview | null> => {
+      const clientId = wp.clientId || '';
+      if (clientId) {
+        const fromList = clientsList.find((c) => c.id === clientId);
+        if (fromList) {
+          return {
+            id: fromList.id,
+            name: fromList.name,
+            cnpj: fromList.cnpj,
+            address: fromList.address || wp.address,
+          };
+        }
+        try {
+          const fetched = await clientService.getClientById(clientId);
+          setClients((prev) =>
+            prev.some((c) => c.id === fetched.id) ? prev : [...prev, fetched],
+          );
+          return {
+            id: fetched.id,
+            name: fetched.name,
+            cnpj: fetched.cnpj,
+            address: fetched.address || wp.address,
+          };
+        } catch {
+          // segue com dados mínimos do posto
+        }
+      }
+      if (wp.clientName) {
+        return {
+          id: clientId,
+          name: wp.clientName,
+          address: wp.address,
+        };
+      }
+      return null;
+    },
+    [],
+  );
+
   const syncEmployeeWorkContext = useCallback(async (empId: string) => {
-    if (!empId) return;
+    if (!empId) {
+      setResolvedClientPreview(null);
+      return;
+    }
     setSyncingEmployeeContext(true);
     try {
       const full = await employeeService.getEmployeeById(empId);
-      if (!full) return;
+      if (!full) {
+        setResolvedClientPreview(null);
+        return;
+      }
 
       const simple = employeeToSimpleEmployee(full);
       setSelectedEmployeeData(simple);
@@ -178,19 +237,23 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       }
 
       let wpResolved: Awaited<ReturnType<typeof workPostService.getWorkPostById>> | null = null;
+      let clientPreview: ClientPreview | null = null;
 
       if (workPostId) {
         wpResolved = await workPostService.getWorkPostById(workPostId);
+        clientPreview = await resolveClientFromWorkPost(wpResolved, clients);
+        setResolvedClientPreview(clientPreview);
         setForm((prev) => ({
           ...prev,
           companyId: simple.companyId || prev.companyId,
           workPostId: wpResolved!.id,
-          clientId: wpResolved!.clientId || '',
+          clientId: wpResolved!.clientId || clientPreview?.id || '',
           location: wpResolved!.address || prev.location,
           position: full.position?.name || prev.position,
           hireDate: full.hireDate ? String(full.hireDate).split('T')[0] : prev.hireDate,
         }));
       } else {
+        setResolvedClientPreview(null);
         setForm((prev) => ({
           ...prev,
           hireDate: full.hireDate ? String(full.hireDate).split('T')[0] : prev.hireDate,
@@ -207,12 +270,20 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
           simple.unitName ??
           simple.departmentName ??
           '',
-        clientName: wpResolved?.clientName ?? cliente?.name,
+        clientName: clientPreview?.name ?? wpResolved?.clientName ?? '',
       });
     } catch (error) {
       console.error('Erro ao sincronizar posto/cliente do funcionário:', error);
+      setResolvedClientPreview(null);
+      toast({
+        title: 'Erro ao carregar cliente',
+        description: 'Não foi possível vincular o posto de trabalho ao cliente deste funcionário.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncingEmployeeContext(false);
     }
-  }, [companyId, toast, applyTemplateForContext, empresa?.name, empresa?.sigla, cliente?.name]);
+  }, [companyId, clients, toast, applyTemplateForContext, empresa?.name, empresa?.sigla, resolveClientFromWorkPost]);
 
   useEffect(() => {
     if (form.employeeId) {
@@ -292,7 +363,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     return () => { cancelled = true; };
   }, [form.companyId, form.clientId]);
 
-  const handleWorkPostChange = (value: string) => {
+  const handleWorkPostChange = async (value: string) => {
     const wp = workPosts.find(w => w.id === value);
     const clientId = resolveClientIdFromWorkPost(wp) || wp?.clientId || '';
     setForm(prev => ({
@@ -301,6 +372,25 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       clientId,
       location: wp?.address || prev.location,
     }));
+    if (wp?.clientName || clientId) {
+      setResolvedClientPreview({
+        id: clientId,
+        name: wp?.clientName || '',
+        address: wp?.address,
+      });
+    } else if (clientId) {
+      try {
+        const fetched = await clientService.getClientById(clientId);
+        setResolvedClientPreview(fetched);
+        setClients((prev) =>
+          prev.some((c) => c.id === fetched.id) ? prev : [...prev, fetched],
+        );
+      } catch {
+        setResolvedClientPreview(null);
+      }
+    } else {
+      setResolvedClientPreview(null);
+    }
     if (funcionario) {
       setTimeout(() => {
         applyTemplateForContext(getTemplateContext({ sector: wp?.name, clientName: wp?.clientName }), {
@@ -345,8 +435,8 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
       employeePosition: fullEmployee.position?.name || form.position || '',
       sector: sectorName,
-      clientName: cliente!.name,
-      clientAddress: cliente!.address || '',
+      clientName: clienteExibicao!.name,
+      clientAddress: clienteExibicao!.address || '',
       serviceType: form.serviceType || form.responsibility,
       location: form.location,
       startDate: form.startDate || null,
@@ -360,6 +450,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       city: form.city || empresa!.city || 'Contagem',
       documentDate: form.documentDate || todayIso(),
       responsibility: form.responsibility,
+      employeeObligations: form.employeeObligations,
       revision: form.revision,
       hireDate: form.hireDate || fullEmployee.hireDate || null,
       layoutType: form.layoutType,
@@ -367,6 +458,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       risks: form.risks,
       preventiveMeasures: form.preventiveMeasures,
       uniform: form.uniform,
+      uniformSectionTitle: form.uniformSectionTitle || undefined,
       mandatoryTrainings: form.mandatoryTrainings,
       accidentProcedure: form.accidentProcedure,
     };
@@ -401,7 +493,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
   ];
 
   const handleGenerateOrder = async () => {
-    if (!funcionario || !empresa || !cliente || !form.activities?.trim()) {
+    if (!funcionario || !empresa || !clienteExibicao || !form.activities?.trim()) {
       toast({
         title: 'Atenção',
         description:
@@ -447,7 +539,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
   };
 
   const handlePreviewOrder = async () => {
-    if (!funcionario || !empresa || !cliente) {
+    if (!funcionario || !empresa || !clienteExibicao) {
       toast({
         title: 'Atenção',
         description: 'Selecione funcionário e empresa com posto de trabalho vinculado a um cliente!',
@@ -495,7 +587,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                 Emissão de ordem de serviço para execução de atividades.
               </CardDescription>
             </div>
-            {(funcionario && empresa && cliente && form.activities) && (
+            {(funcionario && empresa && clienteExibicao && form.activities) && (
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 px-3 py-1">
                 <CheckCircle2 className="h-3 w-3" />
                 Pronto para gerar
@@ -949,7 +1041,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
               onClick={handlePreviewOrder}
               variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
-              disabled={loading || !funcionario || !empresa || !cliente}
+              disabled={loading || !funcionario || !empresa || !clienteExibicao}
             >
               {loading ? (
                 <>
@@ -967,7 +1059,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
               type="button"
               onClick={handleGenerateOrder}
               className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
-              disabled={loading || !funcionario || !empresa || !cliente}
+              disabled={loading || !funcionario || !empresa || !clienteExibicao}
             >
               {loading ? (
                 <>

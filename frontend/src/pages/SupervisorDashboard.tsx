@@ -140,6 +140,14 @@ const SupervisorDashboard = () => {
               <RefreshCw className={`mr-1 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => navigate('/supervisao/checkin-posto')}
+            >
+              <MapPin className="mr-1 h-4 w-4" />
+              Check-in no posto
+            </Button>
             <Button size="sm" onClick={() => navigate('/supervisao/visitas/nova')}>
               <Plus className="mr-1 h-4 w-4" />
               Nova visita

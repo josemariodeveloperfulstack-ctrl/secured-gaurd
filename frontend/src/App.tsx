@@ -239,6 +239,7 @@ const AdmissaoFuncionarios = lazy(() => import('@/pages/AdmissaoFuncionarios'));
 
 const ControleVisitasAvancado = lazy(() => import('@/pages/ControleVisitasAvancado'));
 const SupervisorNovaVisita = lazy(() => import('@/pages/SupervisorNovaVisita'));
+const SupervisorCheckinPosto = lazy(() => import('@/pages/SupervisorCheckinPosto'));
 const SupervisorDashboard = lazy(() => import('@/pages/SupervisorDashboard'));
 const GestorRemanejamentos = lazy(() => import('@/pages/GestorRemanejamentos'));
 const GestaoVisitasSupervisor = lazy(() => import('@/pages/GestaoVisitasSupervisor'));
@@ -1278,6 +1279,11 @@ function App() {
                     <Route path="/supervisao/visitas/nova" element={
                       <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
                         <SupervisorNovaVisita />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/supervisao/checkin-posto" element={
+                      <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
+                        <SupervisorCheckinPosto />
                       </ProtectedRoute>
                     } />
                     <Route path="/operacional/remanejamentos/aprovacoes" element={

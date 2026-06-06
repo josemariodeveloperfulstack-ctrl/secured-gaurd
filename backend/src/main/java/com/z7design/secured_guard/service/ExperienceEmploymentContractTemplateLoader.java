@@ -19,11 +19,18 @@ public class ExperienceEmploymentContractTemplateLoader {
 
     private static final String EXP_PART1 = "contracts/contrato-experiencia-part1.txt";
     private static final String EXP_PART2 = "contracts/contrato-experiencia-part2.txt";
+    private static final String EXP_PART2_VIG = "contracts/contrato-experiencia-part2-vig.txt";
     private static final String IND_PART1 = "contracts/contrato-indeterminado-part1.txt";
     private static final String IND_PART2 = "contracts/contrato-indeterminado-part2.txt";
 
     public String loadRawTemplate() {
-        return loadConcat(EXP_PART1, EXP_PART2, "contrato de experiência");
+        return loadRawTemplate(false);
+    }
+
+    /** Parte 2 da experiência: LGPD padrão ou modelo Vigilância (VIG). */
+    public String loadRawTemplate(boolean vigilancia) {
+        String part2 = vigilancia ? EXP_PART2_VIG : EXP_PART2;
+        return loadConcat(EXP_PART1, part2, "contrato de experiência");
     }
 
     /** Contrato CLT por prazo indeterminado (pós-experiência), sem termo de prorrogação. */

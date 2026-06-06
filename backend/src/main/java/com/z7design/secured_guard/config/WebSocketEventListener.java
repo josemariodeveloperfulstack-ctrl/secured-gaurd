@@ -129,6 +129,10 @@ public class WebSocketEventListener {
             }
         } else {
             log.warn("Desconexão WebSocket sem principal (sessionId: {})", sessionId);
+            userOnlineStatusService.resolveUserIdBySession(sessionId).ifPresent(userId -> {
+                log.info("WebSocket desconectado via fallback de sessão: usuário {} (sessionId: {})", userId, sessionId);
+                userOnlineStatusService.userDisconnected(userId, sessionId);
+            });
         }
     }
 

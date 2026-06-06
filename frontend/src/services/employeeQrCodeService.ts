@@ -44,7 +44,7 @@ export interface IdentifyResponse {
  * Convenções:
  *  - {@code ensure} é idempotente — pode ser chamado várias vezes.
  *  - {@code regenerate} INVALIDA o crachá anterior. Operação destrutiva — confirmar com usuário.
- *  - {@code getImageUrl} retorna URL direta para o {@code <img>}, sem fetch manual.
+ *  - {@code getImageBlobUrl} busca a imagem com JWT e devolve blob URL para {@code <img>}.
  *  - {@code identify} é o endpoint usado pela tela do Supervisor durante a visita.
  */
 export const employeeQrCodeService = {
@@ -71,14 +71,17 @@ export const employeeQrCodeService = {
   },
 
   /**
-   * URL absoluta da imagem PNG do QR Code (para usar em {@code <img src={...}/>}).
-   * Inclui um sufixo de invalidação de cache opcional.
+   * Busca a imagem PNG do QR Code via axios (com JWT) e devolve uma blob URL
+   * segura para {@code <img src={...}/>}. O endpoint exige autenticação — uma
+   * URL direta no {@code src} não envia o Bearer token e a imagem quebra.
    */
-  getImageUrl(employeeId: string, cacheBust?: string | number): string {
-    const base = (api.defaults.baseURL ?? '').replace(/\/$/, '');
-    const url = `${base}/api/employees/${employeeId}/qr-code/image`;
-    if (cacheBust === undefined) return url;
-    return `${url}?v=${encodeURIComponent(String(cacheBust))}`;
+  async getImageBlobUrl(employeeId: string, cacheBust?: string | number): Promise<string> {
+    const params = cacheBust === undefined ? undefined : { v: String(cacheBust) };
+    const { data } = await api.get<Blob>(`/api/employees/${employeeId}/qr-code/image`, {
+      responseType: 'blob',
+      params,
+    });
+    return URL.createObjectURL(data);
   },
 
   /**

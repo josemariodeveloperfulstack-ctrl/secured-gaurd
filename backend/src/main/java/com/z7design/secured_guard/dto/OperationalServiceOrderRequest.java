@@ -51,10 +51,14 @@ public class OperationalServiceOrderRequest {
     private String layoutType;
 
     // Segurança e Medicina do Trabalho (NR-01)
+    /** Uma obrigação por linha; quando informado, substitui a lista padrão no PDF */
+    private String employeeObligations;
     private String activities;
     private String risks;
     private String preventiveMeasures;
     private String uniform;
+    /** Título da seção de EPI/uniforme no PDF (padrão: UNIFORME DE USO OBRIGATÓRIO) */
+    private String uniformSectionTitle;
     private String mandatoryTrainings;
 
     /** Procedimento em caso de acidentes (layout Bombeiro Civil) */

@@ -99,20 +99,7 @@ public class OsStandardPdfService {
                         .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
                         .setPadding(3f));
 
-                // Obligations List
-                com.itextpdf.layout.element.List list = new com.itextpdf.layout.element.List()
-                        .setSymbolIndent(12)
-                        .setListSymbol("•")
-                        .setFontSize(8.5f);
-                list.add(new com.itextpdf.layout.element.ListItem("Cumprir todas as normas expedidas pelo Empregador, inclusive esta ordem de serviço;"));
-                list.add(new com.itextpdf.layout.element.ListItem("Executar as tarefas que lhe forem delegadas após treinamento específico para execução da mesma;"));
-                list.add(new com.itextpdf.layout.element.ListItem("Manter a ordem, disciplina, higiene e segurança no trabalho;"));
-                list.add(new com.itextpdf.layout.element.ListItem("Participar de treinamentos relacionados à segurança e saúde ocupacional;"));
-                list.add(new com.itextpdf.layout.element.ListItem("Usar obrigatoriamente os Equipamentos de Proteção Individual indicado para a função;"));
-                list.add(new com.itextpdf.layout.element.ListItem("Colaborar com a empresa na aplicação das Normas Regulamentadoras – NR's. (PPRA – PCMSO)"));
-                list.add(new com.itextpdf.layout.element.ListItem("É responsabilidade do empregado usar, guardar, conservar, e comunicar ao empregador qualquer alteração que torne impróprio uso do Equipamento de Proteção Individual."));
-                
-                table.addCell(new Cell().add(list).setPadding(5f));
+                table.addCell(new Cell().add(buildEmployeeObligationsList(request)).setPadding(5f));
 
                 // Habitual Activities
                 table.addCell(new Cell().add(new Paragraph("ATIVIDADES HABITUAIS").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
@@ -132,8 +119,12 @@ public class OsStandardPdfService {
                         .setPadding(3f));
                 table.addCell(new Cell().add(new Paragraph(safeStr(request.getPreventiveMeasures())).setFontSize(9f)).setPadding(5f));
 
-                // Uniform
-                table.addCell(new Cell().add(new Paragraph("UNIFORME DE USO OBRIGATÓRIO").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                // Uniform / EPI
+                String uniformSectionTitle = request.getUniformSectionTitle();
+                if (uniformSectionTitle == null || uniformSectionTitle.isBlank()) {
+                        uniformSectionTitle = "UNIFORME DE USO OBRIGATÓRIO";
+                }
+                table.addCell(new Cell().add(new Paragraph(uniformSectionTitle).setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
                         .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
                         .setPadding(3f));
                 table.addCell(new Cell().add(new Paragraph(safeStr(request.getUniform())).setFontSize(9f)).setPadding(5f));
@@ -155,6 +146,43 @@ public class OsStandardPdfService {
 
                 // Signatures
                 addSignatures(document, request, company);
+        }
+
+        private com.itextpdf.layout.element.List buildEmployeeObligationsList(OperationalServiceOrderRequest request) {
+                com.itextpdf.layout.element.List list = new com.itextpdf.layout.element.List()
+                        .setSymbolIndent(12)
+                        .setListSymbol("•")
+                        .setFontSize(8.5f);
+
+                String custom = request.getEmployeeObligations();
+                if (custom != null && !custom.isBlank()) {
+                        for (String rawLine : custom.split("\\r?\\n")) {
+                                String line = rawLine.trim();
+                                if (line.isEmpty()) {
+                                        continue;
+                                }
+                                if (line.startsWith("•")) {
+                                        line = line.substring(1).trim();
+                                }
+                                if (line.startsWith("-")) {
+                                        line = line.substring(1).trim();
+                                }
+                                if (!line.endsWith(";") && !line.endsWith(".")) {
+                                        line = line + ";";
+                                }
+                                list.add(new com.itextpdf.layout.element.ListItem(line));
+                        }
+                        return list;
+                }
+
+                list.add(new com.itextpdf.layout.element.ListItem("Cumprir todas as normas expedidas pelo Empregador, inclusive esta ordem de serviço;"));
+                list.add(new com.itextpdf.layout.element.ListItem("Executar as tarefas que lhe forem delegadas após treinamento específico para execução da mesma;"));
+                list.add(new com.itextpdf.layout.element.ListItem("Manter a ordem, disciplina, higiene e segurança no trabalho;"));
+                list.add(new com.itextpdf.layout.element.ListItem("Participar de treinamentos relacionados à segurança e saúde ocupacional;"));
+                list.add(new com.itextpdf.layout.element.ListItem("Usar obrigatoriamente os Equipamentos de Proteção Individual indicado para a função;"));
+                list.add(new com.itextpdf.layout.element.ListItem("Colaborar com a empresa na aplicação das Normas Regulamentadoras – NR's. (PPRA – PCMSO)"));
+                list.add(new com.itextpdf.layout.element.ListItem("É responsabilidade do empregado usar, guardar, conservar, e comunicar ao empregador qualquer alteração que torne impróprio uso do Equipamento de Proteção Individual."));
+                return list;
         }
 
         private String safeStr(String str) {

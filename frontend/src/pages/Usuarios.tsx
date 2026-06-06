@@ -259,19 +259,23 @@ const Usuarios: React.FC = () => {
   useWebSocket({
     token: localStorage.getItem('token') || '',
     username: currentUser?.username || currentUser?.email || currentUser?.id || '',
+    onConnect: () => {
+      // Após reconectar o WS, sincroniza a lista com o backend (snapshot de online)
+      queryClient.invalidateQueries({ queryKey: ['users', 'paged'] });
+    },
     onUserStatus: (event) => {
+      const isOnline = Boolean(event.isOnline ?? (event as { online?: boolean }).online);
       queryClient.setQueriesData<UserPageResponse>(
         { queryKey: ['users', 'paged'] },
         (prev) => {
           if (!prev) return prev;
           const nextContent = prev.content.map((u) =>
-            u.id === event.userId ? { ...u, isOnline: Boolean(event.isOnline) } : u
+            u.id === event.userId ? { ...u, isOnline } : u
           );
           const wasOnline = prev.content.some((u) => u.id === event.userId && u.isOnline);
-          const isNowOnline = Boolean(event.isOnline);
           let nextOnlineCount = prev.onlineCount;
-          if (wasOnline && !isNowOnline) nextOnlineCount = Math.max(0, nextOnlineCount - 1);
-          if (!wasOnline && isNowOnline) nextOnlineCount += 1;
+          if (wasOnline && !isOnline) nextOnlineCount = Math.max(0, nextOnlineCount - 1);
+          if (!wasOnline && isOnline) nextOnlineCount += 1;
           return { ...prev, content: nextContent, onlineCount: nextOnlineCount };
         }
       );

@@ -15,6 +15,18 @@ interface WebSocketConfig {
   onDisconnect?: () => void;
 }
 
+/** Jackson pode serializar como "online" ou "isOnline" — normaliza aqui. */
+function normalizeUserStatusEvent(raw: Record<string, unknown>): {
+  userId: string;
+  isOnline: boolean;
+  timestamp?: number;
+} {
+  const userId = String(raw.userId ?? '');
+  const isOnline = Boolean(raw.isOnline ?? raw.online);
+  const timestamp = typeof raw.timestamp === 'number' ? raw.timestamp : undefined;
+  return { userId, isOnline, timestamp };
+}
+
 // Singleton state for the physical connection
 let sharedClient: Client | null = null;
 let sharedSubscribers: Set<WebSocketConfig> = new Set();
@@ -126,7 +138,7 @@ export const useWebSocket = (config: WebSocketConfig) => {
 
         client.subscribe(`/user/${config.username}/queue/user-status`, (message) => {
           try {
-            const event = JSON.parse(message.body);
+            const event = normalizeUserStatusEvent(JSON.parse(message.body));
             const { updateUserStatus } = useMessageStore.getState();
             if (updateUserStatus && event.userId) {
               updateUserStatus(event.userId, event.isOnline);
@@ -139,7 +151,7 @@ export const useWebSocket = (config: WebSocketConfig) => {
 
         client.subscribe('/topic/user-status', (message) => {
           try {
-            const event = JSON.parse(message.body);
+            const event = normalizeUserStatusEvent(JSON.parse(message.body));
             const { updateUserStatus } = useMessageStore.getState();
             if (updateUserStatus && event.userId) {
               updateUserStatus(event.userId, event.isOnline);

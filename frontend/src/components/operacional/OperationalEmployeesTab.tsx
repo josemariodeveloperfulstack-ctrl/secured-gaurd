@@ -26,10 +26,17 @@ import {
   Building2,
   ArrowRightLeft,
   Search,
+  QrCode,
 } from 'lucide-react';
 import { employeeService } from '@/services/employeeService';
 import { operationalService, WorkPostAssignment } from '@/services/operationalService';
 import { employeeChangeHistoryService, EmployeeChangeHistoryItem } from '@/services/employeeChangeHistoryService';
+import {
+  supervisorVisitService,
+  ALLOCATION_BADGE_CLASS,
+  ALLOCATION_LABEL,
+  type EmployeePresenceHistoryRow,
+} from '@/services/supervisorVisitService';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -515,13 +522,14 @@ const EmployeeRow: React.FC<EmployeeRowProps> = ({
     medicalExams: Array<{ id: string; scheduledDate?: string; completionDate?: string; category?: string; status?: string }>;
     trainings: Array<{ id: string; training?: { name?: string }; completionDate?: string; status?: string }>;
     activities: Array<{ id: string; activityType?: string; activityDate?: string; status?: string }>;
+    presences: EmployeePresenceHistoryRow[];
   } | null>(null);
 
   const loadHistory = async () => {
     if (history) return;
     setHistoryLoading(true);
     try {
-      const [fullEmployeeRes, changesRes, assignments, medicalExams, trainings, activities] = await Promise.allSettled([
+      const [fullEmployeeRes, changesRes, assignments, medicalExams, trainings, activities, presences] = await Promise.allSettled([
         employeeService.getEmployeeById(employee.id),
         employeeChangeHistoryService.getByEmployeeId(employee.id, 0, 50),
         operationalService.getAllWorkPostAssignments().then(list =>
@@ -532,6 +540,7 @@ const EmployeeRow: React.FC<EmployeeRowProps> = ({
         operationalService.getAllSpecificActivities().then(list =>
           list.filter((a: { employee?: { id?: string } }) => a.employee?.id === employee.id)
         ),
+        supervisorVisitService.employeeHistory(employee.id).catch(() => []),
       ]);
 
       const fullEmp = fullEmployeeRes.status === 'fulfilled' ? fullEmployeeRes.value : null;
@@ -542,6 +551,7 @@ const EmployeeRow: React.FC<EmployeeRowProps> = ({
         medicalExams: medicalExams.status === 'fulfilled' ? (medicalExams.value as any[]) : [],
         trainings: trainings.status === 'fulfilled' ? (trainings.value as any[]) : [],
         activities: activities.status === 'fulfilled' ? activities.value : [],
+        presences: presences.status === 'fulfilled' ? (presences.value as EmployeePresenceHistoryRow[]) : [],
       });
     } catch (e) {
       console.error('Erro ao carregar histórico:', e);
@@ -552,6 +562,7 @@ const EmployeeRow: React.FC<EmployeeRowProps> = ({
         medicalExams: [],
         trainings: [],
         activities: [],
+        presences: [],
       });
     } finally {
       setHistoryLoading(false);
@@ -661,6 +672,7 @@ interface EmployeeHistoryPanelProps {
     medicalExams: Array<{ id: string; scheduledDate?: string; completionDate?: string; category?: string; status?: string }>;
     trainings: Array<{ id: string; training?: { name?: string }; completionDate?: string; status?: string }>;
     activities: Array<{ id: string; activityType?: string; activityDate?: string; status?: string }>;
+    presences: EmployeePresenceHistoryRow[];
   };
 }
 
@@ -866,6 +878,64 @@ const EmployeeHistoryPanel: React.FC<EmployeeHistoryPanelProps> = ({ employee, h
               <div key={a.id} className="text-sm flex items-center gap-2">
                 <Calendar className="h-3.5 w-3.5 text-slate-500" />
                 {formatDate(a.activityDate)} - {a.activityType?.replace('_', ' ') || '-'}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Confirmações de presença (visitas do supervisor) */}
+      <div className="space-y-4 lg:col-span-2">
+        <h4 className="font-semibold text-slate-200 flex items-center gap-2">
+          <QrCode className="h-4 w-4" />
+          Confirmações de presença
+          {history.presences.length > 0 && (
+            <Badge variant="outline" className="bg-blue-500/20 text-blue-300">
+              {history.presences.length}
+            </Badge>
+          )}
+        </h4>
+        <div className="bg-slate-800/50 rounded-lg p-4 max-h-60 overflow-y-auto space-y-2">
+          {history.presences.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              Nenhuma presença confirmada por supervisor.
+            </p>
+          ) : (
+            history.presences.map((p) => (
+              <div
+                key={p.visitId}
+                className="text-sm border-b border-slate-700/50 pb-2 last:border-0"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <CheckCircle className="h-3.5 w-3.5 text-green-400 flex-shrink-0" />
+                  <span className="text-slate-300">
+                    {formatDate(p.visitDate)}
+                    {p.visitTime ? ` às ${p.visitTime.slice(0, 5)}` : ''}
+                  </span>
+                  <span className="text-slate-400">•</span>
+                  <span className="flex items-center gap-1 text-slate-300">
+                    <MapPin className="h-3 w-3" />
+                    {p.workPostName || '-'}
+                  </span>
+                  {p.allocationType && (
+                    <Badge className={`${ALLOCATION_BADGE_CLASS[p.allocationType]} text-xs`}>
+                      {ALLOCATION_LABEL[p.allocationType]}
+                    </Badge>
+                  )}
+                  {p.qrCodeVerified && (
+                    <Badge variant="outline" className="bg-blue-500/20 text-blue-300 text-xs">
+                      <QrCode className="h-3 w-3 mr-1" /> QR posto
+                    </Badge>
+                  )}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 pl-5 text-xs text-muted-foreground">
+                  {p.supervisorName && <span>Supervisor: {p.supervisorName}</span>}
+                  {p.locationAddress && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> {p.locationAddress}
+                    </span>
+                  )}
+                </div>
               </div>
             ))
           )}

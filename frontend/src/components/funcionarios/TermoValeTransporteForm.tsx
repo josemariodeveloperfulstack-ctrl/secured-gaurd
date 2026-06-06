@@ -18,59 +18,11 @@ import api from '@/lib/axios';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { CompanyCombobox } from '@/components/ui/company-combobox';
 import { useInvalidateDocumentosGerados } from '@/hooks/queries/useDocumentosGerados';
+import { formatEmployeeFullAddress, type EmployeeAddressSource } from '@/utils/formatEmployeeAddress';
 
 interface TermoValeTransporteFormProps {
   employeeId?: string;
   companyId?: string;
-}
-
-type EmployeeAddressSource = {
-  address?: string | {
-    street?: string;
-    number?: string;
-    complement?: string;
-    neighborhood?: string;
-    city?: string;
-    state?: string;
-    zipCode?: string;
-  };
-  enderecoRua?: string;
-  enderecoNumero?: string;
-  enderecoComplemento?: string;
-  enderecoBairro?: string;
-  enderecoCidade?: string;
-  enderecoEstado?: string;
-  enderecoCep?: string;
-};
-
-function formatEmployeeAddress(emp: EmployeeAddressSource): string {
-  if (typeof emp.address === 'string' && emp.address.trim()) {
-    return emp.address.trim();
-  }
-
-  const addr = typeof emp.address === 'object' && emp.address ? emp.address : undefined;
-  const parts: string[] = [];
-
-  const streetLine = [addr?.street ?? emp.enderecoRua, addr?.number ?? emp.enderecoNumero]
-    .filter(Boolean)
-    .join(', ');
-  if (streetLine) parts.push(streetLine);
-
-  const complement = addr?.complement ?? emp.enderecoComplemento;
-  if (complement) parts.push(complement);
-
-  const neighborhood = addr?.neighborhood ?? emp.enderecoBairro;
-  if (neighborhood) parts.push(neighborhood);
-
-  const cityState = [addr?.city ?? emp.enderecoCidade, addr?.state ?? emp.enderecoEstado]
-    .filter(Boolean)
-    .join('/');
-  if (cityState) parts.push(cityState);
-
-  const zip = addr?.zipCode ?? emp.enderecoCep;
-  if (zip) parts.push(`CEP ${zip}`);
-
-  return parts.join(' - ');
 }
 
 function toIsoDateOnly(value?: string): string | undefined {
@@ -212,7 +164,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
     }
 
     const admissionDate = toIsoDateOnly(fullEmployee.hireDate || form.dataInicio);
-    const addressValue = formatEmployeeAddress(fullEmployee as EmployeeAddressSource);
+    const addressValue = formatEmployeeFullAddress(fullEmployee as EmployeeAddressSource);
     const companyName =
       empresa?.name
       || (fullEmployee.company as { name?: string } | undefined)?.name
@@ -273,7 +225,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       employeeCpf: fullEmployee.cpf || (fullEmployee as { document?: string }).document || '',
       companyName,
       hireDate: admissionDate,
-      employeeAddress: formatEmployeeAddress(fullEmployee as EmployeeAddressSource),
+      employeeAddress: formatEmployeeFullAddress(fullEmployee as EmployeeAddressSource),
       city: empresa?.city || (fullEmployee.company as { city?: string } | undefined)?.city || '',
       documentDate: admissionDate,
       manualFill: true,
@@ -558,7 +510,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                   <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">Endereço do Funcionário</p>
                   <p className="text-sm font-medium">
                     {funcionario
-                      ? formatEmployeeAddress(selectedEmployeeData as EmployeeAddressSource) || 'Não cadastrado'
+                      ? formatEmployeeFullAddress(selectedEmployeeData as EmployeeAddressSource) || 'Não cadastrado'
                       : 'Selecione um funcionário'}
                   </p>
                 </div>

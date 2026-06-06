@@ -213,6 +213,46 @@ public class CompanyDataFormatter {
     }
 
     /**
+     * Endereço no padrão do termo LGPD da Vigilância:
+     * Rua, Número, Bairro, Cidade/UF, CEP: XX.XXX-XXX
+     */
+    public static String formatAddressForLgpdVig(Company company) {
+        if (company == null) {
+            return "";
+        }
+
+        java.util.List<String> parts = new java.util.ArrayList<>();
+
+        if (company.getEnderecoRua() != null && !company.getEnderecoRua().isBlank()) {
+            String street = company.getEnderecoRua().trim();
+            if (company.getEnderecoNumero() != null && !company.getEnderecoNumero().isBlank()) {
+                street += ", " + company.getEnderecoNumero().trim();
+            }
+            parts.add(street);
+        } else if (company.getAddress() != null && !company.getAddress().isBlank()) {
+            parts.add(company.getAddress().trim());
+        }
+
+        if (company.getEnderecoBairro() != null && !company.getEnderecoBairro().isBlank()) {
+            parts.add(company.getEnderecoBairro().trim());
+        }
+
+        if (company.getCity() != null && !company.getCity().isBlank()) {
+            String cityState = company.getCity().trim();
+            if (company.getState() != null && !company.getState().isBlank()) {
+                cityState += "/" + company.getState().trim();
+            }
+            parts.add(cityState);
+        }
+
+        if (company.getZipCode() != null && !company.getZipCode().isBlank()) {
+            parts.add("CEP: " + formatZipCode(company.getZipCode()));
+        }
+
+        return String.join(", ", parts);
+    }
+
+    /**
      * Formata CEP: XXXXX-XXX
      */
     public static String formatZipCode(String zipCode) {

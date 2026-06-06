@@ -1,6 +1,9 @@
 package com.z7design.secured_guard.config;
 
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.security.JwtService;
+import com.z7design.secured_guard.service.UserOnlineStatusService;
+import com.z7design.secured_guard.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +23,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Configuração de segurança para WebSocket
@@ -35,6 +40,12 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
 
     @Autowired
     private UserDetailsService userDetailsService;
+
+    @Autowired
+    private UserOnlineStatusService userOnlineStatusService;
+
+    @Autowired
+    private UserService userService;
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
@@ -75,6 +86,7 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
                                         
                                         // Definir o principal na sessão
                                         accessor.setUser(authentication);
+                                        registerOnlineUser(username, accessor.getSessionId());
                                         
                                         log.info("✅ WebSocket autenticado para usuário: {} (sessionId: {})", username, accessor.getSessionId());
                                     } else {
@@ -104,6 +116,7 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
                                     userDetails.getAuthorities()
                                 );
                                 accessor.setUser(authentication);
+                                registerOnlineUser(username, accessor.getSessionId());
                                 log.info("✅ WebSocket autenticado via X-Username para usuário: {} (sessionId: {})", username, accessor.getSessionId());
                             } catch (Exception e) {
                                 log.error("❌ Erro ao autenticar via X-Username (username: {}): {}", username, e.getMessage(), e);
@@ -114,9 +127,47 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
                     }
                 }
                 
+                if (accessor != null && StompCommand.DISCONNECT.equals(accessor.getCommand())) {
+                    String sessionId = accessor.getSessionId();
+                    UUID userId = resolveUserId(accessor);
+                    if (userId == null && sessionId != null) {
+                        userId = userOnlineStatusService.resolveUserIdBySession(sessionId).orElse(null);
+                    }
+                    if (userId != null) {
+                        log.info("WebSocket DISCONNECT: usuário {} (sessionId: {})", userId, sessionId);
+                        userOnlineStatusService.userDisconnected(userId, sessionId);
+                    }
+                }
+
                 return message;
             }
         });
+    }
+
+    private void registerOnlineUser(String username, String sessionId) {
+        if (username == null || sessionId == null) {
+            return;
+        }
+        try {
+            Optional<User> user = userService.findByUsername(username);
+            user.ifPresent(u -> userOnlineStatusService.userConnected(u.getId(), sessionId));
+        } catch (Exception e) {
+            log.error("Erro ao registrar usuário online via WebSocket ({}): {}", username, e.getMessage(), e);
+        }
+    }
+
+    private UUID resolveUserId(StompHeaderAccessor accessor) {
+        if (accessor.getUser() == null) {
+            return null;
+        }
+        try {
+            return userService.findByUsername(accessor.getUser().getName())
+                    .map(User::getId)
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("Não foi possível resolver userId do principal {}: {}", accessor.getUser().getName(), e.getMessage());
+            return null;
+        }
     }
 }
 

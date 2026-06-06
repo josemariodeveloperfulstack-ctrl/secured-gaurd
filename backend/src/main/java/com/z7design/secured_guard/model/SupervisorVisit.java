@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.model;
 
+import com.z7design.secured_guard.model.enums.PostAllocationType;
 import com.z7design.secured_guard.model.enums.VisitStatus;
 
 import jakarta.persistence.*;
@@ -30,7 +31,7 @@ public class SupervisorVisit {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "supervisor_id", nullable = false)
+    @JoinColumn(name = "supervisor_id")
     private Employee supervisor;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -38,8 +39,21 @@ public class SupervisorVisit {
     private WorkPost workPost;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "client_id", nullable = false)
+    @JoinColumn(name = "client_id")
     private Client client;
+
+    /** Funcionário verificado no posto durante a visita (efetivo, remanejado ou cobertura). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "checked_employee_id")
+    private Employee checkedEmployee;
+
+    /** Vínculo do funcionário verificado com o posto no momento do check-in. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "allocation_type")
+    private PostAllocationType allocationType;
+
+    @Column(name = "allocation_description")
+    private String allocationDescription;
 
     @Column(nullable = false)
     private LocalDate visitDate;

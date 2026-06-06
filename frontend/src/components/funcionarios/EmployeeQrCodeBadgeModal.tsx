@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Printer, RefreshCw, ShieldCheck } from 'lucide-react';
 import {
   Dialog,
@@ -54,7 +54,26 @@ export function EmployeeQrCodeBadgeModal({
   const [loading, setLoading] = useState(false);
   const [employee, setEmployee] = useState<EmployeeIdentification | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [imageVersion, setImageVersion] = useState<number>(() => Date.now());
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const imageUrlRef = useRef<string>('');
+
+  const revokeImageUrl = useCallback(() => {
+    if (imageUrlRef.current) {
+      URL.revokeObjectURL(imageUrlRef.current);
+      imageUrlRef.current = '';
+    }
+    setImageUrl('');
+  }, []);
+
+  const loadQrImage = useCallback(
+    async (id: string) => {
+      revokeImageUrl();
+      const blobUrl = await employeeQrCodeService.getImageBlobUrl(id, Date.now());
+      imageUrlRef.current = blobUrl;
+      setImageUrl(blobUrl);
+    },
+    [revokeImageUrl],
+  );
 
   const loadCard = useCallback(async () => {
     if (!employeeId) return;
@@ -63,7 +82,7 @@ export function EmployeeQrCodeBadgeModal({
       const { token: t, employee: emp } = await employeeQrCodeService.ensure(employeeId);
       setToken(t);
       setEmployee(emp);
-      setImageVersion(Date.now());
+      await loadQrImage(employeeId);
     } catch (err: any) {
       toast({
         title: 'Erro ao gerar QR Code',
@@ -73,22 +92,20 @@ export function EmployeeQrCodeBadgeModal({
     } finally {
       setLoading(false);
     }
-  }, [employeeId, toast]);
+  }, [employeeId, loadQrImage, toast]);
 
   useEffect(() => {
     if (open && employeeId) {
       void loadCard();
     } else if (!open) {
       // Reseta o estado ao fechar para evitar piscar dados de outro funcionário.
+      revokeImageUrl();
       setEmployee(null);
       setToken(null);
     }
-  }, [open, employeeId, loadCard]);
+  }, [open, employeeId, loadCard, revokeImageUrl]);
 
-  const imageUrl = useMemo(
-    () => (employeeId ? employeeQrCodeService.getImageUrl(employeeId, imageVersion) : ''),
-    [employeeId, imageVersion],
-  );
+  useEffect(() => () => revokeImageUrl(), [revokeImageUrl]);
 
   const handleRegenerate = useCallback(async () => {
     if (!employeeId) return;
@@ -99,7 +116,7 @@ export function EmployeeQrCodeBadgeModal({
       );
       setToken(t);
       setEmployee(emp);
-      setImageVersion(Date.now());
+      await loadQrImage(employeeId);
       toast({
         title: 'QR Code regenerado',
         description: warning ?? 'Imprima o novo crachá. O anterior foi invalidado.',
@@ -113,7 +130,7 @@ export function EmployeeQrCodeBadgeModal({
     } finally {
       setLoading(false);
     }
-  }, [employeeId, toast]);
+  }, [employeeId, loadQrImage, toast]);
 
   const handlePrint = useCallback(() => {
     if (!employee || !imageUrl) return;

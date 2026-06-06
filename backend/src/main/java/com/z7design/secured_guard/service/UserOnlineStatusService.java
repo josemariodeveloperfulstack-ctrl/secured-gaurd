@@ -1,11 +1,13 @@
 package com.z7design.secured_guard.service;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,6 +22,9 @@ public class UserOnlineStatusService {
     // Mapa de userId -> Set de sessionIds (um usuário pode ter múltiplas sessões)
     private final Map<UUID, Set<String>> onlineUsers = new ConcurrentHashMap<>();
 
+    // sessionId -> userId (permite desconectar mesmo quando o Principal já sumiu)
+    private final Map<String, UUID> sessionToUser = new ConcurrentHashMap<>();
+
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
@@ -29,20 +34,25 @@ public class UserOnlineStatusService {
      * @param sessionId ID da sessão WebSocket
      */
     public void userConnected(UUID userId, String sessionId) {
+        if (userId == null || sessionId == null || sessionId.isBlank()) {
+            return;
+        }
+        sessionToUser.put(sessionId, userId);
         onlineUsers.compute(userId, (key, sessions) -> {
             if (sessions == null) {
                 sessions = ConcurrentHashMap.newKeySet();
             }
-            sessions.add(sessionId);
-            
-            // Se é a primeira sessão deste usuário, notificar que ele ficou online
-            if (sessions.size() == 1) {
+            boolean wasEmpty = sessions.isEmpty();
+            boolean added = sessions.add(sessionId);
+
+            // Primeira sessão deste usuário → broadcast online
+            if (added && wasEmpty) {
                 log.info("Usuário {} ficou online (sessão: {})", userId, sessionId);
                 notifyUserStatusChange(userId, true);
-            } else {
+            } else if (added) {
                 log.debug("Usuário {} adicionou nova sessão: {} (total: {})", userId, sessionId, sessions.size());
             }
-            
+
             return sessions;
         });
     }
@@ -53,9 +63,15 @@ public class UserOnlineStatusService {
      * @param sessionId ID da sessão WebSocket
      */
     public void userDisconnected(UUID userId, String sessionId) {
+        if (sessionId != null) {
+            sessionToUser.remove(sessionId);
+        }
+        if (userId == null) {
+            return;
+        }
         onlineUsers.computeIfPresent(userId, (key, sessions) -> {
             sessions.remove(sessionId);
-            
+
             // Se não há mais sessões, o usuário ficou offline
             if (sessions.isEmpty()) {
                 log.info("Usuário {} ficou offline (última sessão removida: {})", userId, sessionId);
@@ -66,6 +82,16 @@ public class UserOnlineStatusService {
                 return sessions;
             }
         });
+    }
+
+    /**
+     * Resolve o usuário associado a uma sessão WebSocket (fallback na desconexão).
+     */
+    public Optional<UUID> resolveUserIdBySession(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(sessionToUser.get(sessionId));
     }
 
     /**
@@ -133,6 +159,7 @@ public class UserOnlineStatusService {
      */
     public static class UserStatusEvent {
         private String userId;
+        @JsonProperty("isOnline")
         private boolean isOnline;
         private long timestamp;
 
@@ -144,10 +171,12 @@ public class UserOnlineStatusService {
             this.userId = userId;
         }
 
+        @JsonProperty("isOnline")
         public boolean isOnline() {
             return isOnline;
         }
 
+        @JsonProperty("isOnline")
         public void setOnline(boolean online) {
             isOnline = online;
         }

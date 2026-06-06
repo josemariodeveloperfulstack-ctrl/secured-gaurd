@@ -22,6 +22,7 @@ import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { resolveCompanySigningCity } from '@/utils/resolveCompanySigningCity';
+import { formatEmployeeFullAddress } from '@/utils/formatEmployeeAddress';
 import { useInvalidateDocumentosGerados } from '@/hooks/queries/useDocumentosGerados';
 
 interface ContratosTrabalhoFormProps {
@@ -34,9 +35,13 @@ interface ContratosTrabalhoFormProps {
 function resolvePdfContractKind(
   contractType: string
 ): 'EXPERIENCE' | 'INDEFINITE' | 'STANDARD' {
-  if (contractType === 'Contrato de Experiência') return 'EXPERIENCE';
+  if (contractType === 'Contrato de Experiência' || contractType === 'Intermitente') return 'EXPERIENCE';
   if (contractType === 'CLT - Prazo indeterminado (integral)') return 'INDEFINITE';
   return 'STANDARD';
+}
+
+function isExperienceLikeContract(contractType: string): boolean {
+  return contractType === 'Contrato de Experiência' || contractType === 'Intermitente';
 }
 
 /**
@@ -236,17 +241,17 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
     }
   }, [funcionario, costCenters, allWorkPosts]);
 
-  // Default da duração de experiência: 45 dias quando "Contrato de Experiência" é selecionado
+  // Default da duração: 45 dias para experiência e intermitente (modelo integral)
   useEffect(() => {
-    if (form.contractType === 'Contrato de Experiência' && !form.experienceDuration) {
+    if (isExperienceLikeContract(form.contractType) && !form.experienceDuration) {
       setForm(prev => ({ ...prev, experienceDuration: '45' }));
     }
   }, [form.contractType, form.experienceDuration]);
 
-  // Garante que a data de início use a hireDate do cadastro quando for contrato de experiência
+  // Data de início = data de admissão (hireDate) para experiência e intermitente
   useEffect(() => {
     if (
-      form.contractType === 'Contrato de Experiência' &&
+      isExperienceLikeContract(form.contractType) &&
       funcionario?.hireDate &&
       !form.startDate
     ) {
@@ -257,12 +262,12 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
     }
   }, [form.contractType, funcionario?.hireDate, form.startDate]);
 
-  // Auto-calcula a Data de Término para contratos de experiência.
+  // Auto-calcula a Data de Término para contratos de experiência/intermitente.
   // Usa cálculo local (sem timezone) para garantir que a data exibida no card
   // ("Data de Término Calculada") seja IDÊNTICA à do input "Data de Término".
   useEffect(() => {
     if (
-      form.contractType === 'Contrato de Experiência' &&
+      isExperienceLikeContract(form.contractType) &&
       form.startDate &&
       form.experienceDuration
     ) {
@@ -333,10 +338,10 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
       });
       return false;
     }
-    if (form.contractType === 'Contrato de Experiência' && !form.experienceDuration) {
+    if (isExperienceLikeContract(form.contractType) && !form.experienceDuration) {
       toast({
         title: 'Atenção',
-        description: 'Selecione a duração do período de experiência (30, 45, 60 ou 90 dias)!',
+        description: 'Selecione a duração do período contratual (30, 45, 60 ou 90 dias)!',
         variant: 'destructive'
       });
       return false;
@@ -349,9 +354,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
     const fullEmployee = await employeeService.getEmployeeById(funcionario!.id);
     if (!fullEmployee) throw new Error('Funcionário não encontrado');
 
-    const addressValue = typeof fullEmployee.address === 'string'
-      ? fullEmployee.address
-      : fullEmployee.address?.street || '';
+    const addressValue = formatEmployeeFullAddress(fullEmployee);
 
     const pdfKind = resolvePdfContractKind(form.contractType);
     const isExperiencia = pdfKind === 'EXPERIENCE';
@@ -785,16 +788,22 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
               </div>
             </div>
 
-            {/* Campo de Duração da Experiência (aparece apenas para Contrato de Experiência) */}
-            {form.contractType === 'Contrato de Experiência' && (
+            {/* Duração do período (experiência e intermitente — modelo integral em várias páginas) */}
+            {isExperienceLikeContract(form.contractType) && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50 border-2 border-orange-300 rounded-lg animate-in fade-in zoom-in-95 duration-300">
                 <div className="space-y-2 md:col-span-3">
                   <div className="flex items-center gap-2 mb-2">
                     <Clock className="h-5 w-5 text-orange-600" />
-                    <Label className="text-orange-700 font-bold text-base">⚠️ Configuração do Contrato de Experiência</Label>
+                    <Label className="text-orange-700 font-bold text-base">
+                      {form.contractType === 'Intermitente'
+                        ? 'Configuração do Contrato Intermitente'
+                        : 'Configuração do Contrato de Experiência'}
+                    </Label>
                   </div>
                   <p className="text-sm text-orange-700">
-                    Selecione a duração do período de experiência. A data de término será calculada automaticamente.
+                    {form.contractType === 'Intermitente'
+                      ? 'Gera o contrato integral (cláusulas, LGPD Vigilância e termo de prorrogação). A data do contrato é a data de admissão.'
+                      : 'Selecione a duração do período de experiência. A data de término será calculada automaticamente.'}
                   </p>
                   <p className="text-xs text-orange-600 mt-1">
                     Padrão: <strong>45 dias</strong> a partir da data de admissão
@@ -804,7 +813,9 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-orange-700 font-semibold">Duração da Experiência *</Label>
+                  <Label className="text-orange-700 font-semibold">
+                    {form.contractType === 'Intermitente' ? 'Duração do Período *' : 'Duração da Experiência *'}
+                  </Label>
                   <Select
                     value={form.experienceDuration}
                     onValueChange={(value) => setForm(prev => ({ ...prev, experienceDuration: value }))}
@@ -849,13 +860,20 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <Label>Data de Início</Label>
+                <Label>
+                  {isExperienceLikeContract(form.contractType) ? 'Data de Admissão (início do contrato)' : 'Data de Início'}
+                </Label>
                 <Input
                   type="date"
                   value={form.startDate}
                   onChange={(e) => setForm(prev => ({ ...prev, startDate: e.target.value }))}
                   className="bg-background h-11"
                 />
+                {isExperienceLikeContract(form.contractType) && (
+                  <p className="text-xs text-muted-foreground">
+                    Esta data é usada na assinatura do contrato (cidade + data de admissão).
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">

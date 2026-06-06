@@ -50,6 +50,19 @@ public class PublicEmailController {
         return ResponseEntity.ok(Map.of("ok", ok));
     }
 
+    /**
+     * Descadastro one-click (RFC 8058) acionado pelo botão "Cancelar inscrição"
+     * do Gmail/Outlook. O provedor envia {@code POST} com
+     * {@code Content-Type: application/x-www-form-urlencoded} e corpo
+     * {@code List-Unsubscribe=One-Click}; o token vai na própria URL do
+     * cabeçalho {@code List-Unsubscribe}. Deve responder 2xx rapidamente.
+     */
+    @PostMapping(value = "/unsubscribe", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ResponseEntity<Void> unsubscribeOneClick(@RequestParam("token") String token) {
+        unsubscribeService.confirmByToken(token, "one-click (RFC 8058)");
+        return ResponseEntity.ok().build();
+    }
+
     private String buildHtml(String title, String message) {
         return """
                 <!doctype html>

@@ -20,6 +20,10 @@ public class LGPDConsentRequest {
     private String employeeCep;
     private String city;
     private LocalDate consentDate;
+    /** VIGILANCIA = termo Promover Vigilância; DEFAULT = demais empresas */
+    private String termVariant;
+    /** Endereço completo pré-formatado (variante vigilância) */
+    private String employeeFullAddress;
 
     public LGPDConsentRequest() {
     }
@@ -160,5 +164,21 @@ public class LGPDConsentRequest {
 
     public void setDate(LocalDate date) {
         this.consentDate = date;
+    }
+
+    public String getTermVariant() {
+        return termVariant;
+    }
+
+    public void setTermVariant(String termVariant) {
+        this.termVariant = termVariant;
+    }
+
+    public String getEmployeeFullAddress() {
+        return employeeFullAddress;
+    }
+
+    public void setEmployeeFullAddress(String employeeFullAddress) {
+        this.employeeFullAddress = employeeFullAddress;
     }
 }
