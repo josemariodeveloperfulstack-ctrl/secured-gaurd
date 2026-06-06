@@ -108,6 +108,7 @@ services:
       BAILEYS_REST_URL: ${BAILEYS_REST_URL:-http://whatsapp-service-ci:3333}
       BAILEYS_ENABLED: ${BAILEYS_ENABLED:-true}
       BAILEYS_INSTANCE_KEY: ${BAILEYS_INSTANCE_KEY:-securedguard_ci}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=25.0 -XX:+UseG1GC -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom"
     ports:
       - "8081:8080"
     volumes:
@@ -125,9 +126,9 @@ services:
     healthcheck:
       test: ["CMD", "sh", "-c", "curl -f http://localhost:8080/api/health || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 15
-      start_period: 420s
+      timeout: 15s
+      retries: 20
+      start_period: 600s
     restart: unless-stopped
     # DESABILITADO TRAEFIK - usando Nginx como proxy reverso
     labels:
@@ -249,7 +250,7 @@ services:
       - "traefik.http.routers.nginx-ci-https.priority=2000"
       - "traefik.http.routers.nginx-ci-http.rule=Host(`ci.z7botsolutions.com.br`)"
       - "traefik.http.routers.nginx-ci-http.entrypoints=web"
-      - "traefik.http.routers.nginx-ci-http.middlewares=redirect-https@docker"
+      - "traefik.http.routers.nginx-ci-http.middlewares=redirect-https@file"
       - "traefik.http.routers.nginx-ci-http.priority=2000"
       - "traefik.http.services.nginx-ci-service.loadbalancer.server.port=80"
       - "traefik.docker.network=z7network"

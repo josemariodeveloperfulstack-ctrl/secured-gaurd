@@ -449,9 +449,26 @@ jobs:
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || true
             
-            echo "🚀 Iniciando todos os containers..."
-            # Imagens já foram puxadas do Docker Hub acima; --pull missing evita re-pull do GHCR/registry errado
-            $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing --remove-orphans
+            echo "🚀 Iniciando backend primeiro (reduz contenção de RAM na VPS)..."
+            $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing backend-ci
+            echo "⏳ Aguardando backend iniciar boot (Flyway + Spring)..."
+            for i in $(seq 1 24); do
+              if curl -sf --max-time 5 http://localhost:8081/api/health >/dev/null 2>&1; then
+                echo "✅ Backend respondeu em localhost:8081!"
+                break
+              fi
+              RESTARTS=$(docker inspect secured-guard-backend-ci --format '{{.RestartCount}}' 2>/dev/null || echo 0)
+              echo "   tentativa $i/24 — restarts=$RESTARTS"
+              [ "$RESTARTS" -gt 3 ] 2>/dev/null && {
+                echo "⚠️ Backend reiniciou $RESTARTS vezes — últimos logs:"
+                docker logs --tail 30 secured-guard-backend-ci 2>&1 || true
+              }
+              [ $i -eq 24 ] && echo "⚠️ Backend ainda não respondeu; subindo demais serviços mesmo assim"
+              sleep 15
+            done
+
+            echo "🚀 Iniciando frontend, nginx, whatsapp e evolution..."
+            $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing frontend-ci nginx-ci whatsapp-service-ci evolution-api-ci
             
             echo "🔎 Verificando containers CI..."
             $DC -f docker-compose.ci.yml ps
@@ -471,10 +488,14 @@ jobs:
             curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
             
             echo "🔄 Garantindo que o traefik está a rodar..."
+            cd /var/www/secured_guard
             if ! docker ps --format '{{.Names}}' | grep -q '^traefik$'; then
-              cd /var/www/secured_guard
               $DC -f docker-compose.traefik.yml up -d
             fi
+            # Forçar reload do file provider (redirect-https@file em traefik/dynamic/ci.yml)
+            touch /var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || true
+            sleep 3
+            cd /var/www/secured_guard/ci
             docker network connect z7network secured-guard-nginx-ci 2>/dev/null || true
             
           EOF

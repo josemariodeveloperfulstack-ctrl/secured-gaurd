@@ -7,6 +7,12 @@
 
 http:
   middlewares:
+    # Redirecionamento HTTP → HTTPS (file provider — não depende de labels do container traefik)
+    redirect-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
     # Middleware para permitir todos os métodos HTTP
     ci-allow-methods:
       headers:

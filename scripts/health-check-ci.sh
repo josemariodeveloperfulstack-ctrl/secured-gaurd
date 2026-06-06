@@ -30,9 +30,10 @@ fi
 
 echo "🏥 Verificando saúde da aplicação CI (VPS: ${CI_BASE_DIR})..."
 
-# Configurações
-MAX_ATTEMPTS=25
+# Configurações — backend Spring Boot + Flyway no CI pode levar 8–12 min na VPS
+MAX_ATTEMPTS=40
 ATTEMPT=1
+RETRY_INTERVAL=25
 HEALTH_CHECK_URL="https://ci.z7botsolutions.com.br/api/health"
 INTERNAL_HEALTH_CHECK="http://localhost:8081/api/health"
 # Por omissão o script só termina com sucesso se o health PÚBLICO (Cloudflare) passar.
@@ -58,6 +59,20 @@ check_traefik() {
 check_backend_ready() {
     log "🔍 Verificando se backend está pronto..."
     local backend_status=$(docker inspect secured-guard-backend-ci --format '{{.State.Health.Status}}' 2>/dev/null || echo 'unknown')
+    local restart_count=$(docker inspect secured-guard-backend-ci --format '{{.RestartCount}}' 2>/dev/null || echo '0')
+    local started_at=$(docker inspect secured-guard-backend-ci --format '{{.State.StartedAt}}' 2>/dev/null || echo 'unknown')
+    local uptime_sec=$(docker inspect secured-guard-backend-ci --format '{{if .State.Running}}{{.State.StartedAt}}{{end}}' 2>/dev/null | xargs -I{} date -d {} +%s 2>/dev/null || echo "0")
+    local now_sec=$(date +%s 2>/dev/null || echo "0")
+    if [ "$uptime_sec" != "0" ] && [ "$now_sec" != "0" ]; then
+        local elapsed=$((now_sec - uptime_sec))
+        log "📊 Backend: status=$backend_status, restarts=$restart_count, uptime=${elapsed}s"
+    else
+        log "📊 Backend: status=$backend_status, restarts=$restart_count, started=$started_at"
+    fi
+
+    if [ "${restart_count:-0}" -gt 2 ] 2>/dev/null; then
+        log "⚠️ Backend reiniciou ${restart_count}x — possível OOM ou erro no startup (verifique logs)"
+    fi
     
     if [ "$backend_status" = "healthy" ]; then
         log "✅ Backend está healthy"
@@ -67,7 +82,6 @@ check_backend_ready() {
         return 1
     else
         log "⚠️ Status do backend: $backend_status"
-        # Verificar logs para ver se há erros
         local last_log=$(docker logs --tail 5 secured-guard-backend-ci 2>&1 | tail -1 || echo "")
         if [ -n "$last_log" ]; then
             log "📋 Última linha do log: $last_log"
@@ -218,8 +232,11 @@ collect_diagnostics() {
     docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null | grep -E ':80->|:::80->' || echo "   (nenhum container mapeando :80)"
     
     echo ""
-    echo "📋 Logs do backend (últimas 30 linhas):"
-    docker logs --tail 30 secured-guard-backend-ci 2>&1 | tail -30 || echo "Container não encontrado"
+    echo "📋 Diagnóstico do backend:"
+    docker inspect secured-guard-backend-ci --format 'Status={{.State.Status}} Health={{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}} Restarts={{.RestartCount}} Started={{.State.StartedAt}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}}' 2>/dev/null || echo "Container não encontrado"
+    echo ""
+    echo "📋 Logs do backend (últimas 50 linhas):"
+    docker logs --tail 50 secured-guard-backend-ci 2>&1 | tail -50 || echo "Container não encontrado"
     
     echo ""
     echo "📋 Logs do nginx (últimas 20 linhas):"
@@ -227,9 +244,9 @@ collect_diagnostics() {
 }
 
 # Aguardar inicialização
-log "⏳ Aguardando 30 segundos para aplicação inicializar (o deploy principal já verificou o básico)..."
-log "💡 Backend precisa de tempo para conectar ao banco e Flyway."
-sleep 30
+log "⏳ Aguardando 60 segundos para aplicação inicializar (o deploy principal já verificou o básico)..."
+log "💡 Backend precisa de tempo para conectar ao banco, Flyway e carregar beans Spring."
+sleep 60
 
 # Loop principal de tentativas
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
@@ -284,8 +301,8 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     
     # Se não passou, aguardar antes da próxima tentativa
     if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-        log "⏳ Aguardando 20 segundos antes da próxima tentativa..."
-        sleep 20
+        log "⏳ Aguardando ${RETRY_INTERVAL} segundos antes da próxima tentativa..."
+        sleep "${RETRY_INTERVAL}"
     fi
     
     ATTEMPT=$((ATTEMPT + 1))
