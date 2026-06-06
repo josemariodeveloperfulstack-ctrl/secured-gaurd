@@ -68,11 +68,21 @@ RUN for i in 1 2 3; do \
 COPY src ./src
 
 # Build do projeto com retry (skip tests em produção)
-RUN for i in 1 2 3; do \
-    echo "🔨 Tentativa $i de build..." && \
-    mvn clean package -DskipTests -B -Dmaven.test.skip=true && break || \
-    (echo "⚠️ Tentativa $i falhou, aguardando 10 segundos..." && sleep 10); \
-    done && \
+RUN set -e; \
+    success=0; \
+    for i in 1 2 3; do \
+        echo "🔨 Tentativa $i de build..." && \
+        if mvn clean package -DskipTests -B -Dmaven.test.skip=true; then \
+            success=1; \
+            break; \
+        fi; \
+        echo "⚠️ Tentativa $i falhou, aguardando 10 segundos..."; \
+        sleep 10; \
+    done; \
+    if [ "$success" -ne 1 ]; then \
+        echo "❌ Build Maven falhou após 3 tentativas"; \
+        exit 1; \
+    fi; \
     find target -name "*.jar" -not -name "*sources.jar" -not -name "*javadoc.jar" -not -name "*-original.jar" | head -1 | xargs -I {} sh -c 'mv "{}" app.jar' || \
     (echo "❌ Erro: Nenhum JAR encontrado após build" && ls -la target/ && exit 1)
 
