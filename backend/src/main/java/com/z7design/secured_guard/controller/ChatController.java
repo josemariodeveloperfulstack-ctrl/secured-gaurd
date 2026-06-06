@@ -22,6 +22,7 @@ import com.z7design.secured_guard.model.User;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
@@ -48,7 +49,7 @@ public class ChatController {
     private UserService userService;
 
     @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private ObjectProvider<SimpMessagingTemplate> messagingTemplateProvider;
 
     @Autowired
     private MessageReactionService reactionService;
@@ -358,7 +359,10 @@ public class ChatController {
             ReactionSummaryDTO reaction = reactionService.toggleReaction(messageId, userId, emoji);
 
             // Publicar atualização via WebSocket
-            messagingTemplate.convertAndSend("/topic/chat/message/" + messageId + "/reactions", reaction);
+            SimpMessagingTemplate messagingTemplate = messagingTemplateProvider.getIfAvailable();
+            if (messagingTemplate != null) {
+                messagingTemplate.convertAndSend("/topic/chat/message/" + messageId + "/reactions", reaction);
+            }
 
             return ResponseEntity.ok(reaction);
         } catch (BusinessException e) {
@@ -574,6 +578,10 @@ public class ChatController {
         if (typingEvent.getGroupId() != null) {
             // Enviar para todos do grupo via tópico
             try {
+                SimpMessagingTemplate messagingTemplate = messagingTemplateProvider.getIfAvailable();
+                if (messagingTemplate == null) {
+                    return;
+                }
                 String destination = "/topic/chat/group/" + typingEvent.getGroupId() + "/typing";
                 messagingTemplate.convertAndSend(destination, typingEvent);
                 log.info("Evento de digitação publicado para grupo: {} (destino: {})", typingEvent.getGroupId(),
@@ -585,6 +593,10 @@ public class ChatController {
         if (typingEvent.getDepartmentId() != null) {
             // Enviar para todos do departamento via tópico
             try {
+                SimpMessagingTemplate messagingTemplate = messagingTemplateProvider.getIfAvailable();
+                if (messagingTemplate == null) {
+                    return;
+                }
                 String destination = "/topic/chat/department/" + typingEvent.getDepartmentId() + "/typing";
                 messagingTemplate.convertAndSend(destination, typingEvent);
                 log.info("Evento de digitação publicado para departamento: {} (destino: {})",

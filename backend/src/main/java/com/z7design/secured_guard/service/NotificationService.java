@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,7 +35,7 @@ public class NotificationService {
     private final InvoiceRepository invoiceRepository;
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ObjectProvider<SimpMessagingTemplate> messagingTemplateProvider;
 
     // O From DEVE coincidir com a conta SMTP autenticada (spring.mail.username),
     // caso contrário o servidor de envio recusa/suspende a conta por spoofing
@@ -329,6 +330,11 @@ public class NotificationService {
         log.info("Enviando notificação para mensagem: {}", message);
         
         try {
+            SimpMessagingTemplate messagingTemplate = messagingTemplateProvider.getIfAvailable();
+            if (messagingTemplate == null) {
+                log.debug("WebSocket indisponível; notificação da mensagem {} não broadcastada", message.getId());
+                return;
+            }
             // Publicar notificação via WebSocket para todos os destinatários
             if (message.getRecipients() != null && !message.getRecipients().isEmpty()) {
                 for (User recipient : message.getRecipients()) {
@@ -349,6 +355,11 @@ public class NotificationService {
         log.info("Enviando notificação de digitação: {} - {}", recipientId, event);
         
         try {
+            SimpMessagingTemplate messagingTemplate = messagingTemplateProvider.getIfAvailable();
+            if (messagingTemplate == null) {
+                log.debug("WebSocket indisponível; evento de digitação não broadcastado");
+                return;
+            }
             // Publicar evento de digitação via WebSocket
             if (recipientId != null) {
                 User recipient = userRepository.findById(UUID.fromString(recipientId)).orElse(null);

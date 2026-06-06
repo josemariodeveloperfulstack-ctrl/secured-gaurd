@@ -6,6 +6,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +44,7 @@ public class ChatService {
     private DepartmentRepository departmentRepository;
     
     @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private ObjectProvider<SimpMessagingTemplate> messagingTemplateProvider;
     
     /**
      * Envia mensagem de chat
@@ -119,7 +120,10 @@ public class ChatService {
         
         // Publicar mensagem via WebSocket
         try {
-            if (chatMessage.getRecipient() != null) {
+            SimpMessagingTemplate messagingTemplate = messagingTemplateProvider.getIfAvailable();
+            if (messagingTemplate == null) {
+                log.debug("WebSocket indisponível; mensagem {} persistida sem broadcast em tempo real", chatMessage.getId());
+            } else if (chatMessage.getRecipient() != null) {
                 // Mensagem individual: enviar para o destinatário
                 String recipientUsername = chatMessage.getRecipient().getUsername();
                 String destination = "/user/" + recipientUsername + "/queue/messages";
