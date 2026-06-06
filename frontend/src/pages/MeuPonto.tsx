@@ -46,7 +46,7 @@ const MeuPonto: React.FC<MeuPontoProps> = ({ standalone = false }) => {
     const [justificationText, setJustificationText] = useState('');
     const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
-    const employeeId = user?.employeeId ?? user?.id;
+    const employeeId = user?.employeeId;
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);

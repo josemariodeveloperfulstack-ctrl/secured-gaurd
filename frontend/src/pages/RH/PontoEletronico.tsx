@@ -34,8 +34,8 @@ import timeRecordService, { TimeRecord } from '@/services/timeRecordService';
 const PontoEletronico: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
-  /** ID do funcionário: preferência employeeId; fallback user.id (backend resolve por CPF do usuário autenticado). */
-  const effectiveEmployeeId = user?.employeeId ?? user?.id;
+  /** ID do funcionário vinculado ao usuário (obrigatório para registro de ponto). */
+  const effectiveEmployeeId = user?.employeeId;
   const [currentTime, setCurrentTime] = useState(new Date());
   const [registrosHoje, setRegistrosHoje] = useState<TimeRecord[]>([]);
   const [loading, setLoading] = useState(false);
