@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +47,7 @@ public class DocumentProcessingService {
     private final PayslipRepository payslipRepository;
     private final PaymentReceiptRepository paymentReceiptRepository;
     private final UnifiedDocumentRepository unifiedDocumentRepository;
-    private final IndexerWorker indexerWorker;
+    private final ObjectProvider<IndexerWorker> indexerWorkerProvider;
     private final StringRedisTemplate redisTemplate;
     private static final String UPLOAD_DIR = "uploads/temp";
     private static final String STREAM_JOBS = "stream:jobs";
@@ -342,10 +343,12 @@ public class DocumentProcessingService {
     }
     
     public String getDownloadUrl(UUID unifiedDocumentId) {
-        // Buscar URL do cache primeiro
-        String cachedUrl = indexerWorker.getCachedDownloadUrl(unifiedDocumentId);
-        if (cachedUrl != null) {
-            return cachedUrl;
+        IndexerWorker indexerWorker = indexerWorkerProvider.getIfAvailable();
+        if (indexerWorker != null) {
+            String cachedUrl = indexerWorker.getCachedDownloadUrl(unifiedDocumentId);
+            if (cachedUrl != null) {
+                return cachedUrl;
+            }
         }
         
         // Se não encontrar no cache, buscar do banco

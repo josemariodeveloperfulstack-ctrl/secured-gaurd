@@ -3,8 +3,8 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.worker.UnificationWorker;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,11 +17,14 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/unification")
-@RequiredArgsConstructor
 @Tag(name = "Unification", description = "API para gerenciar unificação de holerites e comprovantes")
 public class UnificationController {
     
-    private final UnificationWorker unificationWorker;
+    private final ObjectProvider<UnificationWorker> unificationWorkerProvider;
+
+    public UnificationController(ObjectProvider<UnificationWorker> unificationWorkerProvider) {
+        this.unificationWorkerProvider = unificationWorkerProvider;
+    }
     
     @PostMapping("/run")
     @Operation(
@@ -29,6 +32,13 @@ public class UnificationController {
         description = "Inicia o processo de matching e unificação entre holerites e comprovantes já processados"
     )
     public ResponseEntity<Map<String, Object>> runUnification() {
+        UnificationWorker unificationWorker = unificationWorkerProvider.getIfAvailable();
+        if (unificationWorker == null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "DISABLED");
+            response.put("message", "Workers de processamento desabilitados neste ambiente.");
+            return ResponseEntity.status(503).body(response);
+        }
         try {
             log.info("🔄 Iniciando processo de unificação manual...");
             

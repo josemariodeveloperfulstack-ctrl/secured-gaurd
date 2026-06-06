@@ -7,6 +7,7 @@ import com.z7design.secured_guard.worker.ParserWorker;
 import com.z7design.secured_guard.worker.UnmatchedPayslipWorker;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.EventListener;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "app.workers.enabled", havingValue = "true", matchIfMissing = true)
 public class WorkerInitializationChecker {
 
     private final ApplicationContext applicationContext;
