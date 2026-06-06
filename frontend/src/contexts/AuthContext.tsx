@@ -286,7 +286,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Enviar username em vez de email para corresponder ao backend
       // Usar caminho completo com /api para garantir que o proxy funcione
-      const response = await api.post('/api/auth/login', { username: email, password });
+      const response = await api.post('/auth/login', { username: email, password });
 
       console.log('✅ Resposta do login recebida:', response.status);
       console.log('📦 Dados da resposta:', {
@@ -484,8 +484,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         errorMessage = error?.response?.data?.message || 'Usuário ou senha incorretos.';
       } else if (error?.response?.status === 403) {
         errorMessage = 'Acesso negado. Verifique suas permissões.';
-      } else if (error?.response?.status === 500) {
-        errorMessage = 'Erro interno do servidor. Tente novamente mais tarde.';
+      } else if (error?.response?.status === 429) {
+        errorMessage = 'Muitas tentativas de login. Aguarde um minuto e tente novamente.';
       } else if (
         error?.response?.status === 502 ||
         error?.response?.status === 503 ||
@@ -493,7 +493,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       ) {
         errorMessage =
           error?.response?.data?.message ||
-          'O backend está temporariamente indisponível. Tente novamente em alguns instantes.';
+          'O servidor está reiniciando ou indisponível. Aguarde 2–3 minutos após um deploy e tente novamente.';
+      } else if (error?.response?.status === 500) {
+        errorMessage = 'Erro interno do servidor. Tente novamente mais tarde.';
       } else if (error?.response?.status === 522 || (error as any)?.is522Error) {
         errorMessage = 'O servidor está temporariamente indisponível. O servidor de origem não está respondendo. Por favor, tente novamente em alguns instantes. Se o problema persistir, entre em contato com o suporte.';
       } else if (error?.isConnectionError) {

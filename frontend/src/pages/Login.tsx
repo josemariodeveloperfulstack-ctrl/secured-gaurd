@@ -128,6 +128,16 @@ const Login = () => {
         errorMessage = error?.response?.data?.message || 'Usuário ou senha incorretos.';
       } else if (error?.response?.status === 403) {
         errorMessage = 'Acesso negado. Verifique suas permissões.';
+      } else if (error?.response?.status === 429) {
+        errorMessage = 'Muitas tentativas de login. Aguarde um minuto e tente novamente.';
+      } else if (
+        error?.response?.status === 502 ||
+        error?.response?.status === 503 ||
+        error?.response?.status === 504
+      ) {
+        errorMessage =
+          error?.response?.data?.message ||
+          'O servidor está reiniciando ou indisponível. Aguarde 2–3 minutos após um deploy e tente novamente.';
       } else if (error?.response?.status === 500) {
         errorMessage = 'Erro interno do servidor. Tente novamente mais tarde.';
       } else if (error?.response?.status === 522 || (error as any)?.is522Error) {
