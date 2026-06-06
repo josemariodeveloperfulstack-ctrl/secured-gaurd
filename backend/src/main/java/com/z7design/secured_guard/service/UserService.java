@@ -24,6 +24,7 @@ import com.z7design.secured_guard.model.Role;
 import com.z7design.secured_guard.model.UserGroupEntity;
 import com.z7design.secured_guard.repository.RoleRepository;
 import com.z7design.secured_guard.repository.UserGroupRepository;
+import com.z7design.secured_guard.repository.PermissionRepository;
 import com.z7design.secured_guard.model.Permission;
 import com.z7design.secured_guard.security.JwtService;
 import com.z7design.secured_guard.dto.ProfileUpdateRequest;
@@ -46,6 +47,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
     private final UserGroupRepository userGroupRepository;
+    private final PermissionRepository permissionRepository;
     private final JwtService jwtService;
     private final UserOnlineStatusService userOnlineStatusService;
 
@@ -54,12 +56,14 @@ public class UserService {
             PasswordEncoder passwordEncoder,
             RoleRepository roleRepository,
             UserGroupRepository userGroupRepository,
+            PermissionRepository permissionRepository,
             JwtService jwtService,
             @Lazy UserOnlineStatusService userOnlineStatusService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.roleRepository = roleRepository;
         this.userGroupRepository = userGroupRepository;
+        this.permissionRepository = permissionRepository;
         this.jwtService = jwtService;
         this.userOnlineStatusService = userOnlineStatusService;
     }
@@ -547,8 +551,6 @@ public class UserService {
         userRepository.save(user);
         return user.getPermissions();
     }
-
-    private final com.z7design.secured_guard.repository.PermissionRepository permissionRepository;
 
     @Transactional
     public Set<Permission> addUserPermissionsByIds(UUID userId, List<UUID> permissionIds) {
