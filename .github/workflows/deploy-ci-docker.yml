@@ -467,8 +467,10 @@ jobs:
               sleep 15
             done
 
-            echo "🚀 Iniciando frontend, nginx, whatsapp e evolution..."
-            $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing frontend-ci nginx-ci whatsapp-service-ci evolution-api-ci
+            echo "🚀 Iniciando frontend, nginx e whatsapp (evolution-api fica opcional — economiza RAM)..."
+            $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing frontend-ci nginx-ci whatsapp-service-ci
+            docker stop evolution-api-ci 2>/dev/null || true
+            docker rm -f evolution-api-ci 2>/dev/null || true
             
             echo "🔎 Verificando containers CI..."
             $DC -f docker-compose.ci.yml ps

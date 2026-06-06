@@ -13,7 +13,7 @@ import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
+import com.z7design.secured_guard.config.WorkerComponent;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.PostConstruct;
@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
-@Component
+@WorkerComponent
 @RequiredArgsConstructor
 public class ParserWorker {
     

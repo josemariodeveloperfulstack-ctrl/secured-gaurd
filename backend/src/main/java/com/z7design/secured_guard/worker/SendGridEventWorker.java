@@ -11,7 +11,7 @@ import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
+import com.z7design.secured_guard.config.WorkerComponent;
 
 import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 @Slf4j
-@Component
+@WorkerComponent
 @RequiredArgsConstructor
 public class SendGridEventWorker {
 

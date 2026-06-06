@@ -20,7 +20,7 @@ import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
+import com.z7design.secured_guard.config.WorkerComponent;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.PostConstruct;
@@ -32,7 +32,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 @Slf4j
-@Component
+@WorkerComponent
 @RequiredArgsConstructor
 public class PdfMergeWorker {
     

@@ -101,14 +101,15 @@ services:
       ZAPI_INSTANCE_ID: ${ZAPI_INSTANCE_ID:-}
       ZAPI_INSTANCE_TOKEN: ${ZAPI_INSTANCE_TOKEN:-}
       ZAPI_CLIENT_TOKEN: ${ZAPI_CLIENT_TOKEN:-}
-      EVOLUTION_API_ENABLED: ${EVOLUTION_API_ENABLED:-true}
+      EVOLUTION_API_ENABLED: ${EVOLUTION_API_ENABLED:-false}
       EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution-api-ci:8080}
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-B6D711FCDE4D4FD5936544120E713976}
       EVOLUTION_API_INSTANCE: ${EVOLUTION_API_INSTANCE:-securedguard}
       BAILEYS_REST_URL: ${BAILEYS_REST_URL:-http://whatsapp-service-ci:3333}
       BAILEYS_ENABLED: ${BAILEYS_ENABLED:-true}
       BAILEYS_INSTANCE_KEY: ${BAILEYS_INSTANCE_KEY:-securedguard_ci}
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=25.0 -XX:+UseG1GC -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom"
+      JAVA_OPTS: "-Xms128m -Xmx448m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:+ExitOnOutOfMemoryError -XX:MaxMetaspaceSize=128m -Djava.security.egd=file:/dev/./urandom"
+    mem_limit: 640m
     ports:
       - "8081:8080"
     volumes:
@@ -138,6 +139,8 @@ services:
   # EVOLUTION API (WhatsApp — provedor principal no CI)
   # ========================================
   evolution-api-ci:
+    profiles:
+      - whatsapp-evolution
     image: atendai/evolution-api:v2.1.1
     container_name: evolution-api-ci
     environment:

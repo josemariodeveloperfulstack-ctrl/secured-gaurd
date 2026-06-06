@@ -11,13 +11,13 @@ import jakarta.mail.util.ByteArrayDataSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
+import com.z7design.secured_guard.config.WorkerComponent;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Properties;
 
-@Component
+@WorkerComponent
 @RequiredArgsConstructor
 @Slf4j
 public class ScheduledEmailWorker {

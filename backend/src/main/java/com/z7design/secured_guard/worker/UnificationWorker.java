@@ -14,7 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.similarity.JaroWinklerSimilarity;
 import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
+import com.z7design.secured_guard.config.WorkerComponent;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -28,7 +28,7 @@ import java.util.Optional;
  * Este worker roda periodicamente e faz matching entre documentos já processados.
  */
 @Slf4j
-@Component
+@WorkerComponent
 @RequiredArgsConstructor
 public class UnificationWorker {
     
