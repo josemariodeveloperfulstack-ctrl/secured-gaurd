@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.context.annotation.Lazy;
+
 /**
  * Configuração de segurança para WebSocket
  * Autentica conexões WebSocket usando JWT
@@ -42,6 +44,7 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
     private UserDetailsService userDetailsService;
 
     @Autowired
+    @Lazy
     private UserOnlineStatusService userOnlineStatusService;
 
     @Autowired

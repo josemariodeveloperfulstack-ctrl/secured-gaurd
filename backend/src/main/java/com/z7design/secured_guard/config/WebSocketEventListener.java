@@ -15,6 +15,8 @@ import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 import java.security.Principal;
 import java.util.UUID;
 
+import org.springframework.context.annotation.Lazy;
+
 /**
  * Listener de eventos WebSocket para rastrear conexões e desconexões de usuários
  */
@@ -23,6 +25,7 @@ import java.util.UUID;
 public class WebSocketEventListener {
 
     @Autowired
+    @Lazy
     private UserOnlineStatusService userOnlineStatusService;
 
     @Autowired

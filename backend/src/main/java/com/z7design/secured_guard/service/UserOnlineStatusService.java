@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.context.annotation.Lazy;
+
 /**
  * Serviço para rastrear e gerenciar o status online/offline dos usuários
  */
@@ -26,6 +28,7 @@ public class UserOnlineStatusService {
     private final Map<String, UUID> sessionToUser = new ConcurrentHashMap<>();
 
     @Autowired
+    @Lazy
     private SimpMessagingTemplate messagingTemplate;
 
     /**
