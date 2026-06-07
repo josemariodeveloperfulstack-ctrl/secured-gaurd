@@ -232,9 +232,18 @@ public class EmploymentContractStandardPdfService {
         }
 
         private static boolean isVigilanciaCompany(Company company) {
-                return company != null
-                                && company.getSigla() != null
-                                && "VIG".equalsIgnoreCase(company.getSigla().trim());
+                if (company == null) {
+                        return false;
+                }
+                if (company.getSigla() != null && "VIG".equalsIgnoreCase(company.getSigla().trim())) {
+                        return true;
+                }
+                String cnpj = company.getCnpj() != null ? company.getCnpj().replaceAll("\\D", "") : "";
+                if ("43576260000112".equals(cnpj)) {
+                        return true;
+                }
+                String name = company.getName() != null ? company.getName().toUpperCase(Locale.ROOT) : "";
+                return name.contains("VIGILANCIA") || name.contains("VIGILÂNCIA");
         }
 
         /** Placeholders comuns aos templates longos (experiência e indeterminado). */

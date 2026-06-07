@@ -22,7 +22,7 @@ import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { resolveCompanySigningCity } from '@/utils/resolveCompanySigningCity';
-import { formatEmployeeFullAddress } from '@/utils/formatEmployeeAddress';
+import { formatEmployeeFullAddress, isVigilanciaCompany } from '@/utils/formatEmployeeAddress';
 import { useInvalidateDocumentosGerados } from '@/hooks/queries/useDocumentosGerados';
 import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 
@@ -804,7 +804,9 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
                   <p className="text-sm text-orange-700">
                     {form.contractType === 'Intermitente'
                       ? 'Gera o contrato integral (cláusulas, LGPD Vigilância e termo de prorrogação). A data do contrato é a data de admissão.'
-                      : 'Selecione a duração do período de experiência. A data de término será calculada automaticamente.'}
+                      : isVigilanciaCompany(empresa)
+                        ? 'Gera o modelo Promover Vigilância (escala 12x36, uniforme fornecido, LGPD específica e termo de prorrogação). A data do contrato é a data de admissão.'
+                        : 'Selecione a duração do período de experiência. A data de término será calculada automaticamente.'}
                   </p>
                   <p className="text-xs text-orange-600 mt-1">
                     Padrão: <strong>45 dias</strong> a partir da data de admissão
