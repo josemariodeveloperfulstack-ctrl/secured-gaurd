@@ -35,8 +35,8 @@ let isConnecting = false;
 export const useWebSocket = (config: WebSocketConfig) => {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 5;
-  const reconnectDelay = 3000;
+  const maxReconnectAttempts = 8;
+  const reconnectDelay = 5000;
 
   const {
     setWsConnection,
@@ -86,7 +86,8 @@ export const useWebSocket = (config: WebSocketConfig) => {
             console.log('[WebSocket Debug]', str);
           }
         },
-        reconnectDelay: reconnectDelay,
+        // Desliga reconnect automático do STOMP (infinito); usamos scheduleReconnect com limite.
+        reconnectDelay: 0,
         heartbeatIncoming: 4000,
         heartbeatOutgoing: 4000,
       });

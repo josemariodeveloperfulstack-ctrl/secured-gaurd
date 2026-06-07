@@ -56,7 +56,7 @@ import {
   fetchEmployeeDetailForEdit,
   useInvalidateEmployees,
 } from '@/hooks/queries';
-import { employeeService, EmployeeFilters } from '@/services/employeeService';
+import { employeeService, EmployeeFilters, EMPLOYEE_SEARCH_MAX_LENGTH } from '@/services/employeeService';
 import { admissionRequestService, AdmissionEmployeeIntegrationContext } from '@/services/admissionRequestService';
 import { companyService } from '@/services/companyService';
 import { workPostService, WorkPost } from '@/services/workPostService';
@@ -1295,7 +1295,8 @@ Para excluir este funcionário:
                   <Input
                     placeholder="Digite o nome, CPF ou email..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    maxLength={EMPLOYEE_SEARCH_MAX_LENGTH}
+                    onChange={(e) => setSearchTerm(e.target.value.slice(0, EMPLOYEE_SEARCH_MAX_LENGTH))}
                     className="pl-10 h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20"
                   />
                 </div>

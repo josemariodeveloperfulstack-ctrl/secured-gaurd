@@ -362,6 +362,9 @@ export interface EmployeeFilters {
   sortDir?: 'asc' | 'desc';
 }
 
+/** Evita URI Too Long (414) quando texto longo é colado no campo de busca. */
+export const EMPLOYEE_SEARCH_MAX_LENGTH = 120;
+
 /** Parâmetros de query para /api/employees/stats e /api/employees/paged (filtros compartilhados). */
 function buildEmployeeListQueryParams(
   filters?: EmployeeFilters,
@@ -372,7 +375,7 @@ function buildEmployeeListQueryParams(
   if (page != null) params.page = page;
   if (size != null) params.size = size;
   if (filters?.searchTerm?.trim()) {
-    params.searchTerm = filters.searchTerm.trim();
+    params.searchTerm = filters.searchTerm.trim().slice(0, EMPLOYEE_SEARCH_MAX_LENGTH);
   }
   if (filters?.status && filters.status !== 'all') {
     params.status = filters.status;
