@@ -25,13 +25,22 @@ import {
   isVigilanciaCompany,
 } from '@/utils/formatEmployeeAddress';
 import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
+import { resolveCompanySigningCity } from '@/utils/resolveCompanySigningCity';
+
+type LgpdTermVariant = 'VIGILANCIA' | 'DEFAULT' | 'auto';
 
 interface TermoLGPDFormProps {
   employeeId?: string;
   companyId?: string;
+  /** VIGILANCIA = modelo Promover Vigilância; DEFAULT = consentimento para outros cargos; auto = detecta pela empresa */
+  termVariant?: LgpdTermVariant;
 }
 
-const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) => {
+const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({
+  employeeId,
+  companyId,
+  termVariant = 'auto',
+}) => {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     funcionarioId: employeeId || '',
@@ -57,47 +66,50 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
     }));
   }, [employeeId, companyId]);
 
-  // Carregar dados iniciais do funcionário se vier apenas o ID via props
-  useEffect(() => {
-    if (formData.funcionarioId && !selectedEmployeeData) {
-      const fetchEmployee = async () => {
-        try {
-          const emp = await employeeService.getEmployeeById(formData.funcionarioId);
-          if (emp) {
-            setSelectedEmployeeData({
-              id: emp.id,
-              name: emp.name,
-              document: emp.document || emp.cpf,
-              cpf: emp.cpf || emp.document,
-              email: emp.email,
-              phone: emp.phone,
-              registrationNumber: emp.registrationNumber,
-              hireDate: emp.hireDate,
-              rg: emp.rg,
-              positionName: emp.position?.name,
-              unitName: emp.unit?.name,
-              departmentName: emp.department?.name,
-              workPostId: (emp as any).workPostId || emp.workPost?.id,
-              workPostName: (emp as any).workPostName || emp.workPost?.name,
-              companyId: emp.company?.id,
-              companySigla: emp.company?.sigla,
-              address: emp.address,
-              salario: emp.salario,
-              escalaTrabalho: emp.escalaTrabalho,
-              horarioTrabalho: emp.horarioTrabalho,
-            } as SimpleEmployee);
-            setFormData(prev => ({
-              ...prev,
-              consentDate: employeeAdmissionIsoDateOrToday(emp.hireDate),
-            }));
-          }
-        } catch (error) {
-          console.error("Erro ao carregar dados iniciais do funcionário:", error);
-        }
-      };
-      fetchEmployee();
+  const loadEmployee = async (id: string) => {
+    try {
+      const emp = await employeeService.getEmployeeById(id);
+      if (!emp) return;
+
+      setSelectedEmployeeData({
+        id: emp.id,
+        name: emp.name,
+        document: emp.document || emp.cpf,
+        cpf: emp.cpf || emp.document,
+        email: emp.email,
+        phone: emp.phone,
+        registrationNumber: emp.registrationNumber,
+        hireDate: emp.hireDate,
+        rg: emp.rg,
+        positionName: emp.position?.name,
+        unitName: emp.unit?.name,
+        departmentName: emp.department?.name,
+        workPostId: (emp as any).workPostId || emp.workPost?.id,
+        workPostName: (emp as any).workPostName || emp.workPost?.name,
+        companyId: emp.company?.id,
+        companySigla: emp.company?.sigla,
+        address: emp.address,
+        salario: emp.salario,
+        escalaTrabalho: emp.escalaTrabalho,
+        horarioTrabalho: emp.horarioTrabalho,
+      } as SimpleEmployee);
+
+      setFormData(prev => ({
+        ...prev,
+        funcionarioId: emp.id,
+        empresaId: companyId || emp.company?.id || prev.empresaId,
+        consentDate: employeeAdmissionIsoDateOrToday(emp.hireDate),
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar dados do funcionário:', error);
     }
-  }, [formData.funcionarioId, selectedEmployeeData]);
+  };
+
+  useEffect(() => {
+    if (formData.funcionarioId) {
+      loadEmployee(formData.funcionarioId);
+    }
+  }, [formData.funcionarioId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -122,7 +134,13 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === formData.empresaId);
-  const isVigilanciaTerm = isVigilanciaCompany(empresa);
+  const isVigilanciaTerm =
+    termVariant === 'VIGILANCIA'
+      ? true
+      : termVariant === 'DEFAULT'
+        ? false
+        : isVigilanciaCompany(empresa);
+  const resolvedTermVariant = isVigilanciaTerm ? 'VIGILANCIA' : 'DEFAULT';
   const employeeFullAddress = funcionario
     ? formatEmployeeAddressForLgpdVig(funcionario)
     : '';
@@ -164,13 +182,13 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
       employeeState,
       employeeCep,
       employeeFullAddress: isVigilanciaTerm ? employeeFullAddress : undefined,
-      termVariant: isVigilanciaTerm ? 'VIGILANCIA' : 'DEFAULT',
+      termVariant: resolvedTermVariant,
       consentTypes: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label || id),
       dataUsagePurpose: formData.dataUsage,
       retentionPeriod: formData.dataRetention,
       additionalInformation: formData.additionalInfo,
       consentDate: formData.consentDate,
-      city: empresa!.city || '',
+      city: resolveCompanySigningCity(empresa as { city?: string; address?: string }) || 'Contagem',
     };
   };
 
@@ -221,7 +239,10 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `termo-lgpd-${funcionario.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+      const slug = funcionario.name.replace(/\s+/g, '-').toLowerCase();
+      a.download = isVigilanciaTerm
+        ? `termo-protecao-dados-lgpd-vig-${slug}.pdf`
+        : `termo-consentimento-lgpd-${slug}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -289,7 +310,7 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-2xl">
                 <FileCheck className="h-6 w-6 text-primary" />
-                {isVigilanciaTerm ? 'Termo de Proteção de Dados - LGPD' : 'Termo de Consentimento LGPD'}
+                {isVigilanciaTerm ? 'Termo de Proteção de Dados – LGPD (VIG)' : 'Termo de Consentimento LGPD'}
               </CardTitle>
               <CardDescription>
                 {isVigilanciaTerm
@@ -324,6 +345,7 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
                 </Label>
                 <EmployeeCombobox
                   value={formData.funcionarioId}
+                  initialDisplayName={funcionario?.name}
                   onChange={(value) => setFormData(prev => ({ ...prev, funcionarioId: value }))}
                   onEmployeeSelect={(emp) => {
                     setSelectedEmployeeData(emp);
@@ -510,13 +532,16 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
                 uso, exceções, quebra e vigência de 5 anos), sem necessidade de marcar tipos de consentimento.
               </p>
               <div className="space-y-2 max-w-xs">
-                <Label>Data do Termo</Label>
+                <Label>Data do Termo (admissão do funcionário)</Label>
                 <Input
                   type="date"
                   value={formData.consentDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, consentDate: e.target.value }))}
-                  className="bg-background h-11"
+                  readOnly
+                  className="bg-muted h-11 cursor-not-allowed"
                 />
+                <p className="text-xs text-muted-foreground">
+                  A data do termo é preenchida automaticamente com a data de admissão.
+                </p>
               </div>
             </div>
           ) : (

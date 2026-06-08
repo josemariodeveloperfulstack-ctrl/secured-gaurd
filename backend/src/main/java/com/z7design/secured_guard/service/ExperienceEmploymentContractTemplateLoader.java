@@ -23,6 +23,8 @@ public class ExperienceEmploymentContractTemplateLoader {
     private static final String EXP_PART2_VIG = "contracts/contrato-experiencia-part2-vig.txt";
     private static final String IND_PART1 = "contracts/contrato-indeterminado-part1.txt";
     private static final String IND_PART2 = "contracts/contrato-indeterminado-part2.txt";
+    private static final String INT_PART1 = "contracts/contrato-intermitente-part1.txt";
+    private static final String INT_PART2 = "contracts/contrato-intermitente-part2.txt";
 
     public String loadRawTemplate() {
         return loadRawTemplate(false);
@@ -38,6 +40,11 @@ public class ExperienceEmploymentContractTemplateLoader {
     /** Contrato CLT por prazo indeterminado (pós-experiência), sem termo de prorrogação. */
     public String loadIndefiniteRawTemplate() {
         return loadConcat(IND_PART1, IND_PART2, "contrato por prazo indeterminado");
+    }
+
+    /** Contrato de trabalho intermitente (art. 452-A, CLT), com LGPD e termo de prorrogação. */
+    public String loadIntermittentRawTemplate() {
+        return loadConcat(INT_PART1, INT_PART2, "contrato de trabalho intermitente");
     }
 
     private String loadConcat(String part1, String part2, String labelForError) {

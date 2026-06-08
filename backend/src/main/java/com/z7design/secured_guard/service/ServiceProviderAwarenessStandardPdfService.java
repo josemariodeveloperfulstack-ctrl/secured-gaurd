@@ -2,20 +2,19 @@ package com.z7design.secured_guard.service;
 
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
-import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Paragraph;
-import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.properties.TextAlignment;
-import com.itextpdf.layout.properties.UnitValue;
-import com.z7design.secured_guard.dto.ServiceProviderAwarenessRequest;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
+import com.z7design.secured_guard.dto.ServiceProviderAwarenessRequest;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.CompanyRepository;
-import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
+import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Row;
@@ -28,193 +27,253 @@ import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ServiceProviderAwarenessStandardPdfService {
 
-        private final StandardReportLayoutService pdfLayoutService;
-        private final ExcelReportLayoutService excelLayoutService;
-        private final CompanyRepository companyRepository;
-        private final EmployeeDocumentDateResolver documentDateResolver;
+    private static final String REPORT_TITLE = "TERMO DE CIÊNCIA DO PRESTADOR DE SERVIÇOS";
+    /** Margem superior quando o título fica apenas no corpo (sem título fixo no cabeçalho do layout). */
+    private static final float TERM_TOP_MARGIN_PT = 78f;
 
-        private static final String REPORT_TITLE = "Termo de Ciência - Prestador de Serviços";
+    private final StandardReportLayoutService pdfLayoutService;
+    private final ExcelReportLayoutService excelLayoutService;
+    private final CompanyRepository companyRepository;
+    private final EmployeeRepository employeeRepository;
+    private final EmployeeDocumentDateResolver documentDateResolver;
 
-        public byte[] generatePdf(ServiceProviderAwarenessRequest request) {
-                LocalDate documentDate = documentDateResolver.resolveDocumentDateOrToday(
-                                request.getEmployeeId(), request.getDocumentDate());
-                request.setDocumentDate(documentDate);
-                try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-                        PdfWriter writer = new PdfWriter(outputStream);
+    public byte[] generatePdf(ServiceProviderAwarenessRequest request) {
+        DocumentContext ctx = buildDocumentContext(request);
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            PdfWriter writer = new PdfWriter(outputStream);
 
-                        var configBuilder = ReportLayoutConfig.builder()
-                                        .companyId(request.getCompanyId())
-                                        .reportTitle(REPORT_TITLE)
-                                        .includeEmailInFooter(true);
-                        documentDateResolver.applyAdmissionDateFooter(configBuilder, request.getEmployeeId());
-                        ReportLayoutConfig config = configBuilder.build();
+            var configBuilder = ReportLayoutConfig.builder()
+                    .companyId(ctx.companyId())
+                    .reportTitle(null)
+                    .topMargin(TERM_TOP_MARGIN_PT)
+                    .includeEmailInFooter(true);
+            documentDateResolver.applyAdmissionDateFooter(configBuilder, request.getEmployeeId());
+            ReportLayoutConfig config = configBuilder.build();
 
-                        DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
-                        Document document = docWithPdf.getDocument();
-                        Company company = docWithPdf.getCompany();
+            DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
+            Document document = docWithPdf.getDocument();
 
-                        addContent(document, request, company);
+            addContent(document, ctx);
 
-                        document.close();
-                        return outputStream.toByteArray();
-                } catch (Exception e) {
-                        log.error("Erro ao gerar PDF do Termo de Prestador", e);
-                        throw new RuntimeException("Erro ao gerar PDF do Termo de Prestador", e);
-                }
+            document.close();
+            return outputStream.toByteArray();
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF do Termo de Ciência do Prestador", e);
+            throw new RuntimeException("Erro ao gerar PDF do Termo de Ciência do Prestador", e);
+        }
+    }
+
+    public byte[] generateExcel(ServiceProviderAwarenessRequest request) {
+        DocumentContext ctx = buildDocumentContext(request);
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Termo Ciência");
+            Company company = companyRepository.findById(ctx.companyId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
+
+            int startRow = excelLayoutService.addHeader(sheet, workbook, company, REPORT_TITLE);
+
+            Row row = sheet.createRow(startRow);
+            row.createCell(0).setCellValue("Prestador:");
+            row.createCell(1).setCellValue(ctx.providerName());
+
+            row = sheet.createRow(startRow + 1);
+            row.createCell(0).setCellValue("CPF:");
+            row.createCell(1).setCellValue(ctx.providerCpf());
+
+            row = sheet.createRow(startRow + 2);
+            row.createCell(0).setCellValue("Empresa:");
+            row.createCell(1).setCellValue(ctx.companyName());
+
+            row = sheet.createRow(startRow + 3);
+            row.createCell(0).setCellValue("Data:");
+            row.createCell(1).setCellValue(formatDateShort(ctx.documentDate()));
+
+            sheet.autoSizeColumn(0);
+            sheet.autoSizeColumn(1);
+
+            excelLayoutService.addFooter(sheet, workbook, company);
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        } catch (Exception e) {
+            log.error("Erro ao gerar Excel do Termo de Ciência do Prestador", e);
+            throw new RuntimeException("Erro ao gerar Excel do Termo de Ciência do Prestador", e);
+        }
+    }
+
+    private DocumentContext buildDocumentContext(ServiceProviderAwarenessRequest request) {
+        Employee employee = request.getEmployeeId() == null
+                ? null
+                : employeeRepository.findWithOrgContextById(request.getEmployeeId()).orElse(null);
+
+        if (request.getEmployeeId() != null && employee == null) {
+            log.warn("Funcionário não encontrado para termo de ciência: {}", request.getEmployeeId());
         }
 
-        public byte[] generateExcel(ServiceProviderAwarenessRequest request) {
-                try (Workbook workbook = new XSSFWorkbook()) {
-                        Sheet sheet = workbook.createSheet("Termo Prestador");
-                        Company company = companyRepository.findById(request.getCompanyId())
-                                        .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
+        applyEmployeeToRequest(request, employee);
 
-                        int startRow = excelLayoutService.addHeader(sheet, workbook, company, REPORT_TITLE);
-
-                        Row row = sheet.createRow(startRow);
-                        row.createCell(0).setCellValue("Prestador:");
-                        row.createCell(1).setCellValue(request.getProviderName());
-
-                        row = sheet.createRow(startRow + 1);
-                        row.createCell(0).setCellValue("CNPJ/CPF:");
-                        row.createCell(1).setCellValue(request.getProviderCnpjCpf());
-
-                        row = sheet.createRow(startRow + 2);
-                        row.createCell(0).setCellValue("Contrato:");
-                        row.createCell(1).setCellValue(request.getContractNumber());
-
-                        sheet.autoSizeColumn(0);
-                        sheet.autoSizeColumn(1);
-
-                        excelLayoutService.addFooter(sheet, workbook, company);
-
-                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                        workbook.write(outputStream);
-                        return outputStream.toByteArray();
-                } catch (Exception e) {
-                        log.error("Erro ao gerar Excel do Termo de Prestador", e);
-                        throw new RuntimeException("Erro ao gerar Excel do Termo de Prestador", e);
-                }
+        UUID companyId = request.getCompanyId();
+        if (companyId == null && employee != null && employee.getCompany() != null) {
+            companyId = employee.getCompany().getId();
+            request.setCompanyId(companyId);
+        }
+        if (companyId == null) {
+            throw new ResourceNotFoundException("Empresa não informada para o termo de ciência");
         }
 
-        private void addContent(Document document, ServiceProviderAwarenessRequest request, Company company) {
-                // Seção: Empresa Prestadora
-                document.add(createSectionHeader("EMPRESA / PROFISSIONAL PRESTADOR"));
-                Table providerTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                .useAllAvailableWidth();
-                providerTable.addCell(createLabelValueCell("NOME / RAZÃO SOCIAL:", request.getProviderName()));
-                providerTable.addCell(createLabelValueCell("CNPJ / CPF:", request.getProviderCnpjCpf()));
-                if (request.getRepresentativeName() != null && !request.getRepresentativeName().isEmpty()) {
-                        providerTable.addCell(
-                                        createLabelValueCell("REPRESENTANTE LEGAL:", request.getRepresentativeName()));
-                }
-                document.add(providerTable);
-
-                // Seção: Detalhes do Serviço e Contrato
-                document.add(createSectionHeader("DETALHES DO SERVIÇO E CONTRATO"));
-                Table serviceTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                .useAllAvailableWidth();
-                serviceTable.addCell(createLabelValueCell("DESCRIÇÃO DOS SERVIÇOS:", request.getServiceDescription()));
-                serviceTable.addCell(createLabelValueCell("NÚMERO DO CONTRATO:", request.getContractNumber()));
-                serviceTable.addCell(createLabelValueCell("CONTRATANTE:", company.getName()));
-                document.add(serviceTable);
-
-                // Termos e Ciência
-                document.add(createSectionHeader("TERMOS DE CIÊNCIA E COMPROMISSO"));
-                Paragraph terms = new Paragraph()
-                                .setFontSize(10f)
-                                .setTextAlignment(TextAlignment.JUSTIFIED)
-                                .setMarginBottom(10f);
-
-                terms.add(new Text(
-                                "O PRESTADOR acima identificado declara ter ciência e concordar com as normas e procedimentos de segurança, saúde ocupacional e meio ambiente da contratante ")
-                                .setFontSize(10f));
-                terms.add(new Text(company.getName()).setBold());
-                terms.add(". Declara ainda que:\n\n");
-
-                terms.add("1. Recebeu as instruções de segurança aplicáveis às atividades a serem desenvolvidas.\n");
-                terms.add("2. Seus funcionários utilizarão todos os EPIs (Equipamentos de Proteção Individual) obrigatórios.\n");
-                terms.add("3. Cumprirá rigorosamente a legislação trabalhista e previdenciária vigente em relação aos seus empregados.\n");
-                terms.add("4. É responsável por quaisquer danos causados à contratante ou a terceiros na execução dos serviços.");
-                document.add(terms);
-
-                // Assinaturas
-                addSignatures(document, request, company);
+        Company company = companyRepository.findById(companyId).orElse(null);
+        if (company == null && employee != null) {
+            company = employee.getCompany();
+        }
+        if (company == null) {
+            throw new ResourceNotFoundException("Empresa não encontrada com ID: " + companyId);
         }
 
-        private Cell createLabelValueCell(String label, String value) {
-                Paragraph p = new Paragraph();
-                p.add(new Text(label).setBold().setFontSize(9f));
-                p.add(new Text(" " + (value != null && !value.isEmpty() ? value : "______________________"))
-                                .setFontSize(10f));
-                return new Cell().add(p).setPadding(5f);
+        String providerName = firstNonBlank(request.getProviderName(), employee != null ? employee.getName() : null);
+        String providerCpf = firstNonBlank(
+                request.getProviderCnpjCpf(),
+                employee != null ? employee.getCpf() : null,
+                employee != null ? employee.getDocument() : null);
+        String companyName = firstNonBlank(company.getName(), employee != null ? employee.getEmpresaNome() : null);
+        String companyCnpj = CompanyDataFormatter.formatCnpj(company.getCnpj());
+        String city = firstNonBlank(request.getCity(), resolveCityWithState(company), "Contagem/MG");
+        LocalDate documentDate = documentDateResolver.resolveDocumentDateOrToday(
+                request.getEmployeeId(), request.getDocumentDate());
+
+        request.setProviderName(providerName);
+        request.setProviderCnpjCpf(providerCpf);
+        request.setCity(city);
+        request.setDocumentDate(documentDate);
+
+        return new DocumentContext(companyId, providerName, providerCpf, companyName, companyCnpj, city, documentDate);
+    }
+
+    private void applyEmployeeToRequest(ServiceProviderAwarenessRequest request, Employee employee) {
+        if (employee == null) {
+            return;
         }
-
-        private Paragraph createSectionHeader(String title) {
-                return new Paragraph(title)
-                                .setBold()
-                                .setFontSize(11f)
-                                .setFontColor(com.itextpdf.kernel.colors.DeviceRgb.RED)
-                                .setMarginTop(15f)
-                                .setMarginBottom(5f)
-                                .setBorderLeft(
-                                                new com.itextpdf.layout.borders.SolidBorder(
-                                                                com.itextpdf.kernel.colors.DeviceRgb.RED, 3f))
-                                .setPaddingLeft(5f);
+        if (isBlank(request.getProviderName())) {
+            request.setProviderName(employee.getName());
         }
-
-        private void addSignatures(Document document, ServiceProviderAwarenessRequest request, Company company) {
-                String city = request.getCity() != null ? request.getCity()
-                                : (company.getCity() != null ? company.getCity() : "_______________");
-                String date = formatDateExtended(
-                                documentDateResolver.resolveDocumentDateOrToday(
-                                                request.getEmployeeId(), request.getDocumentDate()));
-
-                Paragraph dateLoc = new Paragraph(city + ", " + date)
-                                .setTextAlignment(TextAlignment.RIGHT)
-                                .setMarginTop(30f)
-                                .setMarginBottom(40f)
-                                .setFontSize(10f);
-                document.add(dateLoc);
-
-                Table sigTable = new Table(UnitValue.createPercentArray(new float[] { 45, 10, 45 }))
-                                .useAllAvailableWidth();
-
-                Cell cell1 = new Cell()
-                                .add(new Paragraph("_________________________________")
-                                                .setTextAlignment(TextAlignment.CENTER))
-                                .add(new Paragraph(company.getName().toUpperCase())
-                                                .setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f).setBold())
-                                .add(new Paragraph("Contratante").setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f))
-                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER);
-
-                Cell spacer = new Cell().setBorder(com.itextpdf.layout.borders.Border.NO_BORDER);
-
-                Cell cell2 = new Cell()
-                                .add(new Paragraph("_________________________________")
-                                                .setTextAlignment(TextAlignment.CENTER))
-                                .add(new Paragraph(request.getProviderName().toUpperCase())
-                                                .setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f).setBold())
-                                .add(new Paragraph("Prestador").setTextAlignment(TextAlignment.CENTER).setFontSize(8f))
-                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER);
-
-                sigTable.addCell(cell1);
-                sigTable.addCell(spacer);
-                sigTable.addCell(cell2);
-
-                document.add(sigTable);
+        if (isBlank(request.getProviderCnpjCpf())) {
+            String cpf = employee.getCpf();
+            request.setProviderCnpjCpf(cpf != null && !cpf.isBlank() ? cpf : employee.getDocument());
         }
-
-        private String formatDateExtended(LocalDate date) {
-                return date.format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new Locale("pt", "BR")));
+        if (employee.getHireDate() != null) {
+            request.setDocumentDate(employee.getHireDate());
         }
+        if (request.getCompanyId() == null && employee.getCompany() != null) {
+            request.setCompanyId(employee.getCompany().getId());
+        }
+    }
+
+    private static String resolveCityWithState(Company company) {
+        if (company == null) {
+            return "";
+        }
+        String city = company.getCity() != null ? company.getCity().trim() : "";
+        String state = company.getState() != null ? company.getState().trim() : "";
+        if (!city.isEmpty() && !state.isEmpty()) {
+            return city + "/" + state;
+        }
+        return city;
+    }
+
+    private void addContent(Document document, DocumentContext ctx) {
+        Paragraph title = new Paragraph(REPORT_TITLE)
+                .setBold()
+                .setItalic()
+                .setUnderline()
+                .setFontSize(12f)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setMarginTop(0f)
+                .setMarginBottom(18f);
+        document.add(title);
+
+        Paragraph intro = new Paragraph()
+                .setFontSize(10f)
+                .setTextAlignment(TextAlignment.JUSTIFIED)
+                .setMultipliedLeading(1.45f)
+                .setMarginBottom(16f);
+        intro.add("Eu, ");
+        intro.add(new Text(safe(ctx.providerName()).toUpperCase()).setBold().setUnderline());
+        intro.add(", inscrito no CPF sob o nº ");
+        intro.add(new Text(CompanyDataFormatter.formatCpf(ctx.providerCpf())).setBold().setUnderline());
+        intro.add(", prestador de serviços e funcionário da empresa ");
+        intro.add(new Text(safe(ctx.companyName()).toUpperCase()).setBold().setUnderline());
+        intro.add(", inscrita no CNPJ sob o nº ");
+        intro.add(new Text(safe(ctx.companyCnpj())).setBold().setUnderline());
+        intro.add(".");
+        document.add(intro);
+
+        document.add(new Paragraph(
+                "DECLARO estar ciente da Diretriz de Prevenção e Controle do Uso Indevido de Álcool e/ou de Outras Drogas, "
+                        + "cuja finalidade é a preservação da saúde e segurança de todos os colaboradores e prestadores de serviços, "
+                        + "e que recebi e li o material explicativo sobre o referido programa.")
+                .setFontSize(10f)
+                .setTextAlignment(TextAlignment.JUSTIFIED)
+                .setMultipliedLeading(1.45f)
+                .setMarginBottom(28f));
+
+        document.add(new Paragraph("Local: " + safe(ctx.city()))
+                .setFontSize(10f)
+                .setMarginBottom(4f));
+
+        document.add(new Paragraph("Data: " + formatDateShort(ctx.documentDate()))
+                .setFontSize(10f)
+                .setMarginBottom(22f));
+
+        document.add(new Paragraph("Assinatura do prestador de serviços:")
+                .setFontSize(10f)
+                .setMarginBottom(18f));
+
+        document.add(new Paragraph("______________________________________________________________")
+                .setTextAlignment(TextAlignment.CENTER)
+                .setFontSize(10f)
+                .setMarginBottom(6f));
+
+        document.add(new Paragraph(safe(ctx.providerName()).toUpperCase())
+                .setTextAlignment(TextAlignment.CENTER)
+                .setFontSize(10f)
+                .setBold());
+    }
+
+    private String formatDateShort(LocalDate date) {
+        return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy", new Locale("pt", "BR")));
+    }
+
+    private String safe(String value) {
+        return value != null ? value.trim() : "";
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (!isBlank(value)) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private record DocumentContext(
+            UUID companyId,
+            String providerName,
+            String providerCpf,
+            String companyName,
+            String companyCnpj,
+            String city,
+            LocalDate documentDate) {
+    }
 }

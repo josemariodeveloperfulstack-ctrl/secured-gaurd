@@ -14,11 +14,13 @@ public enum TipoDocumentoGerado {
     // RH / Admissionais
     EMPLOYMENT_CONTRACT("Contrato de Trabalho"),
     DECLARATION("Declaração"),
-    LGPD_CONSENT("Termo de Consentimento LGPD"),
+    LGPD_CONSENT("Termo de Proteção de Dados – LGPD"),
     TRANSPORT_VOUCHER("Termo de Compromisso de Vale-Transporte"),
     DISCIPLINARY_WARNING("Advertência Disciplinar"),
     EQUIPMENT_RESPONSIBILITY("Termo de Responsabilidade de Equipamento"),
     EQUIPMENT_RESPONSIBILITY_SPECIFIC("Termo de Responsabilidade Específico"),
+    DAMAGE_FINES_RESPONSIBILITY("Termo de Responsabilidade por Danos e Multas"),
+    BODY_CAM_RESPONSIBILITY("Termo de Responsabilidade e Uso de Body Cam"),
     SERVICE_PROVIDER_AWARENESS("Termo de Ciência do Prestador de Serviços"),
 
     // Operacional

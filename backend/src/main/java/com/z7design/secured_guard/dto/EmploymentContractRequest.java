@@ -45,13 +45,17 @@ public class EmploymentContractRequest {
 
     /**
      * Tipo de contrato no PDF: {@code STANDARD} (cláusulas resumidas CLT), {@code EXPERIENCE}
-     * (texto integral + LGPD + termo de prorrogação) ou {@code INDEFINITE} (texto integral por prazo
+     * (texto integral + LGPD + termo de prorrogação), {@code INTERMITTENT} (contrato intermitente
+     * art. 452-A + LGPD + termo de prorrogação) ou {@code INDEFINITE} (texto integral por prazo
      * indeterminado, sem termo de experiência/prorrogação — várias páginas).
      */
     private String contractKind;
 
     /** Dias do período de experiência: 30, 45, 60 ou 90 (usado quando contractKind = EXPERIENCE). */
     private Integer experienceDurationDays;
+
+    /** Meses de vigência do contrato intermitente (padrão: 12). Usado quando contractKind = INTERMITTENT. */
+    private Integer intermittentDurationMonths;
 
     /** Salário por extenso (ex.: cadastro do funcionário). Opcional; se vazio, usa texto orientativo no PDF. */
     private String salaryInWords;

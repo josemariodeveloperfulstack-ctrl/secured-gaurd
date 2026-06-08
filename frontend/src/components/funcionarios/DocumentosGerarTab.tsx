@@ -13,10 +13,12 @@ import TermoCienciaPrestadorForm from './TermoCienciaPrestadorForm';
 import OrdemServicoForm from './OrdemServicoForm';
 import ModelosDocumentosForm from './ModelosDocumentosForm';
 import TermoResponsabilidadeEspecificoForm from './TermoResponsabilidadeEspecificoForm';
+import TermoResponsabilidadeDanosMultasForm from './TermoResponsabilidadeDanosMultasForm';
+import TermoBodyCamForm from './TermoBodyCamForm';
 import NppsForm from './NppsForm';
 import FichaEntregaEPIManualForm from './FichaEntregaEPIManualForm';
 import RelatorioMovimentacaoForm from './RelatorioMovimentacaoForm';
-import { FileText, Shield, FileSignature, FileCheck, UserX, File, CreditCard, ArrowRightLeft } from 'lucide-react';
+import { FileText, Shield, FileSignature, FileCheck, UserX, File, CreditCard, ArrowRightLeft, Car, Video } from 'lucide-react';
 
 const tipos = [
   { key: 'modelos', label: 'Modelos de Documentos', icon: FileText, shortLabel: 'Modelos' },
@@ -25,13 +27,16 @@ const tipos = [
   { key: 'epi-manual', label: 'Entrega de EPI Manual', icon: Shield, shortLabel: 'EPI Manual' },
   { key: 'termo-responsabilidade-especifico', label: 'Termo de Responsabilidade (VT)', icon: CreditCard, shortLabel: 'VT específico' },
   { key: 'equipamento', label: 'Termo de Responsabilidade de Equipamento', icon: Shield, shortLabel: 'Equipamento' },
-  { key: 'lgpd', label: 'Termo de Consentimento LGPD', icon: FileCheck, shortLabel: 'LGPD' },
+  { key: 'danos-multas', label: 'Termo de Responsabilidade por Danos e Multas', icon: Car, shortLabel: 'Danos/Multas' },
+  { key: 'body-cam', label: 'Termo de Responsabilidade e Uso de Câmera Corporal – Body Cam', icon: Video, shortLabel: 'Body Cam' },
+  { key: 'lgpd-vig', label: 'Termo de Proteção de Dados – LGPD (VIG)', icon: FileCheck, shortLabel: 'LGPD VIG' },
+  { key: 'lgpd-consentimento', label: 'Termo de Consentimento LGPD', icon: Shield, shortLabel: 'LGPD' },
+  { key: 'termo-ciencia', label: 'Termo de Ciência do Prestador de Serviços', icon: File, shortLabel: 'Termo Ciência' },
   { key: 'npps', label: 'NPPS – Norma e Procedimento do Posto', icon: FileText, shortLabel: 'NPPS' },
   { key: 'contratos', label: 'Contratos de Trabalho', icon: FileSignature, shortLabel: 'Contratos' },
   { key: 'ordens', label: 'Ordem de Serviços', icon: FileText, shortLabel: 'Ordens' },
   { key: 'advertencia', label: 'Advertência Disciplinar', icon: UserX, shortLabel: 'Advertência' },
   { key: 'declaracao', label: 'Declaração', icon: FileCheck, shortLabel: 'Declaração' },
-  { key: 'termo-ciencia', label: 'Termo de Ciência do Prestador de Serviços', icon: File, shortLabel: 'Termo Ciência' },
   { key: 'movimentacao', label: 'Relatório de Movimentação do Funcionário', icon: ArrowRightLeft, shortLabel: 'Movimentação' },
 ];
 
@@ -40,13 +45,15 @@ interface DocumentosGerarTabProps {
   companyId?: string;
   hideHeader?: boolean;
   tipoSalarioContratual?: string;
+  prazoExperienciaTexto?: string;
 }
 
 const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({
   employeeId: propEmployeeId,
   companyId: propCompanyId,
   hideHeader,
-  tipoSalarioContratual
+  tipoSalarioContratual,
+  prazoExperienciaTexto
 }) => {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -127,12 +134,20 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({
         {tipo === 'npps' && <NppsForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecificoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'lgpd' && <TermoLGPDForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'danos-multas' && <TermoResponsabilidadeDanosMultasForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'body-cam' && <TermoBodyCamForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'lgpd-vig' && (
+          <TermoLGPDForm employeeId={finalEmployeeId} companyId={finalCompanyId} termVariant="VIGILANCIA" />
+        )}
+        {tipo === 'lgpd-consentimento' && (
+          <TermoLGPDForm employeeId={finalEmployeeId} companyId={finalCompanyId} termVariant="DEFAULT" />
+        )}
         {tipo === 'contratos' && (
           <ContratosTrabalhoForm
             employeeId={finalEmployeeId}
             companyId={finalCompanyId}
             tipoSalarioContratual={tipoSalarioContratual}
+            prazoExperienciaTexto={prazoExperienciaTexto}
           />
         )}
         {tipo === 'ordens' && <OrdemServicosForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}

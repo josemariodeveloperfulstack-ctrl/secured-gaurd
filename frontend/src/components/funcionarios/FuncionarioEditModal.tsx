@@ -3774,14 +3774,36 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                          </div>
                          <h3 className="text-xl font-bold text-white">Salve o cadastro primeiro</h3>
                          <p className="text-gray-400 max-w-sm mx-auto">
-                           É necessário salvar o cadastro básico do funcionário antes de iniciar a importação de documentos.
+                           É necessário salvar o cadastro básico do funcionário antes de gerar ou importar documentos.
                          </p>
                        </div>
                      </Card>
                    )}
                 </TabsContent>
                 <TabsContent value="relatorios" className="space-y-4 sm:space-y-6">
-                  {/* Ficha para Contabilidade - Agora em primeiro */}
+                  {!canGenerateReports ? (
+                    <div className="p-6 border border-gray-600 rounded-lg bg-black/20 text-center">
+                      <AlertCircle className="h-8 w-8 text-seguranca-yellow mx-auto mb-3" />
+                      <h4 className="text-lg font-medium text-white mb-2">Salve o cadastro primeiro</h4>
+                      <p className="text-gray-400 text-sm">
+                        É necessário salvar o funcionário antes de gerar documentos e relatórios.
+                      </p>
+                    </div>
+                  ) : (
+                    <DocumentosGerarTab
+                      hideHeader={true}
+                      employeeId={employeeToEdit?.id}
+                      companyId={
+                        selectedCompany?.id ||
+                        funcionario?.company?.id ||
+                        (form as any).company?.id
+                      }
+                      tipoSalarioContratual={form.tipoSalarioContratual}
+                      prazoExperienciaTexto={form.prazoExperienciaTexto}
+                    />
+                  )}
+
+                  {/* Ficha para Contabilidade */}
                   <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
                     <div className="p-4 sm:p-6 space-y-4">
                       <div className="flex items-center gap-2 sm:gap-3">
@@ -3824,25 +3846,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   </div>
                   </div>
                   </Card>
-
-                  {!canGenerateReports ? (
-                    <div className="mt-6 p-6 border border-gray-600 rounded-lg bg-black/20 text-center">
-                      <AlertCircle className="h-8 w-8 text-seguranca-yellow mx-auto mb-3" />
-                      <h4 className="text-lg font-medium text-white mb-2">Salve o cadastro primeiro</h4>
-                      <p className="text-gray-400 text-sm">
-                        É necessário salvar o funcionário antes de ter acesso à geração de todos os documentos avançados.
-                      </p>
-              </div>
-                  ) : (
-                    <div className="mt-6 border-t border-gray-600 pt-6">
-                      <DocumentosGerarTab
-                        hideHeader={true}
-                        employeeId={employeeToEdit?.id}
-                        companyId={selectedCompany?.id || ''}
-                        tipoSalarioContratual={form.tipoSalarioContratual}
-                      />
-              </div>
-                  )}
 
                   {/* Ficha de Registro - Principal */}
                   <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">

@@ -48,40 +48,48 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
     setForm(prev => ({
       ...prev,
       funcionarioId: employeeId || prev.funcionarioId,
-      empresaId: companyId || prev.empresaId
+      empresaId: companyId || prev.empresaId,
     }));
   }, [employeeId, companyId]);
 
-  // Carregar dados iniciais do funcionário se vier apenas o ID via props
-  useEffect(() => {
-    if (form.funcionarioId && !selectedEmployeeData) {
-      const fetchEmployee = async () => {
-        try {
-          const emp = await employeeService.getEmployeeById(form.funcionarioId);
-          if (emp) {
-            setSelectedEmployeeData({
-              id: emp.id,
-              name: emp.name,
-              document: emp.document || emp.cpf,
-              cpf: emp.cpf || emp.document,
-              rg: emp.rg,
-              email: emp.email,
-              phone: emp.phone,
-              registrationNumber: emp.registrationNumber,
-              hireDate: emp.hireDate,
-              terminationDate: emp.terminationDate,
-              positionName: emp.position?.name,
-              unitName: emp.unit?.name,
-              address: emp.address
-            } as SimpleEmployee);
-          }
-        } catch (error) {
-          console.error("Erro ao carregar dados iniciais do funcionário:", error);
-        }
-      };
-      fetchEmployee();
+  const loadEmployee = async (id: string) => {
+    try {
+      const emp = await employeeService.getEmployeeById(id);
+      if (!emp) return;
+
+      setSelectedEmployeeData({
+        id: emp.id,
+        name: emp.name,
+        document: emp.document || emp.cpf,
+        cpf: emp.cpf || emp.document,
+        rg: emp.rg,
+        email: emp.email,
+        phone: emp.phone,
+        registrationNumber: emp.registrationNumber,
+        hireDate: emp.hireDate,
+        terminationDate: emp.terminationDate,
+        positionName: emp.position?.name,
+        unitName: emp.unit?.name,
+        companyId: emp.company?.id,
+        address: emp.address,
+      } as SimpleEmployee);
+
+      setForm(prev => ({
+        ...prev,
+        funcionarioId: emp.id,
+        empresaId: companyId || emp.company?.id || prev.empresaId,
+        dataEmissao: employeeAdmissionIsoDateOrToday(emp.hireDate),
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar dados do funcionário:', error);
     }
-  }, [form.funcionarioId, selectedEmployeeData]);
+  };
+
+  useEffect(() => {
+    if (form.funcionarioId) {
+      loadEmployee(form.funcionarioId);
+    }
+  }, [form.funcionarioId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -267,6 +275,7 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
                 </Label>
                 <EmployeeCombobox
                   value={form.funcionarioId}
+                  initialDisplayName={funcionario?.name}
                   onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
                   onEmployeeSelect={(emp) => {
                     setSelectedEmployeeData(emp);

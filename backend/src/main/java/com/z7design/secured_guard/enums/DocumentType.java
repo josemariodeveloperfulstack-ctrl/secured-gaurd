@@ -12,6 +12,8 @@ public enum DocumentType {
     DISCIPLINARY_WARNING("Advertência Disciplinar"),
     TRANSPORT_VOUCHER_TERM("Termo de Vale-Transporte"),
     EQUIPMENT_RESPONSIBILITY_TERM("Termo de Responsabilidade de Equipamento"),
+    DAMAGE_FINES_RESPONSIBILITY_TERM("Termo de Responsabilidade por Danos e Multas"),
+    BODY_CAM_RESPONSIBILITY_TERM("Termo de Responsabilidade e Uso de Body Cam"),
     SERVICE_PROVIDER_AWARENESS_TERM("Termo de Ciência do Prestador"),
     DECLARATION("Declaração"),
 

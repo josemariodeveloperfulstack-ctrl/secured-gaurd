@@ -46,6 +46,7 @@ public class EmploymentContractStandardPdfService {
 
         private static final String REPORT_TITLE = "Contrato Individual de Trabalho";
         private static final String EXPERIENCE_TITLE = "CONTRATO DE TRABALHO A TÍTULO DE EXPERIÊNCIA";
+        private static final String INTERMITTENT_TITLE = "CONTRATO DE TRABALHO INTERMITENTE";
         private static final String INDEFINITE_TITLE = "CONTRATO DE TRABALHO POR PRAZO INDETERMINADO";
         /** Margens do corpo do contrato em pontos (iText): 1 cm = 72/2,54 pt. */
         private static final float CONTRACT_LEFT_MARGIN_PT = cmToPt(3f);
@@ -152,6 +153,12 @@ public class EmploymentContractStandardPdfService {
                         appendMultipagePlainText(document, filled, request, company);
                         return;
                 }
+                if (isIntermittentContract(request)) {
+                        String raw = experienceTemplateLoader.loadIntermittentRawTemplate();
+                        String filled = fillIntermittentPlaceholders(raw, request, company);
+                        appendMultipagePlainText(document, filled, request, company);
+                        return;
+                }
                 if (isIndefiniteContract(request)) {
                         String raw = experienceTemplateLoader.loadIndefiniteRawTemplate();
                         String filled = fillIndefinitePlaceholders(raw, request, company);
@@ -215,6 +222,9 @@ public class EmploymentContractStandardPdfService {
                 if (isExperienceContract(request)) {
                         return EXPERIENCE_TITLE;
                 }
+                if (isIntermittentContract(request)) {
+                        return INTERMITTENT_TITLE;
+                }
                 if (isIndefiniteContract(request)) {
                         return INDEFINITE_TITLE;
                 }
@@ -224,6 +234,11 @@ public class EmploymentContractStandardPdfService {
         private static boolean isExperienceContract(EmploymentContractRequest request) {
                 return request.getContractKind() != null
                                 && "EXPERIENCE".equalsIgnoreCase(request.getContractKind().trim());
+        }
+
+        private static boolean isIntermittentContract(EmploymentContractRequest request) {
+                return request.getContractKind() != null
+                                && "INTERMITTENT".equalsIgnoreCase(request.getContractKind().trim());
         }
 
         private static boolean isIndefiniteContract(EmploymentContractRequest request) {
@@ -357,6 +372,37 @@ public class EmploymentContractStandardPdfService {
                                 : "__/__/____";
                 return applyCommonLongFormPlaceholders(template, request, company)
                                 .replace("{{DATA_INICIO}}", dataInicio);
+        }
+
+        /** Contrato intermitente: vigência em meses (padrão 12) a partir da data de admissão. */
+        private String fillIntermittentPlaceholders(String template, EmploymentContractRequest request, Company company) {
+                int meses = request.getIntermittentDurationMonths() != null && request.getIntermittentDurationMonths() > 0
+                                ? request.getIntermittentDurationMonths()
+                                : 12;
+                String mesesTexto = intermittentMonthsPhrase(meses);
+                String cidade = resolveSigningCity(company, request);
+                LocalDate inicio = request.getAdmissionDate();
+                String dataInicioStr = inicio != null ? formatDate(inicio) : "__/__/____";
+                String dataFimStr = inicio != null ? formatDate(inicio.plusMonths(meses)) : "__/__/____";
+                String dataAssinatura = inicio != null ? formatDate(inicio) : "___/___/______";
+                String cidadeDataTermo = (cidade.isEmpty() ? "_______________" : cidade.toUpperCase())
+                                + ", " + dataAssinatura + ".";
+
+                return applyCommonLongFormPlaceholders(template, request, company)
+                                .replace("{{MESES_CONTRATO_TEXTO}}", mesesTexto)
+                                .replace("{{DATA_INICIO}}", dataInicioStr)
+                                .replace("{{DATA_FIM}}", dataFimStr)
+                                .replace("{{CIDADE_DATA_TERMO}}", cidadeDataTermo);
+        }
+
+        private static String intermittentMonthsPhrase(int months) {
+                return switch (months) {
+                        case 6 -> "6 (SEIS) meses";
+                        case 12 -> "12 (DOZE) meses";
+                        case 18 -> "18 (DEZOITO) meses";
+                        case 24 -> "24 (VINTE E QUATRO) meses";
+                        default -> months + " meses";
+                };
         }
 
         private static String nullToEmpty(String s) {

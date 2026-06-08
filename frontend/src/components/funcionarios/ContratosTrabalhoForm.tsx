@@ -31,18 +31,47 @@ interface ContratosTrabalhoFormProps {
   companyId?: string;
   /** Valor atual do cadastro (ex.: formulário da modal), usado no PDF antes de persistir. */
   tipoSalarioContratual?: string;
+  /** Prazo de experiência do cadastro (ex.: "45 DIAS", "12 MESES") — define o tipo de contrato sugerido. */
+  prazoExperienciaTexto?: string;
 }
 
 function resolvePdfContractKind(
   contractType: string
-): 'EXPERIENCE' | 'INDEFINITE' | 'STANDARD' {
-  if (contractType === 'Contrato de Experiência' || contractType === 'Intermitente') return 'EXPERIENCE';
+): 'EXPERIENCE' | 'INTERMITTENT' | 'INDEFINITE' | 'STANDARD' {
+  if (contractType === 'Contrato de Experiência') return 'EXPERIENCE';
+  if (contractType === 'Intermitente') return 'INTERMITTENT';
   if (contractType === 'CLT - Prazo indeterminado (integral)') return 'INDEFINITE';
   return 'STANDARD';
 }
 
+function isExperienceContract(contractType: string): boolean {
+  return contractType === 'Contrato de Experiência';
+}
+
+function isIntermittentContract(contractType: string): boolean {
+  return contractType === 'Intermitente';
+}
+
 function isExperienceLikeContract(contractType: string): boolean {
-  return contractType === 'Contrato de Experiência' || contractType === 'Intermitente';
+  return isExperienceContract(contractType) || isIntermittentContract(contractType);
+}
+
+function inferContractTypeFromEmployee(
+  tipoSalario?: string,
+  prazoExperiencia?: string,
+  company?: { sigla?: string; name?: string } | null
+): string {
+  const tipo = (tipoSalario || '').trim().toUpperCase();
+  const prazo = (prazoExperiencia || '').trim().toUpperCase();
+
+  if (tipo === 'HORISTA') return 'Intermitente';
+  if (prazo.includes('INTERMITENTE') || /12\s*MES/.test(prazo)) return 'Intermitente';
+  if (/\d+\s*DIA/.test(prazo) || prazo.includes('EXPERI')) return 'Contrato de Experiência';
+
+  // VIG: contrato intermitente é o padrão, salvo prazo de experiência em dias no cadastro.
+  if (isVigilanciaCompany(company)) return 'Intermitente';
+
+  return '';
 }
 
 /**
@@ -72,6 +101,17 @@ function addDaysIsoLocal(iso: string, days: number): string | null {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function addMonthsIsoLocal(iso: string, months: number): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  d.setMonth(d.getMonth() + months);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 /** Valor enviado em `department` para o PDF como "SETOR DE TRABALHO" (setor + unidade + posto — não centro de custo). */
 function buildSetorLocalTrabalhoContrato(emp: Employee): string {
   const raw = [
@@ -94,7 +134,8 @@ function buildSetorLocalTrabalhoContrato(emp: Employee): string {
 const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
   employeeId,
   companyId,
-  tipoSalarioContratual: tipoSalarioContratualProp
+  tipoSalarioContratual: tipoSalarioContratualProp,
+  prazoExperienciaTexto: prazoExperienciaTextoProp
 }) => {
   const invalidateDocumentosGerados = useInvalidateDocumentosGerados();
   const { toast } = useToast();
@@ -242,9 +283,28 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
     }
   }, [funcionario, costCenters, allWorkPosts]);
 
-  // Default da duração: 45 dias para experiência e intermitente (modelo integral)
+  // Sugere tipo de contrato a partir do cadastro (horista → intermitente; prazo em dias → experiência).
   useEffect(() => {
-    if (isExperienceLikeContract(form.contractType) && !form.experienceDuration) {
+    if (!funcionario || form.contractType) return;
+    const inferred = inferContractTypeFromEmployee(
+      tipoSalarioContratualProp,
+      prazoExperienciaTextoProp,
+      empresa
+    );
+    if (inferred) {
+      setForm(prev => ({ ...prev, contractType: inferred }));
+    }
+  }, [
+    funcionario,
+    empresa,
+    form.contractType,
+    tipoSalarioContratualProp,
+    prazoExperienciaTextoProp,
+  ]);
+
+  // Default da duração: 45 dias para experiência; 12 meses (365 dias) para intermitente
+  useEffect(() => {
+    if (isExperienceContract(form.contractType) && !form.experienceDuration) {
       setForm(prev => ({ ...prev, experienceDuration: '45' }));
     }
   }, [form.contractType, form.experienceDuration]);
@@ -263,15 +323,19 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
     }
   }, [form.contractType, funcionario?.hireDate, form.startDate]);
 
-  // Auto-calcula a Data de Término para contratos de experiência/intermitente.
-  // Usa cálculo local (sem timezone) para garantir que a data exibida no card
-  // ("Data de Término Calculada") seja IDÊNTICA à do input "Data de Término".
+  // Auto-calcula a Data de Término para contratos de experiência (dias) ou intermitente (12 meses).
   useEffect(() => {
-    if (
-      isExperienceLikeContract(form.contractType) &&
-      form.startDate &&
-      form.experienceDuration
-    ) {
+    if (!form.startDate) return;
+
+    if (isIntermittentContract(form.contractType)) {
+      const newEnd = addMonthsIsoLocal(form.startDate, 12);
+      if (newEnd) {
+        setForm(prev => ({ ...prev, endDate: newEnd }));
+      }
+      return;
+    }
+
+    if (isExperienceContract(form.contractType) && form.experienceDuration) {
       const days = parseInt(form.experienceDuration, 10);
       if (!Number.isNaN(days)) {
         const newEnd = addDaysIsoLocal(form.startDate, days);
@@ -339,10 +403,10 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
       });
       return false;
     }
-    if (isExperienceLikeContract(form.contractType) && !form.experienceDuration) {
+    if (isExperienceContract(form.contractType) && !form.experienceDuration) {
       toast({
         title: 'Atenção',
-        description: 'Selecione a duração do período contratual (30, 45, 60 ou 90 dias)!',
+        description: 'Selecione a duração do período de experiência (30, 45, 60 ou 90 dias)!',
         variant: 'destructive'
       });
       return false;
@@ -359,6 +423,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
 
     const pdfKind = resolvePdfContractKind(form.contractType);
     const isExperiencia = pdfKind === 'EXPERIENCE';
+    const isIntermitente = pdfKind === 'INTERMITTENT';
     const cidadeContrato = resolveCompanySigningCity(empresa as { city?: string; address?: string });
 
     // Resolve o nome do posto de trabalho selecionado no formulário
@@ -393,6 +458,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
       experienceDurationDays: isExperiencia && form.experienceDuration
         ? parseInt(form.experienceDuration, 10)
         : undefined,
+      intermittentDurationMonths: isIntermitente ? 12 : undefined,
       salaryInWords: (fullEmployee as any).salarioPorExtenso || (fullEmployee as any).salario_por_extenso || '',
       tipoSalarioContratual:
         tipoSalarioContratualProp?.trim() ||
@@ -789,24 +855,59 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
               </div>
             </div>
 
-            {/* Duração do período (experiência e intermitente — modelo integral em várias páginas) */}
-            {isExperienceLikeContract(form.contractType) && (
+            {/* Configuração do Contrato Intermitente */}
+            {isIntermittentContract(form.contractType) && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50 border-2 border-orange-300 rounded-lg animate-in fade-in zoom-in-95 duration-300">
                 <div className="space-y-2 md:col-span-3">
                   <div className="flex items-center gap-2 mb-2">
                     <Clock className="h-5 w-5 text-orange-600" />
                     <Label className="text-orange-700 font-bold text-base">
-                      {form.contractType === 'Intermitente'
-                        ? 'Configuração do Contrato Intermitente'
-                        : 'Configuração do Contrato de Experiência'}
+                      Configuração do Contrato Intermitente
                     </Label>
                   </div>
                   <p className="text-sm text-orange-700">
-                    {form.contractType === 'Intermitente'
-                      ? 'Gera o contrato integral (cláusulas, LGPD Vigilância e termo de prorrogação). A data do contrato é a data de admissão.'
-                      : isVigilanciaCompany(empresa)
-                        ? 'Gera o modelo Promover Vigilância (escala 12x36, uniforme fornecido, LGPD específica e termo de prorrogação). A data do contrato é a data de admissão.'
-                        : 'Selecione a duração do período de experiência. A data de término será calculada automaticamente.'}
+                    Gera o contrato <strong>CONTRATO DE TRABALHO INTERMITENTE</strong> (cláusulas art. 452-A, LGPD e termo de prorrogação).
+                    A data de assinatura é a data de admissão do funcionário.
+                    {tipoSalarioContratualProp === 'HORISTA' && (
+                      <> Salário horista conforme cadastro.</>
+                    )}
+                  </p>
+                  <p className="text-xs text-orange-600 mt-1">
+                    Vigência padrão: <strong>12 meses</strong> a partir da data de admissão
+                    {funcionario?.hireDate && (
+                      <> (<strong>{formatLocalDate(funcionario.hireDate)}</strong>)</>
+                    )}.
+                  </p>
+                </div>
+                {form.startDate && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label className="text-orange-700 font-semibold">Data de Término Prevista (12 meses)</Label>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg border-2 border-orange-400">
+                      <Calendar className="h-5 w-5 text-orange-600" />
+                      <span className="font-bold text-base text-gray-800">
+                        {form.endDate ? formatLocalDate(form.endDate) : 'Calculando...'}
+                      </span>
+                      <Badge className="ml-auto bg-orange-600">Automático</Badge>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Duração do período de experiência */}
+            {isExperienceContract(form.contractType) && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50 border-2 border-orange-300 rounded-lg animate-in fade-in zoom-in-95 duration-300">
+                <div className="space-y-2 md:col-span-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-5 w-5 text-orange-600" />
+                    <Label className="text-orange-700 font-bold text-base">
+                      Configuração do Contrato de Experiência
+                    </Label>
+                  </div>
+                  <p className="text-sm text-orange-700">
+                    {isVigilanciaCompany(empresa)
+                      ? 'Gera o modelo Promover Vigilância (escala 12x36, uniforme fornecido, LGPD específica e termo de prorrogação). A data do contrato é a data de admissão.'
+                      : 'Selecione a duração do período de experiência. A data de término será calculada automaticamente.'}
                   </p>
                   <p className="text-xs text-orange-600 mt-1">
                     Padrão: <strong>45 dias</strong> a partir da data de admissão
@@ -816,9 +917,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-orange-700 font-semibold">
-                    {form.contractType === 'Intermitente' ? 'Duração do Período *' : 'Duração da Experiência *'}
-                  </Label>
+                  <Label className="text-orange-700 font-semibold">Duração da Experiência *</Label>
                   <Select
                     value={form.experienceDuration}
                     onValueChange={(value) => setForm(prev => ({ ...prev, experienceDuration: value }))}

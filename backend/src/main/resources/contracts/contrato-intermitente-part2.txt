@@ -1,0 +1,46 @@
+12 – Este Termo registra a manifestação livre, informada e inequívoca do titular sobre o acesso e tratamento de seus dados pessoais para finalidade específica, em conformidade com a Lei nº 13.709/18 – Lei Geral de Proteção de Dados Pessoais (LGPD).
+
+Consentimento expresso: O titular consente que o Receptor tenha acesso e realize o tratamento de seus dados pessoais, consubstanciado na coleta, produção, recepção, classificação, utilização, acesso, reprodução, transmissão, distribuição, processamento, arquivamento, armazenamento, eliminação, avaliação ou controle da informação, modificação, comunicação, transferência, difusão ou extração de dados pessoais.
+
+Dados Pessoais: Fica expressamente autorizado o acesso e tratamento pelo Receptor dos seguintes dados pessoais do signatário: nome completo, número do Cadastro de Pessoas Físicas (CPF), número do Cadastro Nacional de Pessoa Jurídica (CNPJ), e-mail, telefone, endereço e data de nascimento, informações cadastrais, financeiras, bancárias, fiscais e patrimoniais fornecidas pelo próprio Titular e/ou obtidas por consultas a cadastros públicos e birôs de crédito.
+
+Finalidades do Tratamento dos Dados: O tratamento dos dados pessoais autorizado neste Termo possui a finalidade de execução do contrato de trabalho intermitente, cumprimento de obrigações legais e regulatórias, gestão de recursos humanos e prestação de serviços inerentes à atividade da EMPREGADORA.
+
+Compartilhamento de Dados: O Receptor fica autorizado a compartilhar os dados pessoais do titular com outros agentes de tratamento de dados, caso seja necessário e para as finalidades listadas neste Termo, observados os princípios e as garantias estabelecidas pela Lei nº 13.709/18. Em nenhuma hipótese o Receptor compartilhará os dados do titular para fins comerciais, de divulgação de produtos e/ou serviços por outras empresas, principalmente de telemarketing.
+
+Segurança dos Dados: O Receptor possui política de proteção e responsabiliza-se pela manutenção de todas as medidas de segurança, técnicas e administrativas, aptas a proteger os dados pessoais de acessos não autorizados e de situações acidentais ou ilícitas de destruição, perda, alteração, comunicação ou qualquer forma de tratamento inadequado ou ilícito.
+
+No cumprimento do art. 48 da Lei nº 13.709/18, o Receptor comunicará ao titular e à Autoridade Nacional de Proteção de Dados (ANPD) a ocorrência de eventual incidente de segurança que possa acarretar risco ou dano relevante ao Titular.
+
+Término do Tratamento dos Dados: O Receptor poderá manter e tratar os dados pessoais do Titular apenas durante o período de vigência da relação entre as Partes.
+
+Direitos do Titular: O receptor garante ao Titular os seguintes direitos, que poderão ser exercidos a qualquer momento e mediante simples solicitação:
+
+I - confirmação da existência de tratamento;
+II - acesso aos dados;
+III - correção de dados incompletos, inexatos ou desatualizados;
+IV - anonimização, bloqueio ou eliminação de dados desnecessários, excessivos ou tratados em desconformidade com o disposto na Lei nº 13.709/18;
+V - portabilidade dos dados a outro fornecedor de serviço ou produto, mediante requisição expressa e observados os segredos comercial e industrial, de acordo com a regulamentação do órgão controlador;
+VI - eliminação dos dados pessoais tratados com o consentimento do Titular, exceto nas hipóteses previstas no art. 16 da Lei nº 13.709/18;
+VII - informação das entidades públicas e/ou privadas com as quais o Receptor tenha compartilhado os dados;
+VIII - informação sobre a possibilidade de não fornecer consentimento e sobre as consequências da negativa;
+IX - revogação do consentimento, nos termos do § 5º do art. 8º da Lei nº 13.709/18.
+
+Assinatura eletrônica ou digital: O(a) Titular concorda que a assinatura do presente Termo seja obtida de forma física ou eletrônica avançada, ciente de que não poderá contestá-lo quanto à sua forma, autenticidade e/ou integridade.
+
+13 – Dada a peculiaridade das atividades econômicas e sociais da EMPREGADORA, o EMPREGADO(A) deverá guardar sigilo quanto às informações que tiver ciência em virtude da relação de emprego, seja durante a constância do contrato de trabalho ou após a sua extinção.
+
+E por estarem de pleno acordo, as partes contratantes assinam o presente Contrato de Trabalho Intermitente em duas vias.
+
+{{CIDADE_DATA_EXTENSO}}
+
+{{ASSINATURAS_DUAS_COLUNAS}}
+
+
+TERMO DE PRORROGAÇÃO
+
+Por mútuo acordo entre as partes, fica o presente contrato de trabalho intermitente, que deveria vencer nesta data prorrogado até ___/___/______.
+
+{{CIDADE_DATA_TERMO}}
+
+{{ASSINATURAS_DUAS_COLUNAS}}

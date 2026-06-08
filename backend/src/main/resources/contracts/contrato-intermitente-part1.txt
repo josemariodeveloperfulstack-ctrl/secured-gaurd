@@ -1,0 +1,55 @@
+{{EMPREGADOR_NOME}}, com sede na {{EMPREGADOR_ENDERECO}}, inscrita no CNPJ sob nº {{EMPREGADOR_CNPJ}}, doravante denominada EMPREGADORA, e {{EMPREGADO_NOME}}, {{EMPREGADO_NACIONALIDADE}}, {{EMPREGADO_ESTADO_CIVIL}}, portador(a) do RG {{EMPREGADO_RG}} e CPF {{EMPREGADO_CPF}}, portador(a) da CTPS {{EMPREGADO_CTPS}} e PIS {{EMPREGADO_PIS}}, residente e domiciliado(a) na {{EMPREGADO_ENDERECO}}, doravante denominado(a) EMPREGADO(A), celebram o presente CONTRATO DE TRABALHO INTERMITENTE, nos termos do art. 443, § 3º, e art. 452-A, da CLT, de acordo com as condições a seguir especificadas:
+
+1 – Fica o EMPREGADO(A) admitido(a) para exercer a função de {{FUNCAO}}, mediante o salário {{SALARIO_TIPO}} de {{SALARIO_VALOR}} ({{SALARIO_EXTENSO}}), {{SALARIO_PERIODICIDADE}}, podendo ser o EMPREGADO remanejado para outra atividade em que demonstre melhor capacidade de adaptação, e ainda cumular outros afazeres, desde que compatíveis com sua condição pessoal.
+
+1.1 – O EMPREGADO(A) declara ciência de que deverá abrir conta bancária para recebimento dos valores devidos em razão da prestação de serviços, informando os dados à EMPREGADORA.
+
+2 – A prestação de serviços, em razão da natureza intermitente do contrato, não é contínua, dependendo de convocação da EMPREGADORA, que comunicará ao EMPREGADO(A), com antecedência mínima de 03 (três) dias corridos, a data, o horário e o local da prestação de serviços.
+
+3 – O EMPREGADO(A) não é obrigado a aceitar todas as convocações, podendo recusar a prestação de serviços no prazo de até 24 (vinte e quatro) horas após o recebimento da convocação, sem que isso implique em penalidade, salvo se já tiver manifestado aceite.
+
+4 – Na hipótese de prestação de serviços em jornada superior à contratada, o EMPREGADO(A) fará jus ao pagamento das horas extras, nos termos da legislação vigente.
+
+5 – Aceita o EMPREGADO(A), expressamente, a condição de prestar serviços em quaisquer dos turnos de trabalho, isto é, tanto durante o dia quanto durante a noite, desde que sem simultaneidade, não incorrendo em alteração lesiva do contrato a alternância dos turnos.
+
+5.1 – Compromete-se o EMPREGADO(A) a comparecer pontualmente ao local de trabalho nas datas e horários convocados, sob pena de responsabilização pelos prejuízos causados à EMPREGADORA.
+
+6 – Fica ajustado, nos termos do § 1º, art. 469, da CLT, que o EMPREGADO concorda com a possibilidade de transferência, transitória ou definitiva, do local de trabalho, não incorrendo em alteração lesiva do contrato a alternância da localidade de prestação dos serviços.
+
+7 – Declara o EMPREGADO(A) que, no ato da contratação, recebeu orientação sobre o Regulamento Interno da Empresa, cujas cláusulas fazem parte do contrato, e a violação de quaisquer delas implicará em sanção.
+
+7.1 – Em caso de acometimento de problemas de saúde, o EMPREGADO(A) se compromete a comunicar de forma prévia e diretamente à EMPREGADORA de sua impossibilidade de comparecimento ao posto de trabalho, bem como se compromete a apresentar à EMPREGADORA, no prazo máximo de 03 (três) dias, se outro não for convencionado, o atestado médico, em via original, capaz de justificar a sua ausência, sob pena de ser considerada como falta injustificada.
+
+7.2 – A EMPREGADORA, livre de quaisquer ônus para com o EMPREGADO(A), poderá utilizar-se de imagens deste, gravadas durante a vigência do presente contrato, para fins exclusivos de divulgação da EMPREGADORA e de suas atividades, podendo, para tanto, reproduzi-la ou divulgá-la junto à "Internet", jornais e todos os demais meios de comunicação, público ou privado.
+
+8 – Em caso de dano causado pelo EMPREGADO(A), seja por culpa ou dolo, fica a EMPREGADORA autorizada a efetivar o desconto da importância correspondente ao prejuízo, nos termos do art. 462, da CLT.
+
+9 – Em atendimento às alterações instituídas pela Lei 13.467/2017, manifesta o EMPREGADO(A) ter ciência e expressa concordância em relação aos seguintes temas:
+
+9.1 – É obrigatório o uso do uniforme fornecido pela EMPREGADORA, devendo o EMPREGADO(A) comparecer ao posto de trabalho devidamente uniformizado, ou, quando assim autorizado, terminar a uniformização no local de trabalho, utilizando-se dos 05 (cinco) minutos anteriores à jornada, previstos no art. 58, §1º, da CLT.
+
+9.2 – O EMPREGADO(A) fará jus ao descanso semanal remunerado e aos intervalos previstos na legislação, proporcionalmente ao tempo de serviço prestado em cada convocação.
+
+9.3 – Fica ajustada a responsabilidade do(a) EMPREGADO(A) no tocante a higienização do uniforme que lhe for confiado pela EMPREGADORA, reconhecendo as partes que tal limpeza não demanda o uso de procedimentos ou produtos especiais (art. 456-A, § único, CLT).
+
+9.4 – O EMPREGADO(A) fará jus às férias proporcionais, ao décimo terceiro salário e ao FGTS, calculados proporcionalmente ao tempo de serviço prestado, nos termos do art. 452-A, § 4º, da CLT.
+
+9.5 – Concorda o EMPREGADO(A), a depender da conveniência da EMPREGADORA, com a possibilidade de fracionamento do período de férias, nos termos do art. 134, da CLT.
+
+9.6 – Fica o EMPREGADO(A) ciente de que a perda da habilitação técnica para exercício da profissão, aqui também compreendida a Carteira Nacional de Vigilante (CNV), implicará a extinção motivada do contrato de trabalho, nos termos do art. 482, "m", da CLT.
+
+10 – O presente Contrato vigorará por {{MESES_CONTRATO_TEXTO}}, a contar de {{DATA_INICIO}}, com término previsto em {{DATA_FIM}}, podendo ser prorrogado por mútuo acordo entre as partes.
+
+11 – Opera-se a rescisão do presente contrato:
+
+A) Pela decorrência do prazo, sem qualquer indenização ou aviso;
+
+B) Antes do prazo previsto, por justa causa;
+
+C) Antes do prazo previsto, sem justa causa, por vontade do EMPREGADO(A), que deverá indenizar a EMPREGADORA pelos prejuízos que desse fato lhe resultar;
+
+D) Antes do prazo previsto, sem justa causa, por vontade da EMPREGADORA;
+
+E) Pela não comparecimento do EMPREGADO(A) à convocação previamente aceita, hipótese em que o EMPREGADO(A) deverá indenizar a EMPREGADORA em valor equivalente a 50% (cinquenta por cento) da remuneração que seria devida pela prestação de serviços convocada.
+
+11.1 – O presente contrato permanece em vigor durante os períodos de inatividade, não havendo prestação de serviços nem remuneração, até nova convocação da EMPREGADORA.
