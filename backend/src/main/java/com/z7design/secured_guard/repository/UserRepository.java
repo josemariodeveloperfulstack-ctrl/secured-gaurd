@@ -11,10 +11,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.z7design.secured_guard.dto.UserSelectDTO;
 import com.z7design.secured_guard.model.User;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
+
+    @Query("SELECT new com.z7design.secured_guard.dto.UserSelectDTO(u.id, COALESCE(u.name, u.username), u.username) "
+            + "FROM User u WHERE u.active = true ORDER BY u.name ASC")
+    List<UserSelectDTO> findAllActiveForSelect();
+
     @Query("SELECT DISTINCT u FROM User u")
     java.util.Set<User> findAllDistinct();
 

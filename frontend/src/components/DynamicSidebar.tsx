@@ -212,11 +212,10 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'frota',
     // Gestão de Holerites
     'holerites',
-    // Financeiro (acesso parcial) — Contas a Pagar e Pagamentos
+    // Financeiro (acesso parcial) — Contas a Pagar (sem Fluxo de Caixa)
     'modulo-financeiro',
     'gestao-financeira-dashboard',
     'gestao-financeira-contas-pagar',
-    'gestao-financeira-fluxo-caixa',
     'gestao-financeira-relatorios',
     'gestao-financeira-centros-custo',
     // Estoque e Compras (core do papel)
@@ -245,7 +244,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'frota',
     // Gestão de Holerites
     'holerites',
-    // Financeiro — Contas a Pagar e Pagamentos
+    // Financeiro — Contas a Pagar (sem Fluxo de Caixa nem Pagamentos)
     'gestao-financeira-contas-pagar',
     'gestao-financeira-relatorios',
     'gestao-financeira-centros-custo',
@@ -487,7 +486,7 @@ export function DynamicSidebar() {
       text: 'Fluxo de Caixa',
       to: '/gestao-financeira/fluxo-caixa',
       id: 'gestao-financeira-fluxo-caixa',
-      requiredPermission: 'FINANCIAL_READ'
+      requiredPermission: 'FINANCIAL_CASHFLOW_READ'
     },
     {
       icon: Banknote,

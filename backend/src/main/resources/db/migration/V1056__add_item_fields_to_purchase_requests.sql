@@ -1,0 +1,6 @@
+ALTER TABLE purchase_requests
+    ADD COLUMN IF NOT EXISTS category VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS unit_of_measure VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS item_number VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS quantity DECIMAL(10, 2),
+    ADD COLUMN IF NOT EXISTS size_breakdown TEXT;

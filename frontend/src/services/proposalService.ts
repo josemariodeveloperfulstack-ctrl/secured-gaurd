@@ -1,4 +1,24 @@
 import api from '@/lib/axios';
+import { isRetryableConnectionError } from '@/utils/connectionError';
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function withConnectionRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxRetries && isRetryableConnectionError(error)) {
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
 
 export interface ProposalItem {
   id: number;
@@ -88,7 +108,7 @@ export interface ProposalValueStats {
 
 export const proposalService = {
   async getAllProposals(): Promise<Proposal[]> {
-    const response = await api.get('/api/proposals/all');
+    const response = await withConnectionRetry(() => api.get('/api/proposals/all'));
     return response.data;
   },
 

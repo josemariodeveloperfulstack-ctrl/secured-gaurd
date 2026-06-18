@@ -89,18 +89,9 @@ export interface DependentFilters {
 }
 
 export const RELATIONSHIP_OPTIONS = [
-  { value: 'FILHO', label: 'Filho(a)' },
+  { value: 'FILHO', label: 'Filho' },
   { value: 'FILHA', label: 'Filha' },
   { value: 'CONJUGE', label: 'Cônjuge' },
-  { value: 'ESPOSA', label: 'Esposa' },
-  { value: 'ESPOSO', label: 'Esposo' },
-  { value: 'PAI', label: 'Pai' },
-  { value: 'MAE', label: 'Mãe' },
-  { value: 'IRMAO', label: 'Irmão' },
-  { value: 'IRMA', label: 'Irmã' },
-  { value: 'NETO', label: 'Neto(a)' },
-  { value: 'SOGRO', label: 'Sogro(a)' },
-  { value: 'OUTRO', label: 'Outro' }
 ] as const;
 
 export const GENDER_OPTIONS = [

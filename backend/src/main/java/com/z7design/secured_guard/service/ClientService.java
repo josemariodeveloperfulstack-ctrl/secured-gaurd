@@ -13,6 +13,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,6 +28,7 @@ public class ClientService {
     @Autowired
     private ClientRepository clientRepository;
     
+    @CacheEvict(value = "clients", allEntries = true)
     public ClientDTO createClient(ClientDTO clientDTO) {
         try {
             log.info("[DEBUG] ClientService.createClient - Iniciando criação de cliente");
@@ -96,6 +99,7 @@ public class ClientService {
         }
     }
     
+    @CacheEvict(value = "clients", allEntries = true)
     public ClientDTO updateClient(UUID id, ClientDTO clientDTO) {
         Client existingClient = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + id));
@@ -116,6 +120,7 @@ public class ClientService {
         return updatedClientDTO;
     }
     
+    @Cacheable(value = "clients", key = "#id")
     public ClientDTO getClientById(UUID id) {
         Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + id));
@@ -126,6 +131,7 @@ public class ClientService {
         return clientDTO;
     }
     
+    @Cacheable(value = "clients", key = "#cnpj")
     public ClientDTO getClientByCnpj(String cnpj) {
         Client client = clientRepository.findByCnpj(cnpj)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com CNPJ: " + cnpj));
@@ -136,6 +142,7 @@ public class ClientService {
         return clientDTO;
     }
     
+    @Cacheable(value = "clients", key = "'paged-' + (#pageable.isPaged() ? #pageable.pageNumber : 'all') + '-' + (#pageable.isPaged() ? #pageable.pageSize : 'all')")
     public Page<ClientDTO> getAllClients(Pageable pageable) {
         Page<Client> clients = clientRepository.findAll(pageable);
         return clients.map(client -> {
@@ -145,6 +152,7 @@ public class ClientService {
         });
     }
     
+    @Cacheable(value = "clients", key = "'search-' + #searchTerm + '-' + (#pageable.isPaged() ? #pageable.pageNumber : 'all') + '-' + (#pageable.isPaged() ? #pageable.pageSize : 'all')")
     public Page<ClientDTO> searchClients(String searchTerm, Pageable pageable) {
         Page<Client> clients = clientRepository.findBySearchTerm(searchTerm, pageable);
         return clients.map(client -> {
@@ -154,6 +162,7 @@ public class ClientService {
         });
     }
     
+    @Cacheable(value = "clients", key = "'status-' + #status + '-' + (#pageable.isPaged() ? #pageable.pageNumber : 'all') + '-' + (#pageable.isPaged() ? #pageable.pageSize : 'all')")
     public Page<ClientDTO> getClientsByStatus(ClientStatus status, Pageable pageable) {
         Page<Client> clients = clientRepository.findByStatus(status, pageable);
         return clients.map(client -> {
@@ -163,6 +172,7 @@ public class ClientService {
         });
     }
     
+    @Cacheable(value = "clients", key = "'status-search-' + #status + '-' + #searchTerm + '-' + (#pageable.isPaged() ? #pageable.pageNumber : 'all') + '-' + (#pageable.isPaged() ? #pageable.pageSize : 'all')")
     public Page<ClientDTO> getClientsByStatus(ClientStatus status, String searchTerm, Pageable pageable) {
         Page<Client> clients;
         
@@ -179,6 +189,7 @@ public class ClientService {
         });
     }
     
+    @Cacheable(value = "clients", key = "'status-list-' + #status")
     public List<ClientDTO> getClientsByStatus(ClientStatus status) {
         List<Client> clients = clientRepository.findByStatus(status);
         return clients.stream().map(client -> {
@@ -188,6 +199,7 @@ public class ClientService {
         }).collect(Collectors.toList());
     }
     
+    @CacheEvict(value = "clients", allEntries = true)
     public void deleteClient(UUID id) {
         Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + id));
@@ -204,6 +216,7 @@ public class ClientService {
         clientRepository.delete(client);
     }
     
+    @CacheEvict(value = "clients", allEntries = true)
     public void updateClientStatus(UUID id, ClientStatus status) {
         Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + id));

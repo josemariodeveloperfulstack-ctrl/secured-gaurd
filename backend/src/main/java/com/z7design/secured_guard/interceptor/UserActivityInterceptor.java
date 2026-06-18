@@ -21,6 +21,9 @@ public class UserActivityInterceptor implements HandlerInterceptor {
     
     @Override
     public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler) throws Exception {
+        if (shouldSkipActivityLog(request)) {
+            return true;
+        }
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null && authentication.isAuthenticated() && 
@@ -46,6 +49,27 @@ public class UserActivityInterceptor implements HandlerInterceptor {
         }
         
         return true;
+    }
+
+    /**
+     * Endpoints de polling/alta frequência — não persistir log a cada requisição
+     * (evita saturar o banco e causar ERR_CONNECTION_CLOSED no proxy local).
+     */
+    private boolean shouldSkipActivityLog(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        String path = request.getRequestURI();
+        if (path == null) {
+            return false;
+        }
+        return path.contains("/session/current-role")
+                || path.contains("/users/me/current-role")
+                || path.contains("/messages/unread/count")
+                || path.contains("/v1/chat/unread/count")
+                || path.contains("/v1/chat/recent")
+                || path.contains("/webmail/")
+                || path.startsWith("/api/notifications/unread");
     }
     
     /**

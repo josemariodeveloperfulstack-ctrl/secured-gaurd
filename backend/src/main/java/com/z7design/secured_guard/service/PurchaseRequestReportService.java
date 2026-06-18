@@ -2,6 +2,9 @@ package com.z7design.secured_guard.service;
 
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
+import com.itextpdf.kernel.colors.DeviceRgb;
+import com.itextpdf.layout.borders.SolidBorder;
+import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
@@ -81,9 +84,7 @@ public class PurchaseRequestReportService {
             addReportHeaderInfo(document, filteredRequests, startDate, endDate, status, minValue, maxValue);
             addRequestsTable(document, filteredRequests);
 
-            document.close();
-
-            byte[] result = baos.toByteArray();
+            byte[] result = docWithPdf.closeAndGetPdfBytes(baos, standardReportLayoutService);
             log.info("Relatório PDF de solicitações de compra gerado com sucesso. Tamanho: {} bytes", result.length);
             return result;
 
@@ -91,6 +92,162 @@ public class PurchaseRequestReportService {
             log.error("Erro ao gerar relatório PDF de solicitações de compra: {}", e.getMessage(), e);
             throw new IOException("Erro ao gerar relatório PDF de solicitações de compra: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * PDF individual de uma solicitação de compra com layout corporativo padrão.
+     */
+    @Transactional(readOnly = true)
+    public byte[] generateSinglePurchaseRequestPdf(UUID requestId) throws IOException {
+        PurchaseRequest request = purchaseRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Solicitação de compra não encontrada com ID: " + requestId));
+
+        UUID companyId = resolveCompanyId();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        try {
+            PdfWriter writer = new PdfWriter(baos);
+
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                    .companyId(companyId)
+                    .reportTitle("SOLICITAÇÃO DE COMPRA")
+                    .includeEmailInFooter(true)
+                    .marginExtraTop(-25f)
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
+                    .createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
+
+            addSingleRequestContent(document, request);
+
+            return docWithPdf.closeAndGetPdfBytes(baos, standardReportLayoutService);
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF da solicitação {}: {}", requestId, e.getMessage(), e);
+            throw new IOException("Erro ao gerar PDF da solicitação de compra: " + e.getMessage(), e);
+        }
+    }
+
+    private void addSingleRequestContent(Document document, PurchaseRequest request) {
+        Paragraph requestNumber = new Paragraph("Número: " + safeText(request.getRequestNumber()))
+                .setFontSize(10f)
+                .setMarginBottom(8f);
+        document.add(requestNumber);
+
+        document.add(createSectionHeader("INFORMAÇÕES BÁSICAS"));
+        Table basicTable = new Table(UnitValue.createPercentArray(new float[] { 35f, 65f }))
+                .useAllAvailableWidth();
+        addLabelValueRow(basicTable, "Título:", request.getTitle());
+        addLabelValueRow(basicTable, "Status:", getStatusLabel(request.getStatus()));
+        addLabelValueRow(basicTable, "Prioridade:", getPriorityLabel(request.getPriority()));
+        addLabelValueRow(basicTable, "Urgência:", getUrgencyLabel(request.getUrgency()));
+        addLabelValueRow(basicTable, "Data da Solicitação:", formatDateOptional(request.getRequestDate()));
+        addLabelValueRow(basicTable, "Data Necessária:", formatDateOptional(request.getRequiredDate()));
+        addLabelValueRow(basicTable, "Valor Estimado:", formatCurrency(getRequestTotalValue(request)));
+        document.add(basicTable);
+
+        if (hasText(request.getDescription())) {
+            document.add(createSectionHeader("DESCRIÇÃO"));
+            document.add(new Paragraph(request.getDescription()).setFontSize(10f));
+        }
+        if (hasText(request.getJustification())) {
+            document.add(createSectionHeader("JUSTIFICATIVA"));
+            document.add(new Paragraph(request.getJustification()).setFontSize(10f));
+        }
+
+        document.add(createSectionHeader("SOLICITANTE E DEPARTAMENTO"));
+        Table requesterTable = new Table(UnitValue.createPercentArray(new float[] { 35f, 65f }))
+                .useAllAvailableWidth();
+        addLabelValueRow(requesterTable, "Solicitante:", request.getRequesterName());
+        addLabelValueRow(requesterTable, "Departamento:", request.getDepartment());
+        addLabelValueRow(requesterTable, "Unidade Organizacional:", getUnitName(request));
+        document.add(requesterTable);
+
+        if (hasText(request.getApprovedBy()) || request.getApprovalDate() != null
+                || hasText(request.getApprovalNotes()) || "APPROVED".equalsIgnoreCase(request.getStatus())) {
+            document.add(createSectionHeader("INFORMAÇÕES DE APROVAÇÃO"));
+            Table approvalTable = new Table(UnitValue.createPercentArray(new float[] { 35f, 65f }))
+                    .useAllAvailableWidth();
+            addLabelValueRow(approvalTable, "Aprovador por:", request.getApprovedBy());
+            addLabelValueRow(approvalTable, "Data de Aprovação:", formatDateOptional(request.getApprovalDate()));
+            document.add(approvalTable);
+            if (hasText(request.getApprovalNotes())) {
+                document.add(new Paragraph("Observações da Aprovação:").setBold().setFontSize(10f).setMarginTop(6f));
+                document.add(new Paragraph(request.getApprovalNotes()).setFontSize(10f));
+            }
+        }
+
+        if (hasText(request.getSupplier())) {
+            document.add(createSectionHeader("INFORMAÇÕES DE FORNECEDOR"));
+            Table supplierTable = new Table(UnitValue.createPercentArray(new float[] { 35f, 65f }))
+                    .useAllAvailableWidth();
+            addLabelValueRow(supplierTable, "Fornecedor:", request.getSupplier());
+            addLabelValueRow(supplierTable, "Método de Pagamento:", request.getPaymentMethod());
+            addLabelValueRow(supplierTable, "Método de Entrega:", request.getDeliveryMethod());
+            document.add(supplierTable);
+            if (hasText(request.getDeliveryAddress())) {
+                document.add(new Paragraph("Endereço de Entrega:").setBold().setFontSize(10f).setMarginTop(6f));
+                document.add(new Paragraph(request.getDeliveryAddress()).setFontSize(10f));
+            }
+        }
+
+        if (hasText(request.getNotes())) {
+            document.add(createSectionHeader("OBSERVAÇÕES ADICIONAIS"));
+            document.add(new Paragraph(request.getNotes()).setFontSize(10f));
+        }
+    }
+
+    private void addLabelValueRow(Table table, String label, String value) {
+        table.addCell(createLabelCell(label));
+        table.addCell(createValueCell(value));
+    }
+
+    private Cell createLabelCell(String label) {
+        return new Cell().add(new Paragraph(label).setBold().setFontSize(9f)).setPadding(5f);
+    }
+
+    private Cell createValueCell(String value) {
+        return new Cell().add(new Paragraph(safeText(value)).setFontSize(10f)).setPadding(5f);
+    }
+
+    private Paragraph createSectionHeader(String title) {
+        return new Paragraph(title)
+                .setBold()
+                .setFontSize(11f)
+                .setFontColor(DeviceRgb.RED)
+                .setMarginTop(12f)
+                .setMarginBottom(4f)
+                .setBorderLeft(new SolidBorder(DeviceRgb.RED, 3f))
+                .setPaddingLeft(5f);
+    }
+
+    private String getUnitName(PurchaseRequest request) {
+        if (request.getUnit() == null) {
+            return "-";
+        }
+        return safeText(request.getUnit().getName());
+    }
+
+    private String safeText(String value) {
+        return value != null && !value.isBlank() ? value : "-";
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String getUrgencyLabel(String urgency) {
+        if (urgency == null) {
+            return "-";
+        }
+        return switch (urgency) {
+            case "CRITICAL" -> "Crítica";
+            case "URGENT" -> "Urgente";
+            case "NORMAL" -> "Normal";
+            case "LOW" -> "Baixa";
+            default -> urgency;
+        };
     }
 
     private List<PurchaseRequest> filterRequests(List<PurchaseRequest> requests,

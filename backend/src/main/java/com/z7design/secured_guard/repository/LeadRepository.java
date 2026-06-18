@@ -1,10 +1,12 @@
 package com.z7design.secured_guard.repository;
 
+import com.z7design.secured_guard.dto.LeadDTO;
 import com.z7design.secured_guard.model.Lead;
 import com.z7design.secured_guard.model.enums.LeadStatus;
 import com.z7design.secured_guard.model.enums.LeadSource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +19,25 @@ import java.util.UUID;
 @Repository
 public interface LeadRepository extends JpaRepository<Lead, UUID> {
     
+    @Query("""
+        SELECT new com.z7design.secured_guard.dto.LeadDTO(
+            l.id, l.name, l.email, l.phone, l.mobile, l.company, l.position,
+            l.status, l.source, l.estimatedValue, l.notes,
+            at.id,
+            CASE WHEN at.name IS NOT NULL THEN at.name ELSE at.username END,
+            l.nextFollowUp, l.createdAt, l.updatedAt
+        )
+        FROM Lead l
+        LEFT JOIN l.assignedTo at
+        WHERE l.isDeleted = false
+        ORDER BY l.updatedAt DESC
+        """)
+    List<LeadDTO> findAllActiveAsDTO();
+
+    @EntityGraph(attributePaths = {"assignedTo", "createdBy"})
+    @Query("SELECT l FROM Lead l WHERE l.isDeleted = false")
+    List<Lead> findAllActiveWithRelationships();
+
     @Query("SELECT l FROM Lead l WHERE l.isDeleted = false")
     List<Lead> findAllActive();
 

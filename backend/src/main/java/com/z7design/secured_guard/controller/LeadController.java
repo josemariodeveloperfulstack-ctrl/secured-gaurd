@@ -44,36 +44,8 @@ public class LeadController {
 
     @GetMapping("/all")
     @Operation(summary = "Listar todos os leads sem paginação", description = "Retorna uma lista completa de todos os leads")
-    @Transactional(readOnly = true)
-    public ResponseEntity<List<Lead>> getAllLeadsList() {
-        List<Lead> leads = leadService.findAll();
-        // Forçar inicialização completa do assignedTo antes da serialização JSON
-        // Isso garante que o Jackson possa serializar o relacionamento lazy
-        for (Lead lead : leads) {
-            if (lead.getAssignedTo() != null) {
-                try {
-                    // Acessar TODOS os campos do assignedTo para garantir inicialização completa
-                    // Isso força o Hibernate a carregar o objeto completo antes da serialização
-                    var assignedTo = lead.getAssignedTo();
-                    UUID id = assignedTo.getId();
-                    String name = assignedTo.getName();
-                    String username = assignedTo.getUsername();
-                    // Acessar mais campos para garantir que o objeto está totalmente carregado
-                    assignedTo.getEmail();
-                    assignedTo.isEnabled();
-                    assignedTo.isAccountNonExpired();
-                    // Popular assignedToName para facilitar serialização
-                    lead.setAssignedToName(name != null ? name : username);
-                    log.info("✅ Lead {} - AssignedTo inicializado: ID={}, Name={}, Username={}, AssignedToName={}", 
-                        lead.getId(), id, name, username, lead.getAssignedToName());
-                } catch (Exception e) {
-                    log.warn("❌ Erro ao acessar assignedTo do lead {}: {}", lead.getId(), e.getMessage());
-                }
-            } else {
-                log.debug("⚠️ Lead {} - AssignedTo é null", lead.getId());
-            }
-        }
-        return ResponseEntity.ok(leads);
+    public ResponseEntity<List<LeadDTO>> getAllLeadsList() {
+        return ResponseEntity.ok(leadService.findAllActiveAsDTO());
     }
 
     @GetMapping("/{id}")

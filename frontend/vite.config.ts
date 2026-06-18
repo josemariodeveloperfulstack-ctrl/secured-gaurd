@@ -107,50 +107,48 @@ export default defineConfig(({ mode }) => {
     }),
   ];
 
+  const httpsConfig = (() => {
+    if (process.env.VITE_USE_HTTPS === 'false') return undefined;
+    try {
+      const certDir = path.resolve(process.cwd(), "certs");
+      const keyPath = path.join(certDir, "localhost-key.pem");
+      const certPath = path.join(certDir, "localhost.pem");
+      if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+        return {
+          key: fs.readFileSync(keyPath),
+          cert: fs.readFileSync(certPath),
+        };
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+
   return {
     server: {
-      host: "0.0.0.0", // Permite acesso de qualquer IP na rede
+      host: "0.0.0.0",
       port: 3000,
-      strictPort: false, // Permite usar outra porta se 3000 estiver ocupada
-      // HTTPS local para testar câmera / QR Code (getUserMedia exige HTTPS)
-      https: (() => {
-        try {
-          const certDir = path.resolve(process.cwd(), "certs");
-          const keyPath = path.join(certDir, "localhost-key.pem");
-          const certPath = path.join(certDir, "localhost.pem");
-          if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-            return {
-              key: fs.readFileSync(keyPath),
-              cert: fs.readFileSync(certPath),
-            };
+      strictPort: false,
+      https: httpsConfig,
+      hmr: httpsConfig
+        ? {
+            protocol: 'wss',
+            host: 'localhost',
+            port: 3000,
+            overlay: false,
           }
-          return undefined;
-        } catch {
-          // Se os arquivos não existirem, segue em HTTP normal
-          return undefined;
-        }
-      })(),
-      hmr: {
-        overlay: false, // Desabilita overlay de erros HMR
-        // Configurar HMR para funcionar com IP externo
-        clientPort: 3000,
-      },
+        : {
+            overlay: false,
+            clientPort: 3000,
+          },
       proxy: {
         '/api': {
           target: 'http://localhost:8083',
           changeOrigin: true,
           secure: false,
-          configure: (proxy, options) => {
-            proxy.on('error', (err, req, res) => {
-              console.log('proxy error', err);
-            });
-            proxy.on('proxyReq', (proxyReq, req, res) => {
-              console.log('Sending Request to the Target:', req.method, req.url);
-            });
-            proxy.on('proxyRes', (proxyRes, req, res) => {
-              console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
-            });
-          },
+          timeout: 120000,
+          proxyTimeout: 120000,
         },
         '/ws': {
           target: 'http://localhost:8083',

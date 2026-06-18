@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.util.List;
 import java.util.UUID;
@@ -25,6 +27,7 @@ public class PositionService {
     private final PositionRepository positionRepository;
     private final UnitRepository unitRepository;
 
+    @Cacheable(value = "positions", key = "'all'")
     public List<PositionDTO> getAllPositions() {
         try {
             log.info("Buscando todos os cargos");
@@ -54,6 +57,7 @@ public class PositionService {
         }
     }
 
+    @Cacheable(value = "positions", key = "'search-' + #query")
     public List<PositionDTO> searchPositions(String query) {
         log.info("Buscando cargos com query: {}", query);
         List<Position> positions;
@@ -77,6 +81,7 @@ public class PositionService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(value = "positions", key = "#id")
     public PositionDTO getPositionById(UUID id) {
         log.info("Buscando cargo por ID: {}", id);
         Position position = positionRepository.findById(id)
@@ -84,6 +89,7 @@ public class PositionService {
         return PositionDTO.fromEntity(position);
     }
 
+    @CacheEvict(value = "positions", allEntries = true)
     public PositionDTO createPosition(PositionDTO dto) {
         log.info("Criando novo cargo: {}", dto.getName());
 
@@ -105,6 +111,7 @@ public class PositionService {
         return PositionDTO.fromEntity(position);
     }
 
+    @CacheEvict(value = "positions", allEntries = true)
     public PositionDTO updatePosition(UUID id, PositionDTO dto) {
         log.info("Atualizando cargo ID: {}", id);
 
@@ -134,6 +141,7 @@ public class PositionService {
         return PositionDTO.fromEntity(existingPosition);
     }
 
+    @CacheEvict(value = "positions", allEntries = true)
     public void deletePosition(UUID id) {
         log.info("Excluindo cargo ID: {}", id);
         if (!positionRepository.existsById(id)) {

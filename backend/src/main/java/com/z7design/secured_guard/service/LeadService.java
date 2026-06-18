@@ -145,6 +145,47 @@ public class LeadService {
     }
 
     @Transactional(readOnly = true)
+    public List<LeadDTO> findAllActiveAsDTO() {
+        return leadRepository.findAllActiveAsDTO();
+    }
+
+    public LeadDTO mapToDTO(Lead lead) {
+        if (lead == null) {
+            return null;
+        }
+
+        LeadDTO dto = new LeadDTO();
+        dto.setId(lead.getId());
+        dto.setName(lead.getName());
+        dto.setEmail(lead.getEmail());
+        dto.setPhone(lead.getPhone());
+        dto.setMobile(lead.getMobile());
+        dto.setCompany(lead.getCompany());
+        dto.setPosition(lead.getPosition());
+        dto.setStatus(lead.getStatus());
+        dto.setSource(lead.getSource());
+        dto.setEstimatedValue(lead.getEstimatedValue());
+        dto.setNotes(lead.getNotes());
+        dto.setNextFollowUp(lead.getNextFollowUp());
+        dto.setCreatedAt(lead.getCreatedAt());
+        dto.setUpdatedAt(lead.getUpdatedAt());
+
+        try {
+            if (lead.getAssignedTo() != null) {
+                dto.setAssignedToId(lead.getAssignedTo().getId());
+                String name = lead.getAssignedTo().getName();
+                dto.setAssignedToName(name != null ? name : lead.getAssignedTo().getUsername());
+            } else if (lead.getAssignedToName() != null) {
+                dto.setAssignedToName(lead.getAssignedToName());
+            }
+        } catch (Exception e) {
+            log.debug("Lead {} — assignedTo indisponível: {}", lead.getId(), e.getMessage());
+        }
+
+        return dto;
+    }
+
+    @Transactional(readOnly = true)
     public List<Lead> findAllActive() {
         List<Lead> leads = leadRepository.findAllActive();
         // Inicializar relacionamentos lazy dentro da transação

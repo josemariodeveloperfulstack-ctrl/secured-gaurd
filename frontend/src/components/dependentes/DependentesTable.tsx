@@ -57,21 +57,13 @@ export const DependentesTable: React.FC<DependentesTableProps> = ({
 
   const getRelationshipBadge = (relationship: string) => {
     const relationshipConfig = {
-      'FILHO': { label: 'Filho(a)', variant: 'default' as const, color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+      'FILHO': { label: 'Filho', variant: 'default' as const, color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
       'FILHA': { label: 'Filha', variant: 'default' as const, color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
       'CONJUGE': { label: 'Cônjuge', variant: 'default' as const, color: 'bg-green-500/20 text-green-300 border-green-500/30' },
-      'ESPOSA': { label: 'Esposa', variant: 'default' as const, color: 'bg-green-500/20 text-green-300 border-green-500/30' },
-      'ESPOSO': { label: 'Esposo', variant: 'default' as const, color: 'bg-green-500/20 text-green-300 border-green-500/30' },
-      'PAI': { label: 'Pai', variant: 'default' as const, color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
-      'MAE': { label: 'Mãe', variant: 'default' as const, color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
-      'IRMAO': { label: 'Irmão', variant: 'default' as const, color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
-      'IRMA': { label: 'Irmã', variant: 'default' as const, color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
-      'NETO': { label: 'Neto(a)', variant: 'default' as const, color: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
-      'SOGRO': { label: 'Sogro(a)', variant: 'default' as const, color: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' },
-      'OUTRO': { label: 'Outro', variant: 'default' as const, color: 'bg-gray-500/20 text-gray-300 border-gray-500/30' }
     };
     
-    const config = relationshipConfig[relationship as keyof typeof relationshipConfig] || relationshipConfig['OUTRO'];
+    const config = relationshipConfig[relationship as keyof typeof relationshipConfig]
+      || { label: relationship, variant: 'default' as const, color: 'bg-gray-500/20 text-gray-300 border-gray-500/30' };
     return <Badge className={`${config.color} px-2 py-1 rounded-full text-xs font-medium`}>{config.label}</Badge>;
   };
 

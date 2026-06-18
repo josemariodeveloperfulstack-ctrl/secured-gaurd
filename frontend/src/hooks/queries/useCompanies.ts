@@ -8,6 +8,8 @@ export function useCompanies(options?: { enabled?: boolean }) {
     queryKey: queryKeys.companies.list(),
     queryFn: () => companyService.getAllCompanies(),
     staleTime: 5 * 60 * 1000,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
     enabled: options?.enabled ?? true,
   });
 }

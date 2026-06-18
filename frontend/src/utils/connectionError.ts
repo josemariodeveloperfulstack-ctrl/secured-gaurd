@@ -17,6 +17,8 @@ export function isConnectionError(error: any): boolean {
     error?.code === 'ECONNREFUSED' ||
     error?.code === 'ERR_CONNECTION_REFUSED' ||
     error?.code === 'ERR_NETWORK' ||
+    error?.code === 'ERR_CONNECTION_CLOSED' ||
+    error?.message?.includes('ERR_CONNECTION_CLOSED') ||
     error?.code === 'ERR_TOO_MANY_REDIRECTS' ||
     error?.message?.includes('too many redirects') ||
     error?.message?.includes('Network Error') ||
@@ -68,10 +70,35 @@ export function createConnectionError(apiUrl?: string): ConnectionError {
  * Trata erros de conexão de forma silenciosa (apenas loga warning)
  * Retorna true se o erro foi tratado, false caso contrário
  */
+/**
+ * Repete a operação quando falhar por indisponibilidade temporária do backend.
+ */
+export async function fetchWithConnectionRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries = 2,
+  delayMs = 800,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isConnectionError(error) || attempt >= maxRetries) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
 export function handleConnectionErrorSilently(error: any, context?: string): boolean {
   if (isConnectionError(error)) {
     const contextMsg = context ? `[${context}] ` : '';
-    console.warn(`⚠️ ${contextMsg}Backend não está disponível. Continuando sem dados.`);
+    if (import.meta.env.DEV) {
+      console.debug(`ℹ️ ${contextMsg}Conexão temporária com o servidor — ignorado (polling).`);
+    }
     return true;
   }
   return false;

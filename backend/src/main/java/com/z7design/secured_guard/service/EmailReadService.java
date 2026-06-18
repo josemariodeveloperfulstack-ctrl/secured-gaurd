@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.model.EmailAccount;
 import com.z7design.secured_guard.repository.EmailAccountRepository;
 import com.z7design.secured_guard.repository.EmailCacheRepository;
+import com.z7design.secured_guard.exception.BusinessException;
 import jakarta.mail.*;
 import jakarta.mail.internet.MimeMultipart;
 import lombok.RequiredArgsConstructor;
@@ -101,9 +102,13 @@ public class EmailReadService {
             }
             store.close();
             return folderNames;
+        } catch (AuthenticationFailedException e) {
+            log.warn("Autenticação IMAP falhou para conta {} ({}): {}", accountId, account.getEmail(), e.getMessage());
+            throw new com.z7design.secured_guard.exception.EmailAuthenticationException(
+                    "Credenciais de e-mail inválidas. Atualize a senha da conta em Configurações do Webmail.", e);
         } catch (Exception e) {
             log.error("Erro ao listar pastas", e);
-            throw new RuntimeException("Erro ao buscar pastas");
+            throw new BusinessException("Não foi possível conectar ao servidor de e-mail.");
         }
     }
 

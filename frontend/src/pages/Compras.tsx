@@ -351,8 +351,13 @@ export default function Compras() {
     }
   };
 
-  const handleEditRequest = (request: PurchaseRequest) => {
-    setEditingRequest(request);
+  const handleEditRequest = async (request: PurchaseRequest) => {
+    try {
+      const full = await purchaseRequestService.getPurchaseRequestById(request.id);
+      setEditingRequest(full);
+    } catch {
+      setEditingRequest(request);
+    }
     setIsModalOpen(true);
   };
 

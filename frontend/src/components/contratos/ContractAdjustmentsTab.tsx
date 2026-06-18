@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { contractService, ContractAdjustment, AdjustmentTypeType } from '@/services/contractService';
+import { isUuid } from '@/utils/uuid';
 import { Loader2, Plus } from 'lucide-react';
 import {
   Dialog,
@@ -43,6 +44,7 @@ export const ContractAdjustmentsTab: React.FC<ContractAdjustmentsTabProps> = ({
   });
 
   const loadAdjustments = async () => {
+    if (!isUuid(contractId)) return;
     setLoading(true);
     try {
       const data = await contractService.getAdjustments(contractId);

@@ -28,6 +28,7 @@ export default function CommercialDashboard({ className }: Props) {
   const [kpis, setKpis] = useState<CommercialKpis | null>(null);
   const [goals, setGoals] = useState<SalesGoal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [periodo, setPeriodo] = useState('12'); // meses
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
   const [usersList, setUsersList] = useState<{ id: string; name: string }[]>([]);
@@ -36,40 +37,43 @@ export default function CommercialDashboard({ className }: Props) {
 
   useEffect(() => {
     loadData();
-    if (isGestorOrAdmin) {
-      loadUsers();
-    }
   }, [periodo, selectedUserId]);
+
+  useEffect(() => {
+    if (!isGestorOrAdmin) return;
+    void loadUsers();
+  }, [isGestorOrAdmin]);
 
   const loadUsers = async () => {
     try {
-      const data = await userService.getAllUsers();
-      setUsersList(data.map((u: any) => ({ id: u.id, name: u.name || u.username })));
-    } catch { /* ignore */ }
+      const data = await userService.getUsersForSelect();
+      setUsersList(data.map((u) => ({ id: u.id, name: u.name || u.username })));
+    } catch { /* ignore — filtro de vendedor é opcional */ }
   };
 
   const loadData = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const endDate = new Date().toISOString().split('T')[0];
       const start = new Date();
       start.setMonth(start.getMonth() - parseInt(periodo));
       const startDate = start.toISOString().split('T')[0];
 
-      // Se for COMERCIAL e não gestor, forçar userId do próprio usuário
       const userId = isGestorOrAdmin
         ? (selectedUserId || undefined)
         : (user as any)?.id;
 
-      const [kpisData, goalsData] = await Promise.all([
-        commercialDashboardService.getKpis({ userId, startDate, endDate }),
-        salesGoalService.getProgress(new Date().getMonth() + 1, new Date().getFullYear()).catch(() => []),
-      ]);
-
+      const kpisData = await commercialDashboardService.getKpis({ userId, startDate, endDate });
       setKpis(kpisData);
+
+      const goalsData = await salesGoalService
+        .getProgress(new Date().getMonth() + 1, new Date().getFullYear())
+        .catch(() => []);
       setGoals(goalsData);
     } catch (error) {
       console.error('Erro ao carregar dashboard:', error);
+      setLoadError('Falha ao carregar dashboard comercial. Tente novamente.');
       toast({ title: 'Erro', description: 'Falha ao carregar dashboard comercial.', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -89,7 +93,22 @@ export default function CommercialDashboard({ className }: Props) {
     );
   }
 
-  if (!kpis) return <p className="text-gray-400 text-center py-10">Nenhum dado disponível.</p>;
+  if (!kpis) {
+    return (
+      <div className="text-center py-10 space-y-3">
+        <p className="text-gray-400">{loadError || 'Nenhum dado disponível.'}</p>
+        {loadError && (
+          <button
+            type="button"
+            onClick={() => loadData()}
+            className="text-sm text-seguranca-yellow hover:underline"
+          >
+            Tentar novamente
+          </button>
+        )}
+      </div>
+    );
+  }
 
   // Preparar dados dos gráficos
   const funilData = kpis.funilVendas

@@ -202,26 +202,26 @@ export default function CrmKanban() {
           </TabsList>
 
           <TabsContent value="kanban" className="space-y-4 w-full min-w-0">
-            <KanbanBoard />
+            {activeTab === 'kanban' && <KanbanBoard />}
           </TabsContent>
 
           <TabsContent value="dashboard" className="space-y-4">
-            <CrmDashboard />
+            {activeTab === 'dashboard' && <CrmDashboard />}
           </TabsContent>
 
           <TabsContent value="desempenho" className="space-y-4">
-            <CommercialDashboard />
+            {activeTab === 'desempenho' && <CommercialDashboard />}
           </TabsContent>
 
           {isGestorOrAdmin && (
             <TabsContent value="equipe" className="space-y-4">
-              <TeamDashboard />
+              {activeTab === 'equipe' && <TeamDashboard />}
             </TabsContent>
           )}
 
           {isGestorOrAdmin && (
             <TabsContent value="metas" className="space-y-4">
-              <SalesGoalManager />
+              {activeTab === 'metas' && <SalesGoalManager />}
             </TabsContent>
           )}
         </Tabs>

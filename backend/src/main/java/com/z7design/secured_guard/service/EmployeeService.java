@@ -35,6 +35,7 @@ import com.z7design.secured_guard.repository.PositionRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
 import com.z7design.secured_guard.dto.EmployeeDTO;
 import com.z7design.secured_guard.dto.SimpleEmployeeDTO;
+import com.z7design.secured_guard.validation.CpfValidationUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +67,8 @@ public class EmployeeService {
     private EmployeeChangeHistoryService employeeChangeHistoryService;
     @Autowired
     private RemanejamentoService remanejamentoService;
+    @Autowired
+    private com.z7design.secured_guard.repository.DependentRepository dependentRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -179,13 +182,11 @@ public class EmployeeService {
             System.out.println("[DEBUG] EmployeeService.create - Iniciando criação de funcionário");
             System.out.println("[DEBUG] DTO recebido: " + dto.getName() + " - " + dto.getCpf());
 
+            validateEmployeeForSave(dto, null, null);
+
             if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty()
                     && employeeRepository.existsByEmail(dto.getEmail())) {
                 throw new java.lang.IllegalArgumentException("Email já cadastrado");
-            }
-
-            if (dto.getCpf() != null && documentAlreadyRegistered(dto.getCpf())) {
-                throw new IllegalArgumentException("CPF já cadastrado para outro funcionário");
             }
 
             System.out.println("[DEBUG] Validações passaram, convertendo DTO para Entity");
@@ -239,12 +240,7 @@ public class EmployeeService {
                 throw new IllegalArgumentException("Email já cadastrado");
             }
 
-            // Validar CPF único (exceto para o próprio funcionário)
-            if (dto.getCpf() != null && !isSameDocument(dto.getCpf(), existingEmployee.getDocument())) {
-                if (documentAlreadyRegisteredByOther(dto.getCpf(), id)) {
-                    throw new IllegalArgumentException("CPF já cadastrado para outro funcionário");
-                }
-            }
+            validateEmployeeForSave(dto, id, existingEmployee.getDocument());
 
             System.out.println("[DEBUG] Atualizando campos do funcionário existente...");
 
@@ -1026,6 +1022,7 @@ public class EmployeeService {
         }
     }
 
+    @Transactional(readOnly = true)
     public List<SimpleEmployeeDTO> findSimpleEmployeesByNameOrDocument(String searchTerm) {
         try {
             System.out.println(
@@ -1268,6 +1265,7 @@ public class EmployeeService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "employees", key = "'basic-data'")
     public List<Object[]> findBasicData() {
         try {
             System.out.println("🔍 EmployeeService.findBasicData - Buscando dados básicos");
@@ -1281,6 +1279,8 @@ public class EmployeeService {
         }
     }
 
+    @Transactional(readOnly = true)
+    @Cacheable(value = "employees", key = "'search-' + #searchTerm")
     public List<Object[]> findBasicDataBySearchTerm(String searchTerm) {
         try {
             System.out.println("🔍 EmployeeService.findBasicDataBySearchTerm - Buscando por termo: " + searchTerm);
@@ -1299,6 +1299,7 @@ public class EmployeeService {
      * Dados básicos de funcionários com aniversário no mês informado (1–12).
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = "employees", key = "'birthdays-' + #month + '-' + #onlyActive + '-' + #companyId")
     public List<Object[]> findBasicDataByBirthMonth(int month, boolean onlyActive, java.util.UUID companyId) {
         if (month < 1 || month > 12) {
             throw new IllegalArgumentException("Mês deve estar entre 1 e 12");
@@ -1339,6 +1340,7 @@ public class EmployeeService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "employees", key = "'paged-' + #page + '-' + #size + '-' + #companyId + '-' + #status + '-' + #sortBy + '-' + #sortDir + '-' + #hireDateFrom + '-' + #hireDateTo + '-' + #terminationDateFrom + '-' + #terminationDateTo")
     public List<Object[]> findBasicDataPaged(int page, int size, java.util.UUID companyId, String status,
             String sortBy, String sortDir, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
             java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
@@ -1385,6 +1387,7 @@ public class EmployeeService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "employees", key = "'search-paged-' + #searchTerm + '-' + #page + '-' + #size + '-' + #companyId + '-' + #status + '-' + #sortBy + '-' + #sortDir + '-' + #hireDateFrom + '-' + #hireDateTo + '-' + #terminationDateFrom + '-' + #terminationDateTo")
     public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size, java.util.UUID companyId,
             String status, String sortBy, String sortDir, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
             java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
@@ -2214,6 +2217,34 @@ public class EmployeeService {
             return Objects.equals(left, right);
         }
         return normalizedLeft.equals(normalizedRight);
+    }
+
+    private void validateEmployeeForSave(EmployeeDTO dto, UUID excludeId, String existingDocument) {
+        if (dto.getCpf() == null || dto.getCpf().trim().isEmpty()) {
+            throw new IllegalArgumentException("CPF é obrigatório");
+        }
+        String cpfDigits = CpfValidationUtils.digitsOnly(dto.getCpf());
+        if (cpfDigits.length() != 11 || !CpfValidationUtils.isValid(cpfDigits)) {
+            throw new IllegalArgumentException("CPF inválido. Verifique os dígitos informados.");
+        }
+        if (dto.getHireDate() == null) {
+            throw new IllegalArgumentException("Data de admissão é obrigatória");
+        }
+        if (excludeId == null) {
+            if (documentAlreadyRegistered(dto.getCpf())) {
+                throw new IllegalArgumentException("CPF já cadastrado para outro funcionário");
+            }
+        } else if (!isSameDocument(dto.getCpf(), existingDocument)
+                && documentAlreadyRegisteredByOther(dto.getCpf(), excludeId)) {
+            throw new IllegalArgumentException("CPF já cadastrado para outro funcionário");
+        }
+        if (cpfUsedByDependent(cpfDigits)) {
+            throw new IllegalArgumentException("CPF já cadastrado no sistema");
+        }
+    }
+
+    private boolean cpfUsedByDependent(String cpfDigits) {
+        return !dependentRepository.findIdsByCpfDigitsNormalized(cpfDigits).isEmpty();
     }
 
     private boolean documentAlreadyRegistered(String document) {

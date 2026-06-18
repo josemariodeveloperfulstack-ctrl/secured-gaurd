@@ -42,7 +42,7 @@ export default function SalesGoalManager() {
       setLoading(true);
       const [goalsData, usersData] = await Promise.all([
         salesGoalService.getAll(parseInt(filterYear)),
-        userService.getAllUsers(),
+        userService.getUsersForSelect(),
       ]);
       setGoals(goalsData);
       setUsers(usersData.map((u: any) => ({ id: u.id, name: u.name || u.username })));

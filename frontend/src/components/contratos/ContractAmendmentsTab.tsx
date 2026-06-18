@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { contractService, ContractAmendment, AmendmentTypeType } from '@/services/contractService';
+import { isUuid } from '@/utils/uuid';
 import { Loader2, Plus, Check, X, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -45,6 +46,7 @@ export const ContractAmendmentsTab: React.FC<ContractAmendmentsTabProps> = ({
   });
 
   const loadAmendments = async () => {
+    if (!isUuid(contractId)) return;
     setLoading(true);
     try {
       const data = await contractService.getAmendments(contractId);

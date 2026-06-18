@@ -8,12 +8,13 @@ import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Shield, Loader2, CheckCircle2 } from 'lucide-react';
 import { employeeService, SimpleEmployee, employeeToSimpleEmployee } from '@/services/employeeService';
-import { companyService } from '@/services/companyService';
 import { Company } from '@/types/company';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
+import { useDocumentFormCompanies } from '@/hooks/useDocumentFormCompanies';
+import { fetchWithConnectionRetry } from '@/utils/connectionError';
 
 
 const documentTypes = [
@@ -25,9 +26,16 @@ const documentTypes = [
 interface TermoResponsabilidadeEspecificoFormProps {
     employeeId?: string;
     companyId?: string;
+    companies?: Company[];
+    employeeName?: string;
 }
 
-const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecificoFormProps> = ({ employeeId, companyId }) => {
+const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecificoFormProps> = ({
+    employeeId,
+    companyId,
+    companies: parentCompanies,
+    employeeName,
+}) => {
     const { toast } = useToast();
     const [form, setForm] = useState({
         funcionarioId: employeeId || '',
@@ -39,8 +47,8 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
 
     const [loading, setLoading] = useState(false);
     const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
-    const [companies, setCompanies] = useState<Company[]>([]);
-    const [loadingData, setLoadingData] = useState(false);
+    const activeCompanyId = form.empresaId || companyId || '';
+    const { companies, loadingCompanies, refetchCompanies } = useDocumentFormCompanies(activeCompanyId, parentCompanies);
 
 
     useEffect(() => {
@@ -56,7 +64,10 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
         if (form.funcionarioId && !selectedEmployeeData) {
             const fetchEmployee = async () => {
                 try {
-                    const emp = await employeeService.getEmployeeById(form.funcionarioId);
+                    const emp = await fetchWithConnectionRetry(
+                        () => employeeService.getEmployeeById(form.funcionarioId),
+                        2,
+                    );
                     if (emp) {
                         setSelectedEmployeeData(employeeToSimpleEmployee(emp));
 
@@ -72,21 +83,6 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
             fetchEmployee();
         }
     }, [form.funcionarioId, selectedEmployeeData, form.empresaId]);
-
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoadingData(true);
-            try {
-                const companiesData = await companyService.getAllCompanies();
-                setCompanies(companiesData);
-            } catch (error) {
-                console.error('Erro ao buscar dados:', error);
-            } finally {
-                setLoadingData(false);
-            }
-        };
-        fetchData();
-    }, []);
 
 
     const selectedFunc = selectedEmployeeData;
@@ -120,8 +116,8 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
         let companyList = companies;
         if (companyList.length === 0) {
             try {
-                companyList = await companyService.getAllCompanies();
-                setCompanies(companyList);
+                const refreshed = await refetchCompanies();
+                companyList = refreshed.data ?? [];
             } catch (error) {
                 console.error('Erro ao carregar empresas para o termo:', error);
             }
@@ -273,7 +269,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                             <Label className="text-seguranca-lightgray font-semibold">Funcionário</Label>
                             <EmployeeCombobox
                                 value={form.funcionarioId}
-                                initialDisplayName={selectedFunc?.name}
+                                initialDisplayName={selectedFunc?.name || employeeName}
                                 onChange={(val) => {
                                     setForm(prev => ({ ...prev, funcionarioId: val }));
                                     if (!val) {
@@ -307,9 +303,13 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
 
                         <div className="space-y-2">
                             <Label className="text-seguranca-lightgray font-semibold">Empresa</Label>
-                            <Select value={form.empresaId} onValueChange={(val) => setForm(prev => ({ ...prev, empresaId: val }))}>
+                            <Select
+                                value={form.empresaId}
+                                onValueChange={(val) => setForm(prev => ({ ...prev, empresaId: val }))}
+                                disabled={loadingCompanies && companies.length === 0}
+                            >
                                 <SelectTrigger className="bg-seguranca-black border-gray-700 text-white h-11">
-                                    <SelectValue placeholder="Selecione..." />
+                                    <SelectValue placeholder={loadingCompanies ? 'Carregando...' : 'Selecione...'} />
                                 </SelectTrigger>
                                 <SelectContent className="bg-seguranca-black border-gray-700 text-white">
                                     {companies.map(e => (

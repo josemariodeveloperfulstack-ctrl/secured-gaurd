@@ -57,6 +57,10 @@ public class EmploymentContractStandardPdfService {
         }
 
         public byte[] generatePdf(EmploymentContractRequest request) {
+                if (request.getCompanyId() == null) {
+                        throw new IllegalArgumentException(
+                                        "Empresa (companyId) é obrigatória para gerar o contrato de trabalho.");
+                }
                 enrichEmployeeAddress(request);
                 LocalDate admissionDate = documentDateResolver.resolveDocumentDateOrToday(
                                 request.getEmployeeId(),
@@ -79,7 +83,8 @@ public class EmploymentContractStandardPdfService {
                                         .includeEmailInFooter(true)
                                         .removeBoldFromFooterCompanyName(true)
                                         .useCalibriLightFooter(true)
-                                        .footerCompanyNameFontSize(11f);
+                                        .footerCompanyNameFontSize(11f)
+                                        .showPageNumbers(true);
                         documentDateResolver.applyAdmissionDateFooter(configBuilder, request.getEmployeeId());
                         ReportLayoutConfig config = configBuilder.build();
 
@@ -89,8 +94,7 @@ public class EmploymentContractStandardPdfService {
 
                         addContent(document, request, company);
 
-                        document.close();
-                        return outputStream.toByteArray();
+                        return docWithPdf.closeAndGetPdfBytes(outputStream, pdfLayoutService);
                 } catch (Exception e) {
                         log.error("Erro ao gerar PDF do Contrato de Trabalho", e);
                         throw new RuntimeException("Erro ao gerar PDF do Contrato de Trabalho", e);

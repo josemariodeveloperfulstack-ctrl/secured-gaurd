@@ -135,20 +135,19 @@ export const formatDateSafe = (dateString: string | Date | null | undefined): st
   }
   
   try {
-    let date: Date;
-    
-    if (typeof dateString === 'string') {
-      date = new Date(dateString);
-    } else {
-      date = dateString;
+    if (dateString instanceof Date) {
+      if (!isValid(dateString) || dateString.getFullYear() < 1900) {
+        return 'N/A';
+      }
+      return format(dateString, 'dd/MM/yyyy', { locale: ptBR });
     }
-    
-    // Verificar se a data é válida
-    if (!isValid(date) || date.getFullYear() < 1900) {
+
+    const parsed = parseDateFromBackend(String(dateString));
+    if (!parsed || parsed.getFullYear() < 1900) {
       return 'N/A';
     }
     
-    return format(date, 'dd/MM/yyyy', { locale: ptBR });
+    return formatDateForDisplay(parsed);
   } catch (error) {
     console.error('Erro ao formatar data:', dateString, error);
     return 'N/A';

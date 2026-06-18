@@ -22,7 +22,7 @@ import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
 import { DependentFormModal } from '@/components/dependentes/DependentFormModal';
 import dependentService from '@/services/dependentService';
-import { Dependent, DependentCreateRequest } from '@/types/dependent';
+import { Dependent, DependentCreateRequest, RELATIONSHIP_OPTIONS } from '@/types/dependent';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/hooks/queries';
@@ -161,6 +161,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const draftRestoreNotifiedRef = useRef(false);
   const modalWasOpenRef = useRef(false);
   const loadedEmployeeIdRef = useRef<string | null>(null);
+  /** Posto original ao abrir edição — remanejamento só se o usuário mudar para outro posto. */
+  const initialWorkPostIdRef = useRef('');
+  /** Evita abrir modal de remanejamento durante hidratação do Select (workPosts ainda carregando). */
+  const workPostSelectReadyRef = useRef(false);
   const draftStorageKey = useMemo(
     () => getEmployeeFormDraftKey(user?.id || user?.username),
     [user?.id, user?.username],
@@ -388,12 +392,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   }, []);
 
   useEffect(() => {
-    if (!open || !employeeToEdit?.id) {
-      setEmployeeDependents([]);
+    const empId = currentEmployeeId || employeeToEdit?.id;
+    if (!open || !empId) {
       return;
     }
-    loadEmployeeDependents(employeeToEdit.id);
-  }, [open, employeeToEdit?.id, loadEmployeeDependents]);
+    loadEmployeeDependents(empId);
+  }, [open, currentEmployeeId, employeeToEdit?.id, loadEmployeeDependents]);
 
   // Estados para modal de remanejamento ao alterar setor/posto
   const [remanejamentoModalOpen, setRemanejamentoModalOpen] = useState(false);
@@ -539,6 +543,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
     if (!open) {
       loadedEmployeeIdRef.current = null;
+      initialWorkPostIdRef.current = '';
+      workPostSelectReadyRef.current = false;
       return;
     }
 
@@ -701,6 +707,11 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         departmentId: String((employeeToEdit as any).departmentId || (employeeToEdit as any).department?.id || '')
       });
 
+      initialWorkPostIdRef.current = String(
+        (employeeToEdit as any).workPostId || (employeeToEdit as any).workPost?.id || '',
+      ).toLowerCase();
+      workPostSelectReadyRef.current = false;
+
       setTemIntervaloAlmoco(employeeToEdit.horarioTrabalhoIntervalo ? 'sim' : 'nao');
 
       // Preencher seleções
@@ -852,6 +863,26 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       loadWorkPostsData(selectedCompany?.id);
     }
   }, [selectedCompany?.id, open]); // Re-carregar também ao abrir o modal
+
+  // Habilitar detecção de remanejamento só após postos carregarem (evita modal ao abrir edição)
+  useEffect(() => {
+    if (!open || !isEditMode) {
+      workPostSelectReadyRef.current = false;
+      return;
+    }
+
+    const hasInitialPost = initialWorkPostIdRef.current !== '';
+    if (hasInitialPost && workPosts.length === 0) {
+      workPostSelectReadyRef.current = false;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      workPostSelectReadyRef.current = true;
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [open, isEditMode, workPosts.length, employeeToEdit?.id]);
 
   // Atualizar selectedCompany quando companies forem carregadas e houver employeeToEdit
   useEffect(() => {
@@ -1275,6 +1306,36 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       return;
     }
 
+    if (!form.hireDate) {
+      setError('Data de admissão é obrigatória.');
+      return;
+    }
+
+    const cpfDigits = form.cpf.replace(/\D/g, '');
+    if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
+      setError('Informe um CPF válido.');
+      setCpfError('CPF inválido');
+      return;
+    }
+
+    const duplicatePendingCpf = pendingDependents.some(
+      (dep) => dep.cpf.replace(/\D/g, '') === cpfDigits
+    );
+    if (duplicatePendingCpf) {
+      setError('O CPF informado já está cadastrado em um dependente pendente.');
+      return;
+    }
+
+    const pendingCpfSet = new Set<string>();
+    for (let i = 0; i < pendingDependents.length; i++) {
+      const depCpf = pendingDependents[i].cpf.replace(/\D/g, '');
+      if (pendingCpfSet.has(depCpf)) {
+        setError(`Dependentes pendentes ${i + 1} possuem CPF duplicado.`);
+        return;
+      }
+      pendingCpfSet.add(depCpf);
+    }
+
     // Validações de endereço
     if (!form.enderecoRua || !form.enderecoNumero || !form.enderecoBairro || !form.enderecoCidade || !form.enderecoEstado || !form.enderecoCep) {
       setError('Todos os campos de endereço são obrigatórios (Rua, Número, Bairro, Cidade, Estado e CEP).');
@@ -1340,6 +1401,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         void clearEmployeeFormDraft(draftStorageKey);
         setDraftSavedAt(null);
 
+        if (createdEmployee.id) {
+          await loadEmployeeDependents(createdEmployee.id);
+        }
+
         // Salvar dependentes pendentes após criar o funcionário
         if (pendingDependents.length > 0 && createdEmployee.id) {
           try {
@@ -1403,11 +1468,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
       const message = err instanceof Error ? err.message : '';
 
-      if (message.includes('CPF já cadastrado')) {
-        setError('CPF já cadastrado para outro funcionário');
+      if (message.includes('CPF já cadastrado') || message.includes('CPF já cadastrado no sistema')) {
+        setError('CPF já cadastrado no sistema');
+        setCpfError('CPF já cadastrado');
         toast({
           title: 'CPF já cadastrado',
-          description: 'Este CPF já está cadastrado para outro funcionário.',
+          description: 'Este CPF já está cadastrado no sistema.',
+          variant: 'destructive',
+        });
+      } else if (message.includes('Data de admissão')) {
+        setError('Data de admissão é obrigatória.');
+        toast({
+          title: 'Campo obrigatório',
+          description: 'Informe a data de admissão do funcionário.',
           variant: 'destructive',
         });
       } else if (message.includes('Email já cadastrado')) {
@@ -1609,6 +1682,26 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const employeeIdValue = currentEmployeeId || employeeToEdit?.id || '';
   const employeeDisplayName = form.name || employeeToEdit?.name || 'Funcionário';
   const canGenerateReports = Boolean(employeeIdValue);
+  const existingDependentCpfs = [
+    ...employeeDependents.filter((d) => d.id !== dependentToEdit?.id).map((d) => d.cpf),
+    ...pendingDependents.map((d) => d.cpf),
+    form.cpf,
+  ].filter(Boolean) as string[];
+
+  const getRelationshipLabel = (relationship: string) => {
+    const option = RELATIONSHIP_OPTIONS.find((opt) => opt.value === relationship);
+    return option?.label ?? relationship;
+  };
+
+  const handlePendingDependentCreate = (data: DependentCreateRequest) => {
+    setPendingDependents((prev) => [...prev, data]);
+    setDependentModalOpen(false);
+    setDependentToEdit(null);
+  };
+
+  const handleRemovePendingDependent = (index: number) => {
+    setPendingDependents((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const openBlobInNewTab = (blob: Blob) => {
     const url = window.URL.createObjectURL(blob);
@@ -2136,20 +2229,42 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
                             <Select
-                              value={String((form as any).workPostId || '').toLowerCase()}
+                              value={String((form as any).workPostId || 'none').toLowerCase()}
                               onValueChange={(value) => {
-                                const currentWorkPostId = String((form as any).workPostId || '').toLowerCase();
-                                if (value !== currentWorkPostId && isEditMode) {
-                                  setPendingWorkPostId(value);
+                                if (!workPostSelectReadyRef.current) {
+                                  return;
+                                }
+
+                                const currentWorkPostId = String((form as any).workPostId || 'none').toLowerCase();
+                                const newValue = value === 'none' ? '' : value;
+                                const normalizedNew = String(newValue).toLowerCase();
+
+                                if (
+                                  normalizedNew === currentWorkPostId
+                                  || (normalizedNew === '' && currentWorkPostId === 'none')
+                                ) {
+                                  return;
+                                }
+
+                                const baseline = initialWorkPostIdRef.current;
+                                const isRemanejamento =
+                                  isEditMode
+                                  && baseline !== ''
+                                  && baseline !== 'none'
+                                  && normalizedNew !== ''
+                                  && normalizedNew !== baseline;
+
+                                if (isRemanejamento) {
+                                  setPendingWorkPostId(normalizedNew);
                                   const hoje = new Date().toISOString().split('T')[0];
                                   setRemanejamentoForm({
                                     dataInicio: hoje,
                                     escalaTrabalho: (form as any).escalaTrabalho || '',
-                                    horarioTrabalho: (form as any).horarioTrabalho || ''
+                                    horarioTrabalho: (form as any).horarioTrabalho || '',
                                   });
                                   setRemanejamentoModalOpen(true);
                                 } else {
-                                  setForm(prev => ({ ...(prev as any), workPostId: value }));
+                                  setForm(prev => ({ ...(prev as any), workPostId: newValue }));
                                 }
                               }}
                             >
@@ -2157,6 +2272,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                                 <SelectValue placeholder="Selecione um posto" />
                               </SelectTrigger>
                               <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                                <SelectItem value="none" className="hover:bg-gray-700">
+                                  <span className="text-gray-400">Nenhum posto</span>
+                                </SelectItem>
                                 {workPosts.map((wp) => (
                                   <SelectItem key={wp.id} value={String(wp.id).toLowerCase()} className="hover:bg-gray-700">
                                     {wp.name}
@@ -3994,12 +4112,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                         </Button>
                       </div>
 
-                      {/* Permitir adicionar dependentes mesmo na criação - serão salvos após salvar o funcionário */}
-                      {employeeDependents.length === 0 && !isEditMode ? (
+                      {/* Dependentes salvos ou pendentes (antes de salvar o funcionário) */}
+                      {!employeeIdValue && pendingDependents.length === 0 ? (
                         <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
                           <p className="text-blue-300 text-sm flex items-center">
                             <AlertCircle className="mr-2" size={16} />
-                            Você pode adicionar dependentes após salvar o funcionário. Eles serão salvos automaticamente.
+                            Você pode adicionar dependentes antes de salvar. Eles serão gravados automaticamente ao salvar o funcionário.
                           </p>
                         </div>
                       ) : (
@@ -4009,7 +4127,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto"></div>
                               <p className="text-gray-400 text-sm mt-2">Carregando dependentes...</p>
                             </div>
-                          ) : employeeDependents.length === 0 ? (
+                          ) : employeeDependents.length === 0 && pendingDependents.length === 0 ? (
                             <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-4 text-center">
                               <UsersIcon className="mx-auto mb-2 text-gray-400" size={32} />
                               <p className="text-gray-400 text-sm">Nenhum dependente cadastrado</p>
@@ -4017,6 +4135,47 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             </div>
                           ) : (
                             <div className="space-y-2">
+                              {pendingDependents.map((dependent, index) => (
+                                <div
+                                  key={`pending-${index}`}
+                                  className="bg-gray-800/50 border border-amber-600/40 rounded-lg p-4"
+                                >
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <h4 className="font-semibold text-white">{dependent.name}</h4>
+                                        <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30">
+                                          Pendente
+                                        </Badge>
+                                        <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                                          {getRelationshipLabel(dependent.relationship)}
+                                        </Badge>
+                                      </div>
+                                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                                        {dependent.cpf && (
+                                          <p className="text-gray-400">
+                                            <span className="font-medium">CPF:</span> {dependent.cpf}
+                                          </p>
+                                        )}
+                                        {dependent.birthDate && (
+                                          <p className="text-gray-400">
+                                            <span className="font-medium">Nascimento:</span> {new Date(dependent.birthDate).toLocaleDateString('pt-BR')}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRemovePendingDependent(index)}
+                                      className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                    >
+                                      <Trash2 size={16} />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
                               {employeeDependents.map((dependent) => (
                                 <div
                                   key={dependent.id}
@@ -4082,7 +4241,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                                 </div>
                               ))}
                               <p className="text-gray-400 text-xs mt-2">
-                                Total: {employeeDependents.length} dependente(s)
+                                Total: {employeeDependents.length + pendingDependents.length} dependente(s)
                               </p>
                             </div>
                           )}
@@ -4121,8 +4280,15 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   ) : (
                     <DocumentosGerarTab
                       hideHeader={true}
-                      employeeId={currentEmployeeId || ''}
-                      companyId={selectedCompany?.id || ''}
+                      employeeId={employeeIdValue}
+                      companyId={
+                        selectedCompany?.id
+                        || form.company?.id
+                        || employeeToEdit?.company?.id
+                        || ''
+                      }
+                      companies={companies}
+                      employeeName={employeeDisplayName}
                       tipoSalarioContratual={form.tipoSalarioContratual}
                       prazoExperienciaTexto={form.prazoExperienciaTexto}
                     />
@@ -4334,24 +4500,23 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             setDependentModalOpen(false);
             setDependentToEdit(null);
           }}
-          employeeId={employeeToEdit?.id}
-          employeeName={employeeToEdit?.name}
+          employeeId={employeeIdValue || undefined}
+          employeeName={employeeDisplayName}
           dependent={dependentToEdit || undefined}
+          deferSave={!employeeIdValue}
+          onPendingCreate={handlePendingDependentCreate}
+          existingCpfs={existingDependentCpfs}
           onSuccess={async () => {
-            if (!isEditMode || !employeeToEdit?.id) {
-              // Se ainda não há funcionário criado, armazenar dependente temporariamente
-              // O DependentFormModal retornará os dados do dependente via callback
-              setDependentModalOpen(false);
-              setDependentToEdit(null);
-              toast({
-                title: "Aviso",
-                description: "Dependente será adicionado após salvar o funcionário.",
-                variant: "default"
-              });
-            } else {
-              // Se já há funcionário, usar o callback normal
-              await handleDependentSaved();
+            if (employeeIdValue) {
+              await loadEmployeeDependents(employeeIdValue, true);
             }
+            setDependentModalOpen(false);
+            setDependentToEdit(null);
+            toast({
+              title: "Sucesso!",
+              description: dependentToEdit ? "Dependente atualizado com sucesso." : "Dependente adicionado com sucesso.",
+              variant: "default"
+            });
           }}
         />
 

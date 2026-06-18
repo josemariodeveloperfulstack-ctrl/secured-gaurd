@@ -52,6 +52,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatDate } from '@/utils/formatters';
+import { parseDateFromBackend } from '@/utils/dateUtils';
 
 /** Colunas disponíveis para o relatório PDF (chave usada no backend, label exibido) */
 const REPORT_COLUMNS: { key: string; label: string }[] = [
@@ -164,18 +166,18 @@ export function RelatoriosModal({
 
     // Optimized: Pre-process employees to have numeric timestamps for lightning-fast filtering
     const processedEmployees = useMemo(() => {
+        const toLocalDayTime = (dateStr?: string | null) => {
+            const parsed = parseDateFromBackend(dateStr ?? undefined);
+            if (!parsed) return undefined;
+            parsed.setHours(0, 0, 0, 0);
+            return parsed.getTime();
+        };
+
         return allEmployees.map(emp => {
-            // Pre-calculate timestamps to avoid new Date() in the filtering loop
-            const hireTime = emp.hireDate ? new Date(emp.hireDate).setHours(0, 0, 0, 0) : undefined;
-            const termTime = (emp.dataRescisao || emp.terminationDate)
-                ? new Date(emp.dataRescisao || emp.terminationDate!).setHours(0, 0, 0, 0)
-                : undefined;
-            const asoTime = emp.exameMedicoVencimento
-                ? new Date(emp.exameMedicoVencimento).setHours(0, 0, 0, 0)
-                : undefined;
-            const feriasVencTime = emp.proximasFeriasVencimento
-                ? new Date(emp.proximasFeriasVencimento).setHours(0, 0, 0, 0)
-                : undefined;
+            const hireTime = toLocalDayTime(emp.hireDate);
+            const termTime = toLocalDayTime(emp.dataRescisao || emp.terminationDate);
+            const asoTime = toLocalDayTime(emp.exameMedicoVencimento);
+            const feriasVencTime = toLocalDayTime(emp.proximasFeriasVencimento);
 
             return {
                 ...emp,
@@ -475,7 +477,8 @@ export function RelatoriosModal({
             });
 
             let dataToExport = await processDataInChunks(fullEmployeesData, (emp) => {
-                const formatDate = (dateStr?: string) => dateStr ? new Date(dateStr).toLocaleDateString() : '';
+                const formatReportDate = (dateStr?: string | null) =>
+                    dateStr ? formatDate(dateStr) : '';
                 const getAddress = (addr: any) => {
                     if (!addr) return '';
                     if (typeof addr === 'string') return addr;
@@ -495,9 +498,9 @@ export function RelatoriosModal({
                 if (columnsToUse.includes('status')) row['Status'] = getStatusLabel(emp.status);
                 if (columnsToUse.includes('cpf')) row['CPF'] = emp.cpf || (emp as any).document || '';
                 if (columnsToUse.includes('rg')) row['RG'] = emp.rg || '';
-                if (columnsToUse.includes('birthDate')) row['Data Nasc.'] = formatDate(emp.birthDate);
-                if (columnsToUse.includes('hireDate')) row['Admissão'] = formatDate(emp.hireDate);
-                if (columnsToUse.includes('terminationDate')) row['Data Rescisão'] = formatDate(emp.dataRescisao || emp.terminationDate);
+                if (columnsToUse.includes('birthDate')) row['Data Nasc.'] = formatReportDate(emp.birthDate);
+                if (columnsToUse.includes('hireDate')) row['Admissão'] = formatReportDate(emp.hireDate);
+                if (columnsToUse.includes('terminationDate')) row['Data Rescisão'] = formatReportDate(emp.dataRescisao || emp.terminationDate);
                 if (columnsToUse.includes('terminationReason')) row['Motivo Demissão'] = emp.terminationReason || '';
                 if (columnsToUse.includes('email')) row['E-mail'] = emp.email || '';
                 if (columnsToUse.includes('phone')) row['Telefone'] = emp.phone || emp.telefoneContato || '';
@@ -510,9 +513,9 @@ export function RelatoriosModal({
                 if (columnsToUse.includes('matriculaEsocial')) row['Matr. eSocial'] = emp.matriculaEsocial || '';
                 if (columnsToUse.includes('cnhNumber')) row['CNH'] = emp.cnh || emp.cnhNumber || '';
                 if (columnsToUse.includes('cnhCategory')) row['Categ. CNH'] = emp.cnhCategory || '';
-                if (columnsToUse.includes('cnhExpirationDate')) row['Validade CNH'] = formatDate(emp.cnhExpirationDate);
-                if (columnsToUse.includes('exameMedicoVencimento')) row['Próx. ASO'] = formatDate(emp.exameMedicoVencimento);
-                if (columnsToUse.includes('proximasFeriasVencimento')) row['Venc. Férias'] = formatDate(emp.proximasFeriasVencimento);
+                if (columnsToUse.includes('cnhExpirationDate')) row['Validade CNH'] = formatReportDate(emp.cnhExpirationDate);
+                if (columnsToUse.includes('exameMedicoVencimento')) row['Próx. ASO'] = formatReportDate(emp.exameMedicoVencimento);
+                if (columnsToUse.includes('proximasFeriasVencimento')) row['Venc. Férias'] = formatReportDate(emp.proximasFeriasVencimento);
                 if (columnsToUse.includes('address')) row['Endereço'] = getAddress(emp.address);
                 if (columnsToUse.includes('nationality')) row['Nacionalidade'] = emp.nationality || '';
                 if (columnsToUse.includes('motherName')) row['Nome Mãe'] = emp.motherName || emp.nomeMae || '';

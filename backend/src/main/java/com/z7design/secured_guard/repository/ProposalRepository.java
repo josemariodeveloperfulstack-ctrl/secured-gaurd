@@ -4,6 +4,7 @@ import com.z7design.secured_guard.model.Proposal;
 import com.z7design.secured_guard.model.enums.ProposalStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,6 +24,10 @@ public interface ProposalRepository extends JpaRepository<Proposal, UUID> {
     @Query("SELECT DISTINCT p FROM Proposal p LEFT JOIN FETCH p.items WHERE p.id = :id AND p.isDeleted = false")
     Optional<Proposal> findByIdWithItems(@Param("id") UUID id);
     
+    @EntityGraph(attributePaths = {"client", "lead", "createdBy", "assignedTo"})
+    @Query("SELECT p FROM Proposal p WHERE p.isDeleted = false")
+    List<Proposal> findAllActiveWithRelationships();
+
     @Query("SELECT p FROM Proposal p WHERE p.isDeleted = false")
     List<Proposal> findAllActive();
 

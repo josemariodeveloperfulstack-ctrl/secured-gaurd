@@ -17,6 +17,7 @@ import DepartamentosEmailConfig from '@/components/comercial/DepartamentosEmailC
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
 import { contractService, Contract, ContractFilters } from '@/services/contractService';
+import { isUuid } from '@/utils/uuid';
 import { Plus, Search, Settings, Loader2, AlertCircle, RefreshCw, FileText, Building } from 'lucide-react';
 
 const Contratos = () => {
@@ -59,6 +60,10 @@ const Contratos = () => {
             console.warn('⚠️ Contrato recebido sem dados do cliente:', contract);
             return false;
           }
+          if (!isUuid(String(contract.id))) {
+            console.warn('⚠️ Contrato ignorado — ID inválido (dados mock/stale):', contract.id);
+            return false;
+          }
           return true;
         });
         
@@ -71,6 +76,7 @@ const Contratos = () => {
     } catch (err) {
       console.error('❌ Erro ao carregar contratos:', err);
       setError('Erro ao carregar contratos. Tente novamente.');
+      setContratos([]);
       toast({
         title: "Erro",
         description: "Não foi possível carregar os contratos.",
@@ -205,6 +211,14 @@ const Contratos = () => {
   };
 
   const handleEditContrato = (contrato: Contract) => {
+    if (!isUuid(String(contrato.id))) {
+      toast({
+        title: 'Contrato inválido',
+        description: 'Este contrato usa um ID obsoleto. Recarregue a página para atualizar a lista.',
+        variant: 'destructive',
+      });
+      return;
+    }
     console.log('🖊️ Editando contrato:', contrato);
     setSelectedContractForEdit(contrato);
     setEditModalOpen(true);

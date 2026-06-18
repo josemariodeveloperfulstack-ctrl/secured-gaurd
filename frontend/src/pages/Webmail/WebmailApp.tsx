@@ -80,12 +80,19 @@ export default function WebmailApp() {
 
   const loadFolders = async (accountId: string) => {
     try {
-      const response = await api.get(`/webmail/${accountId}/folders`);
+      const response = await api.get(`/webmail/${accountId}/folders`, { silent: true } as Parameters<typeof api.get>[1]);
       const allFolders = [...response.data];
       if (!allFolders.includes('Agendados')) allFolders.push('Agendados');
       setFolders(allFolders);
-    } catch (error) {
+    } catch (error: unknown) {
+      const status = (error as { response?: { status?: number; data?: { message?: string } } })?.response?.status;
+      if (status === 401) {
+        console.warn('Webmail: credenciais IMAP inválidas — use cache local (INBOX).');
+        setFolders(['INBOX', 'Agendados']);
+        return;
+      }
       console.error('Erro ao carregar pastas', error);
+      setFolders(['INBOX', 'Agendados']);
     }
   };
 

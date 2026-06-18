@@ -15,7 +15,7 @@ import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
 import accountingFormService from '@/services/accountingFormService';
 import CurrencyInput from 'react-currency-input-field';
 import { Eye, Shield, Edit2, Trash2, Users as UsersIcon, Link, X, UserPlus, AlertCircle, FileSpreadsheet } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -241,6 +241,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [remanejamentoModalOpen, setRemanejamentoModalOpen] = useState(false);
   const [pendingWorkPostId, setPendingWorkPostId] = useState<string>('');
   const [remanejamentoForm, setRemanejamentoForm] = useState({ dataInicio: '', escalaTrabalho: '', horarioTrabalho: '' });
+  const initialWorkPostIdRef = useRef('');
+  const workPostSelectReadyRef = useRef(false);
 
   const loadEmployeeDependents = async (employeeId: string | undefined, keepOnError = false) => {
     const raw = String(employeeId ?? '').trim();
@@ -348,6 +350,25 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       }
     }
   }, [(form as any).company?.id, companies, open, funcionario?.id]);
+
+  useEffect(() => {
+    if (!open || !funcionario?.id) {
+      workPostSelectReadyRef.current = false;
+      return;
+    }
+
+    const hasInitialPost = initialWorkPostIdRef.current !== '';
+    if (hasInitialPost && workPosts.length === 0) {
+      workPostSelectReadyRef.current = false;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      workPostSelectReadyRef.current = true;
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [open, funcionario?.id, workPosts.length]);
 
   // Atualizar usuário e cargo selecionados quando os dados forem carregados
   useEffect(() => {
@@ -668,6 +689,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         
         console.log('🔍 [DEBUG] formToSet.workPostId:', formToSet.workPostId);
         setForm(formToSet);
+        initialWorkPostIdRef.current = String(formToSet.workPostId || '').toLowerCase();
+        workPostSelectReadyRef.current = false;
         setTemIntervaloRefeicao(employeeData.horarioTrabalhoIntervalo ? 'sim' : 'nao');
 
         const docRef = (employeeData as any).exameMedicoDoctor;
@@ -1181,6 +1204,23 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       return;
     }
 
+    if (!form.cpf?.trim()) {
+      setError('CPF é obrigatório.');
+      return;
+    }
+
+    if (!form.hireDate) {
+      setError('Data de admissão é obrigatória.');
+      return;
+    }
+
+    const cpfDigits = form.cpf.replace(/\D/g, '');
+    if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
+      setError('Informe um CPF válido.');
+      setCpfError('CPF inválido');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -1208,10 +1248,18 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       
       // Tratar erros específicos
       if (err.message.includes('CPF já cadastrado')) {
-        setError('CPF já cadastrado para outro funcionário');
+        setError('CPF já cadastrado no sistema');
+        setCpfError('CPF já cadastrado');
         toast({
           title: "CPF Duplicado",
-          description: "Este CPF já está cadastrado para outro funcionário.",
+          description: "Este CPF já está cadastrado no sistema.",
+          variant: "destructive"
+        });
+      } else if (err.message.includes('Data de admissão')) {
+        setError('Data de admissão é obrigatória.');
+        toast({
+          title: "Campo obrigatório",
+          description: "Informe a data de admissão do funcionário.",
           variant: "destructive"
         });
       } else if (err.message.includes('Email já cadastrado')) {
@@ -1279,6 +1327,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         workPostId: (funcionario as any).workPostId || (funcionario as any).workPost?.id || '',
         salario: funcionario.salario != null ? String(funcionario.salario) : ('' as any),
       });
+      initialWorkPostIdRef.current = String(
+        (funcionario as any).workPostId || (funcionario as any).workPost?.id || '',
+      ).toLowerCase();
+      workPostSelectReadyRef.current = false;
     }
     setError(null);
     setUserSearchTerm('');
@@ -1772,25 +1824,39 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <Select
                               value={String((form as any).workPostId || 'none').toLowerCase()}
                               onValueChange={(value) => {
+                                if (!workPostSelectReadyRef.current) {
+                                  return;
+                                }
+
                                 const currentWorkPostId = String((form as any).workPostId || 'none').toLowerCase();
                                 const newValue = value === 'none' ? '' : value;
-                                
-                                if (value !== currentWorkPostId) {
-                                  // Se o funcionário já tinha um posto e está mudando para OUTRO,
-                                  // abrimos o modal de remanejamento. Se ele NÃO tinha posto (none ou vazio),
-                                  // é apenas uma atribuição inicial ou atualização simples.
-                                  if (currentWorkPostId !== 'none' && currentWorkPostId !== '') {
-                                    setPendingWorkPostId(newValue);
-                                    const hoje = new Date().toISOString().split('T')[0];
-                                    setRemanejamentoForm({
-                                      dataInicio: hoje,
-                                      escalaTrabalho: form.escalaTrabalho || '',
-                                      horarioTrabalho: form.horarioTrabalho || ''
-                                    });
-                                    setRemanejamentoModalOpen(true);
-                                  } else {
-                                    setForm(prev => ({ ...prev, workPostId: newValue }));
-                                  }
+                                const normalizedNew = String(newValue).toLowerCase();
+
+                                if (
+                                  normalizedNew === currentWorkPostId
+                                  || (normalizedNew === '' && currentWorkPostId === 'none')
+                                ) {
+                                  return;
+                                }
+
+                                const baseline = initialWorkPostIdRef.current;
+                                const isRemanejamento =
+                                  baseline !== ''
+                                  && baseline !== 'none'
+                                  && normalizedNew !== ''
+                                  && normalizedNew !== baseline;
+
+                                if (isRemanejamento) {
+                                  setPendingWorkPostId(normalizedNew);
+                                  const hoje = new Date().toISOString().split('T')[0];
+                                  setRemanejamentoForm({
+                                    dataInicio: hoje,
+                                    escalaTrabalho: form.escalaTrabalho || '',
+                                    horarioTrabalho: form.horarioTrabalho || '',
+                                  });
+                                  setRemanejamentoModalOpen(true);
+                                } else {
+                                  setForm(prev => ({ ...prev, workPostId: newValue }));
                                 }
                               }}
                             >
@@ -4162,24 +4228,15 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             setDependentModalOpen(false);
             setDependentToEdit(null);
           }}
-          employeeId={employeeToEdit?.id}
-          employeeName={employeeToEdit?.name}
+          employeeId={funcionario?.id}
+          employeeName={funcionario?.name}
           dependent={dependentToEdit || undefined}
+          existingCpfs={[
+            ...employeeDependents.filter((d) => d.id !== dependentToEdit?.id).map((d) => d.cpf),
+            form.cpf,
+          ].filter(Boolean) as string[]}
           onSuccess={async () => {
-            if (!isEditMode || !employeeToEdit?.id) {
-              // Se ainda não há funcionário criado, armazenar dependente temporariamente
-              // O DependentFormModal retornará os dados do dependente via callback
-              setDependentModalOpen(false);
-              setDependentToEdit(null);
-              toast({
-                title: "Aviso",
-                description: "Dependente será adicionado após salvar o funcionário.",
-                variant: "default"
-              });
-            } else {
-              // Se já há funcionário, usar o callback normal
-              await handleDependentSaved();
-            }
+            await handleDependentSaved();
           }}
         />
 

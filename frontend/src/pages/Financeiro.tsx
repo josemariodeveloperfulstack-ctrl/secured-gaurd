@@ -100,7 +100,7 @@ const FinanceiroSimple: React.FC = () => {
                   Contas a Receber
                 </TabsTrigger>
               )}
-              {hasTabPermission('FINANCIAL_READ') && (
+              {hasTabPermission('FINANCIAL_PAYABLE_WRITE') && (
                 <TabsTrigger value="pagamentos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
                   Pagamentos
                 </TabsTrigger>

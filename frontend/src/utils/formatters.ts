@@ -8,10 +8,16 @@ export const formatDate = (dateString: string | null | undefined): string => {
     return '-';
   }
   try {
-    // Adicionar T00:00:00 apenas se não for uma data/hora completa (ISO string)
-    // para evitar "RangeError: Invalid time value" (ex: "2024-07-31T10:00:00.000ZT00:00:00")
-    const isoString = dateString.includes('T') ? dateString : `${dateString}T00:00:00`;
-    const date = new Date(isoString);
+    // Usar só a parte yyyy-MM-dd com meio-dia local evita deslocamento de fuso (UTC vs America/Sao_Paulo)
+    const dateOnly = dateString.split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+      const date = new Date(`${dateOnly}T12:00:00`);
+      return new Intl.DateTimeFormat('pt-BR').format(date);
+    }
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) {
+      return 'Data inválida';
+    }
     return new Intl.DateTimeFormat('pt-BR').format(date);
   } catch (error) {
     console.error("Erro ao formatar data:", dateString, error);

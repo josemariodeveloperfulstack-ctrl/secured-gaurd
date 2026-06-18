@@ -13,17 +13,22 @@ import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { Company } from '@/types/company';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 import { SimpleEmployee, employeeService } from '@/services/employeeService';
-import { companyService } from '@/services/companyService';
+import { useDocumentFormCompanies } from '@/hooks/useDocumentFormCompanies';
+import { fetchWithConnectionRetry } from '@/utils/connectionError';
 import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 
 interface TermoResponsabilidadeDanosMultasFormProps {
   employeeId?: string;
   companyId?: string;
+  companies?: Company[];
+  employeeName?: string;
 }
 
 const TermoResponsabilidadeDanosMultasForm: React.FC<TermoResponsabilidadeDanosMultasFormProps> = ({
   employeeId,
   companyId,
+  companies: parentCompanies,
+  employeeName,
 }) => {
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
@@ -33,8 +38,8 @@ const TermoResponsabilidadeDanosMultasForm: React.FC<TermoResponsabilidadeDanosM
   });
 
   const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [loadingData, setLoadingData] = useState(false);
+  const activeCompanyId = form.empresaId || companyId || '';
+  const { companies, loadingCompanies } = useDocumentFormCompanies(activeCompanyId, parentCompanies);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -49,7 +54,10 @@ const TermoResponsabilidadeDanosMultasForm: React.FC<TermoResponsabilidadeDanosM
     if (form.funcionarioId && !selectedEmployeeData) {
       const fetchEmployee = async () => {
         try {
-          const emp = await employeeService.getEmployeeById(form.funcionarioId);
+          const emp = await fetchWithConnectionRetry(
+            () => employeeService.getEmployeeById(form.funcionarioId),
+            2,
+          );
           if (emp) {
             setSelectedEmployeeData({
               id: emp.id,
@@ -78,22 +86,6 @@ const TermoResponsabilidadeDanosMultasForm: React.FC<TermoResponsabilidadeDanosM
       fetchEmployee();
     }
   }, [form.funcionarioId, selectedEmployeeData]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoadingData(true);
-      try {
-        const companiesData = await companyService.getAllCompanies();
-        setCompanies(companiesData);
-      } catch (error) {
-        console.error('Erro ao buscar dados:', error);
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    fetchData();
-  }, []);
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.empresaId);
@@ -211,6 +203,7 @@ const TermoResponsabilidadeDanosMultasForm: React.FC<TermoResponsabilidadeDanosM
                 </Label>
                 <EmployeeCombobox
                   value={form.funcionarioId}
+                  initialDisplayName={funcionario?.name || employeeName}
                   onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
                   onEmployeeSelect={(emp) => {
                     setSelectedEmployeeData(emp);
@@ -231,10 +224,10 @@ const TermoResponsabilidadeDanosMultasForm: React.FC<TermoResponsabilidadeDanosM
                 <Select
                   value={form.empresaId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
-                  disabled={loadingData}
+                  disabled={loadingCompanies && companies.length === 0}
                 >
                   <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60">
-                    <SelectValue placeholder={loadingData ? 'Carregando...' : 'Selecione a empresa'} />
+                    <SelectValue placeholder={loadingCompanies ? 'Carregando...' : 'Selecione a empresa'} />
                   </SelectTrigger>
                   <SelectContent>
                     {companies.map(e => (

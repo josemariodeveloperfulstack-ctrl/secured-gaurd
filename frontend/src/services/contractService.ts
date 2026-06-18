@@ -172,11 +172,11 @@ export const contractService = {
     if (!hasPagination && Object.keys(filters).length === 0) {
       // Busca todos sem paginação
       try {
-        const response = await api.get('/contracts/all');
-        return Array.isArray(response.data) ? response.data : this.getMockContracts();
+        const response = await api.get('/api/contracts/all');
+        return Array.isArray(response.data) ? response.data : [];
       } catch (error) {
         console.error('Erro ao buscar contratos:', error);
-        return this.getMockContracts();
+        throw error;
       }
     }
     const params = new URLSearchParams();
@@ -427,49 +427,9 @@ export const contractService = {
     }
   },
 
-  // Método para retornar dados mockados temporariamente
+  /** @deprecated Apenas referência de estrutura — não usar em produção */
   getMockContracts(): Contract[] {
-    return [
-      {
-        id: 'CON-001',
-        contractNumber: 'CON-2024-001',
-        description: 'Contrato de prestação de serviços de segurança',
-        startDate: '2024-01-01',
-        endDate: '2024-12-31',
-        value: 50000.00,
-        status: 'ACTIVE',
-        notes: 'Contrato principal da empresa',
-        clientId: 'CLI-001',
-        clientName: 'Empresa ABC Ltda',
-        clientCnpj: '12.345.678/0001-90',
-        client: {
-          id: 'CLI-001',
-          name: 'Empresa ABC Ltda',
-          cnpj: '12.345.678/0001-90'
-        },
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      },
-      {
-        id: 'CON-002',
-        contractNumber: 'CON-2024-002',
-        description: 'Contrato de manutenção de equipamentos',
-        startDate: '2024-02-01',
-        endDate: '2024-11-30',
-        value: 25000.00,
-        status: 'ACTIVE',
-        notes: 'Contrato de manutenção preventiva',
-        clientId: 'CLI-002',
-        clientName: 'Tech Solutions S.A.',
-        clientCnpj: '98.765.432/0001-10',
-        client: {
-          id: 'CLI-002',
-          name: 'Tech Solutions S.A.',
-          cnpj: '98.765.432/0001-10'
-        },
-        createdAt: '2024-02-01T00:00:00Z',
-        updatedAt: '2024-02-01T00:00:00Z'
-      }
-    ];
+    console.warn('getMockContracts() não deve ser usado — dados fictícios com IDs inválidos (CON-001, CON-002)');
+    return [];
   }
 }; 

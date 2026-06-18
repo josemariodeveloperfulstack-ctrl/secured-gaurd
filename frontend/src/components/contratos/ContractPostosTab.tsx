@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { workPostService, WorkPost } from '@/services/workPostService';
+import { isUuid } from '@/utils/uuid';
 import { Loader2, Plus, MapPin, Unlink } from 'lucide-react';
 
 interface ContractPostosTabProps {
@@ -24,7 +25,7 @@ export const ContractPostosTab: React.FC<ContractPostosTabProps> = ({
   const [selectedPostoToLink, setSelectedPostoToLink] = useState<string>('');
 
   const loadLinked = async () => {
-    if (!contractId) return;
+    if (!isUuid(contractId)) return;
     setLoading(true);
     try {
       const data = await workPostService.getWorkPostsByContract(contractId);
@@ -37,7 +38,7 @@ export const ContractPostosTab: React.FC<ContractPostosTabProps> = ({
   };
 
   const loadClientPostos = async () => {
-    if (!clientId) return;
+    if (!isUuid(clientId)) return;
     try {
       const data = await workPostService.getWorkPostsByClient(clientId);
       setClientPostos(Array.isArray(data) ? data : []);

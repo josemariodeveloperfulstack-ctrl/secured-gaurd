@@ -134,21 +134,21 @@ public class PermissionService {
             Permission.PROFILE_READ, Permission.PROFILE_WRITE
         )));
 
-        // SUPRIMENTOS - Suprimentos e almoxarifado (acesso ao módulo Pagamentos)
+        // SUPRIMENTOS - Suprimentos e almoxarifado (Contas a Pagar; sem Fluxo de Caixa/Pagamentos)
         rolePermissions.put(UserRole.SUPRIMENTOS, new HashSet<>(Arrays.asList(
             Permission.STOCK_READ, Permission.STOCK_WRITE, Permission.STOCK_CREATE,
             Permission.INVENTORY_READ, Permission.INVENTORY_WRITE, Permission.INVENTORY_MOVEMENTS_READ, Permission.INVENTORY_MOVEMENTS_CREATE,
             Permission.PRODUCTS_READ, Permission.PRODUCTS_WRITE,
             Permission.PURCHASE_REQUESTS_READ,
-            // Acesso ao módulo Financeiro / Pagamentos
-            Permission.FINANCIAL_READ, Permission.FINANCIAL_WRITE,
+            // Acesso parcial ao módulo Financeiro (Contas a Pagar)
+            Permission.FINANCIAL_READ,
             Permission.REPORTS_READ, Permission.REPORTS_GENERATE,
             Permission.DASHBOARD_READ,
             Permission.PROFILE_READ, Permission.PROFILE_WRITE,
             Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE
         )));
 
-        // ANALISTA_SUPRIMENTOS - Analista de Suprimentos (acesso ao módulo Pagamentos)
+        // ANALISTA_SUPRIMENTOS - Analista de Suprimentos (Contas a Pagar; sem Fluxo de Caixa/Pagamentos)
         rolePermissions.put(UserRole.ANALISTA_SUPRIMENTOS, new HashSet<>(Arrays.asList(
             Permission.STOCK_READ, Permission.STOCK_WRITE, Permission.STOCK_CREATE,
             Permission.INVENTORY_READ, Permission.INVENTORY_WRITE, Permission.INVENTORY_MOVEMENTS_READ, Permission.INVENTORY_MOVEMENTS_CREATE,
@@ -156,8 +156,8 @@ public class PermissionService {
             Permission.PURCHASE_REQUESTS_READ, Permission.PURCHASE_REQUESTS_WRITE, Permission.PURCHASE_REQUESTS_CREATE,
             Permission.EQUIPMENTS_READ, // Frota (leitura)
             Permission.PAYSLIPS_READ,   // Holerites (somente leitura)
-            // Acesso ao módulo Financeiro / Pagamentos
-            Permission.FINANCIAL_READ, Permission.FINANCIAL_WRITE,
+            // Acesso parcial ao módulo Financeiro (Contas a Pagar)
+            Permission.FINANCIAL_READ,
             Permission.REPORTS_READ, Permission.REPORTS_GENERATE,
             Permission.DASHBOARD_READ,
             Permission.PROFILE_READ, Permission.PROFILE_WRITE,

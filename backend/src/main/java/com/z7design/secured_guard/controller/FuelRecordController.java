@@ -26,6 +26,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -55,6 +57,7 @@ public class FuelRecordController {
     private final FileStorageService receiptStorageService;
     
     @GetMapping
+    @Cacheable(value = "fuel-records", key = "'all'")
     public ResponseEntity<List<FuelRecordDTO>> getAllFuelRecords() {
         try {
             log.info("GET /api/fuel-records - Iniciando busca de todos os registros");
@@ -91,6 +94,7 @@ public class FuelRecordController {
     }
     
     @GetMapping("/{id}")
+    @Cacheable(value = "fuel-records", key = "#id")
     public ResponseEntity<FuelRecordDTO> getFuelRecordById(@PathVariable UUID id) {
         FuelRecord fuelRecord = fuelRecordRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Registro de abastecimento não encontrado com ID: " + id));
@@ -98,6 +102,7 @@ public class FuelRecordController {
     }
     
     @GetMapping("/vehicle/{vehicleId}")
+    @Cacheable(value = "fuel-records", key = "'vehicle-' + #vehicleId")
     public ResponseEntity<List<FuelRecordDTO>> getFuelRecordsByVehicle(@PathVariable UUID vehicleId) {
         try {
             log.info("🔍 Buscando registros de combustível para veículo: {}", vehicleId);
@@ -159,6 +164,7 @@ public class FuelRecordController {
     }
     
     @GetMapping("/vehicle/{vehicleId}/period")
+    @Cacheable(value = "fuel-records", key = "'vehicle-period-' + #vehicleId + '-' + #startDate + '-' + #endDate")
     public ResponseEntity<List<FuelRecordDTO>> getFuelRecordsByVehicleAndPeriod(
             @PathVariable UUID vehicleId,
             @RequestParam LocalDate startDate,
@@ -193,6 +199,7 @@ public class FuelRecordController {
      * Buscar postos de combustível únicos
      */
     @GetMapping("/stations")
+    @Cacheable(value = "fuel-records", key = "'stations'")
     public ResponseEntity<List<String>> getUniqueFuelStations() {
         try {
             log.info("🔍 Endpoint /stations chamado - buscando postos de combustível únicos");
@@ -295,6 +302,7 @@ public class FuelRecordController {
     }
     
     @PostMapping
+    @CacheEvict(value = "fuel-records", allEntries = true)
     public ResponseEntity<FuelRecordDTO> createFuelRecord(
             @RequestPart("fuelRecord") @Valid CreateFuelRecordDTO createFuelRecordDTO,
             @RequestPart(name = "receipt", required = false) MultipartFile receipt) throws IOException {
@@ -355,6 +363,7 @@ public class FuelRecordController {
     }
     
     @PutMapping("/{id}")
+    @CacheEvict(value = "fuel-records", allEntries = true)
     public ResponseEntity<FuelRecordDTO> updateFuelRecord(
             @PathVariable UUID id, 
             @RequestPart("fuelRecord") @Valid CreateFuelRecordDTO updateFuelRecordDTO,
@@ -421,11 +430,13 @@ public class FuelRecordController {
      * Deve ficar antes de DELETE /{id} para não confundir "batch" com UUID.
      */
     @DeleteMapping("/batch")
+    @CacheEvict(value = "fuel-records", allEntries = true)
     public ResponseEntity<Map<String, Object>> deleteFuelRecordsBatch(@RequestBody(required = false) List<UUID> ids) {
         return deleteFuelRecordsBatchInternal(ids);
     }
 
     @PostMapping("/batch/delete")
+    @CacheEvict(value = "fuel-records", allEntries = true)
     public ResponseEntity<Map<String, Object>> deleteFuelRecordsBatchPost(@RequestBody List<UUID> ids) {
         return deleteFuelRecordsBatchInternal(ids);
     }
@@ -463,6 +474,7 @@ public class FuelRecordController {
     }
     
     @DeleteMapping("/{id}")
+    @CacheEvict(value = "fuel-records", allEntries = true)
     public ResponseEntity<Void> deleteFuelRecord(@PathVariable UUID id) {
         if (!fuelRecordRepository.existsById(id)) {
             throw new ResourceNotFoundException("Registro de abastecimento não encontrado com ID: " + id);

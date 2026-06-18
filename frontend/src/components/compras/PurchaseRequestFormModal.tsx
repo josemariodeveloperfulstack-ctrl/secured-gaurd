@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { PurchaseRequest, CreatePurchaseRequestRequest, UpdatePurchaseRequestRequest } from '@/services/purchaseRequestService';
+import { PurchaseRequest, CreatePurchaseRequestRequest, UpdatePurchaseRequestRequest, PurchaseRequestSizeEntry } from '@/services/purchaseRequestService';
 import { unitService } from '@/services/unitService';
 import { employeeService, Employee } from '@/services/employeeService';
 import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
@@ -26,7 +26,7 @@ import { SupplierFormModal } from '@/components/estoque/SupplierFormModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calendar, User, Building2, CheckCircle, Plus, Search, FileText } from 'lucide-react';
+import { Calendar, User, Building2, CheckCircle, Plus, Search, FileText, Trash2 } from 'lucide-react';
 import CurrencyInput from 'react-currency-input-field';
 
 interface PurchaseRequestFormModalProps {
@@ -76,6 +76,8 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [requesterSearchTerm, setRequesterSearchTerm] = useState('');
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState('');
+  const [sizeBreakdown, setSizeBreakdown] = useState<PurchaseRequestSizeEntry[]>([]);
+  const [useSizeByQuantity, setUseSizeByQuantity] = useState(false);
   const [formData, setFormData] = useState<CreatePurchaseRequestRequest>({
     title: '',
     description: '',
@@ -104,7 +106,30 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
     quantity: undefined,
     unitOfMeasure: '',
     category: '',
-    size: '',
+    itemNumber: '',
+  });
+
+  const showSizeBreakdown = formData.category === 'EPI' || useSizeByQuantity || sizeBreakdown.length > 0;
+
+  const totalSizeQuantity = sizeBreakdown.reduce(
+    (sum, entry) => sum + (Number(entry.quantity) || 0),
+    0
+  );
+
+  const buildSizeBreakdownFromRequest = (req: PurchaseRequest): PurchaseRequestSizeEntry[] => {
+    if (req.sizeBreakdown && req.sizeBreakdown.length > 0) {
+      return req.sizeBreakdown.map((entry) => ({
+        size: entry.size,
+        quantity: Number(entry.quantity) || 0,
+      }));
+    }
+    return [];
+  };
+
+  const resetItemFields = () => ({
+    quantity: undefined as number | undefined,
+    unitOfMeasure: '',
+    category: '',
     itemNumber: '',
   });
 
@@ -136,6 +161,9 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
         setRequestNumber(request.requestNumber || '');
         const estimatedTotalValue = normalizeEstimatedTotal(request.estimatedTotal);
         const requesterIdValue = request.requesterId ? String(request.requesterId) : '';
+        const breakdown = buildSizeBreakdownFromRequest(request);
+        setSizeBreakdown(breakdown);
+        setUseSizeByQuantity(breakdown.length > 0 || request.category === 'EPI');
         setFormData({
           id: request.id,
           title: request.title,
@@ -162,11 +190,10 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
           notes: request.notes || '',
           unitId: request.unitId ? String(request.unitId) : '',
           approverId: request.approverId ? String(request.approverId) : '',
-          quantity: (request as any).quantity ?? undefined,
-          unitOfMeasure: (request as any).unitOfMeasure || '',
-          category: (request as any).category || '',
-          size: (request as any).size || '',
-          itemNumber: (request as any).itemNumber || '',
+          quantity: request.quantity ?? (breakdown.length > 0 ? breakdown.reduce((s, e) => s + e.quantity, 0) : undefined),
+          unitOfMeasure: request.unitOfMeasure || '',
+          category: request.category || '',
+          itemNumber: request.itemNumber || '',
         });
         setEstimatedTotalDisplay(
           estimatedTotalValue.toLocaleString('pt-BR', {
@@ -176,6 +203,8 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
         );
       } else {
         setRequestNumber('');
+        setSizeBreakdown([]);
+        setUseSizeByQuantity(false);
         setFormData({
           title: '',
           description: '',
@@ -201,11 +230,7 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
           unitId: '',
           requesterId: '',
           approverId: '',
-          quantity: undefined,
-          unitOfMeasure: '',
-          category: '',
-          size: '',
-          itemNumber: '',
+          ...resetItemFields(),
         });
         setEstimatedTotalDisplay('');
       }
@@ -369,12 +394,65 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
       ...prev,
       [field]: value
     }));
+
+    if (field === 'category' && value === 'EPI') {
+      setUseSizeByQuantity(true);
+      if (sizeBreakdown.length === 0) {
+        setSizeBreakdown([{ size: '', quantity: 1 }]);
+      }
+    }
+  };
+
+  const addSizeRow = () => {
+    setSizeBreakdown((prev) => [...prev, { size: '', quantity: 1 }]);
+    setUseSizeByQuantity(true);
+  };
+
+  const updateSizeRow = (index: number, field: keyof PurchaseRequestSizeEntry, value: string | number) => {
+    setSizeBreakdown((prev) =>
+      prev.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry))
+    );
+  };
+
+  const removeSizeRow = (index: number) => {
+    setSizeBreakdown((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const dataToSend = { ...formData, requesterName: loggedUserName || formData.requesterName };
+      const effectiveBreakdown = showSizeBreakdown
+        ? sizeBreakdown.filter((entry) => entry.size.trim() && Number(entry.quantity) > 0)
+        : [];
+
+      if (showSizeBreakdown) {
+        if (effectiveBreakdown.length === 0) {
+          toast({
+            title: 'Validação',
+            description: 'Informe ao menos um tamanho com quantidade.',
+            variant: 'destructive',
+          });
+          return;
+        }
+      } else if (!formData.quantity || formData.quantity <= 0) {
+        toast({
+          title: 'Validação',
+          description: 'Informe a quantidade.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const computedQuantity = effectiveBreakdown.length > 0
+        ? effectiveBreakdown.reduce((sum, entry) => sum + Number(entry.quantity), 0)
+        : formData.quantity;
+
+      const dataToSend = {
+        ...formData,
+        requesterName: loggedUserName || formData.requesterName,
+        quantity: computedQuantity,
+        sizeBreakdown: effectiveBreakdown.length > 0 ? effectiveBreakdown : undefined,
+      };
       if (dataToSend.requiredDate && dataToSend.requiredDate.length === 10) {
         dataToSend.requiredDate = `${dataToSend.requiredDate}T00:00:00`;
       }
@@ -390,7 +468,7 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
         notificationService.notifyNewPurchaseRequest({
           requesterName: loggedUserName,
           title: formData.title || 'Sem título',
-          quantity: (formData as any).quantity,
+          quantity: computedQuantity,
           category: formData.category,
         });
       }
@@ -625,19 +703,23 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
 
                   <div className="space-y-2">
                     <Label htmlFor="quantity" className="text-seguranca-lightgray font-medium">
-                      Quantidade <span className="text-seguranca-red">*</span>
+                      Quantidade {!showSizeBreakdown && <span className="text-seguranca-red">*</span>}
                     </Label>
                     <Input
                       id="quantity"
                       type="number"
                       min="1"
                       step="1"
-                      value={formData.quantity ?? ''}
+                      value={showSizeBreakdown ? (totalSizeQuantity || '') : (formData.quantity ?? '')}
                       onChange={(e) => handleInputChange('quantity', e.target.value ? Number(e.target.value) : undefined)}
                       placeholder="Ex: 10"
-                      required
-                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                      required={!showSizeBreakdown}
+                      readOnly={showSizeBreakdown}
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11 read-only:opacity-70"
                     />
+                    {showSizeBreakdown && (
+                      <p className="text-xs text-gray-400">Total calculado automaticamente pelos tamanhos.</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -663,25 +745,92 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
                   </div>
                 </div>
 
-                {/* Tamanho e Número */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="size" className="text-seguranca-lightgray font-medium">Tamanho</Label>
-                    <Input
-                      id="size"
-                      value={(formData as any).size ?? ''}
-                      onChange={(e) => handleInputChange('size' as any, e.target.value)}
-                      placeholder="Ex: P, M, G, XG, 42"
-                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
-                    />
+                {/* Quantidade por tamanho e Número / Código */}
+                <div className="mt-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label className="text-seguranca-lightgray font-medium">Tamanhos</Label>
+                    {formData.category !== 'EPI' && (
+                      <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={useSizeByQuantity}
+                          onChange={(e) => {
+                            setUseSizeByQuantity(e.target.checked);
+                            if (e.target.checked && sizeBreakdown.length === 0) {
+                              setSizeBreakdown([{ size: '', quantity: 1 }]);
+                            }
+                          }}
+                          className="rounded border-gray-600"
+                        />
+                        Informar quantidade por tamanho
+                      </label>
+                    )}
                   </div>
+
+                  {showSizeBreakdown ? (
+                    <div className="space-y-2 rounded-lg border border-gray-600 p-3 bg-seguranca-black/40">
+                      {sizeBreakdown.map((entry, index) => (
+                        <div key={`size-row-${index}`} className="grid grid-cols-1 md:grid-cols-[1fr_140px_auto] gap-2 items-end">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-gray-400">Tamanho</Label>
+                            <Input
+                              value={entry.size}
+                              onChange={(e) => updateSizeRow(index, 'size', e.target.value)}
+                              placeholder="Ex: 42, M, G"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray h-10"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-gray-400">Quantidade</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={entry.quantity}
+                              onChange={(e) => updateSizeRow(index, 'quantity', Number(e.target.value) || 0)}
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray h-10"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeSizeRow(index)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-10 w-10"
+                            aria-label="Remover tamanho"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addSizeRow}
+                        className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Adicionar tamanho
+                      </Button>
+                      {totalSizeQuantity > 0 && (
+                        <p className="text-sm text-seguranca-yellow">
+                          Total: {totalSizeQuantity} unidade{totalSizeQuantity !== 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      Selecione a categoria EPI ou marque &quot;Informar quantidade por tamanho&quot; para detalhar por numeração/tamanho.
+                    </p>
+                  )}
 
                   <div className="space-y-2">
                     <Label htmlFor="itemNumber" className="text-seguranca-lightgray font-medium">Número / Código</Label>
                     <Input
                       id="itemNumber"
-                      value={(formData as any).itemNumber ?? ''}
-                      onChange={(e) => handleInputChange('itemNumber' as any, e.target.value)}
+                      value={formData.itemNumber ?? ''}
+                      onChange={(e) => handleInputChange('itemNumber', e.target.value)}
                       placeholder="Ex: REF-001"
                       className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
                     />

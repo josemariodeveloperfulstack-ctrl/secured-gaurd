@@ -114,6 +114,22 @@ public class PurchaseRequest {
     
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(length = 50)
+    private String category;
+
+    @Column(name = "unit_of_measure", length = 20)
+    private String unitOfMeasure;
+
+    @Column(name = "item_number", length = 100)
+    private String itemNumber;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal quantity;
+
+    /** JSON: [{"size":"42","quantity":3}] */
+    @Column(name = "size_breakdown", columnDefinition = "TEXT")
+    private String sizeBreakdown;
     
     // Métodos de negócio
     public boolean isUrgent() {

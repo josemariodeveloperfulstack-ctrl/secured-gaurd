@@ -291,7 +291,7 @@ const financeiroMenuItems = [
   { icon: CreditCard, text: 'Contas a Pagar', to: '/financeiro/contas-pagar', id: 'financeiro-contas-pagar', requiredPermission: 'FINANCIAL_PAYABLE_READ' },
   { icon: Receipt, text: 'Contas a Receber', to: '/financeiro/contas-receber', id: 'financeiro-contas-receber', requiredPermission: 'FINANCIAL_RECEIVABLE_READ' },
   { icon: TrendingUp, text: 'Fluxo de Caixa', to: '/financeiro/fluxo-caixa', id: 'financeiro-fluxo-caixa', requiredPermission: 'FINANCIAL_CASHFLOW_READ' },
-  { icon: Banknote, text: 'Pagamentos', to: '/financeiro/pagamentos', id: 'financeiro-pagamentos', requiredPermission: 'FINANCIAL_READ' },
+  { icon: Banknote, text: 'Pagamentos', to: '/financeiro/pagamentos', id: 'financeiro-pagamentos', requiredPermission: 'FINANCIAL_PAYABLE_WRITE' },
   { icon: Upload, text: 'Conciliação Bancária', to: '/financeiro/conciliacao-bancaria', id: 'financeiro-conciliacao-bancaria', requiredPermission: 'FINANCIAL_READ' },
   { icon: Building2, text: 'Bancos', to: '/financeiro/bancos', id: 'financeiro-bancos', requiredPermission: 'FINANCIAL_READ' },
   { icon: Building, text: 'Agências', to: '/financeiro/agencias', id: 'financeiro-agencias', requiredPermission: 'FINANCIAL_READ' },
@@ -477,10 +477,9 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'frota',
     // Gestão de Holerites
     'holerites',
-    // Financeiro — Contas a Pagar e Pagamentos
+    // Financeiro — Contas a Pagar (sem Fluxo de Caixa nem Pagamentos)
     'financeiro',
     'financeiro-contas-pagar',
-    'financeiro-pagamentos',
     'financeiro-relatorios',
     'financeiro-centro-custos',
     // Estoque
@@ -572,11 +571,9 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'frota',
     // Gestão de Holerites
     'holerites',
-    // Financeiro — Contas a Pagar e Pagamentos
+    // Financeiro — Contas a Pagar (sem Fluxo de Caixa nem Pagamentos)
     'financeiro',
     'financeiro-contas-pagar',
-    'financeiro-pagamentos',
-    'financeiro-fluxo-caixa',
     'financeiro-relatorios',
     'financeiro-centro-custos',
     // Estoque
@@ -590,38 +587,6 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'compras-aprovacoes',
     'compras-cotacoes',
     'compras-fornecedores',
-    'compras-relatorios',
-    // Comunicação, Emails e Mensagens
-    'chat-interno',
-    'mensagens',
-    'webmail',
-    'gestao-mensagens-grupos',
-    'gestao-mensagens-notificacoes',
-    'gestao-atendimento-tickets',
-    // ❌ RH / DPE / SST: não permitidos
-  ]),
-  ANALISTA_SUPRIMENTOS: new Set([
-    'dashboard',
-    // Frota
-    'frota',
-    // Gestão de Holerites
-    'holerites',
-    // Financeiro — Contas a Pagar e Pagamentos
-    'financeiro',
-    'financeiro-contas-pagar',
-    'financeiro-pagamentos',
-    'financeiro-relatorios',
-    'financeiro-centro-custos',
-    // Estoque
-    'estoque-simplificado',
-    'estoque-relatorios',
-    'estoque-alertas',
-    'estoque-fornecedores',
-    // Compras
-    'compras',
-    'compras-solicitacoes',
-    'compras-aprovacoes',
-    'compras-cotacoes',
     'compras-relatorios',
     // Comunicação, Emails e Mensagens
     'chat-interno',
@@ -672,7 +637,7 @@ const ROLES_WITHOUT_FINANCIAL_MODULES = new Set<UserRole>([
   'VIGILANTE',
   'OPERACIONAL',
   'COLABORADOR',
-  // ✅ ANALISTA_SUPRIMENTOS removido — agora acessa Contas a Pagar e Pagamentos
+  // ✅ SUPRIMENTOS / ANALISTA_SUPRIMENTOS — acesso parcial ao Financeiro (Contas a Pagar), sem Fluxo de Caixa nem Pagamentos
 ]);
 
 // Roles que NÃO devem ver módulo Comercial (Leads, Marketing, Empresas, Clientes, Propostas, etc.)

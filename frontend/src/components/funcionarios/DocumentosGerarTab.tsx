@@ -19,6 +19,7 @@ import NppsForm from './NppsForm';
 import FichaEntregaEPIManualForm from './FichaEntregaEPIManualForm';
 import RelatorioMovimentacaoForm from './RelatorioMovimentacaoForm';
 import { FileText, Shield, FileSignature, FileCheck, UserX, File, CreditCard, ArrowRightLeft, Car, Video } from 'lucide-react';
+import type { Company } from '@/types/company';
 
 const tipos = [
   { key: 'modelos', label: 'Modelos de Documentos', icon: FileText, shortLabel: 'Modelos' },
@@ -43,6 +44,8 @@ const tipos = [
 interface DocumentosGerarTabProps {
   employeeId?: string;
   companyId?: string;
+  companies?: Company[];
+  employeeName?: string;
   hideHeader?: boolean;
   tipoSalarioContratual?: string;
   prazoExperienciaTexto?: string;
@@ -51,6 +54,8 @@ interface DocumentosGerarTabProps {
 const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({
   employeeId: propEmployeeId,
   companyId: propCompanyId,
+  companies: propCompanies,
+  employeeName: propEmployeeName,
   hideHeader,
   tipoSalarioContratual,
   prazoExperienciaTexto
@@ -66,6 +71,12 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({
 
   const finalEmployeeId = propEmployeeId || params.get('employeeId') || undefined;
   const finalCompanyId = propCompanyId || params.get('companyId') || undefined;
+  const sharedFormProps = {
+    employeeId: finalEmployeeId,
+    companyId: finalCompanyId,
+    companies: propCompanies,
+    employeeName: propEmployeeName,
+  };
 
   // Atualizar tipo quando mudar na URL
   useEffect(() => {
@@ -128,33 +139,32 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({
       {/* Conteúdo do formulário selecionado */}
       <div>
         {tipo === 'modelos' && <ModelosDocumentosForm hideHeaderStats={hideHeader} />}
-        {tipo === 'vt' && <TermoValeTransporteForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'epi' && <FichaEntregaEPIForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'epi-manual' && <FichaEntregaEPIManualForm companyId={finalCompanyId} employeeId={finalEmployeeId} />}
-        {tipo === 'npps' && <NppsForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecificoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'danos-multas' && <TermoResponsabilidadeDanosMultasForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'body-cam' && <TermoBodyCamForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'vt' && <TermoValeTransporteForm {...sharedFormProps} />}
+        {tipo === 'epi' && <FichaEntregaEPIForm {...sharedFormProps} />}
+        {tipo === 'epi-manual' && <FichaEntregaEPIManualForm {...sharedFormProps} />}
+        {tipo === 'npps' && <NppsForm {...sharedFormProps} />}
+        {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecificoForm {...sharedFormProps} />}
+        {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm {...sharedFormProps} />}
+        {tipo === 'danos-multas' && <TermoResponsabilidadeDanosMultasForm {...sharedFormProps} />}
+        {tipo === 'body-cam' && <TermoBodyCamForm {...sharedFormProps} />}
         {tipo === 'lgpd-vig' && (
-          <TermoLGPDForm employeeId={finalEmployeeId} companyId={finalCompanyId} termVariant="VIGILANCIA" />
+          <TermoLGPDForm {...sharedFormProps} termVariant="VIGILANCIA" />
         )}
         {tipo === 'lgpd-consentimento' && (
-          <TermoLGPDForm employeeId={finalEmployeeId} companyId={finalCompanyId} termVariant="DEFAULT" />
+          <TermoLGPDForm {...sharedFormProps} termVariant="DEFAULT" />
         )}
         {tipo === 'contratos' && (
           <ContratosTrabalhoForm
-            employeeId={finalEmployeeId}
-            companyId={finalCompanyId}
+            {...sharedFormProps}
             tipoSalarioContratual={tipoSalarioContratual}
             prazoExperienciaTexto={prazoExperienciaTexto}
           />
         )}
-        {tipo === 'ordens' && <OrdemServicosForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'advertencia' && <AdvertenciaDisciplinarForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'declaracao' && <DeclaracaoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'termo-ciencia' && <TermoCienciaPrestadorForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'movimentacao' && <RelatorioMovimentacaoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'ordens' && <OrdemServicosForm {...sharedFormProps} />}
+        {tipo === 'advertencia' && <AdvertenciaDisciplinarForm {...sharedFormProps} />}
+        {tipo === 'declaracao' && <DeclaracaoForm {...sharedFormProps} />}
+        {tipo === 'termo-ciencia' && <TermoCienciaPrestadorForm {...sharedFormProps} />}
+        {tipo === 'movimentacao' && <RelatorioMovimentacaoForm {...sharedFormProps} />}
       </div>
     </div>
   );

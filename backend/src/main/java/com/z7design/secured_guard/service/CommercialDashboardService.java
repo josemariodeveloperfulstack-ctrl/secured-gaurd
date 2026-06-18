@@ -15,6 +15,7 @@ import com.z7design.secured_guard.repository.ProposalRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +43,7 @@ public class CommercialDashboardService {
      * Se userId == null, retorna dados globais.
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = "commercial-dashboard", key = "'kpis-' + (#userId != null ? #userId : 'all') + '-' + #startDate + '-' + #endDate")
     public CommercialKpisDTO getKpis(UUID userId, LocalDate startDate, LocalDate endDate) {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(LocalTime.MAX);
@@ -238,6 +240,7 @@ public class CommercialDashboardService {
      * KPIs consolidados da equipe.
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = "commercial-dashboard", key = "'team-' + #startDate + '-' + #endDate")
     public TeamKpisDTO getTeamKpis(LocalDate startDate, LocalDate endDate) {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(LocalTime.MAX);
@@ -289,6 +292,7 @@ public class CommercialDashboardService {
      * Ranking de vendedores, ordenado por receita, conversão ou contratos.
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = "commercial-dashboard", key = "'ranking-' + #startDate + '-' + #endDate + '-' + #orderBy")
     public List<VendedorRankingDTO> getRanking(LocalDate startDate, LocalDate endDate, String orderBy) {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(LocalTime.MAX);
@@ -363,6 +367,7 @@ public class CommercialDashboardService {
      * Pipeline: distribuição de leads por status.
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = "commercial-dashboard", key = "'pipeline'")
     public Map<String, Long> getPipeline() {
         Map<String, Long> pipeline = new LinkedHashMap<>();
         pipeline.put("Novos", leadRepository.countByStatus(LeadStatus.NEW));

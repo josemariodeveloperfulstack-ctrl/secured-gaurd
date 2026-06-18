@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -23,6 +24,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DependentService {
     
+    private static final Set<String> ALLOWED_RELATIONSHIPS = Set.of("FILHO", "FILHA", "CONJUGE");
+
     private final DependentRepository dependentRepository;
     private final EmployeeRepository employeeRepository;
     
@@ -36,12 +39,12 @@ public class DependentService {
         
         String cpfNormalizado = normalizeAndAssertValidCpf(request.getCpf());
 
-        assertCpfNotAlreadyRegistered(request.getEmployeeId(), cpfNormalizado, null);
+        assertCpfUniqueInSystem(cpfNormalizado, null);
         
         Dependent dependent = Dependent.builder()
             .employee(employee)
             .name(request.getName())
-            .relationship(request.getRelationship())
+            .relationship(normalizeRelationship(request.getRelationship()))
             .birthDate(request.getBirthDate())
             .cpf(cpfNormalizado)
             .rg(normalizeRg(request.getRg()))
@@ -75,14 +78,16 @@ public class DependentService {
             String cpfNormalizado = normalizeAndAssertValidCpf(request.getCpf());
             String cpfAtual = CpfValidationUtils.digitsOnly(existingDependent.getCpf());
             if (!cpfNormalizado.equals(cpfAtual)) {
-                assertCpfNotAlreadyRegistered(existingDependent.getEmployee().getId(), cpfNormalizado, id);
+                assertCpfUniqueInSystem(cpfNormalizado, id);
             }
             existingDependent.setCpf(cpfNormalizado);
         }
         
         // Atualizar campos
         if (request.getName() != null) existingDependent.setName(request.getName());
-        if (request.getRelationship() != null) existingDependent.setRelationship(request.getRelationship());
+        if (request.getRelationship() != null) {
+            existingDependent.setRelationship(normalizeRelationship(request.getRelationship()));
+        }
         if (request.getBirthDate() != null) existingDependent.setBirthDate(request.getBirthDate());
         if (request.getRg() != null) existingDependent.setRg(normalizeRg(request.getRg()));
         if (request.getGender() != null) existingDependent.setGender(request.getGender());
@@ -192,6 +197,7 @@ public class DependentService {
         if (dependent.getRelationship() == null || dependent.getRelationship().trim().isEmpty()) {
             throw new IllegalArgumentException("Relação com o dependente é obrigatória");
         }
+        validateRelationship(dependent.getRelationship());
         
         if (dependent.getBirthDate() == null) {
             throw new IllegalArgumentException("Data de nascimento é obrigatória");
@@ -207,20 +213,35 @@ public class DependentService {
     }
 
     /**
-     * Impede CPF duplicado na base (mesmo ou outro funcionário). {@code excludeDependentId} ignora
-     * o registo em atualização.
+     * Impede CPF duplicado em todo o sistema (dependentes e funcionários).
+     * {@code excludeDependentId} ignora o registo em atualização.
      */
-    private void assertCpfNotAlreadyRegistered(UUID employeeId, String cpfDigits, UUID excludeDependentId) {
+    private void assertCpfUniqueInSystem(String cpfDigits, UUID excludeDependentId) {
+        if (employeeRepository.existsByNormalizedDocument(cpfDigits)) {
+            throw new IllegalArgumentException("CPF já cadastrado no sistema");
+        }
         for (UUID depId : dependentRepository.findIdsByCpfDigitsNormalized(cpfDigits)) {
             if (excludeDependentId != null && depId.equals(excludeDependentId)) {
                 continue;
             }
-            Dependent d = dependentRepository.findById(depId)
-                    .orElseThrow(() -> new IllegalStateException("Dependente inconsistente na verificação de CPF"));
-            if (!d.getEmployee().getId().equals(employeeId)) {
-                throw new IllegalArgumentException("CPF já está cadastrado para outro dependente");
-            }
-            throw new IllegalArgumentException("Este CPF já está cadastrado como dependente deste funcionário");
+            throw new IllegalArgumentException("CPF já cadastrado no sistema");
+        }
+    }
+
+    private static String normalizeRelationship(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            throw new IllegalArgumentException("Relação com o dependente é obrigatória");
+        }
+        String normalized = raw.trim().toUpperCase();
+        if (!ALLOWED_RELATIONSHIPS.contains(normalized)) {
+            throw new IllegalArgumentException("Parentesco inválido. Opções permitidas: Filho, Filha, Cônjuge");
+        }
+        return normalized;
+    }
+
+    private static void validateRelationship(String relationship) {
+        if (relationship == null || !ALLOWED_RELATIONSHIPS.contains(relationship.trim().toUpperCase())) {
+            throw new IllegalArgumentException("Parentesco inválido. Opções permitidas: Filho, Filha, Cônjuge");
         }
     }
 

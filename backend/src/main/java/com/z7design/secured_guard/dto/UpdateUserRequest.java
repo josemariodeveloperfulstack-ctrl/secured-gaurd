@@ -1,8 +1,6 @@
 package com.z7design.secured_guard.dto;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -32,13 +30,11 @@ public class UpdateUserRequest {
     private String username;
 
     /**
-     * Senha opcional - só validada se fornecida
+     * Senha opcional — validada em {@link com.z7design.secured_guard.service.UserService#updateFromRequest}
+     * apenas quando informada (não aplicar @Size/@Pattern aqui para evitar 400 com string vazia).
      */
-    @Size(min = 6, message = "Senha deve ter no mínimo 6 caracteres")
-    @Pattern(regexp = "^(?:(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*|\\d{11}@2025)?$", message = "Senha deve ser forte (maiúscula, minúscula, dígito, especial) ou no formato CPF@2025")
     private String password;
 
-    @Pattern(regexp = "^\\d{9,20}$|^$", message = "WhatsApp deve conter apenas dígitos (9-20 caracteres)")
     private String whatsapp;
 
     private List<String> roles; // Array de Strings com nomes dos roles
@@ -60,7 +56,6 @@ public class UpdateUserRequest {
     @Size(max = 50, message = "Código do funcionário deve ter no máximo 50 caracteres")
     private String employeeCode;
 
-    @Pattern(regexp = "^\\d{9,20}$|^$", message = "Telefone deve conter apenas dígitos (9-20 caracteres)")
     private String phone;
 
     @Size(max = 500, message = "Endereço deve ter no máximo 500 caracteres")

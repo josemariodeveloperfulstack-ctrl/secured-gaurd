@@ -1,88 +1,74 @@
 /**
  * usePagePrefetch
  *
- * Prefetches lazy-loaded page chunks after the user logs in, using
- * requestIdleCallback so it never blocks the main thread.
+ * Prefetches lazy-loaded page chunks after the user logs in.
  *
- * Strategy:
- *  1. On mount (authenticated user), schedule idle-time prefetch for the most
- *     commonly used pages across all roles.
- *  2. Exports `prefetchRoute(importFn)` so the sidebar can trigger a targeted
- *     prefetch on hover — the chunk will already be in the module cache by the
- *     time the user actually clicks.
+ * Em dev o Vite serve cada chunk como requisição HTTPS separada — prefetch
+ * em massa (50+ páginas) satura o servidor e causa ERR_CONNECTION_CLOSED.
+ * Por isso o prefetch automático fica desabilitado em dev; hover na sidebar
+ * continua funcionando via fila com concorrência limitada.
  */
 
 import { useEffect, useRef } from 'react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type ImportFn = () => Promise<unknown>;
 
-// ─── Global module cache (prevents duplicate fetches) ─────────────────────────
-
 const prefetched = new Set<ImportFn>();
+const prefetchQueue: ImportFn[] = [];
+let activePrefetches = 0;
+
+const IS_DEV = import.meta.env.DEV;
+const MAX_CONCURRENT = IS_DEV ? 1 : 3;
+const GAP_BETWEEN_MS = IS_DEV ? 1200 : 400;
+
+function drainPrefetchQueue(): void {
+  while (activePrefetches < MAX_CONCURRENT && prefetchQueue.length > 0) {
+    const importFn = prefetchQueue.shift()!;
+    activePrefetches++;
+    importFn()
+      .catch(() => {
+        prefetched.delete(importFn);
+      })
+      .finally(() => {
+        activePrefetches--;
+        setTimeout(drainPrefetchQueue, GAP_BETWEEN_MS);
+      });
+  }
+}
 
 /**
- * Trigger an immediate prefetch for a single import function.
- * Safe to call multiple times — will only execute once per function reference.
+ * Enfileira prefetch de um chunk. Seguro chamar várias vezes — executa só uma.
  */
 export function prefetchRoute(importFn: ImportFn): void {
   if (prefetched.has(importFn)) return;
   prefetched.add(importFn);
-  importFn().catch(() => {
-    // Remove from cache so a retry is possible on the next hover/idle cycle.
-    prefetched.delete(importFn);
-  });
+  prefetchQueue.push(importFn);
+  drainPrefetchQueue();
 }
-
-// ─── Priority page imports (most visited pages across all roles) ───────────────
 
 import { ROUTE_PREFETCH_MAP } from '@/config/routePrefetch';
 
 const PRIORITY_PAGES: ImportFn[] = [
-  // Core
   () => import('@/pages/Dashboard'),
   () => import('@/pages/Index'),
-  // RH / Funcionários
   () => import('@/pages/Funcionarios'),
   () => import('@/pages/RH'),
-  () => import('@/pages/RH/PontoEletronico'),
-  () => import('@/pages/RH/FechamentoHoras'),
-  // Comercial
   () => import('@/pages/Clientes'),
   () => import('@/pages/Contratos'),
-  // Financeiro
   () => import('@/pages/Financeiro'),
-  () => import('@/pages/ContasAPagar'),
-  () => import('@/pages/ContasAReceber'),
-  // Operacional
   () => import('@/pages/Operacional'),
-  () => import('@/pages/Frota'),
-  // Holerites / Docs
   () => import('@/pages/Holerites'),
-  () => import('@/pages/DocumentosUnificados'),
-  // Comunicação
-  () => import('@/pages/Mensagens'),
-  () => import('@/pages/ChatInterno'),
-  // Estoque / Compras
-  () => import('@/pages/EstoqueSimplificado'),
-  () => import('@/pages/Compras'),
-  // Sistema
   () => import('@/pages/Configuracoes'),
-  () => import('@/pages/Usuarios'),
-  () => import('@/pages/Grupos'),
 ];
 
-// Rotas do mapa compartilhado (sidebar) — sem duplicar imports do bloco acima
 const MAP_PREFETCH_PATHS = new Set([
   '/dashboard', '/dashboard-home', '/funcionarios', '/financeiro', '/operacional',
   '/holerites', '/clientes', '/contratos', '/comercial/marketing', '/configuracoes',
 ]);
+
 const SECONDARY_PAGES: ImportFn[] = Object.entries(ROUTE_PREFETCH_MAP)
   .filter(([path]) => !MAP_PREFETCH_PATHS.has(path))
   .map(([, fn]) => fn);
-
-// ─── requestIdleCallback polyfill ─────────────────────────────────────────────
 
 type IdleDeadline = { timeRemaining: () => number; didTimeout: boolean };
 type IdleCallback = (deadline: IdleDeadline) => void;
@@ -97,38 +83,35 @@ const cIC: (id: number) => void =
     ? cancelIdleCallback
     : clearTimeout;
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
+function schedulePrefetchQueue(pages: ImportFn[], startDelayMs: number, stepMs: number): number[] {
+  const ids: number[] = [];
+  pages.forEach((importFn, index) => {
+    const id = rIC(() => prefetchRoute(importFn), {
+      timeout: startDelayMs + index * stepMs,
+    });
+    ids.push(id);
+  });
+  return ids;
+}
 
 export function usePagePrefetch(): void {
   const scheduledRef = useRef<number[]>([]);
 
   useEffect(() => {
-    const ids: number[] = [];
+    if (IS_DEV) {
+      // Em dev: sem prefetch em massa — evita derrubar o Vite HTTPS.
+      // Hover na sidebar ainda prefetcha via prefetchRoute (fila serial).
+      return;
+    }
 
-    // Batch priority pages with a short delay between each to stay idle-friendly
-    PRIORITY_PAGES.forEach((importFn, index) => {
-      const id = rIC(
-        () => prefetchRoute(importFn),
-        // Stagger: first 5 quickly, then spread out at 200ms intervals
-        { timeout: 3000 + index * 200 }
-      );
-      ids.push(id);
-    });
-
-    // Secondary pages after a longer initial delay
-    SECONDARY_PAGES.forEach((importFn, index) => {
-      const id = rIC(
-        () => prefetchRoute(importFn),
-        { timeout: 8000 + index * 300 }
-      );
-      ids.push(id);
-    });
-
+    const ids = [
+      ...schedulePrefetchQueue(PRIORITY_PAGES, 4000, 600),
+      ...schedulePrefetchQueue(SECONDARY_PAGES, 12000, 800),
+    ];
     scheduledRef.current = ids;
 
     return () => {
-      // Cancel any pending idle callbacks on unmount
       scheduledRef.current.forEach(cIC);
     };
-  }, []); // Run once on mount — authenticated layout is already mounted
+  }, []);
 }

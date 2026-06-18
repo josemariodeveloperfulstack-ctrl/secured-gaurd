@@ -104,7 +104,7 @@ const DependenteForm: React.FC<DependenteFormProps> = ({
       if (error.message.includes('CPF já cadastrado')) {
         setErrors(prev => ({
           ...prev,
-          cpf: 'CPF já cadastrado para outro dependente'
+          cpf: 'CPF já cadastrado no sistema'
         }));
       } else {
         setErrors(prev => ({

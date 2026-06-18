@@ -58,4 +58,10 @@ public class PurchaseRequestDTO {
     private List<PurchaseRequestItemDTO> items;
     private int totalItems;
     private BigDecimal totalValue;
+
+    private String category;
+    private String unitOfMeasure;
+    private String itemNumber;
+    private BigDecimal quantity;
+    private List<PurchaseRequestSizeEntryDTO> sizeBreakdown;
 }

@@ -799,12 +799,12 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
       return {
         ...basePermissions,
         // Analista de Suprimentos: Estoque, Compras, Holerites (leitura), Financeiro parcial, Frota, Mensagens
-        // ❌ SEM acesso a RH, DPE, SST, Folha de Pagamento
+        // ❌ SEM acesso a RH, DPE, SST, Folha de Pagamento, Fluxo de Caixa e Pagamentos
         PAYSLIPS_READ: true,              // Gestão de Holerites (somente leitura)
         FINANCIAL_READ: true,
         FINANCIAL_PAYABLE_READ: true,     // Contas a Pagar
-        FINANCIAL_PAYABLE_WRITE: true,    // Pagamentos
-        FINANCIAL_CASHFLOW_READ: true,
+        FINANCIAL_PAYABLE_WRITE: false,
+        FINANCIAL_CASHFLOW_READ: false,
         STOCK_READ: true,
         STOCK_WRITE: true,
         STOCK_CREATE: true,
@@ -847,13 +847,13 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
       return {
         ...basePermissions,
         // Suprimentos: Financeiro (parcial) + Estoque + Compras + Holerites + Frota + Mensagens
-        // ❌ SEM acesso a RH, DPE, SST, Folha de Pagamento (PAYROLL)
+        // ❌ SEM acesso a RH, DPE, SST, Folha de Pagamento (PAYROLL), Fluxo de Caixa e Pagamentos
         PAYSLIPS_READ: true,              // Gestão de Holerites (leitura)
         FINANCIAL_READ: true,
         FINANCIAL_WRITE: true,
         FINANCIAL_PAYABLE_READ: true,     // Contas a Pagar
-        FINANCIAL_PAYABLE_WRITE: true,    // Pagamentos
-        FINANCIAL_CASHFLOW_READ: true,
+        FINANCIAL_PAYABLE_WRITE: false,
+        FINANCIAL_CASHFLOW_READ: false,
         FINANCIAL_INVOICE_READ: true,
         FINANCIAL_RECEIVABLE_READ: false,
         FINANCIAL_RECEIVABLE_WRITE: false,

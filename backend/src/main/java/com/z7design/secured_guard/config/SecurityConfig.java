@@ -12,8 +12,8 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.z7design.secured_guard.security.LegacyCompatiblePasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -741,9 +741,7 @@ public class SecurityConfig {
 
         @Bean
         public PasswordEncoder passwordEncoder() {
-                // Parâmetros recomendados (saltLength, hashLength, parallelism, memory,
-                // iterations)
-                return new Argon2PasswordEncoder(16, 32, 1, 1 << 16, 3);
+                return new LegacyCompatiblePasswordEncoder();
         }
 
         @Bean

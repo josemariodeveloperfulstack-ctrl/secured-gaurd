@@ -1,5 +1,10 @@
 import api from '@/lib/axios';
 
+export interface PurchaseRequestSizeEntry {
+  size: string;
+  quantity: number;
+}
+
 export interface PurchaseRequest {
   id: string;
   requestNumber: string;
@@ -43,6 +48,11 @@ export interface PurchaseRequest {
   items?: PurchaseRequestItem[];
   totalItems: number;
   totalValue: number;
+  category?: string;
+  unitOfMeasure?: string;
+  itemNumber?: string;
+  quantity?: number;
+  sizeBreakdown?: PurchaseRequestSizeEntry[];
 }
 
 export interface PurchaseRequestItem {
@@ -109,8 +119,8 @@ export interface CreatePurchaseRequestRequest {
   quantity?: number;
   unitOfMeasure?: string;
   category?: string;
-  size?: string;
   itemNumber?: string;
+  sizeBreakdown?: PurchaseRequestSizeEntry[];
 }
 
 export interface UpdatePurchaseRequestRequest extends CreatePurchaseRequestRequest {
@@ -232,6 +242,13 @@ class PurchaseRequestService {
 
   async getOverdueRequestsCount(): Promise<number> {
     const response = await api.get('/api/purchase-requests/stats/overdue-count');
+    return response.data;
+  }
+
+  async generateSingleRequestPDF(id: string): Promise<Blob> {
+    const response = await api.get(`/api/purchase-requests/${id}/pdf`, {
+      responseType: 'blob',
+    });
     return response.data;
   }
 

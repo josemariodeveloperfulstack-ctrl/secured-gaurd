@@ -26,6 +26,7 @@ export default function TeamDashboard() {
   const [revenueBySegment, setRevenueBySegment] = useState<{ segmentos: Record<string, number>; total: number } | null>(null);
   const [expiringContracts, setExpiringContracts] = useState<ExpiringContract[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [periodo, setPeriodo] = useState('12');
   const [orderBy, setOrderBy] = useState('revenue');
   const [expiringDays, setExpiringDays] = useState('90');
@@ -37,26 +38,30 @@ export default function TeamDashboard() {
   const loadData = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const endDate = new Date().toISOString().split('T')[0];
       const start = new Date();
       start.setMonth(start.getMonth() - parseInt(periodo));
       const startDate = start.toISOString().split('T')[0];
+      const filters = { startDate, endDate };
 
-      const [teamData, rankingData, pipelineData, segmentData, contractsData] = await Promise.all([
-        commercialDashboardService.getTeamKpis({ startDate, endDate }),
-        commercialDashboardService.getRanking({ startDate, endDate, orderBy }),
-        commercialDashboardService.getPipeline(),
-        commercialDashboardService.getRevenueBySegment({ startDate, endDate }),
-        commercialDashboardService.getExpiringContracts(parseInt(expiringDays)),
-      ]);
-
+      const teamData = await commercialDashboardService.getTeamKpis(filters);
       setTeamKpis(teamData);
+
+      const rankingData = await commercialDashboardService.getRanking({ ...filters, orderBy });
       setRanking(rankingData);
+
+      const pipelineData = await commercialDashboardService.getPipeline();
       setPipeline(pipelineData);
+
+      const segmentData = await commercialDashboardService.getRevenueBySegment(filters).catch(() => null);
       setRevenueBySegment(segmentData);
+
+      const contractsData = await commercialDashboardService.getExpiringContracts(parseInt(expiringDays)).catch(() => []);
       setExpiringContracts(contractsData);
     } catch (error) {
       console.error('Erro ao carregar dashboard de equipe:', error);
+      setLoadError('Falha ao carregar dados da equipe. Tente novamente.');
       toast({ title: 'Erro', description: 'Falha ao carregar dados da equipe.', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -71,6 +76,23 @@ export default function TeamDashboard() {
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
         <span className="ml-3 text-gray-400">Carregando dados da equipe...</span>
+      </div>
+    );
+  }
+
+  if (!teamKpis) {
+    return (
+      <div className="text-center py-10 space-y-3">
+        <p className="text-gray-400">{loadError || 'Nenhum dado disponível.'}</p>
+        {loadError && (
+          <button
+            type="button"
+            onClick={() => loadData()}
+            className="text-sm text-seguranca-yellow hover:underline"
+          >
+            Tentar novamente
+          </button>
+        )}
       </div>
     );
   }

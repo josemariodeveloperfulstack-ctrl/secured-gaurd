@@ -61,6 +61,42 @@ public class LeadDTO {
         this.name = name;
         this.email = email;
     }
+
+    /** Projeção JPQL para listagem — evita carregar entidade User completa (roles/permissions EAGER). */
+    public LeadDTO(
+            java.util.UUID id,
+            String name,
+            String email,
+            String phone,
+            String mobile,
+            String company,
+            String position,
+            LeadStatus status,
+            LeadSource source,
+            BigDecimal estimatedValue,
+            String notes,
+            java.util.UUID assignedToId,
+            String assignedToName,
+            LocalDateTime nextFollowUp,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+        this.phone = phone;
+        this.mobile = mobile;
+        this.company = company;
+        this.position = position;
+        this.status = status;
+        this.source = source;
+        this.estimatedValue = estimatedValue;
+        this.notes = notes;
+        this.assignedToId = assignedToId;
+        this.assignedToName = assignedToName;
+        this.nextFollowUp = nextFollowUp;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
     
     // Getters and Setters
     public java.util.UUID getId() {

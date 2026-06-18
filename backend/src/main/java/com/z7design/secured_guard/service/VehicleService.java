@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +23,7 @@ public class VehicleService {
     private final VehicleRepository vehicleRepository;
     
     @Transactional(readOnly = true)
+    @Cacheable(value = "vehicles", key = "'all'")
     public List<VehicleDTO> getAllVehicles() {
         log.debug("Buscando todos os veículos");
         try {
@@ -36,6 +39,7 @@ public class VehicleService {
     }
     
     @Transactional(readOnly = true)
+    @Cacheable(value = "vehicles", key = "#id")
     public VehicleDTO getVehicleById(UUID id) {
         log.debug("Buscando veículo por ID: {}", id);
         Vehicle vehicle = vehicleRepository.findById(id)
@@ -44,6 +48,7 @@ public class VehicleService {
     }
     
     @Transactional(readOnly = true)
+    @Cacheable(value = "vehicles", key = "#plate")
     public Optional<VehicleDTO> getVehicleByPlate(String plate) {
         log.debug("Buscando veículo por placa: {}", plate);
         Optional<Vehicle> vehicle = vehicleRepository.findByPlate(plate);
@@ -51,6 +56,7 @@ public class VehicleService {
     }
     
     @Transactional(readOnly = true)
+    @Cacheable(value = "vehicles-by-status", key = "#status")
     public List<VehicleDTO> getVehiclesByStatus(Vehicle.VehicleStatus status) {
         log.debug("Buscando veículos por status: {}", status);
         try {
@@ -66,6 +72,7 @@ public class VehicleService {
     }
     
     @Transactional(readOnly = true)
+    @Cacheable(value = "vehicles", key = "'search-' + #searchTerm")
     public List<VehicleDTO> searchVehicles(String searchTerm) {
         log.debug("Buscando veículos com termo: {}", searchTerm);
         try {
@@ -81,6 +88,7 @@ public class VehicleService {
     }
     
     @Transactional
+    @CacheEvict(value = { "vehicles", "vehicles-by-status" }, allEntries = true)
     public VehicleDTO createVehicle(VehicleDTO vehicleDTO) {
         log.debug("Criando novo veículo: {}", vehicleDTO.getPlate());
         try {
@@ -100,6 +108,7 @@ public class VehicleService {
     }
     
     @Transactional
+    @CacheEvict(value = { "vehicles", "vehicles-by-status" }, allEntries = true)
     public VehicleDTO updateVehicle(UUID id, VehicleDTO vehicleDTO) {
         log.debug("Atualizando veículo ID: {}", id);
         try {
@@ -148,6 +157,7 @@ public class VehicleService {
     }
     
     @Transactional
+    @CacheEvict(value = { "vehicles", "vehicles-by-status" }, allEntries = true)
     public void deleteVehicle(UUID id) {
         log.debug("Excluindo veículo ID: {}", id);
         try {

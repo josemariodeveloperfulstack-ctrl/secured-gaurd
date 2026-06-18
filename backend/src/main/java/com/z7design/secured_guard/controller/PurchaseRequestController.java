@@ -210,6 +210,17 @@ public class PurchaseRequestController {
         return ResponseEntity.ok(count);
     }
 
+    @GetMapping("/{id}/pdf")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
+    public ResponseEntity<byte[]> generatePurchaseRequestPdf(@PathVariable UUID id) throws IOException {
+        log.info("Gerando PDF individual da solicitação de compra {}", id);
+        byte[] pdf = purchaseRequestReportService.generateSinglePurchaseRequestPdf(id);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=solicitacao-compra.pdf")
+                .body(pdf);
+    }
+
     /**
      * Gera relatório PDF de solicitações de compra com layout corporativo padrão,
      * utilizando os mesmos filtros de data, status e valor do frontend.

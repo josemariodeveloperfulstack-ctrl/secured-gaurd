@@ -8,6 +8,7 @@ import { groupService } from '@/services/groupService';
 import { getApiUrl } from '@/config/environment';
 import { SessionTimeoutManager } from '@/components/SessionTimeoutManager';
 import WebSocketConnector from '@/components/WebSocketConnector';
+import { handleConnectionErrorSilently } from '@/utils/connectionError';
 
 const sanitizeRole = (roleStr: string): string => {
   if (!roleStr) return '';
@@ -173,7 +174,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (!token || !savedUserStr) return;
 
       try {
-        const response = await api.get('/session/current-role');
+        const response = await api.get('/session/current-role', { silent: true } as Parameters<typeof api.get>[1]);
         if (!response.data) return;
         
         const { role: dbRole, roles: dbRoles, token: newToken } = response.data as { role: string; roles?: string[]; token: string };
@@ -211,7 +212,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(updatedUser);
         }
       } catch (err: any) {
-        // Silenciar erros de polling, mas logar se for 401 para debug
+        if (handleConnectionErrorSilently(err, 'AuthContext role poll')) return;
         if (err?.response?.status === 401) {
           console.warn('⚠️ [AuthContext] Polling 401 - Session likely expired');
         }
@@ -278,6 +279,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
+
+      // Sessão antiga/expirada pode fazer o interceptor tratar 401 como refresh em vez de credencial inválida
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem(import.meta.env.VITE_TOKEN_KEY || 'token');
+      localStorage.removeItem(import.meta.env.VITE_USER_KEY || 'user');
+      localStorage.removeItem(import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken');
 
       console.log('🔍 Tentando fazer login com:', email);
       console.log('🔍 Base URL:', getApiUrl());

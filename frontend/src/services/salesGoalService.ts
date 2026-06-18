@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import { withConnectionRetry } from '@/utils/requestRetry';
 
 export interface SalesGoal {
   id: string;
@@ -50,8 +51,10 @@ export const salesGoalService = {
   },
 
   async getProgress(month: number, year: number): Promise<SalesGoal[]> {
-    const { data } = await api.get(`/api/sales-goals/progress?month=${month}&year=${year}`);
-    return data;
+    return withConnectionRetry(async () => {
+      const { data } = await api.get(`/sales-goals/progress?month=${month}&year=${year}`);
+      return data;
+    });
   },
 
   async create(goal: CreateSalesGoalRequest): Promise<SalesGoal> {

@@ -355,17 +355,18 @@ const Funcionarios: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [searchTerm, statusFilter, companyFilter, positionFilter, workPostFilter, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, buildApiFilters]);
 
-  // Carregar opções dos filtros (empresas, cargos) da API (uma vez)
+  // Carregar opções dos filtros (empresas, cargos) — sequencial para não competir com a listagem
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        const [companiesRes, positionsRes] = await Promise.all([
-          companyService.getAllCompanies(),
-          positionService.getPositions().catch(() => []),
-        ]);
+        await new Promise((r) => setTimeout(r, 800));
+        if (cancelled) return;
+        const companiesRes = await companyService.getAllCompanies();
         if (cancelled) return;
         setFilterCompanies(Array.isArray(companiesRes) ? companiesRes : []);
+        const positionsRes = await positionService.getPositions().catch(() => []);
+        if (cancelled) return;
         setFilterPositions(Array.isArray(positionsRes) ? positionsRes : []);
       } catch (e) {
         if (!cancelled) console.warn('Erro ao carregar opções dos filtros:', e);
@@ -375,16 +376,18 @@ const Funcionarios: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // Carregar postos de trabalho conforme empresa selecionada (ao escolher empresa, carregar apenas postos daquela empresa)
+  // Postos de trabalho: carrega depois da listagem principal (endpoint pesado)
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
+        await new Promise((r) => setTimeout(r, 1500));
+        if (cancelled) return;
         if (companyFilter && companyFilter !== 'all') {
           const posts = await workPostService.getWorkPostsByCompany(companyFilter);
           if (!cancelled) {
             setFilterWorkPosts(Array.isArray(posts) ? posts : []);
-            setWorkPostFilter('all'); // Resetar filtro de posto ao trocar empresa
+            setWorkPostFilter('all');
           }
         } else {
           const posts = await workPostService.getAllWorkPosts();

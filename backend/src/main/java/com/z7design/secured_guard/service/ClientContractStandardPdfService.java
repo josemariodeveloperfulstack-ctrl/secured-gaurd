@@ -90,8 +90,7 @@ public class ClientContractStandardPdfService {
 
                         addContent(document, request, company, companyConfig);
 
-                        document.close();
-                        return outputStream.toByteArray();
+                        return docWithPdf.closeAndGetPdfBytes(outputStream, pdfLayoutService);
                 } catch (ResourceNotFoundException e) {
                         throw e;
                 } catch (IllegalArgumentException e) {
@@ -226,8 +225,7 @@ public class ClientContractStandardPdfService {
 
                         addContent(document, request, company, companyConfig);
 
-                        document.close();
-                        return outputStream.toByteArray();
+                        return docWithPdf.closeAndGetPdfBytes(outputStream, pdfLayoutService);
                 } catch (ResourceNotFoundException e) {
                         throw e;
                 } catch (IllegalArgumentException e) {

@@ -188,9 +188,10 @@ export const messageService = {
     try {
       const response = await api.get('/messages/unread/count', {
         headers: getAuthHeaders(),
-        validateStatus: (status) => status < 500, // Não lançar erro para 401/403, apenas para 500+
-        maxRedirects: 0 // Desabilitar redirecionamentos automáticos para evitar loops
-      });
+        silent: true,
+        validateStatus: (status) => status < 500,
+        maxRedirects: 0,
+      } as Parameters<typeof api.get>[1]);
       return response.data || 0;
     } catch (error: any) {
       // Evitar loops de redirecionamento - retornar 0 silenciosamente

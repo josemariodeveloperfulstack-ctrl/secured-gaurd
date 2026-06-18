@@ -379,8 +379,6 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
     { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
     { label: 'Financeiro', path: '/financial', icon: 'DollarSign', color: '🟨' },
     { label: 'Contas a Pagar', path: '/gestao-financeira/contas-pagar', icon: 'CreditCard', color: '🟨' },
-    { label: 'Contas a Receber', path: '/gestao-financeira/contas-receber', icon: 'Receipt', color: '🟨' },
-    { label: 'Fluxo de Caixa', path: '/gestao-financeira/fluxo-caixa', icon: 'ArrowUpDown', color: '🟨' },
     { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
     { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
     { label: 'Holerites', path: '/payslips', icon: 'FileText', color: '🟨' },

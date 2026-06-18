@@ -635,12 +635,12 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/financeiro/fluxo-caixa" element={
-                      <ProtectedRoute requiredPermissions={['FINANCIAL_READ']}>
+                      <ProtectedRoute requiredPermissions={['FINANCIAL_CASHFLOW_READ']}>
                         <FluxoCaixa />
                       </ProtectedRoute>
                     } />
                     <Route path="/financeiro/pagamentos" element={
-                      <ProtectedRoute requiredPermissions={['FINANCIAL_READ', 'FINANCIAL_WRITE']} requireAllPermissions={false}>
+                      <ProtectedRoute requiredPermissions={['FINANCIAL_PAYABLE_WRITE']}>
                         <Pagamentos />
                       </ProtectedRoute>
                     } />

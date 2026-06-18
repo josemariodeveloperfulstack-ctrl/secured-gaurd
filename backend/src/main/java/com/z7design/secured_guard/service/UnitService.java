@@ -57,18 +57,21 @@ public class UnitService {
     }
     
     // Métodos de busca como DTOs
+    @Cacheable(value = "units", key = "'all-dto'")
     public List<UnitDTO> findAllAsDTO() {
         return unitRepository.findAll().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "active-units", key = "'all-active'")
     public List<UnitDTO> findAllActiveAsDTO() {
         return unitRepository.findByActiveTrue().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "units", key = "#id")
     public UnitDTO findByIdAsDTO(UUID id) {
         log.debug("Buscando unidade por ID: {}", id);
         Unit unit = unitRepository.findById(id)
@@ -76,48 +79,56 @@ public class UnitService {
         return convertToDTO(unit);
     }
     
+    @Cacheable(value = "units", key = "#code")
     public UnitDTO findByCodeAsDTO(String code) {
         Unit unit = findByCode(code)
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada com código: " + code));
         return convertToDTO(unit);
     }
     
+    @Cacheable(value = "units", key = "'name-' + #name")
     public List<UnitDTO> findByNameContainingAsDTO(String name) {
         return findByNameContaining(name).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "active-units", key = "'name-active-' + #name")
     public List<UnitDTO> findActiveByNameContainingAsDTO(String name) {
         return findActiveByNameContaining(name).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "units", key = "'root'")
     public List<UnitDTO> findRootUnitsAsDTO() {
         return findRootUnits().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "active-units", key = "'root-active'")
     public List<UnitDTO> findActiveRootUnitsAsDTO() {
         return findActiveRootUnits().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "units", key = "'children-' + #parentId")
     public List<UnitDTO> findChildrenAsDTO(UUID parentId) {
         return findChildren(parentId).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "units", key = "'client-' + #clientId")
     public List<UnitDTO> findByClientIdAsDTO(UUID clientId) {
         return findByClientId(clientId).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
     
+    @Cacheable(value = "active-units", key = "'client-active-' + #clientId")
     public List<UnitDTO> findActiveByClientIdAsDTO(UUID clientId) {
         return findActiveByClientId(clientId).stream()
                 .map(this::convertToDTO)
@@ -218,6 +229,7 @@ public class UnitService {
         return convertToDTO(updatedUnit);
     }
     
+    @CacheEvict(value = {"units", "active-units"}, allEntries = true)
     public UnitDTO toggleActiveAsDTO(UUID id) {
         Unit unit = unitRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada com ID: " + id));
@@ -228,6 +240,7 @@ public class UnitService {
         return convertToDTO(updatedUnit);
     }
     
+    @CacheEvict(value = {"units", "active-units"}, allEntries = true)
     public void deleteUnit(UUID id) {
         Unit unit = unitRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada com ID: " + id));
@@ -287,6 +300,7 @@ public class UnitService {
     /**
      * Exclui uma unidade e todas as suas dependências
      */
+    @CacheEvict(value = {"units", "active-units", "employees", "employees-by-company"}, allEntries = true)
     public void deleteUnitWithDependencies(UUID id) {
         Unit unit = unitRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada com ID: " + id));

@@ -71,35 +71,21 @@ export const AgreementProposalsList: React.FC = () => {
       setLoading(true);
       const data = await proposalService.getAllProposals();
       // Filtrar apenas propostas de acordo (pode usar um campo específico ou título)
-      const agreementProposals = await Promise.all(
-        data
-          .filter((p: any) => p.title?.includes('Proposta de Acordo') || p.description?.includes('acordo'))
-          .map(async (proposal: any) => {
-            let clientName = proposal.client?.name || proposal.clientName || 'N/A';
-            let clientId: string | number | undefined = proposal.clientId ?? proposal.client?.id;
-            try {
-              const proposalId = typeof proposal.id === 'string' ? proposal.id : String(proposal.id);
-              const fullProposal = await proposalService.getProposalById(proposalId);
-              clientName = fullProposal.client?.name || (fullProposal as any).clientName || proposal.client?.name || proposal.clientName || 'N/A';
-              clientId = (fullProposal as any).clientId ?? fullProposal.client?.id ?? clientId;
-            } catch (error) {
-              console.warn('Não foi possível buscar proposta completa:', error);
-            }
-            return {
-              id: proposal.id,
-              title: proposal.title || '',
-              proposalNumber: proposal.proposalNumber || '',
-              clientId,
-              clientName,
-              status: proposal.status || 'DRAFT',
-              totalValue: proposal.totalValue ? Number(proposal.totalValue) : 0,
-              validUntil: proposal.validUntil ? new Date(proposal.validUntil).toISOString().split('T')[0] : '',
-              description: proposal.description || '',
-              createdAt: proposal.createdAt ? new Date(proposal.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-              updatedAt: proposal.updatedAt ? new Date(proposal.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-            };
-          })
-      );
+      const agreementProposals = data
+        .filter((p: any) => p.title?.includes('Proposta de Acordo') || p.description?.includes('acordo'))
+        .map((proposal: any) => ({
+          id: proposal.id,
+          title: proposal.title || '',
+          proposalNumber: proposal.proposalNumber || '',
+          clientId: proposal.clientId ?? proposal.client?.id,
+          clientName: proposal.clientName || proposal.client?.name || 'N/A',
+          status: proposal.status || 'DRAFT',
+          totalValue: proposal.totalValue ? Number(proposal.totalValue) : 0,
+          validUntil: proposal.validUntil ? new Date(proposal.validUntil).toISOString().split('T')[0] : '',
+          description: proposal.description || '',
+          createdAt: proposal.createdAt ? new Date(proposal.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          updatedAt: proposal.updatedAt ? new Date(proposal.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+        }));
       setProposals(agreementProposals);
       setFilteredProposals(agreementProposals);
     } catch (error: any) {

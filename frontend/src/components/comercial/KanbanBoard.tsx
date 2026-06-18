@@ -450,21 +450,20 @@ export default function KanbanBoard() {
     }
   };
 
-  // Carregar dados do backend
+  // Carregar o board primeiro; usuários/leads em background (só para formulários)
   useEffect(() => {
-    // Carregar usuários e leads primeiro para ter o mapa disponível
-    loadUsersAndLeads().then(() => {
-      loadData();
-    });
+    loadData();
+    const timer = setTimeout(() => void loadUsersAndLeads(), 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   const loadUsersAndLeads = async () => {
     try {
       const [usersData, leadsData] = await Promise.all([
-        userService.getAllUsers(),
-        leadService.getAllLeads().catch(() => []) // Se não houver leadService, retornar array vazio
+        userService.getUsersForSelect(),
+        leadService.getAllLeads().catch(() => [])
       ]);
-      setUsers(usersData || []);
+      setUsers(usersData.map(u => ({ ...u, email: '', active: true, roles: [] })) || []);
       setLeads(leadsData || []);
     } catch (err) {
       console.error('Erro ao carregar usuários e leads:', err);
@@ -504,11 +503,6 @@ export default function KanbanBoard() {
     try {
       setLoading(true);
       setError(null);
-      
-      // Garantir que usuários estão carregados antes de mapear oportunidades
-      if (users.length === 0) {
-        await loadUsersAndLeads();
-      }
       
       // 1. Carregar status
       let statusesData = [];
@@ -601,11 +595,9 @@ export default function KanbanBoard() {
       
       const mappedOpportunities = (opportunitiesData || []).map((opp: any) => {
         let assignedToName = opp.assignedToName || 'Não atribuído';
-        if (!assignedToName || assignedToName === 'Não atribuído') {
-          if (opp.assignedToId) {
-            const userName = usersMap.get(opp.assignedToId);
-            if (userName) assignedToName = userName;
-          }
+        if ((!assignedToName || assignedToName === 'Não atribuído') && opp.assignedToId) {
+          const userName = usersMap.get(opp.assignedToId);
+          if (userName) assignedToName = userName;
         }
         
         return {

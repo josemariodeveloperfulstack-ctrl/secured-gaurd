@@ -53,6 +53,9 @@ interface DependentFormModalProps {
   dependent?: Dependent;
   employeeId?: string;
   employeeName?: string;
+  deferSave?: boolean;
+  onPendingCreate?: (data: DependentCreateRequest) => void;
+  existingCpfs?: string[];
 }
 
 export const DependentFormModal: React.FC<DependentFormModalProps> = ({
@@ -61,7 +64,10 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
   onSuccess,
   dependent,
   employeeId,
-  employeeName
+  employeeName,
+  deferSave = false,
+  onPendingCreate,
+  existingCpfs = [],
 }) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -163,6 +169,18 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
           return;
         }
 
+        const duplicateCpf = existingCpfs.some(
+          (existing) => digitsOnly(existing) === cpfDigits
+        );
+        if (duplicateCpf) {
+          toast({
+            title: 'CPF duplicado',
+            description: 'Este CPF já está cadastrado no sistema ou na lista de dependentes.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
         const emailForSave = optionalEmail(formData.email);
         if (emailForSave && !validateEmail(emailForSave)) {
           toast({
@@ -200,16 +218,7 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
           description: "Dependente atualizado com sucesso!",
         });
       } else {
-        const empId = String(formData.employeeId ?? '').trim();
-        if (!empId) {
-          toast({
-            title: "Erro",
-            description: "Funcionário não identificado. Feche e abra o formulário novamente.",
-            variant: "destructive",
-          });
-          return;
-        }
-
+        const empId = String(formData.employeeId ?? employeeId ?? '').trim();
         const birth = toBirthDateIso(formData.birthDate);
         const cpfDigits = digitsOnly(formData.cpf);
         if (!formData.name?.trim() || !formData.relationship || !birth) {
@@ -224,6 +233,18 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
           toast({
             title: 'CPF inválido',
             description: 'Informe um CPF válido (11 dígitos e dígitos verificadores corretos).',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const duplicateCpf = existingCpfs.some(
+          (existing) => digitsOnly(existing) === cpfDigits
+        );
+        if (duplicateCpf) {
+          toast({
+            title: 'CPF duplicado',
+            description: 'Este CPF já está cadastrado no sistema ou na lista de dependentes.',
             variant: 'destructive',
           });
           return;
@@ -258,6 +279,16 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
           isBeneficiary: formData.isBeneficiary,
           notes: formData.notes?.trim() || undefined,
         };
+
+        if (deferSave || !empId) {
+          onPendingCreate?.(createData);
+          toast({
+            title: "Dependente adicionado",
+            description: "O dependente será salvo junto com o funcionário.",
+          });
+          onClose();
+          return;
+        }
 
         await dependentService.createDependent(createData);
 

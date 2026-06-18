@@ -10,8 +10,6 @@ import { Badge } from '../ui/badge';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { FileText, Download, Eye, User, Building, Calendar, Loader2, CheckCircle2, ArrowRight, ArrowLeft, PenLine } from 'lucide-react';
 import { employeeService, SimpleEmployee } from '@/services/employeeService';
-
-import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import api from '@/lib/axios';
@@ -19,10 +17,15 @@ import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { CompanyCombobox } from '@/components/ui/company-combobox';
 import { useInvalidateDocumentosGerados } from '@/hooks/queries/useDocumentosGerados';
 import { formatEmployeeFullAddress, type EmployeeAddressSource } from '@/utils/formatEmployeeAddress';
+import { useDocumentFormCompanies } from '@/hooks/useDocumentFormCompanies';
+import { fetchWithConnectionRetry } from '@/utils/connectionError';
+import type { Company } from '@/types/company';
 
 interface TermoValeTransporteFormProps {
   employeeId?: string;
   companyId?: string;
+  companies?: Company[];
+  employeeName?: string;
 }
 
 function toIsoDateOnly(value?: string): string | undefined {
@@ -36,7 +39,12 @@ function toIsoDateOnly(value?: string): string | undefined {
   return parsed.toISOString().split('T')[0];
 }
 
-const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ employeeId, companyId }) => {
+const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({
+  employeeId,
+  companyId,
+  companies: parentCompanies,
+  employeeName,
+}) => {
   const { toast } = useToast();
   const invalidateDocumentosGerados = useInvalidateDocumentosGerados();
   const [form, setForm] = useState({
@@ -56,12 +64,11 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
   });
 
   const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(false);
   const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
-  const [companies, setCompanies] = useState<any[]>([]);
 
   const activeEmployeeId = form.funcionarioId || employeeId || '';
   const activeCompanyId = form.empresaId || companyId || '';
+  const { companies, loadingCompanies } = useDocumentFormCompanies(activeCompanyId, parentCompanies);
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => String(e.id) === String(activeCompanyId));
   const canGenerate = Boolean(activeEmployeeId && activeCompanyId);
@@ -79,7 +86,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
 
   const loadEmployeeDetails = async (id: string) => {
     try {
-      const emp = await employeeService.getEmployeeById(id);
+      const emp = await fetchWithConnectionRetry(() => employeeService.getEmployeeById(id), 2);
       if (!emp) return;
 
       setSelectedEmployeeData({
@@ -120,28 +127,6 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
     }
   }, [activeEmployeeId]);
 
-
-  // Carregar dados do backend (empresas)
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoadingData(true);
-    try {
-      const companiesData = await companyService.getAllCompanies();
-      setCompanies(companiesData);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar funcionários e empresas.',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoadingData(false);
-    }
-  };
 
   const tiposVale = [
     'Vale Transporte',
@@ -465,7 +450,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                       setSelectedEmployeeData(null);
                     }
                   }}
-                  initialDisplayName={funcionario?.name}
+                  initialDisplayName={funcionario?.name || employeeName}
                 />
               </div>
 
@@ -478,6 +463,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                   value={form.empresaId}
                   onChange={(id) => setForm(prev => ({ ...prev, empresaId: id }))}
                   companies={companies}
+                  disabled={loadingCompanies && companies.length === 0}
                 />
               </div>
             </div>

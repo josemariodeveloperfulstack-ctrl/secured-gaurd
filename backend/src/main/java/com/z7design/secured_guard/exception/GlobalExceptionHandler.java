@@ -25,6 +25,19 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(EmailAuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleEmailAuthentication(EmailAuthenticationException ex,
+            WebRequest request) {
+        log.warn("Falha de autenticação de e-mail: {}", ex.getMessage());
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now().toString());
+        body.put("status", HttpStatus.UNAUTHORIZED.value());
+        body.put("error", "EMAIL_AUTH_FAILED");
+        body.put("message", ex.getMessage());
+        body.put("path", request.getDescription(false).replace("uri=", ""));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException ex, WebRequest request) {
         log.warn("Recurso não encontrado: {}", ex.getMessage());
@@ -234,7 +247,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, WebRequest request) {
+    public ResponseEntity<?> handleGenericException(Exception ex, WebRequest request) {
         // Ignorar ClientAbortException no handler genérico (já tratado acima)
         if (ex instanceof ClientAbortException ||
                 (ex.getCause() != null && ex.getCause() instanceof ClientAbortException)) {
@@ -280,15 +293,26 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error("INTERNAL_SERVER_ERROR")
-                .message("Erro interno do servidor. Tente novamente mais tarde.")
-                .path(request.getDescription(false).replace("uri=", ""))
-                .build();
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        String path = request.getDescription(false).replace("uri=", "");
+        try {
+            ErrorResponse errorResponse = ErrorResponse.builder()
+                    .timestamp(LocalDateTime.now())
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                    .error("INTERNAL_SERVER_ERROR")
+                    .message("Erro interno do servidor. Tente novamente mais tarde.")
+                    .path(path)
+                    .build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        } catch (Throwable serializationFailure) {
+            log.error("Fallback de erro HTTP (classloader): {}", serializationFailure.getMessage());
+            Map<String, Object> body = new HashMap<>();
+            body.put("timestamp", LocalDateTime.now().toString());
+            body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+            body.put("error", "INTERNAL_SERVER_ERROR");
+            body.put("message", ex.getMessage() != null ? ex.getMessage() : "Erro interno do servidor");
+            body.put("path", path);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+        }
     }
 
     // Exceções específicas do módulo operacional

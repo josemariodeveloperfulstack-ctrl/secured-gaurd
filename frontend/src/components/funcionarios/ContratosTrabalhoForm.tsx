@@ -497,9 +497,22 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
       });
     } catch (err: any) {
       console.error('Erro ao gerar contrato:', err);
+      let description = 'Erro ao gerar contrato.';
+      const blob = err.response?.data;
+      if (blob instanceof Blob && err.response?.status >= 400) {
+        try {
+          const text = await blob.text();
+          const json = JSON.parse(text) as { message?: string; error?: string };
+          description = json.message || json.error || description;
+        } catch {
+          /* mantém mensagem padrão */
+        }
+      } else if (err.message) {
+        description = err.message;
+      }
       toast({
         title: 'Erro',
-        description: err.response?.data?.message || 'Erro ao gerar contrato.',
+        description,
         variant: 'destructive'
       });
     } finally {

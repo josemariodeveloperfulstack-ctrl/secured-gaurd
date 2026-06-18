@@ -561,21 +561,21 @@ public class UserGroupService {
                 "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "FINANCIAL_READ",
                 "FINANCIAL_WRITE", "REPORTS_READ", "CONTRACTS_READ", "EMPLOYEES_READ")));
 
-        // GRUPO_SUPRIMENTOS - Suprimentos: Sistema de Holerites completo + módulo financeiro exceto Contas a Receber e Medição
+        // GRUPO_SUPRIMENTOS - Suprimentos: holerites + financeiro parcial (Contas a Pagar, sem Fluxo de Caixa/Pagamentos)
         permissions.put(UserGroup.GRUPO_SUPRIMENTOS, new HashSet<>(Arrays.asList(
                 "PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "PAYSLIPS_PUBLISH", "PAYSLIPS_DOWNLOAD",
                 "PAYROLL_READ", "PAYROLL_MANAGE",
                 "PROFILE_WRITE", "STOCK_READ", "STOCK_WRITE", "REPORTS_READ", "DASHBOARD_READ",
-                "FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_PAYABLE_READ", "FINANCIAL_PAYABLE_WRITE",
-                "FINANCIAL_CASHFLOW_READ", "FINANCIAL_INVOICE_READ", "CONTRACTS_READ", "EMPLOYEES_READ")));
+                "FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_PAYABLE_READ",
+                "FINANCIAL_INVOICE_READ", "CONTRACTS_READ", "EMPLOYEES_READ")));
 
-        // GRUPO_ANALISTA_SUPRIMENTOS - Analista de Suprimentos: mesmo que Suprimentos (holerites completo + financeiro sem Contas a Receber/Medição)
+        // GRUPO_ANALISTA_SUPRIMENTOS - Analista de Suprimentos: mesmo escopo financeiro parcial
         permissions.put(UserGroup.GRUPO_ANALISTA_SUPRIMENTOS, new HashSet<>(Arrays.asList(
                 "PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "PAYSLIPS_PUBLISH", "PAYSLIPS_DOWNLOAD",
                 "PAYROLL_READ", "PAYROLL_MANAGE",
                 "PROFILE_WRITE", "STOCK_READ", "STOCK_WRITE", "REPORTS_READ", "DASHBOARD_READ",
-                "FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_PAYABLE_READ", "FINANCIAL_PAYABLE_WRITE",
-                "FINANCIAL_CASHFLOW_READ", "FINANCIAL_INVOICE_READ", "CONTRACTS_READ", "EMPLOYEES_READ")));
+                "FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_PAYABLE_READ",
+                "FINANCIAL_INVOICE_READ", "CONTRACTS_READ", "EMPLOYEES_READ")));
 
         // GRUPO_COMPRAS - Compras
         permissions.put(UserGroup.GRUPO_COMPRAS, new HashSet<>(Arrays.asList(

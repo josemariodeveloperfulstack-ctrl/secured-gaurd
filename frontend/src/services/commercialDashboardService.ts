@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import { withConnectionRetry } from '@/utils/requestRetry';
 
 export interface CommercialKpis {
   leadsRecebidos: number;
@@ -67,56 +68,67 @@ export interface DashboardFilters {
   endDate?: string;
 }
 
+function buildDateParams(filters: DashboardFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.startDate) params.append('startDate', filters.startDate);
+  if (filters.endDate) params.append('endDate', filters.endDate);
+  return params;
+}
+
 export const commercialDashboardService = {
   async getKpis(filters: DashboardFilters = {}): Promise<CommercialKpis> {
-    const params = new URLSearchParams();
-    if (filters.userId) params.append('userId', filters.userId);
-    if (filters.startDate) params.append('startDate', filters.startDate);
-    if (filters.endDate) params.append('endDate', filters.endDate);
-    const query = params.toString();
-    const url = query ? `/api/commercial-dashboard/kpis?${query}` : '/api/commercial-dashboard/kpis';
-    const { data } = await api.get(url);
-    return data;
+    return withConnectionRetry(async () => {
+      const params = buildDateParams(filters);
+      if (filters.userId) params.append('userId', filters.userId);
+      const query = params.toString();
+      const url = query ? `/commercial-dashboard/kpis?${query}` : '/commercial-dashboard/kpis';
+      const { data } = await api.get(url);
+      return data;
+    });
   },
 
   async getTeamKpis(filters: Omit<DashboardFilters, 'userId'> = {}): Promise<TeamKpis> {
-    const params = new URLSearchParams();
-    if (filters.startDate) params.append('startDate', filters.startDate);
-    if (filters.endDate) params.append('endDate', filters.endDate);
-    const query = params.toString();
-    const url = query ? `/api/commercial-dashboard/team-kpis?${query}` : '/api/commercial-dashboard/team-kpis';
-    const { data } = await api.get(url);
-    return data;
+    return withConnectionRetry(async () => {
+      const params = buildDateParams(filters);
+      const query = params.toString();
+      const url = query ? `/commercial-dashboard/team-kpis?${query}` : '/commercial-dashboard/team-kpis';
+      const { data } = await api.get(url);
+      return data;
+    });
   },
 
   async getRanking(filters: DashboardFilters & { orderBy?: string } = {}): Promise<VendedorRanking[]> {
-    const params = new URLSearchParams();
-    if (filters.startDate) params.append('startDate', filters.startDate);
-    if (filters.endDate) params.append('endDate', filters.endDate);
-    if (filters.orderBy) params.append('orderBy', filters.orderBy);
-    const query = params.toString();
-    const url = query ? `/api/commercial-dashboard/ranking?${query}` : '/api/commercial-dashboard/ranking';
-    const { data } = await api.get(url);
-    return data;
+    return withConnectionRetry(async () => {
+      const params = buildDateParams(filters);
+      if (filters.orderBy) params.append('orderBy', filters.orderBy);
+      const query = params.toString();
+      const url = query ? `/commercial-dashboard/ranking?${query}` : '/commercial-dashboard/ranking';
+      const { data } = await api.get(url);
+      return data;
+    });
   },
 
   async getPipeline(): Promise<Record<string, number>> {
-    const { data } = await api.get('/api/commercial-dashboard/pipeline');
-    return data;
+    return withConnectionRetry(async () => {
+      const { data } = await api.get('/commercial-dashboard/pipeline');
+      return data;
+    });
   },
 
   async getRevenueBySegment(filters: Omit<DashboardFilters, 'userId'> = {}): Promise<{ segmentos: Record<string, number>; total: number }> {
-    const params = new URLSearchParams();
-    if (filters.startDate) params.append('startDate', filters.startDate);
-    if (filters.endDate) params.append('endDate', filters.endDate);
-    const query = params.toString();
-    const url = query ? `/api/commercial-dashboard/revenue-by-segment?${query}` : '/api/commercial-dashboard/revenue-by-segment';
-    const { data } = await api.get(url);
-    return data;
+    return withConnectionRetry(async () => {
+      const params = buildDateParams(filters);
+      const query = params.toString();
+      const url = query ? `/commercial-dashboard/revenue-by-segment?${query}` : '/commercial-dashboard/revenue-by-segment';
+      const { data } = await api.get(url);
+      return data;
+    });
   },
 
   async getExpiringContracts(days: number = 30): Promise<ExpiringContract[]> {
-    const { data } = await api.get(`/api/commercial-dashboard/expiring-contracts?days=${days}`);
-    return data;
+    return withConnectionRetry(async () => {
+      const { data } = await api.get(`/commercial-dashboard/expiring-contracts?days=${days}`);
+      return data;
+    });
   },
 };

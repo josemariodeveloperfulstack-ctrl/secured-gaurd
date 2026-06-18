@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { contractService, ContractDocument, ContractDocumentTypeType } from '@/services/contractService';
+import { isUuid } from '@/utils/uuid';
 import { Loader2, Plus, Trash2, FileText, Upload, Download } from 'lucide-react';
 import api from '@/lib/axios';
 import { getApiUrl } from '@/config/environment';
@@ -40,6 +41,7 @@ export const ContractDocumentsTab: React.FC<ContractDocumentsTabProps> = ({ cont
   });
 
   const loadDocuments = async () => {
+    if (!isUuid(contractId)) return;
     setLoading(true);
     try {
       const data = await contractService.getDocuments(contractId);

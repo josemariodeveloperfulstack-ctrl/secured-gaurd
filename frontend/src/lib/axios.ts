@@ -91,20 +91,46 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
+    const silent = (error.config as { silent?: boolean } | undefined)?.silent;
+
     // Tratamento especial para erros de conexão (backend não disponível)
     if (!error.response && isConnectionError(error)) {
-      const apiUrl = error.config?.baseURL || getApiUrl();
-      if (error?.code === 'ERR_TOO_MANY_REDIRECTS' || error?.message?.includes('too many redirects')) {
-        console.warn('⚠️ Loop de redirecionamento na API (proxy/nginx ou URL base incorreta):', apiUrl);
-        console.warn('⚠️ URL da requisição:', error.config?.url);
-        console.warn('⚠️ Método:', error.config?.method);
-        console.warn('⚠️ Em CI use getApiUrl() = /api (mesmo host). Verifique nginx: proxy_redirect off; e X-Forwarded-*');
-      } else {
-        const requestUrl = error.config?.url ? `${apiUrl}${error.config.url}` : apiUrl;
-        console.warn('⚠️ Falha de rede na requisição (sem resposta HTTP):', requestUrl);
-        console.warn('⚠️ Código:', error?.code || 'desconhecido', '— pode ser timeout, CORS ou endpoint indisponível');
+      const originalRequest = error.config as typeof error.config & {
+        silent?: boolean;
+        __connectionRetryCount?: number;
+      };
+
+      if (originalRequest) {
+        const retryCount = originalRequest.__connectionRetryCount ?? 0;
+        const maxRetries = originalRequest.silent ? 3 : 2;
+        if (retryCount < maxRetries) {
+          originalRequest.__connectionRetryCount = retryCount + 1;
+          const delay = 350 * (retryCount + 1);
+          if (isDebugMode() && !originalRequest.silent) {
+            console.warn(
+              `⚠️ Conexão instável (${error?.code || 'rede'}), nova tentativa ${retryCount + 1}/${maxRetries} em ${delay}ms:`,
+              originalRequest.url,
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return api(originalRequest);
+        }
       }
-      return Promise.reject(createConnectionError(apiUrl));
+
+      if (!silent) {
+        const apiUrl = error.config?.baseURL || getApiUrl();
+        if (error?.code === 'ERR_TOO_MANY_REDIRECTS' || error?.message?.includes('too many redirects')) {
+          console.warn('⚠️ Loop de redirecionamento na API (proxy/nginx ou URL base incorreta):', apiUrl);
+          console.warn('⚠️ URL da requisição:', error.config?.url);
+          console.warn('⚠️ Método:', error.config?.method);
+          console.warn('⚠️ Em CI use getApiUrl() = /api (mesmo host). Verifique nginx: proxy_redirect off; e X-Forwarded-*');
+        } else {
+          const requestUrl = error.config?.url ? `${apiUrl}${error.config.url}` : apiUrl;
+          console.warn('⚠️ Falha de rede na requisição (sem resposta HTTP):', requestUrl);
+          console.warn('⚠️ Código:', error?.code || 'desconhecido', '— pode ser timeout, CORS ou endpoint indisponível');
+        }
+      }
+      return Promise.reject(createConnectionError(error.config?.baseURL || getApiUrl()));
     }
     
     // Tratamento específico para erro 522 (Cloudflare timeout) com retry automático
@@ -140,21 +166,30 @@ api.interceptors.response.use(
     
     const status = error.response?.status;
     const errorData = error.response?.data;
-    if (isDebugMode()) {
-      console.error('❌ Axios Response Error:', status, error.config?.url);
-      console.error('❌ Error details:', errorData);
-    } else if (status && status >= 400 && status < 500 && errorData && typeof errorData === 'object') {
-      const msg =
-        (errorData as { message?: string }).message ||
-        (errorData as { error?: string }).error;
-      if (msg) {
-        console.warn(`⚠️ API ${status} ${error.config?.url}:`, msg);
+    if (!silent) {
+      if (isDebugMode()) {
+        console.error('❌ Axios Response Error:', status, error.config?.url);
+        console.error('❌ Error details:', errorData);
+      } else if (status && status >= 400 && status < 500 && errorData && typeof errorData === 'object') {
+        const msg =
+          (errorData as { message?: string }).message ||
+          (errorData as { error?: string }).error;
+        if (msg) {
+          console.warn(`⚠️ API ${status} ${error.config?.url}:`, msg);
+        }
       }
     }
     const originalRequest = error.config;
 
+    const isPublicAuthRequest = (url?: string) =>
+      !!url && /\/auth\/(login|register|refresh-token)(\/|$|\?)/.test(url);
+
     // Se o erro for 401 (não autorizado - token inválido/expirado)
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Login/registro: repassar 401 ao caller (credenciais inválidas), sem refresh/logout
+      if (isPublicAuthRequest(originalRequest.url)) {
+        return Promise.reject(error);
+      }
       const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'token';
       const refreshTokenKey = import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken';
       const userKey = import.meta.env.VITE_USER_KEY || 'user';

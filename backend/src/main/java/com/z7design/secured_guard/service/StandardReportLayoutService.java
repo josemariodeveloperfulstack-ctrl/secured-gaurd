@@ -10,6 +10,7 @@ import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.geom.Rectangle;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfPage;
+import com.itextpdf.kernel.pdf.PdfReader;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
 import com.itextpdf.layout.Canvas;
@@ -33,6 +34,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
@@ -213,6 +216,16 @@ public class StandardReportLayoutService {
         public ReportLayoutConfig getConfig() {
             return config;
         }
+
+        /**
+         * Fecha o documento e aplica numeração "Página X de Y" em passo posterior,
+         * quando o PDF já está materializado no {@code outputStream}.
+         */
+        public byte[] closeAndGetPdfBytes(ByteArrayOutputStream outputStream,
+                StandardReportLayoutService layoutService) {
+            document.close();
+            return layoutService.finalizePdfBytes(outputStream, config);
+        }
     }
 
     /**
@@ -229,7 +242,63 @@ public class StandardReportLayoutService {
      */
     @Deprecated
     public void finalizeDocumentLayout(DocumentWithPdf docWithPdf) throws IOException {
-        log.debug("Layout automático habilitado via IEventHandler. finalizeDocumentLayout() não é mais necessário.");
+        // Numeração agora é feita via finalizePdfBytes após o documento ser fechado.
+    }
+
+    /**
+     * Aplica numeração "Página X de Y" após o PDF estar completamente gerado.
+     */
+    public byte[] finalizePdfBytes(ByteArrayOutputStream outputStream, ReportLayoutConfig config) {
+        byte[] pdfBytes = outputStream.toByteArray();
+        if (config == null || !config.isShowPageNumbers() || pdfBytes.length == 0) {
+            return pdfBytes;
+        }
+        return stampPageNumbersOnPdf(pdfBytes, config);
+    }
+
+    byte[] stampPageNumbersOnPdf(byte[] pdfBytes, ReportLayoutConfig config) {
+        if (pdfBytes == null || pdfBytes.length == 0 || config == null || !config.isShowPageNumbers()) {
+            return pdfBytes;
+        }
+        try (ByteArrayOutputStream stampedOut = new ByteArrayOutputStream();
+                PdfReader reader = new PdfReader(new ByteArrayInputStream(pdfBytes));
+                PdfWriter writer = new PdfWriter(stampedOut);
+                PdfDocument pdfDoc = new PdfDocument(reader, writer)) {
+
+            int totalPages = pdfDoc.getNumberOfPages();
+            if (totalPages <= 0) {
+                return pdfBytes;
+            }
+
+            DeviceRgb pageNumColor = new DeviceRgb(45, 45, 45);
+
+            for (int pageNum = 1; pageNum <= totalPages; pageNum++) {
+                PdfPage page = pdfDoc.getPage(pageNum);
+                Rectangle pageSizeRect = page.getPageSize();
+                float pageWidth = pageSizeRect.getWidth();
+                float rightFooterWidth = 240f;
+                float rightFooterX = pageWidth - rightFooterWidth - 12f;
+
+                PdfCanvas pdfCanvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdfDoc);
+                Canvas canvas = new Canvas(pdfCanvas, pageSizeRect);
+                addPageNumberFooter(canvas, pageSizeRect, config, pageNum, totalPages);
+                canvas.close();
+                pdfCanvas.release();
+            }
+
+            pdfDoc.close();
+            log.debug("Numeração aplicada em {} página(s) do PDF", totalPages);
+            return stampedOut.toByteArray();
+        } catch (Exception e) {
+            log.warn("Falha ao carregar numeração no PDF: {}", e.getMessage(), e);
+            return pdfBytes;
+        }
+    }
+
+    /** @deprecated Usar {@link #finalizePdfBytes(ByteArrayOutputStream, ReportLayoutConfig)}. */
+    @Deprecated
+    void applyPageNumbers(PdfDocument pdfDoc, ReportLayoutConfig config) {
+        // Mantido apenas para compatibilidade; numeração em documento aberto falha no iText 7.2.5.
     }
 
     /**
@@ -280,9 +349,7 @@ public class StandardReportLayoutService {
                 Canvas canvasLayout = new Canvas(headerFooterCanvas, pageSize);
 
                 service.addHeader(canvasLayout, pageSize, company, config, pdfDoc);
-                int pageNum = pdfDoc.getPageNumber(page);
-                int totalPages = pdfDoc.getNumberOfPages();
-                service.addFooter(canvasLayout, pageSize, company, config, pageNum, totalPages, pdfDoc);
+                service.addFooter(canvasLayout, pageSize, company, config, pdfDoc);
 
                 canvasLayout.close();
                 headerFooterCanvas.release();
@@ -366,12 +433,6 @@ public class StandardReportLayoutService {
         }
     }
 
-    /**
-     * Adiciona rodapé ao documento
-     * Nota: O fundo já foi desenhado no método addHeaderFooterToAllPages
-     * @param pageNum número da página atual (1-based)
-     * @param totalPages total de páginas (pode ser aproximado durante a geração)
-     */
     private PdfFont loadCalibriLightFont(PdfDocument pdfDoc) {
         try {
             // Tenta caminhos comuns de Calibri Light (.ttf)
@@ -397,8 +458,9 @@ public class StandardReportLayoutService {
         }
     }
 
+    /** Rodapé com dados da empresa (sem numeração — aplicada em {@link #applyPageNumbers}). */
     private void addFooter(Canvas canvas, Rectangle pageSize, Company company, ReportLayoutConfig config,
-            int pageNum, int totalPages, PdfDocument pdfDoc) {
+            PdfDocument pdfDoc) {
         float pageWidth = pageSize.getWidth();
         float yPosition = 0;
 
@@ -497,19 +559,23 @@ public class StandardReportLayoutService {
                     .setMarginBottom(0f);
             canvas.add(dateFooter.setFixedPosition(rightFooterX, yPosition + 28f, rightFooterWidth));
         }
+    }
 
-        // Numeração de páginas (canto inferior direito) — abaixo de usuário/data
-        if (config.isShowPageNumbers()) {
-            String pageText = totalPages > 1 ? "Página " + pageNum + " de " + totalPages : "Página " + pageNum;
-            DeviceRgb pageNumColor = new DeviceRgb(45, 45, 45); // cinza escuro para boa leitura
-            Paragraph pageNumFooter = new Paragraph(pageText)
-                    .setFontSize(10)
-                    .setBold()
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setFontColor(pageNumColor)
-                    .setMarginBottom(0f);
-            canvas.add(pageNumFooter.setFixedPosition(rightFooterX, yPosition + 10f, rightFooterWidth));
-        }
+    private void addPageNumberFooter(Canvas canvas, Rectangle pageSize, ReportLayoutConfig config,
+            int pageNum, int totalPages) {
+        float pageWidth = pageSize.getWidth();
+        float yPosition = 0;
+        float rightFooterWidth = 240f;
+        float rightFooterX = pageWidth - rightFooterWidth - 12f;
+        DeviceRgb pageNumColor = new DeviceRgb(45, 45, 45);
+        String pageText = "Página " + pageNum + " de " + totalPages;
+        Paragraph pageNumFooter = new Paragraph(pageText)
+                .setFontSize(10)
+                .setBold()
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setFontColor(pageNumColor)
+                .setMarginBottom(0f);
+        canvas.add(pageNumFooter.setFixedPosition(rightFooterX, yPosition + 10f, rightFooterWidth));
     }
 
     /**

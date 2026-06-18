@@ -1,7 +1,9 @@
 package com.z7design.secured_guard.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.z7design.secured_guard.dto.PurchaseRequestDTO;
-import com.z7design.secured_guard.dto.PurchaseRequestItemDTO;
+import com.z7design.secured_guard.dto.PurchaseRequestSizeEntryDTO;
 import com.z7design.secured_guard.model.PurchaseRequest;
 import com.z7design.secured_guard.model.PurchaseRequestItem;
 import com.z7design.secured_guard.model.User;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +34,7 @@ public class PurchaseRequestService {
     private final PurchaseQuotationRepository purchaseQuotationRepository;
     private final UserRepository userRepository;
     private final UnitRepository unitRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     
     @Transactional(readOnly = true)
     public List<PurchaseRequestDTO> getAllPurchaseRequests() {
@@ -251,6 +255,11 @@ public class PurchaseRequestService {
                 .approverName(request.getApprover() != null ? request.getApprover().getName() : null)
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
+                .category(request.getCategory())
+                .unitOfMeasure(request.getUnitOfMeasure())
+                .itemNumber(request.getItemNumber())
+                .quantity(request.getQuantity())
+                .sizeBreakdown(parseSizeBreakdown(request.getSizeBreakdown()))
                 .build();
         
         // Campos calculados
@@ -295,6 +304,11 @@ public class PurchaseRequestService {
                 .contactPhone(dto.getContactPhone())
                 .contactEmail(dto.getContactEmail())
                 .notes(dto.getNotes())
+                .category(dto.getCategory())
+                .unitOfMeasure(dto.getUnitOfMeasure())
+                .itemNumber(dto.getItemNumber())
+                .quantity(dto.getQuantity())
+                .sizeBreakdown(serializeSizeBreakdown(dto.getSizeBreakdown()))
                 .build();
         
         if (dto.getUnitId() != null) {
@@ -336,6 +350,12 @@ public class PurchaseRequestService {
         request.setContactPhone(dto.getContactPhone());
         request.setContactEmail(dto.getContactEmail());
         request.setNotes(dto.getNotes());
+        request.setInstallments(dto.getInstallments());
+        request.setCategory(dto.getCategory());
+        request.setUnitOfMeasure(dto.getUnitOfMeasure());
+        request.setItemNumber(dto.getItemNumber());
+        request.setQuantity(dto.getQuantity());
+        request.setSizeBreakdown(serializeSizeBreakdown(dto.getSizeBreakdown()));
         
         if (dto.getUnitId() != null) {
             Optional<Unit> unit = unitRepository.findById(dto.getUnitId());
@@ -350,6 +370,30 @@ public class PurchaseRequestService {
         if (dto.getApproverId() != null) {
             Optional<User> approver = userRepository.findById(dto.getApproverId());
             approver.ifPresent(request::setApprover);
+        }
+    }
+
+    private List<PurchaseRequestSizeEntryDTO> parseSizeBreakdown(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<PurchaseRequestSizeEntryDTO>>() {});
+        } catch (Exception e) {
+            log.warn("Erro ao parsear sizeBreakdown: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private String serializeSizeBreakdown(List<PurchaseRequestSizeEntryDTO> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(entries);
+        } catch (Exception e) {
+            log.warn("Erro ao serializar sizeBreakdown: {}", e.getMessage());
+            return null;
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.UserListResponseDTO;
+import com.z7design.secured_guard.dto.UserSelectDTO;
 import com.z7design.secured_guard.dto.UserPageResponse;
 import org.springframework.data.domain.Page;
 import com.z7design.secured_guard.dto.UserGroupDTO;
@@ -59,8 +60,13 @@ public class UserController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Listar usuários", description = "Retorna uma lista de todos os usuários. Permite acesso para usuários autenticados (necessário para chat)")
-    public ResponseEntity<List<UserListResponseDTO>> getAllUsers() {
+    @Operation(summary = "Listar usuários", description = "Retorna uma lista de todos os usuários. Use selectOnly=true para dropdowns (id/nome apenas).")
+    public ResponseEntity<?> getAllUsers(
+            @RequestParam(required = false, defaultValue = "false") boolean selectOnly) {
+        if (selectOnly) {
+            return ResponseEntity.ok(userService.findAllActiveForSelect());
+        }
+
         List<User> users = userService.findAll();
 
         // Log de debug: verificar quantos usuários online existem no serviço
@@ -81,6 +87,13 @@ public class UserController {
                 onlineInResponse);
 
         return ResponseEntity.ok(dtos);
+    }
+
+    @GetMapping("/select")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar usuários (select)", description = "Retorna id e nome para dropdowns, sem roles/permissões")
+    public ResponseEntity<List<UserSelectDTO>> getUsersForSelect() {
+        return ResponseEntity.ok(userService.findAllActiveForSelect());
     }
 
     @GetMapping("/paged")

@@ -48,16 +48,18 @@ public class ProposalService {
         return proposalRepository.count();
     }
 
+    @Transactional(readOnly = true)
     public List<ProposalDTO> findAll() {
-        List<Proposal> proposals = proposalRepository.findAllActive();
+        List<Proposal> proposals = proposalRepository.findAllActiveWithRelationships();
         return proposals.stream()
-                .map(this::mapToDTO)
+                .map(this::mapToSummaryDTO)
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public Page<ProposalDTO> findAll(Pageable pageable) {
         Page<Proposal> proposals = proposalRepository.findAllActive(pageable);
-        return proposals.map(this::mapToDTO);
+        return proposals.map(this::mapToSummaryDTO);
     }
 
     public ProposalDTO mapToDTO(Proposal proposal) {
@@ -126,6 +128,66 @@ public class ProposalService {
                         return itemDto;
                     })
                     .toList());
+        }
+
+        dto.setCreatedAt(proposal.getCreatedAt());
+        dto.setUpdatedAt(proposal.getUpdatedAt());
+
+        return dto;
+    }
+
+    /** DTO resumido para listagens — não carrega itens (evita N+1 e payload grande). */
+    public ProposalDTO mapToSummaryDTO(Proposal proposal) {
+        if (proposal == null) {
+            return null;
+        }
+
+        ProposalDTO dto = new ProposalDTO();
+        dto.setId(proposal.getId());
+        dto.setTitle(proposal.getTitle());
+        dto.setProposalNumber(proposal.getProposalNumber());
+
+        if (proposal.getClient() != null) {
+            try {
+                dto.setClientId(proposal.getClient().getId());
+                dto.setClientName(proposal.getClient().getName());
+            } catch (Exception e) {
+                // Client deletado ou erro de proxy
+            }
+        }
+
+        if (proposal.getLead() != null) {
+            try {
+                dto.setLeadId(proposal.getLead().getId());
+                dto.setLeadName(proposal.getLead().getName());
+            } catch (Exception e) {
+                // Lead deletado ou erro de proxy
+            }
+        }
+
+        dto.setStatus(proposal.getStatus());
+        dto.setTotalValue(proposal.getTotalValue());
+        dto.setValidUntil(proposal.getValidUntil());
+        dto.setDescription(proposal.getDescription());
+        dto.setTermsConditions(proposal.getTermsConditions());
+        dto.setNotes(proposal.getNotes());
+
+        if (proposal.getCreatedBy() != null) {
+            try {
+                dto.setCreatedById(proposal.getCreatedBy().getId());
+                dto.setCreatedByName(proposal.getCreatedBy().getName());
+            } catch (Exception e) {
+                // User deletado ou erro de proxy
+            }
+        }
+
+        if (proposal.getAssignedTo() != null) {
+            try {
+                dto.setAssignedToId(proposal.getAssignedTo().getId());
+                dto.setAssignedToName(proposal.getAssignedTo().getName());
+            } catch (Exception e) {
+                // User deletado ou erro de proxy
+            }
         }
 
         dto.setCreatedAt(proposal.getCreatedAt());

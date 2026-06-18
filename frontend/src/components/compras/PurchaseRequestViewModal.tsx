@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PurchaseRequest } from '@/services/purchaseRequestService';
+import { PurchaseRequest, purchaseRequestService } from '@/services/purchaseRequestService';
 import { FileText, User, Building2, Calendar, DollarSign, CheckCircle, X, Download, Printer, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -101,205 +101,17 @@ export function PurchaseRequestViewModal({
   const handleGeneratePDF = async () => {
     setIsGeneratingPDF(true);
     try {
-      const jsPDF = (await import('jspdf')).default;
-      const autoTable = await import('jspdf-autotable');
-      
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 20;
-      let yPos = 20;
-
-      // Cabeçalho
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Solicitação de Compra', margin, yPos);
-      
-      yPos += 10;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Número: ${request.requestNumber}`, margin, yPos);
-      
-      yPos += 8;
-      doc.setFontSize(9);
-      doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, pageWidth - margin - 60, 20);
-
-      // Informações Básicas
-      yPos += 10;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Informações Básicas', margin, yPos);
-      
-      yPos += 8;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      
-      const basicInfo = [
-        ['Título:', request.title || '-'],
-        ['Status:', getStatusLabel(request.status)],
-        ['Prioridade:', getPriorityLabel(request.priority)],
-        ['Urgência:', getUrgencyLabel(request.urgency)],
-        ['Data da Solicitação:', formatDate(request.requestDate)],
-        ['Data Necessária:', formatDate(request.requiredDate)],
-        ['Valor Estimado:', formatCurrency(request.totalValue || request.estimatedTotal || 0)],
-      ];
-
-      basicInfo.forEach(([label, value]) => {
-        doc.setFont('helvetica', 'bold');
-        doc.text(label, margin, yPos);
-        doc.setFont('helvetica', 'normal');
-        const textWidth = doc.getTextWidth(value);
-        doc.text(value, margin + 50, yPos);
-        yPos += 6;
-      });
-
-      if (request.description) {
-        yPos += 3;
-        doc.setFont('helvetica', 'bold');
-        doc.text('Descrição:', margin, yPos);
-        yPos += 6;
-        doc.setFont('helvetica', 'normal');
-        const descLines = doc.splitTextToSize(request.description, pageWidth - 2 * margin);
-        descLines.forEach((line: string) => {
-          doc.text(line, margin, yPos);
-          yPos += 5;
-        });
-      }
-
-      if (request.justification) {
-        yPos += 3;
-        doc.setFont('helvetica', 'bold');
-        doc.text('Justificativa:', margin, yPos);
-        yPos += 6;
-        doc.setFont('helvetica', 'normal');
-        const justLines = doc.splitTextToSize(request.justification, pageWidth - 2 * margin);
-        justLines.forEach((line: string) => {
-          doc.text(line, margin, yPos);
-          yPos += 5;
-        });
-      }
-
-      // Solicitante e Departamento
-      yPos += 10;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Solicitante e Departamento', margin, yPos);
-      
-      yPos += 8;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      
-      const requesterInfo = [
-        ['Solicitante:', request.requesterName || '-'],
-        ['Departamento:', request.department || '-'],
-        ['Unidade Organizacional:', request.unitName || '-'],
-      ];
-
-      requesterInfo.forEach(([label, value]) => {
-        doc.setFont('helvetica', 'bold');
-        doc.text(label, margin, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.text(value, margin + 50, yPos);
-        yPos += 6;
-      });
-
-      // Informações de Aprovação
-      if (request.status === 'APPROVED' || request.approverName || request.approvedBy) {
-        yPos += 10;
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Informações de Aprovação', margin, yPos);
-        
-        yPos += 8;
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        
-        const approvalInfo = [
-          ['Aprovador por:', request.approverName || request.approvedBy || '-'],
-          ['Data de Aprovação:', formatDate(request.approvalDate)],
-        ];
-
-        approvalInfo.forEach(([label, value]) => {
-          doc.setFont('helvetica', 'bold');
-          doc.text(label, margin, yPos);
-          doc.setFont('helvetica', 'normal');
-          doc.text(value, margin + 50, yPos);
-          yPos += 6;
-        });
-
-        if (request.approvalNotes) {
-          yPos += 3;
-          doc.setFont('helvetica', 'bold');
-          doc.text('Observações da Aprovação:', margin, yPos);
-          yPos += 6;
-          doc.setFont('helvetica', 'normal');
-          const notesLines = doc.splitTextToSize(request.approvalNotes, pageWidth - 2 * margin);
-          notesLines.forEach((line: string) => {
-            doc.text(line, margin, yPos);
-            yPos += 5;
-          });
-        }
-      }
-
-      // Informações de Fornecedor
-      if (request.supplier) {
-        yPos += 10;
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Informações de Fornecedor', margin, yPos);
-        
-        yPos += 8;
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        
-        const supplierInfo = [
-          ['Fornecedor:', request.supplier],
-          ['Método de Pagamento:', request.paymentMethod || '-'],
-          ['Método de Entrega:', request.deliveryMethod || '-'],
-        ];
-
-        supplierInfo.forEach(([label, value]) => {
-          doc.setFont('helvetica', 'bold');
-          doc.text(label, margin, yPos);
-          doc.setFont('helvetica', 'normal');
-          doc.text(value, margin + 50, yPos);
-          yPos += 6;
-        });
-
-        if (request.deliveryAddress) {
-          yPos += 3;
-          doc.setFont('helvetica', 'bold');
-          doc.text('Endereço de Entrega:', margin, yPos);
-          yPos += 6;
-          doc.setFont('helvetica', 'normal');
-          const addressLines = doc.splitTextToSize(request.deliveryAddress, pageWidth - 2 * margin);
-          addressLines.forEach((line: string) => {
-            doc.text(line, margin, yPos);
-            yPos += 5;
-          });
-        }
-      }
-
-      // Observações
-      if (request.notes) {
-        yPos += 10;
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Observações Adicionais', margin, yPos);
-        
-        yPos += 8;
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        const notesLines = doc.splitTextToSize(request.notes, pageWidth - 2 * margin);
-        notesLines.forEach((line: string) => {
-          doc.text(line, margin, yPos);
-          yPos += 5;
-        });
-      }
-
-      // Salvar PDF
+      const blob = await purchaseRequestService.generateSingleRequestPDF(request.id);
       const fileName = `solicitacao-compra-${request.requestNumber}-${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(fileName);
-      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
       toast({
         title: "Sucesso",
         description: "PDF gerado com sucesso!",
@@ -397,7 +209,43 @@ export function PurchaseRequestViewModal({
                   <label className="text-sm text-gray-400">Data da Solicitação</label>
                   <p className="text-seguranca-lightgray">{formatDate(request.requestDate)}</p>
                 </div>
+                {request.category && (
+                  <div>
+                    <label className="text-sm text-gray-400">Categoria</label>
+                    <p className="text-seguranca-lightgray">{request.category}</p>
+                  </div>
+                )}
+                {request.quantity != null && (
+                  <div>
+                    <label className="text-sm text-gray-400">Quantidade</label>
+                    <p className="text-seguranca-lightgray">{request.quantity}</p>
+                  </div>
+                )}
+                {request.unitOfMeasure && (
+                  <div>
+                    <label className="text-sm text-gray-400">Unidade de Medida</label>
+                    <p className="text-seguranca-lightgray">{request.unitOfMeasure}</p>
+                  </div>
+                )}
+                {request.itemNumber && (
+                  <div>
+                    <label className="text-sm text-gray-400">Número / Código</label>
+                    <p className="text-seguranca-lightgray">{request.itemNumber}</p>
+                  </div>
+                )}
               </div>
+              {request.sizeBreakdown && request.sizeBreakdown.length > 0 && (
+                <div>
+                  <label className="text-sm text-gray-400">Tamanhos</label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {request.sizeBreakdown.map((entry, index) => (
+                      <Badge key={`${entry.size}-${index}`} className="bg-seguranca-black text-seguranca-lightgray border border-gray-600">
+                        {entry.size}: {entry.quantity}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
               {request.description && (
                 <div>
                   <label className="text-sm text-gray-400">Descrição</label>

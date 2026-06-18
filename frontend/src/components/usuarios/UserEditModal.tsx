@@ -38,6 +38,26 @@ import { PermissionDTO } from '@/types/user';
 import { useAuth } from '@/contexts/AuthContext';
 import { groupService } from '@/services/groupService';
 
+const normalizeRoleName = (role: string) => role.replace(/^ROLE_/, '').trim();
+
+const digitsOnly = (value: string) => value.replace(/\D/g, '');
+
+const extractApiErrorMessage = (error: unknown, fallback: string): string => {
+  const data = (error as { response?: { data?: Record<string, unknown> } })?.response?.data;
+  if (!data) return fallback;
+
+  const fieldErrors = data.fieldErrors as Record<string, string> | undefined;
+  if (fieldErrors && typeof fieldErrors === 'object') {
+    const details = Object.entries(fieldErrors)
+      .map(([field, msg]) => `${field}: ${msg}`)
+      .join(' · ');
+    if (details) return details;
+  }
+
+  const message = data.message ?? data.error;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+};
+
 interface UserEditModalProps {
   user: UserType | null;
   isOpen: boolean;
@@ -81,7 +101,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     if (user) {
       // Extrair todas as roles do usuário
       const userRoles = user.roles && user.roles.length > 0
-        ? user.roles.map(role => typeof role === 'string' ? role : (role as { name: string }).name)
+        ? user.roles.map(role => normalizeRoleName(typeof role === 'string' ? role : (role as { name: string }).name))
         : [];
 
       setFormData({
@@ -90,10 +110,10 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
         username: user.username || '',
         roles: userRoles,
         active: user.active !== false,
-        whatsapp: user.whatsapp || '',
+        whatsapp: digitsOnly(user.whatsapp || ''),
         password: '',
         confirmPassword: '',
-        phone: user.phone || '',
+        phone: digitsOnly(user.phone || ''),
         address: user.address || '',
         department: user.department || '',
         position: user.position || '',
@@ -226,7 +246,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
         username: string;
         roles: string[];
         active: boolean;
-        whatsapp: string;
+        whatsapp?: string;
         password?: string;
         avatar?: string;
         department?: string;
@@ -235,19 +255,24 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
         phone?: string;
         address?: string;
       } = {
-        name: formData.name,
+        name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         username: formData.username.trim(),
-        roles: formData.roles,
+        roles: formData.roles.map(normalizeRoleName),
         active: formData.active,
-        whatsapp: formData.whatsapp,
-        avatar: formData.avatar || '',
-        department: formData.department || '',
-        position: formData.position || '',
-        employeeCode: formData.employeeCode || '',
-        phone: formData.phone || '',
-        address: formData.address || '',
       };
+
+      const whatsappDigits = digitsOnly(formData.whatsapp);
+      if (whatsappDigits) updateData.whatsapp = whatsappDigits;
+
+      const phoneDigits = digitsOnly(formData.phone);
+      if (phoneDigits) updateData.phone = phoneDigits;
+
+      if (formData.avatar?.trim()) updateData.avatar = formData.avatar.trim();
+      if (formData.department?.trim()) updateData.department = formData.department.trim();
+      if (formData.position?.trim()) updateData.position = formData.position.trim();
+      if (formData.employeeCode?.trim()) updateData.employeeCode = formData.employeeCode.trim();
+      if (formData.address?.trim()) updateData.address = formData.address.trim();
 
       // Apenas SUPER_ADMIN pode alterar senha via UI de edição
       if (isSuperAdmin && formData.password) {
@@ -261,10 +286,10 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
       });
       onSave();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro!',
-        description: error.response?.data?.message || 'Erro ao atualizar usuário.',
+        description: extractApiErrorMessage(error, 'Erro ao atualizar usuário.'),
         variant: 'destructive',
       });
     } finally {
@@ -597,9 +622,13 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                   <Input
                     id="phone"
                     value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    onChange={(e) => {
+                      const value = digitsOnly(e.target.value);
+                      setFormData((prev) => ({ ...prev, phone: value }));
+                    }}
                     className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                     placeholder="Somente números (ex: 11999999999)"
+                    maxLength={20}
                   />
                 </div>
 

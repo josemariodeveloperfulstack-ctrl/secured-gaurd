@@ -77,6 +77,11 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public List<com.z7design.secured_guard.dto.UserSelectDTO> findAllActiveForSelect() {
+        return userRepository.findAllActiveForSelect();
+    }
+
+    @Transactional(readOnly = true)
     public Page<User> findAllPaged(int page, int size, String search, String role, boolean onlineOnly) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
@@ -344,12 +349,13 @@ public class UserService {
 
         // Atualizar WhatsApp se fornecido (aceita vazio ou null)
         if (request.getWhatsapp() != null) {
-            existingUser.setWhatsapp(request.getWhatsapp().trim().isEmpty() ? null : request.getWhatsapp());
+            existingUser.setWhatsapp(normalizePhoneDigits(request.getWhatsapp()));
         }
 
         // Atualizar senha somente se fornecida
         if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
-            existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
+            validatePasswordStrength(request.getPassword().trim());
+            existingUser.setPassword(passwordEncoder.encode(request.getPassword().trim()));
         }
 
         // Atualizar status se fornecido
@@ -402,7 +408,7 @@ public class UserService {
         }
 
         if (request.getPhone() != null) {
-            existingUser.setPhone(request.getPhone().trim().isEmpty() ? null : request.getPhone());
+            existingUser.setPhone(normalizePhoneDigits(request.getPhone()));
         }
 
         if (request.getAddress() != null) {
@@ -441,13 +447,42 @@ public class UserService {
         }
         List<String> resolved = new ArrayList<>();
         for (String name : roleNames) {
-            if ("ADMINISTRADOR".equals(name) && roleRepository.findByName("ADMINISTRADOR").isEmpty()) {
+            if (name == null || name.trim().isEmpty()) {
+                continue;
+            }
+            String normalized = name.trim().replaceFirst("^ROLE_", "");
+            if ("ADMINISTRADOR".equals(normalized) && roleRepository.findByName("ADMINISTRADOR").isEmpty()) {
                 resolved.add("ADMIN");
+            } else if ("ADMIN".equals(normalized)
+                    && roleRepository.findByName("ADMIN").isEmpty()
+                    && roleRepository.findByName("ADMINISTRADOR").isPresent()) {
+                resolved.add("ADMINISTRADOR");
             } else {
-                resolved.add(name);
+                resolved.add(normalized);
             }
         }
         return resolved.stream().distinct().collect(Collectors.toList());
+    }
+
+    private String normalizePhoneDigits(String value) {
+        if (value == null) {
+            return null;
+        }
+        String digits = value.replaceAll("\\D", "");
+        return digits.isEmpty() ? null : digits;
+    }
+
+    private void validatePasswordStrength(String password) {
+        if (password.length() < 6) {
+            throw new IllegalArgumentException("Senha deve ter no mínimo 6 caracteres");
+        }
+        if (password.matches("^\\d{11}@2025$")) {
+            return;
+        }
+        if (!password.matches("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*$")) {
+            throw new IllegalArgumentException(
+                    "Senha deve ser forte (maiúscula, minúscula, dígito, especial) ou no formato CPF@2025");
+        }
     }
 
     /**
