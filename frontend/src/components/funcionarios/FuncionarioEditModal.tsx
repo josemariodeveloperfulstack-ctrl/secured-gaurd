@@ -1178,6 +1178,53 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     }
   }, [form.enderecoRua, form.enderecoNumero, form.enderecoComplemento, form.enderecoBairro, form.enderecoCidade, form.enderecoEstado, form.enderecoCep]);
 
+  const normalizeWorkPostId = (id?: string | null) => {
+    const s = String(id || '').toLowerCase();
+    return s === 'none' ? '' : s;
+  };
+
+  const isWorkPostTransfer = (fromId: string, toId: string) => {
+    const from = normalizeWorkPostId(fromId);
+    const to = normalizeWorkPostId(toId);
+    return from !== '' && to !== '' && from !== to;
+  };
+
+  const syncInitialWorkPostRef = (workPostId?: string | null) => {
+    initialWorkPostIdRef.current = normalizeWorkPostId(workPostId);
+  };
+
+  const handleWorkPostChange = (value: string) => {
+    if (!workPostSelectReadyRef.current) {
+      return;
+    }
+
+    const newValue = value === 'none' ? '' : value;
+    const normalizedNew = normalizeWorkPostId(newValue);
+    const currentWorkPostId = normalizeWorkPostId((form as any).workPostId);
+
+    if (normalizedNew === currentWorkPostId) {
+      return;
+    }
+
+    const baseline = initialWorkPostIdRef.current;
+    if (isWorkPostTransfer(baseline, normalizedNew)) {
+      setPendingWorkPostId(normalizedNew);
+      const hoje = new Date().toISOString().split('T')[0];
+      setRemanejamentoForm({
+        dataInicio: hoje,
+        escalaTrabalho: form.escalaTrabalho || '',
+        horarioTrabalho: form.horarioTrabalho || '',
+      });
+      setRemanejamentoModalOpen(true);
+    } else {
+      setForm(prev => ({
+        ...prev,
+        workPostId: normalizedNew,
+        remanejamentoDataInicio: undefined,
+      } as any));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -1224,6 +1271,22 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setLoading(true);
     setError(null);
     try {
+      const baseline = initialWorkPostIdRef.current;
+      const targetPost = normalizeWorkPostId((form as any).workPostId);
+      if (isWorkPostTransfer(baseline, targetPost)) {
+        const remanejamentoDataInicio = String((form as any).remanejamentoDataInicio || '').trim();
+        if (!remanejamentoDataInicio) {
+          setError('Ao alterar o setor/posto de trabalho, informe a data de início no novo setor. A escala de trabalho e horário também são obrigatórios e serão registrados no histórico do funcionário.');
+          toast({
+            title: 'Remanejamento obrigatório',
+            description: 'Altere o setor/posto novamente e preencha a data de início, escala e horário.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       // Prepara os dados do funcionário, garantindo que o salário seja enviado como número
       const { remanejamentoDataInicio, ...formRest } = form as any;
       const employeeData: any = { ...formRest };
@@ -1232,6 +1295,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       }
 
       const updatedEmployee = await employeeService.updateEmployee(funcionario.id, employeeData);
+      syncInitialWorkPostRef(
+        updatedEmployee?.workPostId || updatedEmployee?.workPost?.id || employeeData.workPostId,
+      );
+      setForm(prev => ({ ...prev, remanejamentoDataInicio: undefined } as any));
       queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
       if (updatedEmployee?.id) {
         queryClient.setQueryData(queryKeys.employees.byId(funcionario.id), updatedEmployee);
@@ -1823,42 +1890,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             </Label>
                             <Select
                               value={String((form as any).workPostId || 'none').toLowerCase()}
-                              onValueChange={(value) => {
-                                if (!workPostSelectReadyRef.current) {
-                                  return;
-                                }
-
-                                const currentWorkPostId = String((form as any).workPostId || 'none').toLowerCase();
-                                const newValue = value === 'none' ? '' : value;
-                                const normalizedNew = String(newValue).toLowerCase();
-
-                                if (
-                                  normalizedNew === currentWorkPostId
-                                  || (normalizedNew === '' && currentWorkPostId === 'none')
-                                ) {
-                                  return;
-                                }
-
-                                const baseline = initialWorkPostIdRef.current;
-                                const isRemanejamento =
-                                  baseline !== ''
-                                  && baseline !== 'none'
-                                  && normalizedNew !== ''
-                                  && normalizedNew !== baseline;
-
-                                if (isRemanejamento) {
-                                  setPendingWorkPostId(normalizedNew);
-                                  const hoje = new Date().toISOString().split('T')[0];
-                                  setRemanejamentoForm({
-                                    dataInicio: hoje,
-                                    escalaTrabalho: form.escalaTrabalho || '',
-                                    horarioTrabalho: form.horarioTrabalho || '',
-                                  });
-                                  setRemanejamentoModalOpen(true);
-                                } else {
-                                  setForm(prev => ({ ...prev, workPostId: newValue }));
-                                }
-                              }}
+                              onValueChange={handleWorkPostChange}
                             >
                               <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
                                 <SelectValue placeholder="Selecione um posto" />
@@ -3524,7 +3556,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                 description: wp.clientName ? `Cliente: ${wp.clientName}` : (wp.address || '')
                               }))}
                               value={form.workPostId || ''}
-                              onChange={(val) => setForm(prev => ({ ...prev, workPostId: val || undefined }))}
+                              onChange={(val) => handleWorkPostChange(val || 'none')}
                               placeholder={loadingWorkPosts ? 'Carregando setores...' : (selectedClientId ? 'Selecione o setor de trabalho' : 'Selecione um cliente primeiro')}
                               emptyMessage={selectedClientId ? 'Nenhum setor encontrado para este cliente' : 'Selecione um cliente para listar os setores'}
                             />

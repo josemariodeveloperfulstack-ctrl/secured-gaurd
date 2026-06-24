@@ -18,7 +18,10 @@ import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.EPIDeliveryForm;
 import com.z7design.secured_guard.model.EPIDeliveryFormItem;
+import com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus;
+import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.EPIDeliveryFormRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
@@ -31,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -49,6 +54,7 @@ public class EPIDeliveryStandardPdfService {
 
         private final EmployeeRepository employeeRepository;
         private final CompanyRepository companyRepository;
+        private final EPIDeliveryFormRepository epiDeliveryFormRepository;
         private final StandardReportLayoutService standardReportLayoutService;
         private final ExcelReportLayoutService excelReportLayoutService;
         private final EmployeeDocumentDateResolver documentDateResolver;
@@ -321,26 +327,22 @@ public class EPIDeliveryStandardPdfService {
                         epiTable.addHeaderCell(createEpiHeaderCell("ASSINATURA"));
 
                         String deliveryStr = formatDate(form.getDeliveryDate());
+                        List<EpiMovementRow> movements = buildMovementRows(form);
                         int itemIdx = 1;
-                        if (form.getItems() != null && !form.getItems().isEmpty()) {
-                                for (EPIDeliveryFormItem item : form.getItems()) {
-                                        epiTable.addCell(createEpiDataCell(
-                                                        item.getEpiName() != null ? item.getEpiName().toUpperCase()
-                                                                        : ""));
-                                        epiTable.addCell(createEpiDataCell(String.valueOf(itemIdx++)));
-                                        epiTable.addCell(createEpiDataCell(item.getCa() != null ? item.getCa() : ""));
-                                        epiTable.addCell(createEpiDataCell(
-                                                        item.getQuantity() != null ? item.getQuantity().toString()
-                                                                        : "1"));
-                                        epiTable.addCell(createEpiDataCell(deliveryStr));
-                                        epiTable.addCell(createEpiDataCell(""));
-                                        epiTable.addCell(createEpiDataCell(""));
-                                        epiTable.addCell(createEpiDataCell(""));
-                                }
+                        for (EpiMovementRow movement : movements) {
+                                epiTable.addCell(createEpiDataCell(
+                                                movement.epiName() != null ? movement.epiName().toUpperCase() : ""));
+                                epiTable.addCell(createEpiDataCell(String.valueOf(itemIdx++)));
+                                epiTable.addCell(createEpiDataCell(movement.ca() != null ? movement.ca() : ""));
+                                epiTable.addCell(createEpiDataCell(String.valueOf(movement.quantity())));
+                                epiTable.addCell(createEpiDataCell(formatDate(movement.deliveryDate())));
+                                epiTable.addCell(createEpiDataCell(movement.substitutionInfo()));
+                                epiTable.addCell(createEpiDataCell(movement.substitutionReason()));
+                                epiTable.addCell(createEpiDataCell(""));
                         }
 
                         // Manter um número fixo de linhas
-                        int itemsToAdd = Math.max(0, 15 - (form.getItems() != null ? form.getItems().size() : 0));
+                        int itemsToAdd = Math.max(0, 15 - movements.size());
                         for (int i = 0; i < itemsToAdd; i++) {
                                 epiTable.addCell(createEpiDataCell(""));
                                 epiTable.addCell(createEpiDataCell(""));
@@ -424,24 +426,22 @@ public class EPIDeliveryStandardPdfService {
                         }
 
                         int itemNumber = 1;
-                        if (form.getItems() != null && !form.getItems().isEmpty()) {
-                                for (EPIDeliveryFormItem item : form.getItems()) {
-                                        Row row = sheet.createRow(rowIndex++);
-                                        row.createCell(0).setCellValue(itemNumber++);
-                                        row.createCell(1).setCellValue(
-                                                        item.getEpiName() != null ? item.getEpiName() : "");
-                                        row.createCell(2).setCellValue(item.getCa() != null ? item.getCa() : "");
-                                        row.createCell(3).setCellValue(
-                                                        item.getQuantity() != null ? item.getQuantity() : 1);
-                                        row.createCell(4).setCellValue(formatDate(form.getDeliveryDate()));
-                                        row.createCell(5).setCellValue("");
-                                        row.createCell(6).setCellValue("");
-                                }
+                        List<EpiMovementRow> movements = buildMovementRows(form);
+                        for (EpiMovementRow movement : movements) {
+                                Row row = sheet.createRow(rowIndex++);
+                                row.createCell(0).setCellValue(itemNumber++);
+                                row.createCell(1).setCellValue(
+                                                movement.epiName() != null ? movement.epiName() : "");
+                                row.createCell(2).setCellValue(movement.ca() != null ? movement.ca() : "");
+                                row.createCell(3).setCellValue(movement.quantity());
+                                row.createCell(4).setCellValue(formatDate(movement.deliveryDate()));
+                                row.createCell(5).setCellValue(movement.substitutionInfo());
+                                row.createCell(6).setCellValue("");
                         }
 
                         // Completar com linhas em branco para manter a mesma quantidade da ficha em PDF
                         final int TOTAL_TABLE_ROWS = 17;
-                        int itemsCount = form.getItems() != null ? form.getItems().size() : 0;
+                        int itemsCount = movements.size();
                         for (int i = itemsCount; i < TOTAL_TABLE_ROWS; i++) {
                                 Row emptyRow = sheet.createRow(rowIndex++);
                                 for (int c = 0; c <= lastColumn; c++) {
@@ -676,5 +676,75 @@ public class EPIDeliveryStandardPdfService {
                 if (date == null)
                         return "";
                 return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        }
+
+        /**
+         * Linha consolidada do histórico de entregas de EPI do funcionário.
+         */
+        private record EpiMovementRow(
+                        String epiName,
+                        String ca,
+                        int quantity,
+                        LocalDate deliveryDate,
+                        String substitutionInfo,
+                        String substitutionReason) {
+        }
+
+        /**
+         * Monta o histórico completo: entregas concluídas anteriores + ficha atual (nova entrega).
+         */
+        private List<EpiMovementRow> buildMovementRows(EPIDeliveryForm anchorForm) {
+                List<EpiMovementRow> rows = new ArrayList<>();
+                if (anchorForm == null || anchorForm.getEmployee() == null || anchorForm.getEmployee().getId() == null) {
+                        if (anchorForm != null) {
+                                appendFormItems(rows, anchorForm);
+                        }
+                        return rows;
+                }
+
+                UUID employeeId = anchorForm.getEmployee().getId();
+                UUID anchorId = anchorForm.getId();
+
+                List<EPIDeliveryForm> completedForms = epiDeliveryFormRepository
+                                .findByEmployeeIdAndStatusWithItemsOrderByDeliveryDateAsc(
+                                                employeeId, EPIDeliveryFormStatus.COMPLETED);
+
+                for (EPIDeliveryForm historicalForm : completedForms) {
+                        if (anchorId != null && anchorId.equals(historicalForm.getId())) {
+                                continue;
+                        }
+                        appendFormItems(rows, historicalForm);
+                }
+
+                appendFormItems(rows, anchorForm);
+                return rows;
+        }
+
+        private void appendFormItems(List<EpiMovementRow> rows, EPIDeliveryForm form) {
+                if (form.getItems() == null || form.getItems().isEmpty()) {
+                        return;
+                }
+
+                LocalDate deliveryDate = form.getDeliveryDate();
+                EPIDeliveryType deliveryType = form.getDeliveryType();
+                String substitutionInfo = "";
+                String substitutionReason = "";
+                if (deliveryType == EPIDeliveryType.SUBSTITUICAO || deliveryType == EPIDeliveryType.TROCA) {
+                        substitutionInfo = formatDate(deliveryDate);
+                        substitutionReason = deliveryType.getDescription();
+                } else if (deliveryType == EPIDeliveryType.DEVOLUCAO) {
+                        substitutionReason = deliveryType.getDescription();
+                }
+
+                for (EPIDeliveryFormItem item : form.getItems()) {
+                        int qty = item.getQuantity() != null && item.getQuantity() > 0 ? item.getQuantity() : 1;
+                        rows.add(new EpiMovementRow(
+                                        item.getEpiName(),
+                                        item.getCa(),
+                                        qty,
+                                        deliveryDate,
+                                        substitutionInfo,
+                                        substitutionReason));
+                }
         }
 }

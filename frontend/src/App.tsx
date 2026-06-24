@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { NotificationProvider } from '@/components/NotificationSystem';
+import BackendUnavailableBanner from '@/components/BackendUnavailableBanner';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -1418,6 +1419,7 @@ function App() {
                       </Suspense>
                     } />
                   </Routes>
+                  <BackendUnavailableBanner />
                   <Toaster />
                   <CookieConsent />
                 </AuthProvider>

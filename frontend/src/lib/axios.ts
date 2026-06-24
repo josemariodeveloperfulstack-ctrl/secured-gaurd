@@ -1,6 +1,12 @@
 import axios from 'axios';
 import { getApiUrl, isDebugMode } from '../config/environment';
-import { isConnectionError, createConnectionError } from '../utils/connectionError';
+import {
+  isConnectionError,
+  createConnectionError,
+  isServerUnavailableStatus,
+  getServerUnavailableMessage,
+} from '../utils/connectionError';
+import { useBackendStatusStore } from '../stores/backendStatusStore';
 
 const api = axios.create({
   baseURL: getApiUrl(),
@@ -85,6 +91,7 @@ api.interceptors.request.use(
 // Response interceptor
 api.interceptors.response.use(
   (response) => {
+    useBackendStatusStore.getState().markAvailable();
     if (isDebugMode()) {
       console.log('✅ Axios Response:', response.status, response.config.url);
     }
@@ -119,6 +126,7 @@ api.interceptors.response.use(
 
       if (!silent) {
         const apiUrl = error.config?.baseURL || getApiUrl();
+        useBackendStatusStore.getState().markUnavailable();
         if (error?.code === 'ERR_TOO_MANY_REDIRECTS' || error?.message?.includes('too many redirects')) {
           console.warn('⚠️ Loop de redirecionamento na API (proxy/nginx ou URL base incorreta):', apiUrl);
           console.warn('⚠️ URL da requisição:', error.config?.url);
@@ -162,6 +170,48 @@ api.interceptors.response.use(
         (error522 as any).status = 522;
         return Promise.reject(error522);
       }
+    }
+
+    // 502/503/504 — backend ou proxy temporariamente indisponível (com retry)
+    const httpStatus = error.response?.status;
+    if (isServerUnavailableStatus(httpStatus) && httpStatus !== 522) {
+      const originalRequest = error.config as typeof error.config & {
+        silent?: boolean;
+        __serverRetryCount?: number;
+      };
+
+      if (originalRequest) {
+        const retryCount = originalRequest.__serverRetryCount ?? 0;
+        const maxRetries = originalRequest.silent ? 2 : 3;
+        if (retryCount < maxRetries) {
+          originalRequest.__serverRetryCount = retryCount + 1;
+          const delay = Math.min(800 * (retryCount + 1), 4000);
+          if (isDebugMode() && !originalRequest.silent) {
+            console.warn(
+              `⚠️ HTTP ${httpStatus} — nova tentativa ${retryCount + 1}/${maxRetries} em ${delay}ms:`,
+              originalRequest.url,
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return api(originalRequest);
+        }
+      }
+
+      const message = getServerUnavailableMessage(error);
+      if (!silent) {
+        useBackendStatusStore.getState().markUnavailable(message);
+        console.warn(`⚠️ HTTP ${httpStatus}:`, message, error.config?.url);
+      }
+
+      const serverError = new Error(message) as Error & {
+        isConnectionError: boolean;
+        status: number;
+        response?: typeof error.response;
+      };
+      serverError.isConnectionError = true;
+      serverError.status = httpStatus!;
+      serverError.response = error.response;
+      return Promise.reject(serverError);
     }
     
     const status = error.response?.status;

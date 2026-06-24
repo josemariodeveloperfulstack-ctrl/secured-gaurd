@@ -18,6 +18,7 @@ import {
   Briefcase
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { isConnectionError, getServerUnavailableMessage, isServerUnavailableError } from '@/utils/connectionError';
 import { epiDeliveryFormService, EPIDeliveryFormFilters } from '@/services/epiDeliveryFormService';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { CompanyCombobox } from '@/components/ui/company-combobox';
@@ -141,10 +142,13 @@ const EPIDeliveryReportModal: React.FC<EPIDeliveryReportModalProps> = ({
       handleClose();
     } catch (error) {
       console.error('Erro ao exportar relatório:', error);
+      const isServerDown = isConnectionError(error) || isServerUnavailableError(error);
       toast({
-        title: "Erro",
-        description: "Não foi possível gerar o relatório. Tente novamente.",
-        variant: "destructive"
+        title: isServerDown ? 'Servidor indisponível' : 'Erro',
+        description: isServerDown
+          ? getServerUnavailableMessage(error)
+          : 'Não foi possível gerar o relatório. Tente novamente.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);

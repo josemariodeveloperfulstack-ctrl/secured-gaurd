@@ -83,6 +83,20 @@ public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm
     java.util.Optional<EPIDeliveryForm> findByIdWithDetails(@Param("id") UUID id);
 
     /**
+     * Histórico de entregas concluídas do funcionário (com itens), ordenado por data.
+     */
+    @Query("""
+        SELECT DISTINCT f FROM EPIDeliveryForm f
+        LEFT JOIN FETCH f.items
+        WHERE f.employee.id = :employeeId
+        AND f.status = :status
+        ORDER BY f.deliveryDate ASC, f.createdAt ASC
+        """)
+    List<EPIDeliveryForm> findByEmployeeIdAndStatusWithItemsOrderByDeliveryDateAsc(
+            @Param("employeeId") UUID employeeId,
+            @Param("status") com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status);
+
+    /**
      * Ficha de EPI vinculada a uma requisição de almoxarifado (campo {@code stock_requisition_id}).
      */
     Optional<EPIDeliveryForm> findFirstByStockRequisitionIdOrderByCreatedAtDesc(UUID stockRequisitionId);

@@ -47,15 +47,9 @@ import { DismissalReasonSelect } from '@/components/funcionarios/DismissalReason
 import { DatePicker } from '@/components/ui/date-picker';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { parseDateFromBackend, formatDateForBackend } from '@/utils/dateUtils';
-import { useDebounce } from '@/hooks/use-debounce';
 import {
   clearEmployeeFormDraft,
-  formatDraftSavedTime,
   getEmployeeFormDraftKey,
-  hasAnyFilledEmployeeField,
-  isEmployeeFormDraftEmpty,
-  loadEmployeeFormDraft,
-  mergeEmployeeFormDraft,
   saveEmployeeFormDraft,
 } from '@/utils/employeeFormDraft';
 import { enqueueEmployeeSync } from '@/utils/employeeOfflineSync';
@@ -157,8 +151,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [loadingCep, setLoadingCep] = useState(false);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(null);
   const [cpfError, setCpfError] = useState<string | null>(null);
-  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
-  const draftRestoreNotifiedRef = useRef(false);
   const modalWasOpenRef = useRef(false);
   const loadedEmployeeIdRef = useRef<string | null>(null);
   /** Posto original ao abrir edição — remanejamento só se o usuário mudar para outro posto. */
@@ -190,7 +182,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         setIsEditMode(true);
         setPendingDependents([]);
         void clearEmployeeFormDraft(draftStorageKey);
-        setDraftSavedAt(null);
       }
 
       setOfflineQueueId(null);
@@ -414,13 +405,32 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   // Intervalos Almoço/Janta: controla visibilidade do campo Horário do Intervalo
   const [temIntervaloAlmoco, setTemIntervaloAlmoco] = useState<'sim' | 'nao'>('nao');
 
-  const debouncedForm = useDebounce(form, 800);
-  const debouncedPendingDependents = useDebounce(pendingDependents, 800);
-  const debouncedTemIntervaloAlmoco = useDebounce(temIntervaloAlmoco, 800);
-  const debouncedActiveTab = useDebounce(activeTab, 800);
-  const debouncedDoctorSearchTerm = useDebounce(doctorSearchTerm, 800);
-  const debouncedUserSearchTerm = useDebounce(userSearchTerm, 800);
-  const debouncedPositionSearchTerm = useDebounce(positionSearchTerm, 800);
+  const resetNewEmployeeFormState = useCallback(async () => {
+    setIsEditMode(false);
+    setCurrentEmployeeId(null);
+    setForm(initialState);
+    setPendingDependents([]);
+    setTemIntervaloAlmoco('nao');
+    setActiveTab('cadastro');
+    setCpfError(null);
+    setError(null);
+    setSelectedPosition(null);
+    setSelectedUnit(null);
+    setSelectedUser(null);
+    setSelectedCompany(null);
+    setPhotoPreview(null);
+    setEmployeeDependents([]);
+    setUserSearchTerm('');
+    setPositionSearchTerm('');
+    setSelectedDoctor(null);
+    setDoctorSearchTerm('');
+    setShowDoctorDropdown(false);
+    await clearEmployeeFormDraft(draftStorageKey);
+  }, [draftStorageKey]);
+
+  const resetForm = () => {
+    void resetNewEmployeeFormState();
+  };
 
   const persistEmployeeDraft = useCallback(async () => {
     if (isEditMode || employeeToEdit) {
@@ -437,12 +447,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       positionSearchTerm,
     });
 
-    if (saved) {
-      setDraftSavedAt(saved.savedAt);
-    } else {
-      setDraftSavedAt(null);
-    }
-
     return saved;
   }, [
     activeTab,
@@ -457,63 +461,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     temIntervaloAlmoco,
   ]);
 
-  // Resetar aba Histórico ao fechar; não limpar aba ativa para preservar rascunho
+  // Resetar aba Histórico quando o modal abrir sem permissão de histórico
   useEffect(() => {
-    if (!open) {
-      draftRestoreNotifiedRef.current = false;
-    } else if (!showHistoryTab && activeTab === 'historico') {
+    if (open && !showHistoryTab && activeTab === 'historico') {
       setActiveTab('cadastro');
     }
   }, [open, showHistoryTab, activeTab]);
-
-  useEffect(() => {
-    if (!open || isEditMode || employeeToEdit) {
-      return;
-    }
-
-    void (async () => {
-      const saved = await saveEmployeeFormDraft(draftStorageKey, {
-        form: debouncedForm,
-        pendingDependents: debouncedPendingDependents,
-        temIntervaloAlmoco: debouncedTemIntervaloAlmoco,
-        activeTab: debouncedActiveTab,
-        doctorSearchTerm: debouncedDoctorSearchTerm,
-        userSearchTerm: debouncedUserSearchTerm,
-        positionSearchTerm: debouncedPositionSearchTerm,
-      });
-
-      if (saved) {
-        setDraftSavedAt(saved.savedAt);
-      } else {
-        setDraftSavedAt(null);
-      }
-    })();
-  }, [
-    open,
-    isEditMode,
-    employeeToEdit,
-    draftStorageKey,
-    debouncedForm,
-    debouncedPendingDependents,
-    debouncedTemIntervaloAlmoco,
-    debouncedActiveTab,
-    debouncedDoctorSearchTerm,
-    debouncedUserSearchTerm,
-    debouncedPositionSearchTerm,
-  ]);
-
-  useEffect(() => {
-    if (!open || isEditMode || employeeToEdit) {
-      return;
-    }
-
-    const handleBeforeUnload = () => {
-      persistEmployeeDraft();
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [open, isEditMode, employeeToEdit, persistEmployeeDraft]);
 
   // Carregar histórico de mudanças quando abrir a aba Histórico (modo edição)
   useEffect(() => {
@@ -776,64 +729,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
     let cancelled = false;
 
-    const restoreDraft = async () => {
-      setIsEditMode(false);
-      const draft = await loadEmployeeFormDraft(draftStorageKey);
+    const prepareNewEmployeeForm = async () => {
+      await resetNewEmployeeFormState();
       if (cancelled) {
         return;
       }
-
-      if (draft && !isEmployeeFormDraftEmpty(draft.form, draft.pendingDependents)) {
-        setForm(mergeEmployeeFormDraft(draft.form, initialState));
-        setPendingDependents(draft.pendingDependents);
-        setTemIntervaloAlmoco(draft.temIntervaloAlmoco);
-        setActiveTab(draft.activeTab || 'cadastro');
-        setDoctorSearchTerm(draft.doctorSearchTerm || '');
-        setUserSearchTerm(draft.userSearchTerm || '');
-        setPositionSearchTerm(draft.positionSearchTerm || '');
-        setDraftSavedAt(draft.savedAt);
-        setCpfError(null);
-        setEmployeeDependents([]);
-        setShowDoctorDropdown(false);
-
-        if (!draftRestoreNotifiedRef.current) {
-          draftRestoreNotifiedRef.current = true;
-          toast({
-            title: 'Rascunho restaurado',
-            description: 'Todos os campos preenchidos foram mantidos.',
-          });
-        }
-        return;
-      }
-
-      if (hasAnyFilledEmployeeField(form) || pendingDependents.length > 0) {
-        setDraftSavedAt(null);
-        return;
-      }
-
-      setForm(initialState);
-      setPendingDependents([]);
-      setTemIntervaloAlmoco('nao');
-      setCpfError(null);
-      setSelectedPosition(null);
-      setSelectedUnit(null);
-      setSelectedUser(null);
-      setSelectedCompany(null);
-      setPhotoPreview(null);
-      setEmployeeDependents([]);
-      setUserSearchTerm('');
-      setPositionSearchTerm('');
-      setSelectedDoctor(null);
-      setDoctorSearchTerm('');
-      setShowDoctorDropdown(false);
-      setDraftSavedAt(null);
     };
 
-    void restoreDraft();
+    void prepareNewEmployeeForm();
     return () => {
       cancelled = true;
     };
-  }, [employeeToEdit, open, draftStorageKey, toast]);
+  }, [employeeToEdit, open, resetNewEmployeeFormState]);
 
   // Carregar médicos quando abrir o modal
   useEffect(() => {
@@ -866,8 +773,13 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
   // Habilitar detecção de remanejamento só após postos carregarem (evita modal ao abrir edição)
   useEffect(() => {
-    if (!open || !isEditMode) {
+    if (!open) {
       workPostSelectReadyRef.current = false;
+      return;
+    }
+
+    if (!isEditMode) {
+      workPostSelectReadyRef.current = true;
       return;
     }
 
@@ -1288,6 +1200,53 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     }
   };
 
+  const normalizeWorkPostId = (id?: string | null) => {
+    const s = String(id || '').toLowerCase();
+    return s === 'none' ? '' : s;
+  };
+
+  const isWorkPostTransfer = (fromId: string, toId: string) => {
+    const from = normalizeWorkPostId(fromId);
+    const to = normalizeWorkPostId(toId);
+    return from !== '' && to !== '' && from !== to;
+  };
+
+  const syncInitialWorkPostRef = (workPostId?: string | null) => {
+    initialWorkPostIdRef.current = normalizeWorkPostId(workPostId);
+  };
+
+  const handleWorkPostChange = (value: string) => {
+    if (isEditMode && !workPostSelectReadyRef.current) {
+      return;
+    }
+
+    const newValue = value === 'none' ? '' : value;
+    const normalizedNew = normalizeWorkPostId(newValue);
+    const currentWorkPostId = normalizeWorkPostId((form as any).workPostId);
+
+    if (normalizedNew === currentWorkPostId) {
+      return;
+    }
+
+    const baseline = initialWorkPostIdRef.current;
+    if (isEditMode && isWorkPostTransfer(baseline, normalizedNew)) {
+      setPendingWorkPostId(normalizedNew);
+      const hoje = new Date().toISOString().split('T')[0];
+      setRemanejamentoForm({
+        dataInicio: hoje,
+        escalaTrabalho: (form as any).escalaTrabalho || '',
+        horarioTrabalho: (form as any).horarioTrabalho || '',
+      });
+      setRemanejamentoModalOpen(true);
+    } else {
+      setForm(prev => ({
+        ...prev,
+        workPostId: normalizedNew,
+        remanejamentoDataInicio: undefined,
+      } as any));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1362,9 +1321,31 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     setLoading(true);
     setError(null);
 
-    const employeeData = { ...form };
+    const employeeData = { ...form } as Record<string, unknown>;
     const targetEmployeeId = employeeToEdit?.id || currentEmployeeId;
     const isUpdate = Boolean(isEditMode && targetEmployeeId);
+
+    if (!isUpdate) {
+      delete employeeData.remanejamentoDataInicio;
+    } else {
+      const baseline = initialWorkPostIdRef.current;
+      const targetPost = normalizeWorkPostId(employeeData.workPostId as string);
+      if (isWorkPostTransfer(baseline, targetPost)) {
+        const remanejamentoDataInicio = String(employeeData.remanejamentoDataInicio || '').trim();
+        if (!remanejamentoDataInicio) {
+          setError('Ao alterar o setor/posto de trabalho, informe a data de início no novo setor. A escala de trabalho e horário também são obrigatórios e serão registrados no histórico do funcionário.');
+          toast({
+            title: 'Remanejamento obrigatório',
+            description: 'Altere o setor/posto novamente e preencha a data de início, escala e horário.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+      } else {
+        delete employeeData.remanejamentoDataInicio;
+      }
+    }
 
   try {
       if (isUpdate && targetEmployeeId) {
@@ -1373,6 +1354,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         console.log('✅ Funcionário atualizado - ID:', savedId);
         console.log('✅ updatedEmployee:', updatedEmployee);
         setCurrentEmployeeId(savedId);
+        syncInitialWorkPostRef(
+          updatedEmployee?.workPostId || updatedEmployee?.workPost?.id || (employeeData.workPostId as string),
+        );
+        setForm(prev => ({ ...prev, remanejamentoDataInicio: undefined } as any));
         setOfflineQueueId(null);
         queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
         if (updatedEmployee?.id) {
@@ -1392,6 +1377,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         console.log('✅ createdEmployee:', createdEmployee);
         setCurrentEmployeeId(createdEmployee.id);
         setIsEditMode(true);
+        syncInitialWorkPostRef(
+          createdEmployee?.workPostId || createdEmployee?.workPost?.id || (employeeData.workPostId as string),
+        );
         setOfflineQueueId(null);
         queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
         queryClient.setQueryData(
@@ -1399,7 +1387,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           createdEmployee,
         );
         void clearEmployeeFormDraft(draftStorageKey);
-        setDraftSavedAt(null);
 
         if (createdEmployee.id) {
           await loadEmployeeDependents(createdEmployee.id);
@@ -1501,19 +1488,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     } finally {
       setLoading(false);
     }
-  };
-
-  const resetForm = () => {
-    setCurrentEmployeeId(null);
-    setIsEditMode(false);
-    setForm(initialState);
-    setPendingDependents([]);
-    setTemIntervaloAlmoco('nao');
-    setPhotoPreview(null);
-    setError(null);
-    setUserSearchTerm('');
-    void clearEmployeeFormDraft(draftStorageKey);
-    setDraftSavedAt(null);
   };
 
   const handleCargoCreated = (cargo: { id: string; name: string; description: string }) => {
@@ -1992,9 +1966,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         if (!isOpen) {
           // Só fechar se não estiver carregando e não houver funcionário salvo recentemente
           if (!loading) {
-            if (!isEditMode && !employeeToEdit) {
-              persistEmployeeDraft();
-            }
             onClose();
           }
         }
@@ -2009,11 +1980,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             </DialogTitle>
             <DialogDescription className="text-white/90 text-xs sm:text-sm mt-1">
               Preencha os dados abaixo. Itens obrigatórios estão indicados em vermelho.
-              {!isEditMode && !employeeToEdit && draftSavedAt && (
-                <span className="block mt-1 text-white/80">
-                  Rascunho salvo automaticamente às {formatDraftSavedTime(draftSavedAt)}.
-                </span>
-              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -2230,43 +2196,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             </Label>
                             <Select
                               value={String((form as any).workPostId || 'none').toLowerCase()}
-                              onValueChange={(value) => {
-                                if (!workPostSelectReadyRef.current) {
-                                  return;
-                                }
-
-                                const currentWorkPostId = String((form as any).workPostId || 'none').toLowerCase();
-                                const newValue = value === 'none' ? '' : value;
-                                const normalizedNew = String(newValue).toLowerCase();
-
-                                if (
-                                  normalizedNew === currentWorkPostId
-                                  || (normalizedNew === '' && currentWorkPostId === 'none')
-                                ) {
-                                  return;
-                                }
-
-                                const baseline = initialWorkPostIdRef.current;
-                                const isRemanejamento =
-                                  isEditMode
-                                  && baseline !== ''
-                                  && baseline !== 'none'
-                                  && normalizedNew !== ''
-                                  && normalizedNew !== baseline;
-
-                                if (isRemanejamento) {
-                                  setPendingWorkPostId(normalizedNew);
-                                  const hoje = new Date().toISOString().split('T')[0];
-                                  setRemanejamentoForm({
-                                    dataInicio: hoje,
-                                    escalaTrabalho: (form as any).escalaTrabalho || '',
-                                    horarioTrabalho: (form as any).horarioTrabalho || '',
-                                  });
-                                  setRemanejamentoModalOpen(true);
-                                } else {
-                                  setForm(prev => ({ ...(prev as any), workPostId: newValue }));
-                                }
-                              }}
+                              onValueChange={handleWorkPostChange}
                             >
                               <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
                                 <SelectValue placeholder="Selecione um posto" />

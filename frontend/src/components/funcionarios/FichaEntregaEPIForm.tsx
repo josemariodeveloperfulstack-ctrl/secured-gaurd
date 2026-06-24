@@ -468,6 +468,19 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     }
   };
 
+  const mapEpisToFormItems = () =>
+    epis.map(epi => ({
+      epiName: epi.nome,
+      quantity: Math.max(1, parseInt(String(epi.quantidade).trim(), 10) || 1),
+      ca: epi.ca || undefined,
+      caName: epi.caName || undefined,
+      validityDate: epi.validade || undefined,
+      uniformType: epi.uniformeTipo || undefined,
+      uniformPiece: epi.uniformePeca || undefined,
+      observations: epi.observacoes || undefined,
+      stockItemId: epi.stockItemId || undefined,
+    }));
+
   const handlePreview = async () => {
     if (!form.funcionarioId || !form.empresaId || !form.dataEntrega) {
       toast({
@@ -542,16 +555,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
         responsibleEmployeeId: form.responsavelEntregaId || undefined,
         observations: form.observacoes || undefined,
         employeeWorkSector: form.employeeWorkSector,
-        items: epis.map(epi => ({
-          epiName: epi.nome,
-          quantity: parseInt(epi.quantidade) || 1,
-          ca: epi.ca || undefined,
-          caName: epi.caName || undefined,
-          validityDate: epi.validade || undefined,
-          uniformType: epi.uniformeTipo || undefined,
-          uniformPiece: epi.uniformePeca || undefined,
-          observations: epi.observacoes || undefined
-        }))
+        items: mapEpisToFormItems(),
       };
 
       const blob = await epiDeliveryFormService.generateAndSavePdf(formData);
@@ -619,17 +623,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
         signatureType: form.signatureType,
         employeeWorkSector: form.employeeWorkSector || undefined,
         status: form.status,
-        items: epis.map(epi => ({
-          epiName: epi.nome,
-          quantity: parseInt(epi.quantidade) || 1,
-          ca: epi.ca || undefined,
-          caName: epi.caName || undefined,
-          validityDate: epi.validade || undefined,
-          uniformType: epi.uniformeTipo || undefined,
-          uniformPiece: epi.uniformePeca || undefined,
-          observations: epi.observacoes || undefined,
-          stockItemId: epi.stockItemId || undefined
-        }))
+        items: mapEpisToFormItems(),
       });
 
       const blob = await epiDeliveryFormService.generateAndSavePdf(buildEpiFormData());
@@ -701,17 +695,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
         signatureBase64: form.signatureBase64 || undefined,
         employeeWorkSector: form.employeeWorkSector || undefined,
         deliveryType: form.tipoEntrega || 'PRIMEIRA_ENTREGA',
-        items: epis.map(epi => ({
-          epiName: epi.nome,
-          quantity: parseInt(epi.quantity) || 1,
-          ca: epi.ca || undefined,
-          caName: epi.caName || undefined,
-          validityDate: epi.validade || undefined,
-          uniformType: epi.uniformeTipo || undefined,
-          uniformPiece: epi.uniformePeca || undefined,
-          observations: epi.observacoes || undefined,
-          stockItemId: epi.stockItemId || undefined
-        }))
+        items: mapEpisToFormItems(),
       };
 
       if (fichaId) {

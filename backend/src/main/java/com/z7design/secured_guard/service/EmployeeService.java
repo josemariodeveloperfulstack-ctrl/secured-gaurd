@@ -444,8 +444,8 @@ public class EmployeeService {
                 try {
                     UUID workPostId = UUID.fromString(dto.getWorkPostId());
                     WorkPost newWorkPost = workPostRepository.findById(workPostId).orElse(null);
-                    if (newWorkPost != null && (oldWorkPost == null || !oldWorkPost.getId().equals(newWorkPost.getId()))) {
-                        // Posto está mudando - data de início, escala e horário são obrigatórios para remanejamento
+                    if (oldWorkPost != null && newWorkPost != null && !oldWorkPost.getId().equals(newWorkPost.getId())) {
+                        // Troca de posto (A → B): data de início, escala e horário são obrigatórios para remanejamento
                         if (dto.getRemanejamentoDataInicio() == null) {
                             throw new IllegalArgumentException("Ao alterar o setor/posto de trabalho, informe a data de início no novo setor. A escala de trabalho e horário também são obrigatórios e serão registrados no histórico do funcionário.");
                         }

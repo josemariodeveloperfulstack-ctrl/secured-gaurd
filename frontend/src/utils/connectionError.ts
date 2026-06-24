@@ -5,6 +5,69 @@
 export interface ConnectionError extends Error {
   isConnectionError: boolean;
   apiUrl?: string;
+  status?: number;
+}
+
+const SERVER_UNAVAILABLE_STATUSES = new Set([502, 503, 504, 522]);
+
+export function isServerUnavailableStatus(status?: number | null): boolean {
+  return status != null && SERVER_UNAVAILABLE_STATUSES.has(status);
+}
+
+/**
+ * Verifica se o erro indica indisponibilidade temporária do servidor (proxy ou backend).
+ */
+export function isServerUnavailableError(error: unknown): boolean {
+  const err = error as {
+    response?: { status?: number; data?: unknown };
+    status?: number;
+    isConnectionError?: boolean;
+    is522Error?: boolean;
+  };
+
+  if (err?.is522Error || err?.isConnectionError) {
+    return true;
+  }
+
+  const status = err?.response?.status ?? err?.status;
+  return isServerUnavailableStatus(status);
+}
+
+/**
+ * Mensagem amigável para o usuário quando o backend/proxy está indisponível.
+ */
+export function getServerUnavailableMessage(error?: unknown): string {
+  const err = error as { response?: { status?: number; data?: unknown }; status?: number };
+  const status = err?.response?.status ?? err?.status;
+  const data = err?.response?.data;
+
+  if (data && typeof data === 'object' && !(data instanceof Blob)) {
+    const obj = data as { message?: string; error?: string };
+    if (obj.message) return obj.message;
+    if (obj.error && status === 503) return obj.error;
+  }
+
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data) as { message?: string; error?: string };
+      if (parsed.message) return parsed.message;
+      if (parsed.error) return parsed.error;
+    } catch {
+      if (data.trim()) return data;
+    }
+  }
+
+  if (status === 503) {
+    return 'O servidor está reiniciando ou temporariamente indisponível. Aguarde 2–3 minutos após um deploy e tente novamente.';
+  }
+  if (status === 502 || status === 504) {
+    return 'O servidor demorou para responder. Tente novamente em alguns instantes.';
+  }
+  if (status === 522) {
+    return 'O servidor está temporariamente indisponível. Por favor, tente novamente em alguns instantes.';
+  }
+
+  return 'Não foi possível conectar ao servidor. Verifique sua conexão ou aguarde alguns instantes e tente novamente.';
 }
 
 /**
@@ -12,6 +75,10 @@ export interface ConnectionError extends Error {
  */
 export function isConnectionError(error: any): boolean {
   if (!error) return false;
+
+  if (isServerUnavailableError(error)) {
+    return true;
+  }
   
   return (
     error?.code === 'ECONNREFUSED' ||
@@ -26,6 +93,7 @@ export function isConnectionError(error: any): boolean {
     error?.message?.includes('Failed to fetch') ||
     error?.message?.includes('Backend não está disponível') ||
     error?.message?.includes('servidor está temporariamente indisponível') ||
+    error?.message?.includes('servidor está reiniciando') ||
     error?.isConnectionError === true ||
     error?.is522Error === true
   );
@@ -94,10 +162,10 @@ export async function fetchWithConnectionRetry<T>(
 }
 
 export function handleConnectionErrorSilently(error: any, context?: string): boolean {
-  if (isConnectionError(error)) {
+  if (isConnectionError(error) || isServerUnavailableError(error)) {
     const contextMsg = context ? `[${context}] ` : '';
     if (import.meta.env.DEV) {
-      console.debug(`ℹ️ ${contextMsg}Conexão temporária com o servidor — ignorado (polling).`);
+      console.debug(`ℹ️ ${contextMsg}Servidor indisponível — ignorado (polling).`);
     }
     return true;
   }
