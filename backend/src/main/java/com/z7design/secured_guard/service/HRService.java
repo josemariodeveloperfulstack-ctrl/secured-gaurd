@@ -43,9 +43,9 @@ public class HRService {
                         // Se não tiver probationEndDate, calcular baseado na data de admissão
                         if (probationEndDate == null) {
                             // Calcular para diferentes períodos de experiência (30, 45, 90 dias)
-                            LocalDate endDate30 = hireDate.plusDays(30);
-                            LocalDate endDate45 = hireDate.plusDays(45);
-                            LocalDate endDate90 = hireDate.plusDays(90);
+                            LocalDate endDate30 = hireDate.plusDays(29);
+                            LocalDate endDate45 = hireDate.plusDays(44);
+                            LocalDate endDate90 = hireDate.plusDays(89);
                             
                             // Verificar se algum dos períodos está vencendo (hoje ou nos próximos 3 dias)
                             boolean expiring30 = !endDate30.isBefore(today) && !endDate30.isAfter(threeDaysFromNow);
@@ -59,8 +59,8 @@ public class HRService {
                             // Verificar se o período de experiência é 30, 45 ou 90 dias
                             long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(hireDate, probationEndDate);
                             
-                            // Apenas períodos de 30, 45 ou 90 dias
-                            if (daysBetween != 30 && daysBetween != 45 && daysBetween != 90) {
+                            // Apenas períodos de 30, 45 ou 90 dias (com diferença inclusiva de 29, 44 ou 89 dias)
+                            if (daysBetween != 29 && daysBetween != 44 && daysBetween != 89) {
                                 return false;
                             }
                             
@@ -229,9 +229,9 @@ public class HRService {
             // Tentar calcular para 30, 45 ou 90 dias e verificar qual está vencendo
             LocalDate today = LocalDate.now();
             LocalDate threeDaysFromNow = today.plusDays(3);
-            LocalDate endDate30 = employee.getHireDate().plusDays(30);
-            LocalDate endDate45 = employee.getHireDate().plusDays(45);
-            LocalDate endDate90 = employee.getHireDate().plusDays(90);
+            LocalDate endDate30 = employee.getHireDate().plusDays(29);
+            LocalDate endDate45 = employee.getHireDate().plusDays(44);
+            LocalDate endDate90 = employee.getHireDate().plusDays(89);
             
             // Verificar qual período está vencendo (hoje ou nos próximos 3 dias)
             if (!endDate30.isBefore(today) && !endDate30.isAfter(threeDaysFromNow)) {

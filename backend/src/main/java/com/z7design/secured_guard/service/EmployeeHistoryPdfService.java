@@ -8,6 +8,7 @@ import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.EmployeeChangeHistoryDTO;
+import com.z7design.secured_guard.dto.EmployeeEmploymentPeriodDTO;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.dto.WorkPostAssignmentResponse;
 import com.z7design.secured_guard.model.Company;
@@ -41,6 +42,7 @@ public class EmployeeHistoryPdfService {
 
     private final EmployeeService employeeService;
     private final EmployeeChangeHistoryService employeeChangeHistoryService;
+    private final EmployeeEmploymentPeriodService employmentPeriodService;
     private final WorkPostAssignmentService workPostAssignmentService;
     private final MedicalExamService medicalExamService;
     private final SSTTrainingService sstTrainingService;
@@ -70,12 +72,13 @@ public class EmployeeHistoryPdfService {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
+        ReportLayoutConfig layoutConfig = null;
 
         try {
             UUID companyId = resolveCompanyId(company);
             PdfWriter writer = new PdfWriter(baos);
 
-            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+            layoutConfig = ReportLayoutConfig.builder()
                     .companyId(companyId)
                     .reportTitle("HISTÓRICO COMPLETO DO FUNCIONÁRIO")
                     .topMargin(130f)
@@ -275,7 +278,146 @@ public class EmployeeHistoryPdfService {
         }
 
         log.info("✅ PDF do histórico gerado com sucesso. Tamanho: {} bytes", baos.size());
-        return baos.toByteArray();
+        return standardReportLayoutService.finalizePdfBytes(baos, layoutConfig);
+    }
+
+    /**
+     * PDF somente com vínculos empregatícios e histórico de alterações de dados (aba Histórico).
+     */
+    @Transactional(readOnly = true)
+    public byte[] generateChangeHistoryPdf(UUID employeeId) throws Exception {
+        log.info("📄 Gerando PDF do histórico de mudanças do funcionário ID: {}", employeeId);
+
+        Employee employee = employeeService.findById(employeeId);
+        if (employee == null) {
+            throw new RuntimeException("Funcionário não encontrado");
+        }
+
+        Company company = null;
+        if (employee.getCompany() != null) {
+            company = companyRepository.findById(employee.getCompany().getId()).orElse(null);
+        }
+
+        List<EmployeeEmploymentPeriodDTO> periods = employmentPeriodService.findByEmployeeId(employeeId);
+        List<EmployeeChangeHistoryDTO> changes = employeeChangeHistoryService
+                .findByEmployeeId(employeeId, null, null, null, null, PageRequest.of(0, 500))
+                .getContent();
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
+        ReportLayoutConfig layoutConfig = null;
+
+        try {
+            UUID companyId = resolveCompanyId(company);
+            PdfWriter writer = new PdfWriter(baos);
+
+            layoutConfig = ReportLayoutConfig.builder()
+                    .companyId(companyId)
+                    .reportTitle("HISTÓRICO DE MUDANÇAS DO FUNCIONÁRIO")
+                    .topMargin(130f)
+                    .bottomMargin(50f)
+                    .leftMargin(25f)
+                    .rightMargin(25f)
+                    .landscape(true)
+                    .build();
+
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
+
+            document.add(new Paragraph(
+                    "Data do Relatório: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                    .setFontSize(9)
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setMarginBottom(10)
+                    .setMarginTop(0));
+
+            Paragraph empTitle = new Paragraph("FUNCIONÁRIO")
+                    .setBold()
+                    .setFontSize(12)
+                    .setMarginTop(5)
+                    .setMarginBottom(10);
+            document.add(empTitle);
+
+            Table empTable = new Table(UnitValue.createPercentArray(new float[] { 40f, 60f }))
+                    .useAllAvailableWidth()
+                    .setMarginBottom(15);
+            addTableRow(empTable, "Nome:", employee.getName());
+            addTableRow(empTable, "CPF:", employee.getDocument() != null ? employee.getDocument() : "-");
+            addTableRow(empTable, "Matrícula:", employee.getRegistrationNumber() != null ? employee.getRegistrationNumber() : "-");
+            addTableRow(empTable, "Cargo atual:", employee.getPosition() != null ? employee.getPosition().getName() : "-");
+            addTableRow(empTable, "Empresa atual:", company != null ? company.getName() : "-");
+            document.add(empTable);
+
+            Paragraph periodsTitle = new Paragraph("VÍNCULOS EMPREGATÍCIOS")
+                    .setBold()
+                    .setFontSize(12)
+                    .setMarginTop(10)
+                    .setMarginBottom(10);
+            document.add(periodsTitle);
+
+            if (periods.isEmpty()) {
+                document.add(new Paragraph("Nenhum vínculo registrado.").setFontSize(10).setMarginBottom(15));
+            } else {
+                Table periodsTable = new Table(UnitValue.createPercentArray(new float[] { 14f, 24f, 18f, 14f, 14f, 16f }))
+                        .useAllAvailableWidth()
+                        .setMarginBottom(15);
+                addTableHeader(periodsTable, "Tipo", "Empresa", "Cargo", "Admissão", "Demissão", "Status");
+                for (EmployeeEmploymentPeriodDTO p : periods) {
+                    String statusLabel = "TERMINATED".equals(p.getStatus()) ? "Demitido" : "Ativo";
+                    addTableRow(periodsTable,
+                            p.getAdmissionTypeLabel() != null ? p.getAdmissionTypeLabel() : "-",
+                            p.getCompanyName() != null ? p.getCompanyName() : "-",
+                            p.getPositionName() != null ? p.getPositionName() : "-",
+                            formatDate(p.getHireDate()),
+                            formatDate(p.getTerminationDate()),
+                            statusLabel);
+                }
+                document.add(periodsTable);
+            }
+
+            Paragraph changesTitle = new Paragraph("HISTÓRICO DE ALTERAÇÕES")
+                    .setBold()
+                    .setFontSize(12)
+                    .setMarginTop(10)
+                    .setMarginBottom(10);
+            document.add(changesTitle);
+
+            if (changes.isEmpty()) {
+                document.add(new Paragraph("Nenhuma alteração registrada.").setFontSize(10).setMarginBottom(15));
+            } else {
+                Table changesTable = new Table(UnitValue.createPercentArray(new float[] { 12f, 12f, 12f, 22f, 22f, 20f }))
+                        .useAllAvailableWidth()
+                        .setMarginBottom(15);
+                addTableHeader(changesTable, "Data/Hora", "Categoria", "Campo", "Valor antigo", "Valor novo", "Alterado por");
+                for (EmployeeChangeHistoryDTO c : changes) {
+                    addTableRow(changesTable,
+                            formatInstant(c.getChangedAt()),
+                            c.getCategoryLabel() != null ? c.getCategoryLabel() : (c.getCategory() != null ? c.getCategory() : "-"),
+                            c.getFieldLabel() != null ? c.getFieldLabel() : (c.getFieldName() != null ? c.getFieldName() : "-"),
+                            c.getOldValue() != null ? c.getOldValue() : "-",
+                            c.getNewValue() != null ? c.getNewValue() : "-",
+                            c.getChangedByUserName() != null ? c.getChangedByUserName() : "-");
+                }
+                document.add(changesTable);
+            }
+
+            document.close();
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF do histórico de mudanças do funcionário", e);
+            throw e;
+        }
+
+        log.info("✅ PDF do histórico de mudanças gerado. Tamanho: {} bytes", baos.size());
+        return standardReportLayoutService.finalizePdfBytes(baos, layoutConfig);
+    }
+
+    private void addTableRow(Table table, String c1, String c2, String c3, String c4, String c5, String c6) {
+        table.addCell(createValueCell(c1));
+        table.addCell(createValueCell(c2));
+        table.addCell(createValueCell(c3));
+        table.addCell(createValueCell(c4));
+        table.addCell(createValueCell(c5));
+        table.addCell(createValueCell(c6));
     }
 
     private void addTableRow(Table table, String label, String value) {

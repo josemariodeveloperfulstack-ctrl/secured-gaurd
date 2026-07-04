@@ -38,7 +38,7 @@ public class SplitterWorker {
     private static final String STREAM_PAGES = "stream:pages";
     private static final String CONSUMER_GROUP = "splitter-group";
     private static final String CONSUMER_NAME = "splitter-worker-1";
-    private static final int DPI = 400; // Aumentado para melhor qualidade de OCR
+    private static final int DPI = 150; // Reduzido de 400 para 150 para otimizar memória (suficiente para OCR do Gemini)
     
     @PostConstruct
     public void init() {

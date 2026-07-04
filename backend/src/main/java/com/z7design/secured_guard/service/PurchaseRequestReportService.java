@@ -14,7 +14,9 @@ import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.PurchaseRequest;
+import com.z7design.secured_guard.model.PurchaseRequestItem;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.PurchaseRequestItemRepository;
 import com.z7design.secured_guard.repository.PurchaseRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +41,7 @@ import java.util.stream.Collectors;
 public class PurchaseRequestReportService {
 
     private final PurchaseRequestRepository purchaseRequestRepository;
+    private final PurchaseRequestItemRepository purchaseRequestItemRepository;
     private final StandardReportLayoutService standardReportLayoutService;
     private final CompanyRepository companyRepository;
 
@@ -196,6 +199,9 @@ public class PurchaseRequestReportService {
             document.add(createSectionHeader("OBSERVAÇÕES ADICIONAIS"));
             document.add(new Paragraph(request.getNotes()).setFontSize(10f));
         }
+
+        // Seção de Itens da Solicitação
+        addItemsSection(document, request);
     }
 
     private void addLabelValueRow(Table table, String label, String value) {
@@ -440,18 +446,19 @@ public class PurchaseRequestReportService {
         // Os valores abaixo somam 100 para evitar corte da tabela na margem direita.
         Table table = new Table(UnitValue.createPercentArray(new float[]{
                 6,  // Número
-                12, // Título
-                10, // Solicitante
-                8,  // Departamento
-                7,  // Status
-                7,  // Prioridade
+                11, // Título
+                9,  // Solicitante
+                7,  // Departamento
+                6,  // Status
+                6,  // Prioridade
                 6,  // Urgência
-                8,  // Data Solicitação
-                8,  // Data Necessária
+                7,  // Data Solicitação
+                7,  // Data Necessária
                 9,  // Aprovado por
                 6,  // Data Aprovação
-                9,  // Fornecedor
-                4   // Valor
+                8,  // Fornecedor
+                5,  // Qtd. Itens
+                7   // Valor
         }))
                 .useAllAvailableWidth()
                 .setMarginTop(10);
@@ -469,6 +476,7 @@ public class PurchaseRequestReportService {
         table.addHeaderCell(standardReportLayoutService.createHeaderCell("Aprovado por"));
         table.addHeaderCell(standardReportLayoutService.createHeaderCell("Data Aprovação"));
         table.addHeaderCell(standardReportLayoutService.createHeaderCell("Fornecedor"));
+        table.addHeaderCell(standardReportLayoutService.createHeaderCell("Qtd. Itens"));
         table.addHeaderCell(standardReportLayoutService.createHeaderCell("Valor"));
 
         for (PurchaseRequest req : requests) {
@@ -496,11 +504,84 @@ public class PurchaseRequestReportService {
                     formatDateOptional(req.getApprovalDate())));
             table.addCell(standardReportLayoutService.createDataCell(
                     req.getSupplier() != null ? req.getSupplier() : "-"));
+            long itemCount = purchaseRequestItemRepository.countByPurchaseRequestId(req.getId());
+            table.addCell(standardReportLayoutService.createDataCell(
+                    String.valueOf(itemCount)));
             table.addCell(standardReportLayoutService.createDataCell(
                     formatCurrency(getRequestTotalValue(req))));
         }
 
         document.add(table);
+    }
+
+    /**
+     * Adiciona seção de itens ao PDF individual de uma solicitação de compra.
+     */
+    private void addItemsSection(Document document, PurchaseRequest request) {
+        List<PurchaseRequestItem> items = purchaseRequestItemRepository
+                .findByPurchaseRequestIdOrderByItemNameAsc(request.getId());
+
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+
+        document.add(createSectionHeader("ITENS DA SOLICITAÇÃO"));
+
+        Paragraph itemCount = new Paragraph("Total de itens: " + items.size())
+                .setFontSize(10f)
+                .setMarginBottom(6f);
+        document.add(itemCount);
+
+        Table itemsTable = new Table(UnitValue.createPercentArray(new float[]{
+                5f,   // #
+                25f,  // Item
+                25f,  // Descrição
+                8f,   // Unidade
+                10f,  // Quantidade
+                12f,  // Valor Unitário
+                15f   // Valor Total
+        })).useAllAvailableWidth().setMarginTop(4f);
+
+        // Cabeçalhos
+        itemsTable.addHeaderCell(standardReportLayoutService.createHeaderCell("#"));
+        itemsTable.addHeaderCell(standardReportLayoutService.createHeaderCell("Item"));
+        itemsTable.addHeaderCell(standardReportLayoutService.createHeaderCell("Descrição"));
+        itemsTable.addHeaderCell(standardReportLayoutService.createHeaderCell("Unidade"));
+        itemsTable.addHeaderCell(standardReportLayoutService.createHeaderCell("Quantidade"));
+        itemsTable.addHeaderCell(standardReportLayoutService.createHeaderCell("Valor Unit."));
+        itemsTable.addHeaderCell(standardReportLayoutService.createHeaderCell("Valor Total"));
+
+        BigDecimal grandTotal = BigDecimal.ZERO;
+        int index = 1;
+
+        for (PurchaseRequestItem item : items) {
+            itemsTable.addCell(standardReportLayoutService.createDataCell(String.valueOf(index++)));
+            itemsTable.addCell(standardReportLayoutService.createDataCell(
+                    safeText(item.getItemName())));
+            itemsTable.addCell(standardReportLayoutService.createDataCell(
+                    safeText(item.getDescription())));
+            itemsTable.addCell(standardReportLayoutService.createDataCell(
+                    safeText(item.getUnit())));
+            itemsTable.addCell(standardReportLayoutService.createDataCell(
+                    item.getQuantity() != null ? item.getQuantity().toPlainString() : "-"));
+            itemsTable.addCell(standardReportLayoutService.createDataCell(
+                    formatCurrency(item.getUnitPrice())));
+
+            BigDecimal itemTotal = item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO;
+            itemsTable.addCell(standardReportLayoutService.createDataCell(
+                    formatCurrency(itemTotal)));
+            grandTotal = grandTotal.add(itemTotal);
+        }
+
+        document.add(itemsTable);
+
+        // Linha de total
+        Paragraph totalLine = new Paragraph("Total dos Itens: " + formatCurrency(grandTotal))
+                .setBold()
+                .setFontSize(11f)
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setMarginTop(6f);
+        document.add(totalLine);
     }
 
     private String formatCurrency(BigDecimal value) {

@@ -334,6 +334,8 @@ export interface CreateEmployeeDTO {
   enderecoCep?: string;
   registrationNumber?: string;
   hireDate?: string;
+  /** READMISSAO ou PROMOCAO — usado na recontratação de funcionário demitido */
+  admissionType?: string;
   status?: string;
   notes?: string;
 

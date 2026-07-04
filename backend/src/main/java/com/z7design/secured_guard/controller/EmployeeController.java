@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.EmployeeDTO;
+import com.z7design.secured_guard.dto.EmployeeEmploymentPeriodDTO;
 import com.z7design.secured_guard.dto.SimpleEmployeeDTO;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.User;
@@ -8,6 +9,7 @@ import com.z7design.secured_guard.service.EmployeeService;
 import com.z7design.secured_guard.service.EmployeeRecordPdfService;
 import com.z7design.secured_guard.service.EmployeeHistoryPdfService;
 import com.z7design.secured_guard.service.EmployeeChangeHistoryService;
+import com.z7design.secured_guard.service.EmployeeEmploymentPeriodService;
 import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
 import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
@@ -60,6 +62,7 @@ public class EmployeeController {
     private final EmployeeExcelImportService employeeExcelImportService;
     private final EmployeeImportService employeeImportService;
     private final EmployeeChangeHistoryService employeeChangeHistoryService;
+    private final EmployeeEmploymentPeriodService employmentPeriodService;
     private final DocumentoGeradoPersistenceService documentoGeradoPersistenceService;
 
     @GetMapping("/count")
@@ -697,13 +700,9 @@ public class EmployeeController {
                 return ResponseEntity.badRequest().body(java.util.Map.of("error", "ID inválido: " + id));
             }
 
-            // Buscar funcionário completo com relacionamentos usando findById e toDTO
-            Employee employee = employeeService.findById(employeeId);
-            System.out.println("✅ Funcionário encontrado: " + employee.getName());
-
-            // Converter para DTO que inclui todos os relacionamentos (user, position, unit,
-            // etc)
-            EmployeeDTO dto = employeeService.toDTO(employee);
+            // Buscar funcionário completo com relacionamentos usando cache Redis
+            EmployeeDTO dto = employeeService.getEmployeeDtoById(employeeId);
+            System.out.println("✅ Funcionário encontrado: " + dto.getName());
 
             System.out
                     .println("✅ DTO convertido - User ID: " + (dto.getUser() != null ? dto.getUser().getId() : "null"));
@@ -727,9 +726,9 @@ public class EmployeeController {
     @GetMapping("/email/{email}")
     @Operation(summary = "Buscar funcionário por email", description = "Retorna um funcionário específico pelo email")
     public ResponseEntity<EmployeeDTO> getByEmail(@PathVariable String email) {
-        Employee employee = employeeService.findByEmail(email)
+        EmployeeDTO dto = employeeService.getEmployeeDtoByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado"));
-        return ResponseEntity.ok(employeeService.toDTO(employee));
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping
@@ -760,6 +759,45 @@ public class EmployeeController {
         }
         EmployeeDTO updatedEmployee = employeeService.update(UUID.fromString(id), employeeDTO, changedByUserId);
         return ResponseEntity.ok(updatedEmployee);
+    }
+
+    @PostMapping("/{id}/rehire")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR')")
+    @Operation(summary = "Recontratar funcionário demitido", description = "Readmissão ou promoção reutilizando o cadastro existente")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Funcionário recontratado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos ou funcionário não está demitido"),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado")
+    })
+    public ResponseEntity<EmployeeDTO> rehire(@PathVariable String id, @Valid @RequestBody EmployeeDTO employeeDTO) {
+        UUID changedByUserId = null;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User) {
+            changedByUserId = ((User) auth.getPrincipal()).getId();
+        }
+        EmployeeDTO result = employeeService.rehire(UUID.fromString(id), employeeDTO, changedByUserId);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/eligible-for-rehire/cpf/{cpf}")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'HR_READ')")
+    @Operation(summary = "Verificar elegibilidade para recontratação por CPF", description = "Retorna o funcionário se estiver demitido e elegível para readmissão/promoção")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Funcionário elegível encontrado"),
+            @ApiResponse(responseCode = "404", description = "Nenhum funcionário demitido com este CPF")
+    })
+    public ResponseEntity<EmployeeDTO> findEligibleForRehire(@PathVariable String cpf) {
+        return employeeService.findEligibleForRehireByCpf(cpf)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{id}/employment-periods")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_HISTORY_READ', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_GESTAO_SUPERVISAO')")
+    @Operation(summary = "Histórico de vínculos empregatícios", description = "Lista admissões, readmissões e promoções do funcionário")
+    public ResponseEntity<java.util.List<EmployeeEmploymentPeriodDTO>> getEmploymentPeriods(@PathVariable String id) {
+        employeeService.findById(UUID.fromString(id));
+        return ResponseEntity.ok(employmentPeriodService.findByEmployeeId(UUID.fromString(id)));
     }
 
     @GetMapping("/{id}/change-history")
@@ -998,10 +1036,10 @@ public class EmployeeController {
         try {
             System.out.println("[DEBUG] EmployeeController.findByCpfExact - CPF recebido: " + cpf);
 
-            java.util.Optional<Employee> employeeOpt = employeeService.findByCpfExact(cpf);
+            java.util.Optional<EmployeeDTO> employeeOpt = employeeService.getEmployeeDtoByCpfExact(cpf);
 
             if (employeeOpt.isPresent()) {
-                EmployeeDTO dto = employeeService.toDTO(employeeOpt.get());
+                EmployeeDTO dto = employeeOpt.get();
                 System.out.println(
                         "[DEBUG] EmployeeController.findByCpfExact - Funcionário encontrado: " + dto.getName());
                 return ResponseEntity.ok(dto);
@@ -1046,6 +1084,40 @@ public class EmployeeController {
                     .body(pdf);
         } catch (Exception e) {
             System.err.println("[ERROR] EmployeeController.generateEmployeeHistoryPdf - Erro: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/{id}/generate-change-history-pdf")
+    @Operation(summary = "Gerar PDF do histórico de mudanças", description = "Gera PDF com vínculos empregatícios e alterações de dados do funcionário")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "PDF gerado com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado"),
+            @ApiResponse(responseCode = "500", description = "Erro ao gerar PDF")
+    })
+    public ResponseEntity<byte[]> generateEmployeeChangeHistoryPdf(@PathVariable String id) {
+        try {
+            UUID employeeId = UUID.fromString(id);
+            byte[] pdf = employeeHistoryPdfService.generateChangeHistoryPdf(employeeId);
+            String fileName = "historico-mudancas-funcionario-" + id + ".pdf";
+
+            Map<String, Object> dados = new LinkedHashMap<>();
+            dados.put("employeeId", id);
+            documentoGeradoPersistenceService.persistir(
+                    employeeId,
+                    TipoDocumentoGerado.EMPLOYEE_CHANGE_HISTORY,
+                    pdf,
+                    fileName,
+                    dados);
+
+            return ResponseEntity.ok()
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + fileName + "\"")
+                    .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/pdf")
+                    .body(pdf);
+        } catch (Exception e) {
+            System.err.println("[ERROR] EmployeeController.generateEmployeeChangeHistoryPdf - Erro: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         }

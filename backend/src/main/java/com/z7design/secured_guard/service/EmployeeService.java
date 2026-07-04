@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.enums.EmploymentStatus;
 import com.z7design.secured_guard.model.enums.UserStatus;
 import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
+import com.z7design.secured_guard.model.enums.EmploymentAdmissionType;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.PositionRepository;
@@ -69,6 +71,8 @@ public class EmployeeService {
     private RemanejamentoService remanejamentoService;
     @Autowired
     private com.z7design.secured_guard.repository.DependentRepository dependentRepository;
+    @Autowired
+    private EmployeeEmploymentPeriodService employmentPeriodService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -201,6 +205,7 @@ public class EmployeeService {
             applyTerminationRules(employee, dto);
             System.out.println("[DEBUG] Entity criada, salvando no banco");
             Employee saved = employeeRepository.save(employee);
+            employmentPeriodService.createInitialPeriod(saved);
             System.out.println("[DEBUG] Funcionário salvo com ID: " + saved.getId());
             return toDTO(saved);
         } catch (IllegalArgumentException e) {
@@ -800,6 +805,80 @@ public class EmployeeService {
         employeeRepository.delete(employee);
     }
 
+    /**
+     * Recontrata funcionário demitido (readmissão ou promoção em outra empresa),
+     * reutilizando o mesmo cadastro e registrando novo vínculo no histórico.
+     */
+    @Transactional
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
+    public EmployeeDTO rehire(UUID id, EmployeeDTO dto, UUID changedByUserId) {
+        Employee existing = findById(id);
+        if (existing.getStatus() != EmploymentStatus.TERMINATED) {
+            throw new IllegalArgumentException("Somente funcionários demitidos podem ser recontratados.");
+        }
+
+        EmploymentAdmissionType admissionType = employmentPeriodService.parseAdmissionType(dto.getAdmissionType());
+        employmentPeriodService.validateRehireAdmissionType(admissionType);
+        employmentPeriodService.validateNewHireDate(dto.getHireDate());
+
+        if (existing.getHireDate() != null && dto.getHireDate().equals(existing.getHireDate())) {
+            throw new IllegalArgumentException(
+                    "A nova data de admissão deve ser diferente da data do vínculo anterior (preservada no histórico).");
+        }
+
+        if (admissionType == EmploymentAdmissionType.READMISSAO
+                && dto.getCompany() != null && dto.getCompany().getId() != null
+                && existing.getCompany() != null
+                && dto.getCompany().getId().equals(existing.getCompany().getId())) {
+            throw new IllegalArgumentException(
+                    "Para readmissão, selecione uma empresa diferente da empresa anterior.");
+        }
+
+        String prevCompany = existing.getCompany() != null ? existing.getCompany().getName() : "-";
+        LocalDate prevHireDate = existing.getHireDate();
+        LocalDate prevTermination = existing.getTerminationDate() != null
+                ? existing.getTerminationDate()
+                : existing.getDataRescisao();
+        String prevReason = existing.getTerminationReason();
+
+        employmentPeriodService.sealEmploymentHistoryBeforeRehire(existing);
+
+        dto.setStatus(EmploymentStatus.ACTIVE.name());
+        update(id, dto, changedByUserId);
+
+        Employee saved = findById(id);
+        saved.setTerminationDate(null);
+        saved.setDataRescisao(null);
+        saved.setTerminationReason(null);
+        saved.setStatus(EmploymentStatus.ACTIVE);
+        saved = employeeRepository.save(saved);
+
+        employmentPeriodService.openRehirePeriod(saved, dto, admissionType, changedByUserId);
+        employmentPeriodService.reactivateLinkedUser(saved);
+
+        if (changedByUserId != null) {
+            String prevHireStr = prevHireDate != null ? prevHireDate.toString() : "-";
+            String dismissalInfo = "Admissão: " + prevHireStr + " | Demitido em "
+                    + (prevTermination != null ? prevTermination : "-")
+                    + (prevReason != null && !prevReason.isBlank() ? " — " + prevReason : "");
+            employeeChangeHistoryService.recordChange(
+                    id,
+                    EmployeeChangeCategory.VINCULO_EMPREGATICIO,
+                    "previousEmployment",
+                    "Vínculo anterior preservado",
+                    prevCompany + " (período encerrado)",
+                    dismissalInfo,
+                    changedByUserId);
+        }
+
+        return toDTO(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<EmployeeDTO> findEligibleForRehireByCpf(String cpf) {
+        return employmentPeriodService.findEligibleForRehireByCpf(cpf).map(this::toDTO);
+    }
+
     private void applyTerminationRules(Employee employee, EmployeeDTO dto) {
         if (employee == null) {
             return;
@@ -830,6 +909,7 @@ public class EmployeeService {
         }
 
         employee.setStatus(EmploymentStatus.TERMINATED);
+        employmentPeriodService.closeActivePeriod(employee);
 
         String cpf = dto != null && dto.getCpf() != null && !dto.getCpf().trim().isEmpty()
                 ? dto.getCpf()
@@ -952,6 +1032,29 @@ public class EmployeeService {
         }
 
         return employee;
+    }
+
+    @Transactional(readOnly = true)
+    // @Cacheable removido - EmployeeDTO pode conter campos não serializáveis pelo Redis
+    // (ex: tipos customizados, enums com configurações especiais, relacionamentos complexos)
+    // que causam SerializationException na segunda chamada (500). Cachear DTOs de Employee
+    // requer configuração explícita de serialização no RedisConfig.
+    public EmployeeDTO getEmployeeDtoById(UUID id) {
+        Employee employee = findById(id);
+        return toDTO(employee);
+    }
+
+
+    @Transactional(readOnly = true)
+    @Cacheable(value = "employees", key = "'email-' + #email")
+    public Optional<EmployeeDTO> getEmployeeDtoByEmail(String email) {
+        return findByEmail(email).map(this::toDTO);
+    }
+
+    @Transactional(readOnly = true)
+    @Cacheable(value = "employees", key = "'cpf-' + #cpf")
+    public Optional<EmployeeDTO> getEmployeeDtoByCpfExact(String cpf) {
+        return findByCpfExact(cpf).map(this::toDTO);
     }
 
     public Optional<Employee> findByEmail(String email) {
@@ -1441,6 +1544,7 @@ public class EmployeeService {
     }
 
     @Transactional
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public Employee updateStatus(UUID id, EmploymentStatus status) {
         Employee employee = findById(id);
         employee.setStatus(status);

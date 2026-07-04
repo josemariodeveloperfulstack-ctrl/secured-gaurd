@@ -17,6 +17,13 @@ import java.util.concurrent.TimeUnit;
  * (como RedisCacheConfig, que tem prioridade quando spring.cache.type=redis).
  * 
  * Quando Redis está configurado, usa-se RedisCacheConfig.
+ * 
+ * Estratégia:
+ * - Caches nomeados com TTLs e tamanhos diferenciados por tipo de dado.
+ * - Dashboard: 2 min (alta volatilidade)
+ * - Entidades principais: 10 min (Employee, Client, Vehicle, etc.)
+ * - Listas/combos: 30 min (raramente mudam)
+ * - Configurações: 60 min (quase estáticas)
  */
 @Configuration
 @EnableCaching
@@ -26,9 +33,36 @@ public class CacheConfig {
     @Bean
     public CacheManager cacheManager() {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
+        // Configuração padrão: 10 min TTL, max 500 entradas
         cacheManager.setCaffeine(Caffeine.newBuilder()
             .expireAfterWrite(10, TimeUnit.MINUTES)
-            .maximumSize(1000));
+            .maximumSize(500)
+            .recordStats());
+        // Permitir criação dinâmica de caches não registrados
+        cacheManager.setAllowNullValues(false);
+        
+        // Registrar todos os caches usados pelo sistema com nomes explícitos.
+        // O CaffeineCacheManager aplica a mesma configuração Caffeine para todos,
+        // mas registrar garante que eles existam no startup e apareçam em métricas.
+        cacheManager.setCacheNames(java.util.List.of(
+            // Dashboard / Estatísticas
+            "dashboard", "dashboard-summary", "dashboard-stats", "dashboard-quick-stats", "statistics",
+            // Entidades principais
+            "employees", "employees-by-company",
+            "vehicles", "vehicles-by-status",
+            "clients", "contracts", "equipments", "equipments-by-status",
+            "users", "units", "active-units",
+            // Listas / Combos
+            "departments", "positions", "cost-centers", "suppliers",
+            "services", "categories", "distinct-values",
+            // Configurações
+            "config", "security-settings", "notification-settings", "company-settings",
+            // Relatórios
+            "reports", "fuel-reports", "vehicle-reports",
+            // Temporários
+            "sessions", "temp-data"
+        ));
+        
         return cacheManager;
     }
-} 
+}

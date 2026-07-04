@@ -110,12 +110,7 @@ public class OcrWorker {
                 return;
             }
             
-            log.info("🟡 OcrWorker: Processando {} páginas do stream:pages", records.size());
-            System.out.println("🟡 OcrWorker: Processando " + records.size() + " páginas do stream:pages");
-            
-            // Processar todas as páginas em paralelo (limitado pelo semáforo)
-            for (MapRecord<String, String, String> record : records) {
-                // Processar assincronamente para não bloquear
+                        for (MapRecord<String, String, String> record : records) {
                 processPageAsync(record);
             }
         } catch (RedisConnectionFailureException e) {
@@ -128,13 +123,8 @@ public class OcrWorker {
     private void processPageAsync(MapRecord<String, String, String> record) {
         try {
             semaphore.acquire();
-            // Usar self-injection para garantir que @Transactional funcione
-            if (self != null) {
-                self.processPageTransactional(record);
-            } else {
-                // Fallback se self-injection não funcionar
-                processPage(record);
-            }
+            // Processa sem transação externa global
+            processPage(record);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("Thread interrompida", e);
@@ -143,11 +133,6 @@ public class OcrWorker {
         } finally {
             semaphore.release();
         }
-    }
-    
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
-    public void processPageTransactional(MapRecord<String, String, String> record) {
-        processPage(record);
     }
     
     private void processPage(MapRecord<String, String, String> record) {
@@ -167,36 +152,20 @@ public class OcrWorker {
         
         log.info("🟡 OcrWorker: Processando OCR para página {} do job {} - pageId recebido do stream: {}", pageIndex, jobId, pageId);
         
+        byte[] imageBytes = null;
+        GeminiOcrResponse ocrResponse = null;
+        String hash = null;
+        
         try {
-            // Buscar o job para obter o documentType
-            DocumentProcessingJob job = jobRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Job não encontrado: " + jobId));
-            
-            // Obter documentType do job (ou da mensagem como fallback)
-            String documentTypeStr = record.getValue().get("documentType");
-            if (documentTypeStr == null && job.getDocumentType() != null) {
-                documentTypeStr = job.getDocumentType();
-            }
-            if (documentTypeStr == null) {
-                documentTypeStr = "HOLERITE"; // Default
-            }
-            
-            DocumentPage.DocumentType documentType = documentTypeStr.equalsIgnoreCase("COMPROVANTE") 
-                ? DocumentPage.DocumentType.COMPROVANTE 
-                : DocumentPage.DocumentType.HOLERITE;
-            
-            log.info("🟡 OcrWorker: Tipo de documento definido como {} (do job)", documentType);
-            
-            // Baixar imagem do MinIO/S3 (ou localmente)
-            byte[] imageBytes = minIOService.downloadBytes(s3Url);
+            // 1. Baixar imagem do MinIO/S3 (ou localmente) - FORA da transação do banco
+            imageBytes = minIOService.downloadBytes(s3Url);
             if (imageBytes == null || imageBytes.length == 0) {
                 throw new RuntimeException("Imagem não encontrada ou vazia: " + s3Url);
             }
             
             log.debug("🟡 OcrWorker: Imagem baixada com sucesso ({} bytes)", imageBytes.length);
             
-            // Chamar Gemini OCR
-            GeminiOcrResponse ocrResponse = null;
+            // 2. Chamar Gemini OCR - FORA da transação do banco (bloqueante)
             try {
                 ocrResponse = geminiOcrService.extractTextFromImage(imageBytes)
                     .block(java.time.Duration.ofSeconds(30));
@@ -211,186 +180,174 @@ public class OcrWorker {
             }
             
             // Calcular hash da página
-            String hash = calculateHash(imageBytes);
+            hash = calculateHash(imageBytes);
             
-            // Normalizar dados extraídos
-            String normalizedCpf = normalizeCpf(ocrResponse.getCpf());
-            String normalizedName = normalizeName(ocrResponse.getName());
-            String period = ocrResponse.getPeriod();
-            BigDecimal liquidValue = parseValue(ocrResponse.getValueLiquid());
-            String rawText = extractRawText(ocrResponse);
-            
-            // Normalizar dados de empresa e setor
-            String normalizedCompanyName = normalizeName(ocrResponse.getCompanyName());
-            String normalizedCompanyCnpj = normalizeCnpj(ocrResponse.getCompanyCnpj());
-            String normalizedWorkPostName = normalizeName(ocrResponse.getSector());
-            
-            log.info("🟡 OcrWorker: Dados ANTES da normalização - CPF: {}, Nome: {}, Período: {}, Valor: {}, Empresa: {}, CNPJ: {}, Setor: {}", 
-                ocrResponse.getCpf(), ocrResponse.getName(), ocrResponse.getPeriod(), ocrResponse.getValueLiquid(),
-                ocrResponse.getCompanyName(), ocrResponse.getCompanyCnpj(), ocrResponse.getSector());
-            log.info("🟡 OcrWorker: Dados APÓS normalização - CPF: {}, Nome: {}, Período: {}, Valor: {}, Empresa: {}, CNPJ: {}, Setor: {}", 
-                normalizedCpf, normalizedName, period, liquidValue, normalizedCompanyName, normalizedCompanyCnpj, normalizedWorkPostName);
-            
-            // Criar DocumentPage com o pageId recebido do stream
-            log.info("🟡 OcrWorker: Criando DocumentPage com pageId recebido do stream: {}", pageId);
-            DocumentPage documentPage = DocumentPage.builder()
-                .id(pageId) // IMPORTANTE: Usar o pageId recebido do stream (gerado pelo SplitterWorker)
-                .jobId(jobId)
-                .type(documentType)
-                .cpf(normalizedCpf)
-                .name(normalizedName)
-                .period(period)
-                .liquidValue(liquidValue)
-                .pageNumber(pageIndex)
-                .rawText(rawText)
-                .companyName(normalizedCompanyName)
-                .companyCnpj(normalizedCompanyCnpj)
-                .workPostName(normalizedWorkPostName)
-                .ocrConfidence(ocrResponse.getConfidence() != null ? ocrResponse.getConfidence().floatValue() : 0.0f)
-                .hash(hash)
-                .status(ocrResponse.getConfidence() != null && ocrResponse.getConfidence() >= 0.8 
-                    ? DocumentPage.DocumentPageStatus.OK 
-                    : DocumentPage.DocumentPageStatus.REVIEW)
-                .s3Url(s3Url)
-                .processedAt(LocalDateTime.now())
-                .build();
-            
-            // Salvar no banco com flush para garantir commit imediato
-            try {
-                // Usar findById para garantir que sempre usamos a mesma entidade (evita duplicatas)
-                log.debug("🟡 OcrWorker: Verificando se DocumentPage {} já existe no banco...", pageId);
-                DocumentPage existing = documentPageRepository.findById(pageId).orElse(null);
-                if (existing != null) {
-                    log.info("🟡 OcrWorker: DocumentPage {} já existe. Atualizando campos...", pageId);
-                    // Atualizar campos
-                    existing.setCpf(normalizedCpf);
-                    existing.setName(normalizedName);
-                    existing.setPeriod(period);
-                    existing.setLiquidValue(liquidValue);
-                    existing.setRawText(rawText);
-                    existing.setCompanyName(normalizedCompanyName);
-                    existing.setCompanyCnpj(normalizedCompanyCnpj);
-                    existing.setWorkPostName(normalizedWorkPostName);
-                    existing.setOcrConfidence(documentPage.getOcrConfidence());
-                    existing.setHash(documentPage.getHash());
-                    existing.setStatus(documentPage.getStatus());
-                    existing.setProcessedAt(LocalDateTime.now());
-                    documentPage = documentPageRepository.saveAndFlush(existing);
-                    log.info("✅ OcrWorker: DocumentPage {} atualizada no banco - ID salvo: {}", pageId, documentPage.getId());
-                } else {
-                    log.info("🟡 OcrWorker: Criando nova DocumentPage com ID: {} (builder definiu: {})", pageId, documentPage.getId());
-                    documentPage = documentPageRepository.saveAndFlush(documentPage);
-                    log.info("✅ OcrWorker: DocumentPage {} criada no banco - ID após save: {}", pageId, documentPage.getId());
-                    
-                    // Verificar se o ID foi preservado (agora deve ser preservado após remover @GeneratedValue)
-                    if (!documentPage.getId().equals(pageId)) {
-                        log.error("❌ OcrWorker: ERRO CRÍTICO - ID da DocumentPage foi alterado! Esperado: {}, Obtido: {}", pageId, documentPage.getId());
-                        // Usar o ID salvo no banco para publicação no stream
-                        pageId = documentPage.getId();
-                    }
-                }
-                
-                // saveAndFlush() já faz flush dentro da transação, não precisamos fazer manualmente
-                // O @Transactional garante que o commit será feito ao final do método
-                
-                log.info("✅ OcrWorker: DocumentPage salva no banco - pageId esperado: {}, pageId salvo: {}, type={}, status={}, cpf={}, name={}", 
-                    pageId, documentPage.getId(), documentType, documentPage.getStatus(), documentPage.getCpf(), documentPage.getName());
-            } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                log.error("❌ OcrWorker: Erro de integridade ao salvar DocumentPage - pageId={}, erro={}", pageId, e.getMessage(), e);
-                // Tentar salvar novamente com dados mínimos
-                try {
-                    DocumentPage minimalPage = DocumentPage.builder()
-                        .id(pageId)
-                        .jobId(jobId)
-                        .type(documentType)
-                        .pageNumber(pageIndex)
-                        .status(DocumentPage.DocumentPageStatus.ERROR)
-                        .s3Url(s3Url)
-                        .processedAt(LocalDateTime.now())
-                        .build();
-                    documentPage = documentPageRepository.saveAndFlush(minimalPage);
-                    log.warn("⚠️ OcrWorker: DocumentPage salva com dados mínimos devido a erro de integridade");
-                } catch (Exception ex) {
-                    log.error("❌ OcrWorker: Erro crítico ao salvar DocumentPage mesmo com dados mínimos", ex);
-                    throw e; // Re-throw o erro original
-                }
-            } catch (Exception e) {
-                log.error("❌ OcrWorker: Erro inesperado ao salvar DocumentPage - pageId={}", pageId, e);
-                throw e;
-            }
-            
-            // Preparar dados para publicação no stream (após commit)
-            // Usar o ID da entidade salva para garantir consistência (agora deve ser o mesmo que pageId após remover @GeneratedValue)
-            final UUID finalPageId = documentPage.getId();
-            Map<String, String> parsedFields = new HashMap<>();
-            parsedFields.put("jobId", jobId.toString());
-            parsedFields.put("pageId", finalPageId.toString());
-            parsedFields.put("cpf", documentPage.getCpf() != null ? documentPage.getCpf() : "");
-            parsedFields.put("name", documentPage.getName() != null ? documentPage.getName() : "");
-            parsedFields.put("value", documentPage.getLiquidValue() != null ? documentPage.getLiquidValue().toString() : "");
-            parsedFields.put("period", documentPage.getPeriod() != null ? documentPage.getPeriod() : "");
-            parsedFields.put("type", documentPage.getType().name());
-            parsedFields.put("confidence", String.valueOf(documentPage.getOcrConfidence()));
-            
-            // Publicar no stream APÓS o commit da transação
-            final var recordIdToAck = record.getId();
-            final int finalPageIndex = pageIndex;
-            
-            // Verificar se há transação ativa antes de registrar
-            if (TransactionSynchronizationManager.isActualTransactionActive()) {
-                log.debug("🟡 OcrWorker: Transação ativa detectada, registrando sincronização para publicação após commit");
-                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            log.info("🟢 OcrWorker: Callback afterCommit() executado - publicando no stream");
-                            var messageId = redisTemplate.opsForStream().add(STREAM_PARSED, parsedFields);
-                            log.info("✅ OcrWorker: Página {} publicada no stream:parsed com messageId: {} (após commit)", finalPageIndex, messageId);
-                            System.out.println("✅ OcrWorker: Página " + finalPageIndex + " publicada no stream:parsed (após commit)");
-                            
-                            // ACK da mensagem
-                            redisTemplate.opsForStream().acknowledge(STREAM_PAGES, CONSUMER_GROUP, recordIdToAck);
-                        } catch (Exception e) {
-                            log.error("❌ OcrWorker: Erro ao publicar no stream após commit", e);
-                        }
-                    }
-                });
-            } else {
-                // Se não há transação ativa, publicar imediatamente (não deveria acontecer, mas é um fallback)
-                log.warn("⚠️ OcrWorker: Nenhuma transação ativa detectada! Publicando imediatamente no stream (isso não deveria acontecer)");
-                try {
-                    var messageId = redisTemplate.opsForStream().add(STREAM_PARSED, parsedFields);
-                    log.info("✅ OcrWorker: Página {} publicada no stream:parsed com messageId: {} (sem transação)", finalPageIndex, messageId);
-                    redisTemplate.opsForStream().acknowledge(STREAM_PAGES, CONSUMER_GROUP, recordIdToAck);
-                } catch (Exception e) {
-                    log.error("❌ OcrWorker: Erro ao publicar no stream", e);
-                }
-            }
-            
-            log.info("✅ OcrWorker: Página {} processada com sucesso - Confiança: {}, Type: {}, CPF: {}, Nome: {}", 
-                pageIndex, documentPage.getOcrConfidence(), documentType, documentPage.getCpf(), documentPage.getName());
-            System.out.println("✅ OcrWorker: Página " + pageIndex + " processada - Type: " + documentType + ", CPF: " + documentPage.getCpf());
+            // 3. Salvar no banco e publicar no stream de forma transacional rápida
+            self.saveOcrResult(jobId, pageId, pageIndex, s3Url, ocrResponse, hash, record.getValue().get("documentType"), record.getId().getValue());
             
         } catch (Exception e) {
             log.error("❌ OcrWorker: Erro ao processar OCR da página {} do job {}", pageIndex, jobId, e);
-            // Marcar como erro - IMPORTANTE: sempre definir o type (obrigatório no banco)
-            try {
-                DocumentPage.DocumentType defaultType = DocumentPage.DocumentType.HOLERITE;
-                
-                DocumentPage errorPage = DocumentPage.builder()
-                    .id(pageId)
-                    .jobId(jobId)
-                    .pageNumber(pageIndex)
-                    .type(defaultType) // SEMPRE definir o type (obrigatório no banco)
-                    .status(DocumentPage.DocumentPageStatus.ERROR)
-                    .s3Url(s3Url)
-                    .processedAt(LocalDateTime.now())
-                    .build();
-                documentPageRepository.saveAndFlush(errorPage);
-                log.warn("⚠️ OcrWorker: Página {} marcada como ERROR e salva no banco (type={})", pageIndex, defaultType);
-            } catch (Exception ex) {
-                log.error("❌ OcrWorker: Erro ao salvar página com erro no banco", ex);
+            // Salvar status de erro de forma transacional rápida
+            self.saveOcrError(jobId, pageId, pageIndex, s3Url, record.getValue().get("documentType"), e.getMessage(), record.getId().getValue());
+        }
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void saveOcrResult(UUID jobId, UUID pageId, int pageIndex, String s3Url, 
+                              GeminiOcrResponse ocrResponse, String hash, 
+                              String documentTypeStr, String recordIdToAck) {
+        log.info("🟢 OcrWorker: Iniciando persistência transacional para página {}", pageIndex);
+        
+        // Buscar o job para obter o documentType
+        DocumentProcessingJob job = jobRepository.findById(jobId)
+            .orElseThrow(() -> new RuntimeException("Job não encontrado: " + jobId));
+        
+        // Obter documentType do job (ou do parâmetro como fallback)
+        if (documentTypeStr == null && job.getDocumentType() != null) {
+            documentTypeStr = job.getDocumentType();
+        }
+        if (documentTypeStr == null) {
+            documentTypeStr = "HOLERITE"; // Default
+        }
+        
+        DocumentPage.DocumentType documentType = documentTypeStr.equalsIgnoreCase("COMPROVANTE") 
+            ? DocumentPage.DocumentType.COMPROVANTE 
+            : DocumentPage.DocumentType.HOLERITE;
+        
+        // Normalizar dados extraídos
+        String normalizedCpf = normalizeCpf(ocrResponse.getCpf());
+        String normalizedName = normalizeName(ocrResponse.getName());
+        String period = ocrResponse.getPeriod();
+        BigDecimal liquidValue = parseValue(ocrResponse.getValueLiquid());
+        String rawText = extractRawText(ocrResponse);
+        
+        // Normalizar dados de empresa e setor
+        String normalizedCompanyName = normalizeName(ocrResponse.getCompanyName());
+        String normalizedCompanyCnpj = normalizeCnpj(ocrResponse.getCompanyCnpj());
+        String normalizedWorkPostName = normalizeName(ocrResponse.getSector());
+        
+        DocumentPage documentPage = DocumentPage.builder()
+            .id(pageId)
+            .jobId(jobId)
+            .type(documentType)
+            .cpf(normalizedCpf)
+            .name(normalizedName)
+            .period(period)
+            .liquidValue(liquidValue)
+            .pageNumber(pageIndex)
+            .rawText(rawText)
+            .companyName(normalizedCompanyName)
+            .companyCnpj(normalizedCompanyCnpj)
+            .workPostName(normalizedWorkPostName)
+            .ocrConfidence(ocrResponse.getConfidence() != null ? ocrResponse.getConfidence().floatValue() : 0.0f)
+            .hash(hash)
+            .status(ocrResponse.getConfidence() != null && ocrResponse.getConfidence() >= 0.8 
+                ? DocumentPage.DocumentPageStatus.OK 
+                : DocumentPage.DocumentPageStatus.REVIEW)
+            .s3Url(s3Url)
+            .processedAt(LocalDateTime.now())
+            .build();
+        
+        // Salvar no banco
+        DocumentPage existing = documentPageRepository.findById(pageId).orElse(null);
+        if (existing != null) {
+            log.info("🟡 OcrWorker: DocumentPage {} já existe. Atualizando campos...", pageId);
+            existing.setCpf(normalizedCpf);
+            existing.setName(normalizedName);
+            existing.setPeriod(period);
+            existing.setLiquidValue(liquidValue);
+            existing.setRawText(rawText);
+            existing.setCompanyName(normalizedCompanyName);
+            existing.setCompanyCnpj(normalizedCompanyCnpj);
+            existing.setWorkPostName(normalizedWorkPostName);
+            existing.setOcrConfidence(documentPage.getOcrConfidence());
+            existing.setHash(documentPage.getHash());
+            existing.setStatus(documentPage.getStatus());
+            existing.setProcessedAt(LocalDateTime.now());
+            documentPage = documentPageRepository.saveAndFlush(existing);
+        } else {
+            log.info("🟡 OcrWorker: Criando nova DocumentPage com ID: {}", pageId);
+            documentPage = documentPageRepository.saveAndFlush(documentPage);
+        }
+        
+        // Preparar dados para publicação no stream (após commit)
+        final UUID finalPageId = documentPage.getId();
+        final String finalCpf = documentPage.getCpf() != null ? documentPage.getCpf() : "";
+        final String finalName = documentPage.getName() != null ? documentPage.getName() : "";
+        final String finalValue = documentPage.getLiquidValue() != null ? documentPage.getLiquidValue().toString() : "";
+        final String finalPeriod = documentPage.getPeriod() != null ? documentPage.getPeriod() : "";
+        final String finalType = documentPage.getType().name();
+        final float finalConfidence = documentPage.getOcrConfidence();
+        
+        Map<String, String> parsedFields = new HashMap<>();
+        parsedFields.put("jobId", jobId.toString());
+        parsedFields.put("pageId", finalPageId.toString());
+        parsedFields.put("cpf", finalCpf);
+        parsedFields.put("name", finalName);
+        parsedFields.put("value", finalValue);
+        parsedFields.put("period", finalPeriod);
+        parsedFields.put("type", finalType);
+        parsedFields.put("confidence", String.valueOf(finalConfidence));
+        
+        // Publicar no stream APÓS o commit da transação
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        log.info("🟢 OcrWorker: Callback afterCommit() executado - publicando no stream");
+                        var messageId = redisTemplate.opsForStream().add(STREAM_PARSED, parsedFields);
+                        log.info("✅ OcrWorker: Página {} publicada no stream:parsed com messageId: {}", pageIndex, messageId);
+                        redisTemplate.opsForStream().acknowledge(STREAM_PAGES, CONSUMER_GROUP, recordIdToAck);
+                    } catch (Exception e) {
+                        log.error("❌ OcrWorker: Erro ao publicar no stream após commit", e);
+                    }
+                }
+            });
+        } else {
+            var messageId = redisTemplate.opsForStream().add(STREAM_PARSED, parsedFields);
+            log.info("✅ OcrWorker: Página {} publicada no stream:parsed sem transação ativa com messageId: {}", pageIndex, messageId);
+            redisTemplate.opsForStream().acknowledge(STREAM_PAGES, CONSUMER_GROUP, recordIdToAck);
+        }
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void saveOcrError(UUID jobId, UUID pageId, int pageIndex, String s3Url, 
+                             String documentTypeStr, String errorMessage, String recordIdToAck) {
+        log.info("🟢 OcrWorker: Persistindo status de erro transacional para página {}", pageIndex);
+        try {
+            DocumentProcessingJob job = jobRepository.findById(jobId).orElse(null);
+            String docType = documentTypeStr;
+            if (docType == null && job != null && job.getDocumentType() != null) {
+                docType = job.getDocumentType();
             }
+            if (docType == null) {
+                docType = "HOLERITE";
+            }
+            DocumentPage.DocumentType defaultType = docType.equalsIgnoreCase("COMPROVANTE") 
+                ? DocumentPage.DocumentType.COMPROVANTE 
+                : DocumentPage.DocumentType.HOLERITE;
+            
+            DocumentPage errorPage = DocumentPage.builder()
+                .id(pageId)
+                .jobId(jobId)
+                .pageNumber(pageIndex)
+                .type(defaultType)
+                .status(DocumentPage.DocumentPageStatus.ERROR)
+                .s3Url(s3Url)
+                .processedAt(LocalDateTime.now())
+                .build();
+            documentPageRepository.saveAndFlush(errorPage);
+            log.warn("⚠️ OcrWorker: Página {} marcada como ERROR e salva no banco (type={})", pageIndex, defaultType);
+        } catch (Exception ex) {
+            log.error("❌ OcrWorker: Erro ao salvar página com erro no banco", ex);
+        }
+        
+        // Fazer ACK no Redis
+        try {
+            redisTemplate.opsForStream().acknowledge(STREAM_PAGES, CONSUMER_GROUP, recordIdToAck);
+        } catch (Exception ackEx) {
+            log.error("Erro ao fazer ACK de erro da mensagem {}", recordIdToAck, ackEx);
         }
     }
     

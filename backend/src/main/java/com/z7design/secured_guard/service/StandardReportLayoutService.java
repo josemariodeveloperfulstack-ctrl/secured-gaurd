@@ -478,6 +478,11 @@ public class StandardReportLayoutService {
             footerFont = loadCalibriLightFont(pdfDoc);
         }
 
+        float leftFooterX = config.getLeftMargin();
+        float rightFooterWidth = 240f;
+        float leftFooterWidth = pageWidth - leftFooterX - config.getRightMargin() - rightFooterWidth - 10f;
+        float rightFooterX = pageWidth - rightFooterWidth - config.getRightMargin();
+
         // Primeira linha: Nome da empresa (centralizado)
         if (company.getName() != null && !company.getName().isEmpty()) {
             Paragraph companyNameFooter = new Paragraph(company.getName())
@@ -492,7 +497,7 @@ public class StandardReportLayoutService {
                 companyNameFooter.setFont(footerFont);
             }
             float yPos = useCalibriLight ? yPosition + 37f : yPosition + 30f;
-            canvas.add(companyNameFooter.setFixedPosition(12f, yPos, pageWidth));
+            canvas.add(companyNameFooter.setFixedPosition(leftFooterX, yPos, leftFooterWidth));
         }
 
         // Segunda linha: Endereço completo
@@ -507,7 +512,7 @@ public class StandardReportLayoutService {
                 addressFooter.setFont(footerFont);
             }
             float yPos = useCalibriLight ? yPosition + 23f : yPosition + 20f;
-            canvas.add(addressFooter.setFixedPosition(12f, yPos, pageWidth));
+            canvas.add(addressFooter.setFixedPosition(leftFooterX, yPos, leftFooterWidth));
         }
 
         // Terceira linha: CNPJ
@@ -522,12 +527,10 @@ public class StandardReportLayoutService {
                 cnpjFooter.setFont(footerFont);
             }
             float yPos = useCalibriLight ? yPosition + 10f : yPosition + 10f;
-            canvas.add(cnpjFooter.setFixedPosition(12f, yPos, pageWidth));
+            canvas.add(cnpjFooter.setFixedPosition(leftFooterX, yPos, leftFooterWidth));
         }
 
         // Bloco direito: usuário e data da geração (acima da numeração), alinhado à direita
-        float rightFooterWidth = 240f;
-        float rightFooterX = pageWidth - rightFooterWidth - 12f;
         DeviceRgb metaColor = new DeviceRgb(55, 55, 55);
 
         // Resolver usuário (prioriza config, fallback para contexto de emissão)
@@ -566,7 +569,7 @@ public class StandardReportLayoutService {
         float pageWidth = pageSize.getWidth();
         float yPosition = 0;
         float rightFooterWidth = 240f;
-        float rightFooterX = pageWidth - rightFooterWidth - 12f;
+        float rightFooterX = pageWidth - rightFooterWidth - config.getRightMargin();
         DeviceRgb pageNumColor = new DeviceRgb(45, 45, 45);
         String pageText = "Página " + pageNum + " de " + totalPages;
         Paragraph pageNumFooter = new Paragraph(pageText)

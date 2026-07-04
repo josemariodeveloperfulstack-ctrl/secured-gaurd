@@ -807,6 +807,36 @@ export const employeeService = {
   },
 
   /**
+   * Recontratar funcionário demitido (readmissão ou promoção)
+   */
+  async rehireEmployee(id: string, employeeData: any): Promise<Employee> {
+    try {
+      const payload = prepareEmployeePayload(employeeData, { partialUpdate: false });
+      const response = await api.post(`/api/employees/${id}/rehire`, payload);
+      return this.normalizeEmployee(response.data) as Employee;
+    } catch (error: any) {
+      console.error('Erro ao recontratar funcionário:', error);
+      rethrowIfConnectionError(error);
+      throw new Error(getApiErrorMessage(error, 'Erro ao recontratar funcionário'));
+    }
+  },
+
+  /**
+   * Buscar funcionário demitido elegível para recontratação pelo CPF
+   */
+  async findEligibleForRehire(cpf: string): Promise<Employee | null> {
+    const digits = cpf.replace(/\D/g, '');
+    if (digits.length !== 11) return null;
+    try {
+      const response = await api.get(`/api/employees/eligible-for-rehire/cpf/${digits}`);
+      return this.normalizeEmployee(response.data) as Employee;
+    } catch (error: any) {
+      if (error?.response?.status === 404) return null;
+      throw new Error(getApiErrorMessage(error, 'Erro ao verificar elegibilidade para recontratação'));
+    }
+  },
+
+  /**
    * Atualizar status do funcionário
    */
   async updateEmployeeStatus(id: string, status: string): Promise<Employee> {
@@ -833,6 +863,21 @@ export const employeeService = {
     } catch (error: any) {
       console.error('Erro ao gerar PDF do histórico:', error);
       throw new Error(error.response?.data?.message || 'Erro ao gerar PDF do histórico');
+    }
+  },
+
+  /**
+   * Gerar PDF somente do histórico de mudanças (vínculos + alterações de dados)
+   */
+  async generateEmployeeChangeHistoryPdf(id: string): Promise<Blob> {
+    try {
+      const response = await api.get(`/api/employees/${id}/generate-change-history-pdf`, {
+        responseType: 'blob',
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao gerar PDF do histórico de mudanças:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao gerar PDF do histórico de mudanças');
     }
   },
 

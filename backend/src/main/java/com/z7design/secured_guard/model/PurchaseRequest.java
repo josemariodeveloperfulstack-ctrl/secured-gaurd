@@ -8,6 +8,8 @@ import lombok.Builder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -130,6 +132,9 @@ public class PurchaseRequest {
     /** JSON: [{"size":"42","quantity":3}] */
     @Column(name = "size_breakdown", columnDefinition = "TEXT")
     private String sizeBreakdown;
+
+    @OneToMany(mappedBy = "purchaseRequest", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<PurchaseRequestItem> items = new ArrayList<>();
     
     // Métodos de negócio
     public boolean isUrgent() {

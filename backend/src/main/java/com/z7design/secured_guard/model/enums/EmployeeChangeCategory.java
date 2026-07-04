@@ -22,6 +22,7 @@ public enum EmployeeChangeCategory {
     FALTA("Falta"),
     ADVERTENCIA("Advertência"),
     ATIVIDADE("Atividade"),
+    VINCULO_EMPREGATICIO("Vínculo empregatício"),
     OUTROS("Outros");
 
     private final String label;

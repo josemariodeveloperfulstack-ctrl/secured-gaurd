@@ -232,6 +232,9 @@ public class EmployeeDTO {
     private Boolean exameMedicoPrimeiroEmprego; // true = Sim, false = Não
     private Boolean exameMedicoContribuicaoSindicalPaga; // true = Sim, false = Não
 
+    /** Tipo de admissão para recontratação: READMISSAO ou PROMOCAO */
+    private String admissionType;
+
     /**
      * Usuário do sistema vinculado ao funcionário (opcional).
      * Só deve ser preenchido se o funcionário também for usuário do sistema.

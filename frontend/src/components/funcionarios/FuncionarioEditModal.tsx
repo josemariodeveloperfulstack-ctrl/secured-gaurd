@@ -32,7 +32,7 @@ import { companyService } from '@/services/companyService';
 import { Company } from '@/types/company';
 import { User } from '@/types/user';
 import { Employee } from '@/types/employee';
-import { Search, User as UserIcon, Building, Briefcase, Plus, FileText } from 'lucide-react';
+import { Search, User as UserIcon, Building, Briefcase, Plus, FileText, Download, Loader2 } from 'lucide-react';
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import { useToast } from '@/hooks/use-toast';
 import workPostService, { WorkPost } from '@/services/workPostService';
@@ -51,6 +51,14 @@ import { History, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { remanejamentoService, Remanejamento } from '@/services/remanejamentoService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DismissalReasonSelect } from '@/components/funcionarios/DismissalReasonSelect';
+import { employeeChangeHistoryService, EmployeeChangeHistoryPage } from '@/services/employeeChangeHistoryService';
+import {
+  employeeEmploymentPeriodService,
+  EligibleRehireEmployee,
+  EmployeeEmploymentPeriod,
+  EmploymentAdmissionType,
+} from '@/services/employeeEmploymentPeriodService';
+import RehireAdmissionPanel from '@/components/funcionarios/RehireAdmissionPanel';
 
 interface FuncionarioEditModalProps {
   open: boolean;
@@ -226,6 +234,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
   // Estados que devem estar antes de qualquer return (Rules of Hooks)
   const [cpfError, setCpfError] = useState<string | null>(null);
+  const [eligibleRehireEmployee, setEligibleRehireEmployee] = useState<EligibleRehireEmployee | null>(null);
+  const [rehireAdmissionType, setRehireAdmissionType] = useState<EmploymentAdmissionType | ''>('');
+  const [employmentPeriods, setEmploymentPeriods] = useState<EmployeeEmploymentPeriod[]>([]);
+  const [employmentPeriodsLoading, setEmploymentPeriodsLoading] = useState(false);
+  const [historyPdfLoading, setHistoryPdfLoading] = useState(false);
   const [canCreateDefaultUser, setCanCreateDefaultUser] = useState(false);
   const [criarUsuarioModalOpen, setCriarUsuarioModalOpen] = useState(false);
   const [novoMedicoModalOpen, setNovoMedicoModalOpen] = useState(false);
@@ -302,16 +315,28 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     
     // Buscar histórico de auditoria
     setHistoryLoading(true);
-    employeeChangeHistoryService
-      .getByEmployeeId(funcionario.id, historyPageIndex, 20)
-      .then((data) => {
-        if (!cancelled) setHistoryData(data);
+    setEmploymentPeriodsLoading(true);
+    Promise.all([
+      employeeChangeHistoryService.getByEmployeeId(funcionario.id, historyPageIndex, 20),
+      employeeEmploymentPeriodService.getEmploymentPeriods(funcionario.id),
+    ])
+      .then(([history, periods]) => {
+        if (!cancelled) {
+          setHistoryData(history);
+          setEmploymentPeriods(periods);
+        }
       })
       .catch(() => {
-        if (!cancelled) setHistoryData(null);
+        if (!cancelled) {
+          setHistoryData(null);
+          setEmploymentPeriods([]);
+        }
       })
       .finally(() => {
-        if (!cancelled) setHistoryLoading(false);
+        if (!cancelled) {
+          setHistoryLoading(false);
+          setEmploymentPeriodsLoading(false);
+        }
       });
 
     // Buscar histórico de remanejamentos
@@ -691,6 +716,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         setForm(formToSet);
         initialWorkPostIdRef.current = String(formToSet.workPostId || '').toLowerCase();
         workPostSelectReadyRef.current = false;
+        if ((formToSet.status || '').toUpperCase() === 'TERMINATED') {
+          setEligibleRehireEmployee(employeeData as EligibleRehireEmployee);
+        } else {
+          setEligibleRehireEmployee(null);
+          setRehireAdmissionType('');
+        }
         setTemIntervaloRefeicao(employeeData.horarioTrabalhoIntervalo ? 'sim' : 'nao');
 
         const docRef = (employeeData as any).exameMedicoDoctor;
@@ -1225,6 +1256,18 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     }
   };
 
+  const handleRehireAdmissionTypeChange = (type: EmploymentAdmissionType) => {
+    setRehireAdmissionType(type);
+    const prevHire = eligibleRehireEmployee?.hireDate;
+    setForm((prev) => ({
+      ...prev,
+      status: 'ACTIVE',
+      hireDate: prev.hireDate === prevHire ? '' : prev.hireDate,
+    }));
+  };
+
+  const isRehireFormMode = Boolean(eligibleRehireEmployee && rehireAdmissionType);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -1268,6 +1311,25 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       return;
     }
 
+    if (eligibleRehireEmployee?.id && !rehireAdmissionType) {
+      setError('Selecione Readmissão ou Promoção para recontratar o funcionário.');
+      return;
+    }
+
+    const isRehireFlow = Boolean(eligibleRehireEmployee?.id && rehireAdmissionType);
+
+    if (isRehireFlow) {
+      if (!form.hireDate) {
+        setError('Informe a nova data de admissão para a recontratação.');
+        return;
+      }
+      const prevHire = eligibleRehireEmployee?.hireDate;
+      if (prevHire && form.hireDate === prevHire) {
+        setError('A nova data de admissão deve ser diferente da data do vínculo anterior (preservada no histórico).');
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -1294,7 +1356,22 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         employeeData.remanejamentoDataInicio = remanejamentoDataInicio;
       }
 
-      const updatedEmployee = await employeeService.updateEmployee(funcionario.id, employeeData);
+      if (isRehireFlow) {
+        employeeData.admissionType = rehireAdmissionType;
+        employeeData.status = 'ACTIVE';
+        delete employeeData.dataRescisao;
+        delete employeeData.terminationDate;
+        delete employeeData.terminationReason;
+      }
+
+      const updatedEmployee = isRehireFlow
+        ? await employeeService.rehireEmployee(funcionario.id, employeeData)
+        : await employeeService.updateEmployee(funcionario.id, employeeData);
+
+      if (isRehireFlow) {
+        setEligibleRehireEmployee(null);
+        setRehireAdmissionType('');
+      }
       syncInitialWorkPostRef(
         updatedEmployee?.workPostId || updatedEmployee?.workPost?.id || employeeData.workPostId,
       );
@@ -1307,7 +1384,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       }
       toast({
         title: "Sucesso",
-        description: "Funcionário atualizado com sucesso!",
+        description: isRehireFlow
+          ? `Funcionário recontratado (${rehireAdmissionType === 'PROMOCAO' ? 'Promoção' : 'Readmissão'}) com sucesso!`
+          : "Funcionário atualizado com sucesso!",
       });
       onSuccess();
     } catch (err: any) {
@@ -1551,6 +1630,28 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     a.click();
     a.remove();
     window.URL.revokeObjectURL(url);
+  };
+
+  const handleChangeHistoryPdf = async () => {
+    if (!funcionario?.id) return;
+    setHistoryPdfLoading(true);
+    try {
+      const blob = await employeeService.generateEmployeeChangeHistoryPdf(funcionario.id);
+      downloadBlob(blob, `historico-mudancas-${funcionario.name?.replace(/\s+/g, '_').toLowerCase() || funcionario.id}.pdf`);
+      toast({
+        title: 'Relatório gerado',
+        description: 'PDF do histórico de mudanças baixado com sucesso.',
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao gerar relatório';
+      toast({
+        title: 'Erro',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setHistoryPdfLoading(false);
+    }
   };
 
   const handleEmployeeRecordPdf = async (mode: 'download' | 'preview') => {
@@ -3069,7 +3170,15 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Dados do Cadastro / Admissão</h3>
                       </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {eligibleRehireEmployee && (
+                        <RehireAdmissionPanel
+                          eligibleEmployee={eligibleRehireEmployee}
+                          admissionType={rehireAdmissionType}
+                          onAdmissionTypeChange={handleRehireAdmissionTypeChange}
+                          showTerminatedEditHint
+                        />
+                      )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">PIS</span>
@@ -3098,7 +3207,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                  <span className="truncate">Data de Admissão</span>
+                  <span className="truncate">{isRehireFormMode ? 'Nova data de admissão' : 'Data de Admissão'}</span>
                   <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                 </Label>
                 <DatePicker
@@ -3107,6 +3216,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   className="h-10 sm:h-11 w-full"
                 />
               </div>
+              {!isRehireFormMode && (
               <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Data de Demissão</span>
@@ -3118,7 +3228,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             className="h-10 sm:h-11 w-full"
                           />
                         </div>
-                        {form.dataRescisao && (
+              )}
+                        {!isRehireFormMode && form.dataRescisao && (
                           <div className="md:col-span-2">
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Motivo da Demissão</span>
@@ -4044,12 +4155,73 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   <TabsContent value="historico" className="space-y-4 sm:space-y-6">
                     <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
                       <div className="p-4 sm:p-6 space-y-4">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                            <History className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                              <History className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                            </div>
+                            <h3 className="text-lg sm:text-xl font-semibold text-white">Histórico de Mudanças</h3>
                           </div>
-                          <h3 className="text-lg sm:text-xl font-semibold text-white">Histórico de Mudanças</h3>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleChangeHistoryPdf}
+                            disabled={historyPdfLoading || !funcionario?.id}
+                            className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow/10 h-10"
+                          >
+                            {historyPdfLoading ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Download className="mr-2 h-4 w-4" />
+                            )}
+                            Gerar Relatório PDF
+                          </Button>
                         </div>
+
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-semibold text-gray-200">Vínculos empregatícios</h4>
+                          {employmentPeriodsLoading ? (
+                            <p className="text-gray-400 text-sm">Carregando vínculos...</p>
+                          ) : !employmentPeriods.length ? (
+                            <p className="text-gray-500 text-xs">Nenhum vínculo registrado.</p>
+                          ) : (
+                            <div className="overflow-x-auto rounded-lg border border-gray-600">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-800/80 text-gray-300">
+                                  <tr>
+                                    <th className="text-left p-3">Tipo</th>
+                                    <th className="text-left p-3">Empresa</th>
+                                    <th className="text-left p-3">Cargo</th>
+                                    <th className="text-left p-3">Admissão</th>
+                                    <th className="text-left p-3">Demissão</th>
+                                    <th className="text-left p-3">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="text-gray-400 divide-y divide-gray-600">
+                                  {employmentPeriods.map((period) => (
+                                    <tr key={period.id} className="hover:bg-gray-800/50">
+                                      <td className="p-3">{period.admissionTypeLabel || period.admissionType}</td>
+                                      <td className="p-3">{period.companyName || '-'}</td>
+                                      <td className="p-3">{period.positionName || '-'}</td>
+                                      <td className="p-3 whitespace-nowrap">
+                                        {period.hireDate ? new Date(period.hireDate).toLocaleDateString('pt-BR') : '-'}
+                                      </td>
+                                      <td className="p-3 whitespace-nowrap">
+                                        {period.terminationDate
+                                          ? new Date(period.terminationDate).toLocaleDateString('pt-BR')
+                                          : '-'}
+                                      </td>
+                                      <td className="p-3">
+                                        {period.status === 'TERMINATED' ? 'Demitido' : 'Ativo'}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+
                         {historyLoading ? (
                           <div className="text-center py-8">
                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-seguranca-yellow mx-auto" />

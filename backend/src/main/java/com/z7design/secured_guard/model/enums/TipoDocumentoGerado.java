@@ -33,6 +33,7 @@ public enum TipoDocumentoGerado {
     ACCOUNTING_FORM("Ficha de Contabilidade"),
     EMPLOYEE_RECORD("Ficha de Registro do Funcionário"),
     EMPLOYEE_HISTORY("Histórico do Funcionário"),
+    EMPLOYEE_CHANGE_HISTORY("Histórico de Mudanças do Funcionário"),
     VISIT_CONTROL_REPORT("Relatório de Controle de Visitas"),
     VEHICLE_MAINTENANCE_REPORT("Relatório de Manutenção de Veículos"),
     TRANSPORT_GUIDE("Guia de Transporte"),

@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.z7design.secured_guard.dto.PurchaseRequestDTO;
+import com.z7design.secured_guard.dto.PurchaseRequestItemDTO;
 import com.z7design.secured_guard.dto.PurchaseRequestSizeEntryDTO;
 import com.z7design.secured_guard.model.PurchaseRequest;
 import com.z7design.secured_guard.model.PurchaseRequestItem;
@@ -268,8 +269,20 @@ public class PurchaseRequestService {
         dto.setOverdue(request.isOverdue());
         dto.setDaysUntilRequired(request.getDaysUntilRequired());
         
-        // Se não houver itens, usar estimatedTotal como totalValue
-        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+        // Popular itens da solicitação
+        List<PurchaseRequestItem> items = request.getItems();
+        if (items != null && !items.isEmpty()) {
+            List<PurchaseRequestItemDTO> itemDTOs = items.stream()
+                    .map(this::convertItemToDTO)
+                    .collect(Collectors.toList());
+            dto.setItems(itemDTOs);
+            dto.setTotalItems(itemDTOs.size());
+            BigDecimal total = items.stream()
+                    .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            dto.setTotalValue(total.compareTo(BigDecimal.ZERO) > 0 ? total
+                    : (request.getEstimatedTotal() != null ? request.getEstimatedTotal() : BigDecimal.ZERO));
+        } else {
             dto.setTotalValue(request.getEstimatedTotal() != null ? request.getEstimatedTotal() : BigDecimal.ZERO);
             dto.setTotalItems(0);
         }
@@ -371,6 +384,41 @@ public class PurchaseRequestService {
             Optional<User> approver = userRepository.findById(dto.getApproverId());
             approver.ifPresent(request::setApprover);
         }
+    }
+
+    private PurchaseRequestItemDTO convertItemToDTO(PurchaseRequestItem item) {
+        return PurchaseRequestItemDTO.builder()
+                .id(item.getId())
+                .purchaseRequestId(item.getPurchaseRequest() != null ? item.getPurchaseRequest().getId() : null)
+                .productId(item.getProduct() != null ? item.getProduct().getId() : null)
+                .productName(item.getProduct() != null ? item.getProduct().getName() : null)
+                .itemName(item.getItemName())
+                .description(item.getDescription())
+                .specification(item.getSpecification())
+                .unit(item.getUnit())
+                .quantity(item.getQuantity())
+                .unitPrice(item.getUnitPrice())
+                .totalPrice(item.getTotalPrice())
+                .brand(item.getBrand())
+                .model(item.getModel())
+                .supplier(item.getSupplier())
+                .priority(item.getPriority())
+                .status(item.getStatus())
+                .justification(item.getJustification())
+                .alternativeSupplier(item.getAlternativeSupplier())
+                .notes(item.getNotes())
+                .urgency(item.getUrgency())
+                .currentStock(item.getCurrentStock())
+                .minimumStock(item.getMinimumStock())
+                .stockStatus(item.getStockStatus())
+                .approvedBy(item.getApprovedBy())
+                .approvalNotes(item.getApprovalNotes())
+                .rejectedBy(item.getRejectedBy())
+                .rejectionReason(item.getRejectionReason())
+                .urgent(item.isUrgent())
+                .lowStock(item.isLowStock())
+                .outOfStock(item.isOutOfStock())
+                .build();
     }
 
     private List<PurchaseRequestSizeEntryDTO> parseSizeBreakdown(String json) {
