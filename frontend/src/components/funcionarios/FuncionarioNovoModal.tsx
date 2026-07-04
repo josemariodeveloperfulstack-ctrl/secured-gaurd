@@ -781,27 +781,23 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     }
   }, [open]);
 
-  // Função para carregar Postos de Trabalho (pode ser filtrado por empresa)
-  const loadWorkPostsData = async (companyId?: string) => {
+  // Função para carregar Postos de Trabalho (carrega todos do sistema e ordena alfabeticamente)
+  const loadWorkPostsData = async () => {
     try {
-      let wp;
-      if (companyId) {
-        wp = await workPostService.getWorkPostsByCompany(companyId);
-      } else {
-        wp = await workPostService.getAllWorkPosts();
-      }
-      setWorkPosts(wp);
+      const wp = await workPostService.getAllWorkPosts();
+      const sortedWp = (wp || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setWorkPosts(sortedWp);
     } catch (e) {
       console.error('Erro ao carregar postos de trabalho', e);
     }
   };
 
-  // Carregar Postos de Trabalho quando a empresa mudar
+  // Carregar Postos de Trabalho ao abrir o modal
   useEffect(() => {
     if (open) {
-      loadWorkPostsData(selectedCompany?.id);
+      loadWorkPostsData();
     }
-  }, [selectedCompany?.id, open]); // Re-carregar também ao abrir o modal
+  }, [open]);
 
   // Habilitar detecção de remanejamento só após postos carregarem (evita modal ao abrir edição)
   useEffect(() => {
@@ -2378,24 +2374,26 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <span className="truncate">Setor/Posto de Trabalho</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Select
+                            <SearchableSelect
+                              options={[
+                                { value: 'none', label: 'Nenhum posto' },
+                                ...workPosts.map((wp) => ({
+                                  value: String(wp.id).toLowerCase(),
+                                  label: wp.name,
+                                  description: wp.clientName ? `Cliente: ${wp.clientName}` : (wp.address || ''),
+                                }))
+                              ]}
                               value={String((form as any).workPostId || 'none').toLowerCase()}
-                              onValueChange={handleWorkPostChange}
-                            >
-                              <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                                <SelectValue placeholder="Selecione um posto" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                                <SelectItem value="none" className="hover:bg-gray-700">
-                                  <span className="text-gray-400">Nenhum posto</span>
-                                </SelectItem>
-                                {workPosts.map((wp) => (
-                                  <SelectItem key={wp.id} value={String(wp.id).toLowerCase()} className="hover:bg-gray-700">
-                                    {wp.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              onChange={(value) => {
+                                const resolvedValue = value === 'all' ? String((form as any).workPostId || 'none').toLowerCase() : value;
+                                handleWorkPostChange(resolvedValue === 'none' ? '' : resolvedValue);
+                              }}
+                              placeholder="Selecione um posto"
+                              searchPlaceholder="Buscar posto de trabalho..."
+                              emptyPlaceholder="Nenhum posto encontrado"
+                              minSearchChars={3}
+                              minCharsMessage="Digite pelo menos 3 caracteres para pesquisar o posto..."
+                            />
                           </div>
                         </div>
                       </div>
