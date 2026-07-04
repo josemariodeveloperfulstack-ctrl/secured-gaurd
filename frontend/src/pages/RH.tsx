@@ -243,28 +243,37 @@ const RH: React.FC = () => {
                             return false;
                           }
                           
-                          // Calcular período de experiência
+                          // Calcular período de experiência sem fuso horário
                           const admissionDate = employee.jobInfo?.admissionDate;
                           if (!admissionDate) return false;
                           
-                          const endDate = new Date(probationEndDate);
-                          const admDate = new Date(admissionDate);
-                          const daysBetween = Math.ceil((endDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));
+                          const parseLocalDate = (dateStr: string) => {
+                            const parts = dateStr.split('-');
+                            return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                          };
+                          
+                          const endDate = parseLocalDate(probationEndDate);
+                          const admDate = parseLocalDate(admissionDate);
+                          const daysBetween = Math.round((endDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));
                           
                           // Apenas períodos de 30, 45 ou 90 dias
                           return daysBetween === 30 || daysBetween === 45 || daysBetween === 90;
                         })
                         .map((employee) => {
                           const probationEndDate = employee.jobInfo?.probationEndDate!;
-                          const endDate = new Date(probationEndDate);
+                          const parseLocalDate = (dateStr: string) => {
+                            const parts = dateStr.split('-');
+                            return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                          };
+                          const endDate = parseLocalDate(probationEndDate);
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
                           endDate.setHours(0, 0, 0, 0);
                           const daysUntil = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                           
                           // Calcular período de experiência
-                          const admissionDate = new Date(employee.jobInfo!.admissionDate!);
-                          const daysBetween = Math.ceil((endDate.getTime() - admissionDate.getTime()) / (1000 * 60 * 60 * 24));
+                          const admDate = parseLocalDate(employee.jobInfo!.admissionDate!);
+                          const daysBetween = Math.round((endDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));
                           
                           return (
                             <div key={employee.id} className="flex items-center justify-between p-3 bg-seguranca-black rounded-lg border border-red-500">

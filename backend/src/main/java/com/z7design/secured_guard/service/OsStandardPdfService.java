@@ -1,6 +1,11 @@
 package com.z7design.secured_guard.service;
 
 import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.geom.PageSize;
+import com.itextpdf.io.image.ImageData;
+import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
@@ -9,33 +14,32 @@ import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.OperationalServiceOrderRequest;
-import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
-import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.util.StreamUtils;
 
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Locale;
 
 @Service
 @Slf4j
 public class OsStandardPdfService {
 
-        private final StandardReportLayoutService pdfLayoutService;
         private final EmployeeDocumentDateResolver documentDateResolver;
+        private final CompanyRepository companyRepository;
 
-        public OsStandardPdfService(StandardReportLayoutService pdfLayoutService,
-                        EmployeeDocumentDateResolver documentDateResolver) {
-                this.pdfLayoutService = pdfLayoutService;
+        public OsStandardPdfService(EmployeeDocumentDateResolver documentDateResolver,
+                        CompanyRepository companyRepository) {
                 this.documentDateResolver = documentDateResolver;
+                this.companyRepository = companyRepository;
         }
-
-        private static final String REPORT_TITLE = "ORDEM DE SERVIÇO";
 
         public byte[] generatePdf(OperationalServiceOrderRequest request) {
                 LocalDate documentDate = documentDateResolver.resolveDocumentDateOrToday(
@@ -43,18 +47,14 @@ public class OsStandardPdfService {
                 request.setDocumentDate(documentDate);
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                         PdfWriter writer = new PdfWriter(outputStream);
+                        PdfDocument pdfDoc = new PdfDocument(writer);
+                        Document document = new Document(pdfDoc, PageSize.A4);
+                        document.setMargins(15f, 20f, 15f, 20f);
 
-                        var configBuilder = ReportLayoutConfig.builder()
-                                        .companyId(request.getCompanyId())
-                                        .reportTitle(REPORT_TITLE)
-                                        .includeEmailInFooter(true)
-                                        .marginExtraTop(-35f);
-                        documentDateResolver.applyAdmissionDateFooter(configBuilder, request.getEmployeeId());
-                        ReportLayoutConfig config = configBuilder.build();
-
-                        DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
-                        Document document = docWithPdf.getDocument();
-                        Company company = docWithPdf.getCompany();
+                        Company company = null;
+                        if (request.getCompanyId() != null) {
+                                company = companyRepository.findById(request.getCompanyId()).orElse(null);
+                        }
 
                         addContent(document, request, company);
 
@@ -67,100 +67,138 @@ public class OsStandardPdfService {
         }
 
         private void addContent(Document document, OperationalServiceOrderRequest request, Company company) {
-                // Intro Text
-                String introText = "Conforme estabelecido no item 1.7, letra \"b\", NR-01 da Portaria 3214/MTE, cabe ao empregador elaborar Ordem de Serviço (OS) sobre Segurança e Medicina do Trabalho, dando ciência aos empregados.";
-                document.add(new Paragraph(introText).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(10f));
+                // 1. Header Table
+                Table headerTable = new Table(UnitValue.createPercentArray(new float[] { 30f, 35f, 35f })).useAllAvailableWidth();
+                headerTable.setMarginBottom(8f);
 
-                // Main Table
-                Table table = new Table(UnitValue.createPercentArray(new float[] { 100 })).useAllAvailableWidth();
-
-                // Header
-                table.addCell(new Cell().add(new Paragraph("SEGURANÇA E MEDICINA DO TRABALHO").setBold().setTextAlignment(TextAlignment.CENTER))
-                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
-                        .setPadding(3f));
-
-                // Company and Sector
-                Table row1 = new Table(UnitValue.createPercentArray(new float[] { 70, 30 })).useAllAvailableWidth();
-                row1.addCell(new Cell().add(new Paragraph("EMPRESA: " + (company != null ? company.getName().toUpperCase() : "")).setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER));
-                row1.addCell(new Cell().add(new Paragraph("SETOR: " + safeStr(request.getSector()).toUpperCase()).setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER).setBorderLeft(new com.itextpdf.layout.borders.SolidBorder(1f)));
-                table.addCell(new Cell().add(row1).setPadding(2f));
-
-                // Responsibility
-                String responsibility = request.getResponsibility();
-                if (responsibility == null || responsibility.isBlank()) {
-                        responsibility = request.getServiceType();
+                // Header Table - Cell 1: Logo
+                Cell logoCell = new Cell().setPadding(3f);
+                logoCell.setVerticalAlignment(com.itextpdf.layout.properties.VerticalAlignment.MIDDLE);
+                logoCell.setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.CENTER);
+                Image logo = loadLogo(company);
+                if (logo != null) {
+                        logo.setMaxHeight(45f);
+                        logo.setMaxWidth(130f);
+                        logo.setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.CENTER);
+                        logoCell.add(logo);
+                } else {
+                        logoCell.add(new Paragraph(company != null ? company.getName() : "").setBold().setFontSize(9f).setTextAlignment(TextAlignment.CENTER));
                 }
-                table.addCell(new Cell().add(new Paragraph("RESPONSABILIDADE: " + safeStr(responsibility).toUpperCase()).setBold().setFontSize(9f)).setPadding(2f));
+                headerTable.addCell(logoCell);
 
-                // Dates
-                Table row2 = new Table(UnitValue.createPercentArray(new float[] { 70, 30 })).useAllAvailableWidth();
-                row2.addCell(new Cell().add(new Paragraph("ELABORADO EM: " + formatDate(request.getDocumentDate())).setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER));
-                row2.addCell(new Cell().add(new Paragraph("REVISÃO: " + safeStr(request.getRevision()).toUpperCase()).setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER).setBorderLeft(new com.itextpdf.layout.borders.SolidBorder(1f)));
-                table.addCell(new Cell().add(row2).setPadding(2f));
+                // Header Table - Cell 2: Title
+                Cell titleCell = new Cell().setPadding(3f);
+                titleCell.setVerticalAlignment(com.itextpdf.layout.properties.VerticalAlignment.MIDDLE);
+                titleCell.add(new Paragraph("NR 01").setBold().setFontSize(9.5f).setTextAlignment(TextAlignment.CENTER).setMarginBottom(1f));
+                titleCell.add(new Paragraph("Disposições Gerais").setFontSize(8f).setTextAlignment(TextAlignment.CENTER).setMarginBottom(1f));
+                titleCell.add(new Paragraph("ORDEM DE SERVIÇO").setBold().setFontSize(10.5f).setTextAlignment(TextAlignment.CENTER).setMarginBottom(0f));
+                headerTable.addCell(titleCell);
 
-                // Employee Info
-                table.addCell(new Cell().add(new Paragraph("NOME DO EMPREGADO: " + safeStr(request.getEmployeeName()).toUpperCase()).setBold().setFontSize(9f)).setPadding(2f));
-                table.addCell(new Cell().add(new Paragraph("CARGO: " + safeStr(request.getEmployeePosition()).toUpperCase()).setBold().setFontSize(9f)).setPadding(2f));
+                // Header Table - Cell 3: Safety Engineer Details
+                Cell engineerCell = new Cell().setPadding(3f);
+                engineerCell.setVerticalAlignment(com.itextpdf.layout.properties.VerticalAlignment.MIDDLE);
+                engineerCell.add(new Paragraph("Saúde e Segurança do trabalho").setBold().setFontSize(8.5f).setTextAlignment(TextAlignment.CENTER).setMarginBottom(8f));
+                engineerCell.add(new Paragraph("").setFontSize(6f).setMarginBottom(5f));
+                engineerCell.add(new Paragraph("Alexandro Cirino Taveira").setBold().setFontSize(8f).setTextAlignment(TextAlignment.CENTER).setMarginBottom(1f));
+                engineerCell.add(new Paragraph("Engenheiro de Segurança do Trabalho").setFontSize(7f).setTextAlignment(TextAlignment.CENTER).setMarginBottom(1f));
+                engineerCell.add(new Paragraph("CREA/MG 119986 D").setFontSize(7f).setTextAlignment(TextAlignment.CENTER).setMarginBottom(0f));
+                headerTable.addCell(engineerCell);
 
-                // Obligations Header
-                table.addCell(new Cell().add(new Paragraph("OBRIGAÇÕES DO EMPREGADO").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                headerTable.setBorder(new com.itextpdf.layout.borders.SolidBorder(1f));
+                document.add(headerTable);
+
+                // 2. Intro Text
+                String introText = "Conforme estabelecido no item 1.7, letra \"b\", NR-01 da Portaria 3214/MTE, cabe ao empregador elaborar Ordem de Serviço (OS) sobre Segurança e Medicina do Trabalho, dando ciência aos empregados.";
+                document.add(new Paragraph(introText).setFontSize(7.5f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(6f));
+
+                // 3. Main Grid Table
+                Table table = new Table(UnitValue.createPercentArray(new float[] { 100 })).useAllAvailableWidth();
+                table.setMarginBottom(6f);
+
+                // Section: SEGURANÇA E MEDICINA DO TRABALHO
+                table.addCell(new Cell().add(new Paragraph("SEGURANÇA E MEDICINA DO TRABALHO").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(8.5f))
                         .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
-                        .setPadding(3f));
+                        .setPadding(2f));
 
-                table.addCell(new Cell().add(buildEmployeeObligationsList(request)).setPadding(5f));
+                // Company / CNPJ row
+                String companyName = company != null ? company.getName().toUpperCase() : "";
+                String companyCnpj = company != null && company.getCnpj() != null ? CompanyDataFormatter.formatCnpj(company.getCnpj()) : "";
+                String empresaText = "EMPRESA: " + companyName;
+                if (!companyCnpj.isEmpty()) {
+                        empresaText += " | CNPJ: " + companyCnpj;
+                }
+                table.addCell(new Cell().add(new Paragraph(empresaText).setBold().setFontSize(7.5f)).setPadding(2f));
 
-                // Habitual Activities
-                table.addCell(new Cell().add(new Paragraph("ATIVIDADES HABITUAIS").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                // Employee
+                table.addCell(new Cell().add(new Paragraph("NOME DO EMPREGADO: " + safeStr(request.getEmployeeName()).toUpperCase()).setBold().setFontSize(7.5f)).setPadding(2f));
+
+                // Sector
+                table.addCell(new Cell().add(new Paragraph("SETOR: " + safeStr(request.getSector()).toUpperCase()).setBold().setFontSize(7.5f)).setPadding(2f));
+
+                // Position/Cargo
+                table.addCell(new Cell().add(new Paragraph("CARGO: " + safeStr(request.getEmployeePosition()).toUpperCase()).setBold().setFontSize(7.5f)).setPadding(2f));
+
+                // Section: OBRIGAÇÕES DO EMPREGADO
+                table.addCell(new Cell().add(new Paragraph("OBRIGAÇÕES DO EMPREGADO").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(8.5f))
                         .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
-                        .setPadding(3f));
-                table.addCell(new Cell().add(new Paragraph(safeStr(request.getActivities())).setFontSize(9f)).setPadding(5f));
+                        .setPadding(2f));
 
-                // Risks
-                table.addCell(new Cell().add(new Paragraph("RISCOS").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                Cell obligationsCell = new Cell().setPadding(3f);
+                obligationsCell.add(buildEmployeeObligationsList(request));
+                table.addCell(obligationsCell);
+
+                // Section: ATIVIDADES HABITUAIS
+                table.addCell(new Cell().add(new Paragraph("ATIVIDADES HABITUAIS").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(8.5f))
                         .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
-                        .setPadding(3f));
-                table.addCell(new Cell().add(new Paragraph(safeStr(request.getRisks())).setFontSize(9f)).setPadding(5f));
+                        .setPadding(2f));
+                table.addCell(new Cell().add(new Paragraph(safeStr(request.getActivities())).setFontSize(7.5f)).setPadding(3f));
 
-                // Preventive Measures
-                table.addCell(new Cell().add(new Paragraph("MEDIDAS PREVENTIVAS PARA REALIZAÇÃO DAS ATIVIDADES").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                // Section: RISCOS
+                table.addCell(new Cell().add(new Paragraph("RISCOS").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(8.5f))
                         .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
-                        .setPadding(3f));
-                table.addCell(new Cell().add(new Paragraph(safeStr(request.getPreventiveMeasures())).setFontSize(9f)).setPadding(5f));
+                        .setPadding(2f));
+                table.addCell(new Cell().add(new Paragraph(safeStr(request.getRisks())).setFontSize(7.5f)).setPadding(3f));
 
-                // Uniform / EPI
+                // Section: MEDIDAS PREVENTIVAS PARA REALIZAÇÃO DAS ATIVIDADES
+                table.addCell(new Cell().add(new Paragraph("MEDIDAS PREVENTIVAS PARA REALIZAÇÃO DAS ATIVIDADES").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(8.5f))
+                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                        .setPadding(2f));
+                table.addCell(new Cell().add(new Paragraph(safeStr(request.getPreventiveMeasures())).setFontSize(7.5f)).setPadding(3f));
+
+                // Section: UNIFORME DE USO OBRIGATÓRIO
                 String uniformSectionTitle = request.getUniformSectionTitle();
                 if (uniformSectionTitle == null || uniformSectionTitle.isBlank()) {
                         uniformSectionTitle = "UNIFORME DE USO OBRIGATÓRIO";
                 }
-                table.addCell(new Cell().add(new Paragraph(uniformSectionTitle).setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                table.addCell(new Cell().add(new Paragraph(uniformSectionTitle.toUpperCase()).setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(8.5f))
                         .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
-                        .setPadding(3f));
-                table.addCell(new Cell().add(new Paragraph(safeStr(request.getUniform())).setFontSize(9f)).setPadding(5f));
+                        .setPadding(2f));
+                table.addCell(new Cell().add(new Paragraph(safeStr(request.getUniform())).setFontSize(7.5f)).setPadding(3f));
 
-                // Trainings
-                table.addCell(new Cell().add(new Paragraph("TREINAMENTOS OBRIGATÓRIOS").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                // Section: TREINAMENTOS OBRIGATÓRIOS
+                table.addCell(new Cell().add(new Paragraph("TREINAMENTOS OBRIGATÓRIOS").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(8.5f))
                         .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
-                        .setPadding(3f));
-                table.addCell(new Cell().add(new Paragraph(safeStr(request.getMandatoryTrainings())).setFontSize(9f)).setPadding(5f));
+                        .setPadding(2f));
+                table.addCell(new Cell().add(new Paragraph(safeStr(request.getMandatoryTrainings())).setFontSize(7.5f)).setPadding(3f));
 
                 document.add(table);
 
-                // Warning Text
+                // 4. Warning/Disclaimer Texts
                 String warningText1 = "O descumprimento desta Ordem de Serviço caracteriza ato de indisciplina do empregado. Permitindo aplicar as penalidades que a critério da empresa poderá ser advertência verbal por escrito e até rescisão de contrato de trabalho por justa causa, independentemente de outras medidas de ordem jurídicas aplicáveis no art. 158 da CLT, norma regulamentadora nº 01 da portaria 3214/78 (subitens 1.8 e 1.8.1).";
                 String warningText2 = "Declara o empregado que recebeu cópia da presente Ordem de Serviço, que fica em seu poder passando o original a fazer parte do seu contrato de trabalho, para todos os fins previstos em lei.";
-                
-                document.add(new Paragraph(warningText1).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginTop(10f));
-                document.add(new Paragraph(warningText2).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginTop(10f));
 
-                // Signatures
+                document.add(new Paragraph(warningText1).setFontSize(7f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(4f).setMultipliedLeading(1.1f));
+                document.add(new Paragraph(warningText2).setFontSize(7f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(8f).setMultipliedLeading(1.1f));
+
+                // 5. Signatures and Date
                 addSignatures(document, request, company);
         }
 
         private com.itextpdf.layout.element.List buildEmployeeObligationsList(OperationalServiceOrderRequest request) {
                 com.itextpdf.layout.element.List list = new com.itextpdf.layout.element.List()
-                        .setSymbolIndent(12)
+                        .setSymbolIndent(8)
                         .setListSymbol("•")
-                        .setFontSize(8.5f);
+                        .setFontSize(7.5f);
 
                 String custom = request.getEmployeeObligations();
                 if (custom != null && !custom.isBlank()) {
@@ -199,25 +237,56 @@ public class OsStandardPdfService {
 
         private void addSignatures(Document document, OperationalServiceOrderRequest request, Company company) {
                 String city = request.getCity() != null ? request.getCity()
-                                : (company.getCity() != null ? company.getCity() : "_______________");
+                                : (company != null && company.getCity() != null ? company.getCity() : "Contagem");
                 String date = formatDate(
                                 documentDateResolver.resolveDocumentDateOrToday(
                                                 request.getEmployeeId(), request.getDocumentDate()));
 
                 Paragraph dateLoc = new Paragraph(city + ", " + date)
                                 .setTextAlignment(TextAlignment.LEFT)
-                                .setMarginTop(25f)
-                                .setMarginBottom(40f)
-                                .setFontSize(10f).setBold();
+                                .setMarginTop(2f)
+                                .setMarginBottom(18f)
+                                .setFontSize(8.5f).setBold();
                 document.add(dateLoc);
 
-                document.add(new Paragraph("_________________________________________________").setMarginBottom(0f));
-                document.add(new Paragraph(safeStr(request.getEmployeeName()).toUpperCase()).setFontSize(10f).setBold());
+                document.add(new Paragraph("_________________________________________________").setMarginBottom(1f).setFontSize(8.5f));
+                document.add(new Paragraph(safeStr(request.getEmployeeName()).toUpperCase()).setFontSize(8f).setBold());
         }
 
         private String formatDate(LocalDate date) {
                 if (date == null)
                         return "__/__/____";
                 return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        }
+
+        private Image loadLogo(Company company) {
+                try {
+                        if (company != null && company.getLogoUrl() != null && !company.getLogoUrl().isEmpty()) {
+                                String logoUrl = company.getLogoUrl();
+                                if (logoUrl.startsWith("http")) {
+                                        return new Image(ImageDataFactory.create(logoUrl));
+                                } else {
+                                        java.nio.file.Path path = java.nio.file.Paths.get("uploads", logoUrl);
+                                        if (java.nio.file.Files.exists(path)) {
+                                                return new Image(ImageDataFactory.create(java.nio.file.Files.readAllBytes(path)));
+                                        }
+                                }
+                        }
+                } catch (Exception e) {
+                        log.warn("Erro ao carregar logo da empresa, usando fallback: {}", e.getMessage());
+                }
+
+                try {
+                        org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("static/email-marketing/promover-logo.png");
+                        if (resource.exists()) {
+                                try (InputStream is = resource.getInputStream()) {
+                                        byte[] logoBytes = StreamUtils.copyToByteArray(is);
+                                        return new Image(ImageDataFactory.create(logoBytes));
+                                }
+                        }
+                } catch (Exception e) {
+                        log.error("Erro ao carregar logo fallback: {}", e.getMessage());
+                }
+                return null;
         }
 }

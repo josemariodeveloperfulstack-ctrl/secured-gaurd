@@ -338,7 +338,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
     if (isExperienceContract(form.contractType) && form.experienceDuration) {
       const days = parseInt(form.experienceDuration, 10);
       if (!Number.isNaN(days)) {
-        const newEnd = addDaysIsoLocal(form.startDate, days - 1);
+        const newEnd = addDaysIsoLocal(form.startDate, days);
         if (newEnd) {
           setForm(prev => ({ ...prev, endDate: newEnd }));
         }
