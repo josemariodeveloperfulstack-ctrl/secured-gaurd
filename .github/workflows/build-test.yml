@@ -43,13 +43,6 @@ jobs:
           echo "✅ Backend compilado com sucesso!"
           ls -lh target/*.jar
 
-      - name: 📦 Upload Backend Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jar
-          path: backend/target/*.jar
-          retention-days: 7
-
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
@@ -72,13 +65,6 @@ jobs:
           npm run build
           echo "✅ Frontend compilado com sucesso!"
           ls -lh dist/
-
-      - name: 📦 Upload Frontend Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-          retention-days: 7
 
   summary:
     name: Build Summary
