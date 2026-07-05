@@ -142,7 +142,6 @@ public class ClientService {
         return clientDTO;
     }
     
-    @Cacheable(value = "clients", key = "'paged-' + #pageable.toString()")
     public Page<ClientDTO> getAllClients(Pageable pageable) {
         Page<Client> clients = clientRepository.findAll(pageable);
         return clients.map(client -> {
@@ -152,7 +151,6 @@ public class ClientService {
         });
     }
     
-    @Cacheable(value = "clients", key = "'search-' + #searchTerm + '-' + #pageable.toString()")
     public Page<ClientDTO> searchClients(String searchTerm, Pageable pageable) {
         Page<Client> clients = clientRepository.findBySearchTerm(searchTerm, pageable);
         return clients.map(client -> {
@@ -162,7 +160,6 @@ public class ClientService {
         });
     }
     
-    @Cacheable(value = "clients", key = "'status-' + #status + '-' + #pageable.toString()")
     public Page<ClientDTO> getClientsByStatus(ClientStatus status, Pageable pageable) {
         Page<Client> clients = clientRepository.findByStatus(status, pageable);
         return clients.map(client -> {
@@ -172,7 +169,6 @@ public class ClientService {
         });
     }
     
-    @Cacheable(value = "clients", key = "'status-search-' + #status + '-' + #searchTerm + '-' + #pageable.toString()")
     public Page<ClientDTO> getClientsByStatus(ClientStatus status, String searchTerm, Pageable pageable) {
         Page<Client> clients;
         

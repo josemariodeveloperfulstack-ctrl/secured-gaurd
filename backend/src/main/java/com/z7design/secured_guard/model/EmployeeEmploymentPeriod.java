@@ -7,6 +7,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -34,26 +36,31 @@ public class EmployeeEmploymentPeriod {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id")
     @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler", "employees" })
+    @NotFound(action = NotFoundAction.IGNORE)
     private Company company;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "unit_id")
     @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler", "employees" })
+    @NotFound(action = NotFoundAction.IGNORE)
     private Unit unit;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "position_id")
     @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+    @NotFound(action = NotFoundAction.IGNORE)
     private Position position;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")
     @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+    @NotFound(action = NotFoundAction.IGNORE)
     private Department department;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "work_post_id")
     @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+    @NotFound(action = NotFoundAction.IGNORE)
     private WorkPost workPost;
 
     @Column(name = "hire_date", nullable = false)
