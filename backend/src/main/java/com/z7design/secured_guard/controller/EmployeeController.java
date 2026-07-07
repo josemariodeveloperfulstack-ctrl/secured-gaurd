@@ -255,18 +255,18 @@ public class EmployeeController {
         try {
             System.out.println("🔍 EmployeeController.getBasicData - Buscando dados básicos");
 
-            List<Object[]> data = employeeService.findBasicData();
+            List<?> data = employeeService.findBasicData();
             System.out.println("✅ Encontrados " + data.size() + " registros básicos");
 
             List<java.util.Map<String, Object>> employees = new java.util.ArrayList<>();
-            for (Object[] row : data) {
+            for (Object row : data) {
                 java.util.Map<String, Object> employee = new java.util.HashMap<>();
-                employee.put("id", row[0]);
-                employee.put("name", row[1]);
-                employee.put("email", row[11]); // email está na posição 11 na query completa
-                employee.put("phone", row[10]); // phone está na posição 10
-                employee.put("status", row[7]); // status está na posição 7
-                employee.put("createdAt", row[17]); // created_at está na posição 17
+                employee.put("id", safeAt(row, 0));
+                employee.put("name", safeAt(row, 1));
+                employee.put("email", safeAt(row, 11)); // email está na posição 11 na query completa
+                employee.put("phone", safeAt(row, 10)); // phone está na posição 10
+                employee.put("status", safeAt(row, 7)); // status está na posição 7
+                employee.put("createdAt", safeAt(row, 17)); // created_at está na posição 17
 
                 // Adicionar position, unit, company, workPost e department
                 if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
@@ -331,7 +331,7 @@ public class EmployeeController {
             System.out.println("🔍 EmployeeController.getAll - searchTerm: " + searchTerm);
 
             // Se houver searchTerm, usar busca por nome ou documento
-            List<Object[]> data;
+            List<?> data;
             if (searchTerm != null && !searchTerm.trim().isEmpty()) {
                 System.out.println("🔍 EmployeeController.getAll - Buscando por termo: " + searchTerm);
                 data = employeeService.findBasicDataBySearchTerm(searchTerm.trim());
@@ -347,28 +347,28 @@ public class EmployeeController {
 
             // Converter para Map simples
             List<java.util.Map<String, Object>> employees = new java.util.ArrayList<>();
-            for (Object[] row : data) {
+            for (Object row : data) {
                 try {
                     java.util.Map<String, Object> employee = new java.util.HashMap<>();
-                    employee.put("id", row[0]);
-                    employee.put("name", row[1]);
-                    employee.put("document", row[2]);
-                    employee.put("birthDate", row[3]);
-                    employee.put("registrationNumber", row[4]);
-                    employee.put("hireDate", row[5]);
-                    employee.put("terminationDate", row[6]);
-                    employee.put("status", row[7]);
-                    employee.put("notes", row[8]);
-                    employee.put("address", row[9]);
-                    employee.put("phone", row[10]);
-                    employee.put("email", row[11]);
-                    employee.put("cnhNumber", row[12]);
-                    employee.put("ctps", row[13]);
-                    employee.put("cbo", row[14]);
-                    employee.put("pis", row[15]);
-                    employee.put("salario", row[16]);
-                    employee.put("createdAt", row[17]);
-                    employee.put("updatedAt", row[18]);
+                    employee.put("id", safeAt(row, 0));
+                    employee.put("name", safeAt(row, 1));
+                    employee.put("document", safeAt(row, 2));
+                    employee.put("birthDate", safeAt(row, 3));
+                    employee.put("registrationNumber", safeAt(row, 4));
+                    employee.put("hireDate", safeAt(row, 5));
+                    employee.put("terminationDate", safeAt(row, 6));
+                    employee.put("status", safeAt(row, 7));
+                    employee.put("notes", safeAt(row, 8));
+                    employee.put("address", safeAt(row, 9));
+                    employee.put("phone", safeAt(row, 10));
+                    employee.put("email", safeAt(row, 11));
+                    employee.put("cnhNumber", safeAt(row, 12));
+                    employee.put("ctps", safeAt(row, 13));
+                    employee.put("cbo", safeAt(row, 14));
+                    employee.put("pis", safeAt(row, 15));
+                    employee.put("salario", safeAt(row, 16));
+                    employee.put("createdAt", safeAt(row, 17));
+                    employee.put("updatedAt", safeAt(row, 18));
                     employee.put("escalaTrabalho", safeAt(row, 30));
                     employee.put("horarioTrabalho", safeAt(row, 31));
                     if (safeAt(row, 32) != null) {
@@ -461,7 +461,7 @@ public class EmployeeController {
                     + " hireDateFrom=" + hireDateFrom + " hireDateTo=" + hireDateTo
                     + " terminationDateFrom=" + terminationDateFrom + " terminationDateTo=" + terminationDateTo);
 
-            List<Object[]> data;
+            List<?> data;
             if (searchTerm != null && !searchTerm.trim().isEmpty()) {
                 data = employeeService.findBasicDataBySearchTermPaged(searchTerm.trim(), safePage, safeSize, companyId,
                         statusFilter, sortByParam, sortDirParam, hireDateFrom, hireDateTo, terminationDateFrom,
@@ -479,7 +479,7 @@ public class EmployeeController {
 
             List<java.util.Map<String, Object>> employees = new java.util.ArrayList<>();
             java.util.Set<UUID> seenIds = new java.util.HashSet<>();
-            for (Object[] row : data) {
+            for (Object row : data) {
                 Object idObj = safeAt(row, 0);
                 if (idObj == null) continue;
                 UUID rowId = idObj instanceof UUID ? (UUID) idObj : UUID.fromString(idObj.toString());
@@ -566,9 +566,9 @@ public class EmployeeController {
                 return ResponseEntity.badRequest().body(Map.of("error", "Parâmetro month deve ser entre 1 e 12"));
             }
             int year = referenceYear != null ? referenceYear : java.time.Year.now().getValue();
-            List<Object[]> data = employeeService.findBasicDataByBirthMonth(month, onlyActive, companyId);
+            List<?> data = employeeService.findBasicDataByBirthMonth(month, onlyActive, companyId);
             List<Map<String, Object>> employees = new ArrayList<>();
-            for (Object[] row : data) {
+            for (Object row : data) {
                 Map<String, Object> employee = mapBasicRowToEmployeeMap(row);
                 Object bd = employee.get("birthDate");
                 LocalDate birth = toLocalDate(bd);
@@ -596,27 +596,27 @@ public class EmployeeController {
     /**
      * Converte uma linha da query nativa {@code findBasicData*} no mesmo formato de {@link #getAll(String)}.
      */
-    private static Map<String, Object> mapBasicRowToEmployeeMap(Object[] row) {
+    private static Map<String, Object> mapBasicRowToEmployeeMap(Object row) {
         Map<String, Object> employee = new HashMap<>();
-        employee.put("id", row[0]);
-        employee.put("name", row[1]);
-        employee.put("document", row[2]);
-        employee.put("birthDate", row[3]);
-        employee.put("registrationNumber", row[4]);
-        employee.put("hireDate", row[5]);
-        employee.put("terminationDate", row[6]);
-        employee.put("status", row[7]);
-        employee.put("notes", row[8]);
-        employee.put("address", row[9]);
-        employee.put("phone", row[10]);
-        employee.put("email", row[11]);
-        employee.put("cnhNumber", row[12]);
-        employee.put("ctps", row[13]);
-        employee.put("cbo", row[14]);
-        employee.put("pis", row[15]);
-        employee.put("salario", row[16]);
-        employee.put("createdAt", row[17]);
-        employee.put("updatedAt", row[18]);
+        employee.put("id", safeAt(row, 0));
+        employee.put("name", safeAt(row, 1));
+        employee.put("document", safeAt(row, 2));
+        employee.put("birthDate", safeAt(row, 3));
+        employee.put("registrationNumber", safeAt(row, 4));
+        employee.put("hireDate", safeAt(row, 5));
+        employee.put("terminationDate", safeAt(row, 6));
+        employee.put("status", safeAt(row, 7));
+        employee.put("notes", safeAt(row, 8));
+        employee.put("address", safeAt(row, 9));
+        employee.put("phone", safeAt(row, 10));
+        employee.put("email", safeAt(row, 11));
+        employee.put("cnhNumber", safeAt(row, 12));
+        employee.put("ctps", safeAt(row, 13));
+        employee.put("cbo", safeAt(row, 14));
+        employee.put("pis", safeAt(row, 15));
+        employee.put("salario", safeAt(row, 16));
+        employee.put("createdAt", safeAt(row, 17));
+        employee.put("updatedAt", safeAt(row, 18));
         if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
             Map<String, Object> position = new HashMap<>();
             if (safeAt(row, 19) != null) position.put("name", safeAt(row, 19));
@@ -1278,8 +1278,18 @@ public class EmployeeController {
         }
     }
 
-    private static Object safeAt(Object[] row, int i) {
-        return (row != null && i >= 0 && i < row.length) ? row[i] : null;
+    private static Object safeAt(Object rowObj, int i) {
+        if (rowObj == null) {
+            return null;
+        }
+        if (rowObj instanceof Object[]) {
+            Object[] row = (Object[]) rowObj;
+            return (i >= 0 && i < row.length) ? row[i] : null;
+        } else if (rowObj instanceof java.util.List) {
+            java.util.List<?> row = (java.util.List<?>) rowObj;
+            return (i >= 0 && i < row.size()) ? row.get(i) : null;
+        }
+        return null;
     }
 
     /**
@@ -1287,7 +1297,7 @@ public class EmployeeController {
      * Quando {@code work_post_id} está preenchido mas o registro foi removido de {@code work_posts},
      * o JOIN não traz nome — enviamos rótulo explícito para o frontend não tratar como "posto inválido" sem contexto.
      */
-    private static void putWorkPostIfPresent(java.util.Map<String, Object> employee, Object[] row) {
+    private static void putWorkPostIfPresent(java.util.Map<String, Object> employee, Object row) {
         Object wpName = safeAt(row, 23);
         Object wpId = safeAt(row, 27);
         if (wpName == null && wpId == null) {
