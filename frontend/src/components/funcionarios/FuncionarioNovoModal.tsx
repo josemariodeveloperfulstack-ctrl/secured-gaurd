@@ -176,6 +176,113 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   );
   const [offlineQueueId, setOfflineQueueId] = useState<string | null>(null);
 
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const isInitialMount = useRef(true);
+
+  // Monitor form changes for autosave in FuncionarioNovoModal
+  useEffect(() => {
+    if (!open) {
+      isInitialMount.current = true;
+      return;
+    }
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // 1. Se já está no modo de edição (funcionário já existe)
+    if (isEditMode && currentEmployeeId) {
+      if (!form.cpf?.trim() || !form.hireDate || !form.name?.trim()) {
+        return;
+      }
+      const cpfDigits = form.cpf.replace(/\D/g, '');
+      if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
+        return;
+      }
+
+      const targetPost = normalizeWorkPostId((form as any).workPostId);
+      if (isWorkPostTransfer(initialWorkPostIdRef.current, targetPost) && !(form as any).remanejamentoDataInicio) {
+        return;
+      }
+
+      setSaveStatus('saving');
+
+      const delayDebounceFn = setTimeout(async () => {
+        try {
+          const { remanejamentoDataInicio, ...formRest } = form as any;
+          const employeeData: any = { ...formRest };
+          if (remanejamentoDataInicio && remanejamentoDataInicio.trim()) {
+            employeeData.remanejamentoDataInicio = remanejamentoDataInicio;
+          }
+
+          const updatedEmployee = await employeeService.updateEmployee(currentEmployeeId, employeeData);
+          syncInitialWorkPostRef(
+            updatedEmployee?.workPostId || updatedEmployee?.workPost?.id || employeeData.workPostId,
+          );
+
+          queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+          queryClient.setQueryData(queryKeys.employees.byId(currentEmployeeId), updatedEmployee);
+
+          setSaveStatus('saved');
+          const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
+          return () => clearTimeout(resetStatusTimeout);
+        } catch (err) {
+          console.error('Erro no salvamento automático:', err);
+          setSaveStatus('error');
+        }
+      }, 1500);
+
+      return () => clearTimeout(delayDebounceFn);
+    } 
+    
+    // 2. Se NÃO está no modo de edição (funcionário novo, tentar a criação automática se os campos obrigatórios estiverem válidos)
+    else if (!isEditMode && !currentEmployeeId) {
+      if (!form.name?.trim() || !form.cpf?.trim() || !form.phone?.trim() || !form.hireDate) {
+        return;
+      }
+
+      const cpfDigits = form.cpf.replace(/\D/g, '');
+      if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
+        return;
+      }
+
+      if (!form.enderecoRua?.trim() || !form.enderecoNumero?.trim() || !form.enderecoBairro?.trim() || !form.enderecoCidade?.trim() || !form.enderecoEstado?.trim() || !form.enderecoCep?.trim()) {
+        return;
+      }
+
+      setSaveStatus('saving');
+
+      const delayDebounceFn = setTimeout(async () => {
+        try {
+          const employeeData = { ...form } as Record<string, unknown>;
+          delete employeeData.remanejamentoDataInicio;
+
+          const createdEmployee = await employeeService.createEmployee(employeeData);
+          console.log('✅ Funcionário criado via salvamento automático - ID:', createdEmployee.id);
+          
+          setCurrentEmployeeId(createdEmployee.id);
+          setIsEditMode(true);
+          syncInitialWorkPostRef(
+            createdEmployee?.workPostId || createdEmployee?.workPost?.id || (employeeData.workPostId as string),
+          );
+          
+          queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+          queryClient.setQueryData(queryKeys.employees.byId(createdEmployee.id), createdEmployee);
+          void clearEmployeeFormDraft(draftStorageKey);
+
+          setSaveStatus('saved');
+          const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
+          return () => clearTimeout(resetStatusTimeout);
+        } catch (err) {
+          console.error('Erro ao criar funcionário automaticamente:', err);
+          setSaveStatus('error');
+        }
+      }, 2000);
+
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [form, isEditMode, currentEmployeeId, open, queryClient]);
+
   const handleOfflineItemSynced = useCallback(
     ({ item, employee }: { item: { id: string; operation: string }; employee?: { id?: string } }) => {
       if (offlineQueueId && item.id !== offlineQueueId) {
@@ -2152,11 +2259,27 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       }}>
         <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col overflow-hidden p-0 mx-4 sm:mx-0 bg-seguranca-graphite border-gray-600">
           <DialogHeader className="bg-gradient-to-r shrink-0 from-seguranca-red to-seguranca-yellow p-4 sm:p-6 text-white z-10">
-            <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl md:text-2xl font-bold">
+            <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl md:text-2xl font-bold w-full">
               <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg">
                 <UserIcon className="h-4 w-4 sm:h-6 sm:w-6" />
               </div>
               <span className="truncate">{isEditMode ? 'Editar Funcionário' : 'Novo Funcionário'}</span>
+              {saveStatus === 'saving' && (
+                <span className="text-xs font-normal text-white/80 animate-pulse flex items-center gap-1.5 ml-auto bg-black/20 px-3 py-1 rounded-full border border-white/10">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
+                  Salvando...
+                </span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="text-xs font-normal text-green-300 flex items-center gap-1 ml-auto bg-black/20 px-3 py-1 rounded-full border border-green-500/20">
+                  ✓ Salvo automaticamente
+                </span>
+              )}
+              {saveStatus === 'error' && (
+                <span className="text-xs font-normal text-red-300 flex items-center gap-1 ml-auto bg-black/20 px-3 py-1 rounded-full border border-red-500/20">
+                  ⚠ Erro ao salvar
+                </span>
+              )}
             </DialogTitle>
             <DialogDescription className="text-white/90 text-xs sm:text-sm mt-1">
               Preencha os dados abaixo. Itens obrigatórios estão indicados em vermelho.
