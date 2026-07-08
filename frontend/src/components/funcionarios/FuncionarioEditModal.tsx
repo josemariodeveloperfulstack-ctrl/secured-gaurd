@@ -275,40 +275,56 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     if (!open) {
       isInitialMount.current = true;
       lastSavedFormRef.current = null;
+      console.log('📝 [Autosave Edit] Modal fechado, limpando referências.');
       return;
     }
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      console.log('📝 [Autosave Edit] Mount inicial, pulando salvamento automático.');
       return;
     }
 
-    if (!funcionario?.id) return;
+    if (!funcionario?.id) {
+      console.log('📝 [Autosave Edit] Abortando: funcionario.id ausente.');
+      return;
+    }
 
     if (!form.cpf?.trim() || !form.hireDate || !form.name?.trim()) {
+      console.log('📝 [Autosave Edit] Abortando: campos obrigatórios vazios:', {
+        cpf: form.cpf,
+        hireDate: form.hireDate,
+        name: form.name
+      });
       return;
     }
 
     const cpfDigits = form.cpf.replace(/\D/g, '');
     if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
+      console.log('📝 [Autosave Edit] Abortando: CPF inválido:', form.cpf);
       return;
     }
 
     const targetPost = normalizeWorkPostId((form as any).workPostId);
     if (isWorkPostTransfer(initialWorkPostIdRef.current, targetPost) && !(form as any).remanejamentoDataInicio) {
+      console.log('📝 [Autosave Edit] Abortando: transferência de posto sem data de início.');
       return;
     }
 
     const currentFormStr = JSON.stringify(form);
     if (lastSavedFormRef.current === null) {
+      console.log('📝 [Autosave Edit] Abortando: formulário não hidratado/inicializado ainda.');
       return;
     }
     if (currentFormStr === lastSavedFormRef.current) {
+      console.log('📝 [Autosave Edit] Nenhuma alteração detectada no formulário.');
       return;
     }
 
+    console.log('📝 [Autosave Edit] Alteração detectada! Iniciando timer de 1.5s de debounce...');
     setSaveStatus('saving');
 
     const delayDebounceFn = setTimeout(async () => {
+      console.log('🚀 [Autosave Edit] Executando chamada de atualização no backend para ID:', funcionario.id);
       try {
         const { remanejamentoDataInicio, ...formRest } = form as any;
         const employeeData: any = { ...formRest };
@@ -317,6 +333,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         }
 
         const updatedEmployee = await employeeService.updateEmployee(funcionario.id, employeeData);
+        console.log('✅ [Autosave Edit] Funcionário atualizado com sucesso no backend:', updatedEmployee);
+        
         syncInitialWorkPostRef(
           updatedEmployee?.workPostId || updatedEmployee?.workPost?.id || employeeData.workPostId,
         );
@@ -331,7 +349,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
         return () => clearTimeout(resetStatusTimeout);
       } catch (err) {
-        console.error('Erro no salvamento automático:', err);
+        console.error('❌ [Autosave Edit] Erro no salvamento automático:', err);
         setSaveStatus('error');
       }
     }, 1500);

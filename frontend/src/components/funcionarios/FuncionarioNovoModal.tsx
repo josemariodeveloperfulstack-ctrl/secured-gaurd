@@ -198,39 +198,48 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     if (!open) {
       isInitialMount.current = true;
       lastSavedFormRef.current = null;
+      console.log('📝 [Autosave Novo] Modal fechado, limpando referências.');
       return;
     }
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      console.log('📝 [Autosave Novo] Mount inicial, pulando salvamento automático.');
       return;
     }
 
     const currentFormStr = JSON.stringify(form);
     if (lastSavedFormRef.current === null) {
+      console.log('📝 [Autosave Novo] Abortando: formulário não hidratado/inicializado ainda.');
       return;
     }
     if (currentFormStr === lastSavedFormRef.current) {
+      console.log('📝 [Autosave Novo] Nenhuma alteração detectada no formulário.');
       return;
     }
 
     // 1. Se já está no modo de edição (funcionário já existe)
     if (isEditMode && currentEmployeeId) {
       if (!form.cpf?.trim() || !form.hireDate || !form.name?.trim()) {
+        console.log('📝 [Autosave Novo - Update] Abortando: campos obrigatórios vazios.');
         return;
       }
       const cpfDigits = form.cpf.replace(/\D/g, '');
       if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
+        console.log('📝 [Autosave Novo - Update] Abortando: CPF inválido:', form.cpf);
         return;
       }
 
       const targetPost = normalizeWorkPostId((form as any).workPostId);
       if (isWorkPostTransfer(initialWorkPostIdRef.current, targetPost) && !(form as any).remanejamentoDataInicio) {
+        console.log('📝 [Autosave Novo - Update] Abortando: transferência de posto sem data de início.');
         return;
       }
 
+      console.log('📝 [Autosave Novo - Update] Alteração detectada! Iniciando timer de 1.5s...');
       setSaveStatus('saving');
 
       const delayDebounceFn = setTimeout(async () => {
+        console.log('🚀 [Autosave Novo - Update] Executando chamada de atualização no backend para ID:', currentEmployeeId);
         try {
           const { remanejamentoDataInicio, ...formRest } = form as any;
           const employeeData: any = { ...formRest };
@@ -239,6 +248,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           }
 
           const updatedEmployee = await employeeService.updateEmployee(currentEmployeeId, employeeData);
+          console.log('✅ [Autosave Novo - Update] Atualizado com sucesso no backend:', updatedEmployee);
+          
           syncInitialWorkPostRef(
             updatedEmployee?.workPostId || updatedEmployee?.workPost?.id || employeeData.workPostId,
           );
@@ -251,7 +262,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
           return () => clearTimeout(resetStatusTimeout);
         } catch (err) {
-          console.error('Erro no salvamento automático:', err);
+          console.error('❌ [Autosave Novo - Update] Erro no salvamento automático:', err);
           setSaveStatus('error');
         }
       }, 1500);
@@ -262,23 +273,27 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     // 2. Se NÃO está no modo de edição (funcionário novo, tentar a criação automática se os campos obrigatórios estiverem válidos)
     else if (!isEditMode && !currentEmployeeId && !employeeToEdit) {
       if (!form.name?.trim() || !form.cpf?.trim() || !form.hireDate) {
+        console.log('📝 [Autosave Novo - Create] Abortando: campos básicos incompletos para criação.');
         return;
       }
 
       const cpfDigits = form.cpf.replace(/\D/g, '');
       if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
+        console.log('📝 [Autosave Novo - Create] Abortando: CPF inválido para criação:', form.cpf);
         return;
       }
 
+      console.log('📝 [Autosave Novo - Create] Campos mínimos válidos para criação! Iniciando timer de 2s...');
       setSaveStatus('saving');
 
       const delayDebounceFn = setTimeout(async () => {
+        console.log('🚀 [Autosave Novo - Create] Executando chamada de criação no backend...');
         try {
           const employeeData = { ...form } as Record<string, unknown>;
           delete employeeData.remanejamentoDataInicio;
 
           const createdEmployee = await employeeService.createEmployee(employeeData);
-          console.log('✅ Funcionário criado via salvamento automático - ID:', createdEmployee.id);
+          console.log('✅ [Autosave Novo - Create] Funcionário criado automaticamente no backend - ID:', createdEmployee.id);
           
           setCurrentEmployeeId(createdEmployee.id);
           setIsEditMode(true);
@@ -295,7 +310,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
           return () => clearTimeout(resetStatusTimeout);
         } catch (err) {
-          console.error('Erro ao criar funcionário automaticamente:', err);
+          console.error('❌ [Autosave Novo - Create] Erro ao criar funcionário automaticamente:', err);
           setSaveStatus('error');
         }
       }, 2000);
