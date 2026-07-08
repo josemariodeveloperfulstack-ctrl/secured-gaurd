@@ -261,16 +261,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     
     // 2. Se NÃO está no modo de edição (funcionário novo, tentar a criação automática se os campos obrigatórios estiverem válidos)
     else if (!isEditMode && !currentEmployeeId && !employeeToEdit) {
-      if (!form.name?.trim() || !form.cpf?.trim() || !form.phone?.trim() || !form.hireDate) {
+      if (!form.name?.trim() || !form.cpf?.trim() || !form.hireDate) {
         return;
       }
 
       const cpfDigits = form.cpf.replace(/\D/g, '');
       if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
-        return;
-      }
-
-      if (!form.enderecoRua?.trim() || !form.enderecoNumero?.trim() || !form.enderecoBairro?.trim() || !form.enderecoCidade?.trim() || !form.enderecoEstado?.trim() || !form.enderecoCep?.trim()) {
         return;
       }
 
