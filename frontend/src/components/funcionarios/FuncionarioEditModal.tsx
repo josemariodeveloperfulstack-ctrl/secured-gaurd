@@ -259,11 +259,22 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const isInitialMount = useRef(true);
+  const lastSavedFormRef = useRef<string | null>(null);
+
+  // Monitora a inicialização/carregamento do form
+  useEffect(() => {
+    if (open && funcionario?.id && form.name) {
+      if (lastSavedFormRef.current === null) {
+        lastSavedFormRef.current = JSON.stringify(form);
+      }
+    }
+  }, [open, funcionario?.id, form]);
 
   // Monitor form changes for autosave
   useEffect(() => {
     if (!open) {
       isInitialMount.current = true;
+      lastSavedFormRef.current = null;
       return;
     }
     if (isInitialMount.current) {
@@ -287,6 +298,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       return;
     }
 
+    const currentFormStr = JSON.stringify(form);
+    if (lastSavedFormRef.current === null) {
+      return;
+    }
+    if (currentFormStr === lastSavedFormRef.current) {
+      return;
+    }
+
     setSaveStatus('saving');
 
     const delayDebounceFn = setTimeout(async () => {
@@ -307,6 +326,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           queryClient.setQueryData(queryKeys.employees.byId(funcionario.id), updatedEmployee);
         }
 
+        lastSavedFormRef.current = currentFormStr;
         setSaveStatus('saved');
         const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
         return () => clearTimeout(resetStatusTimeout);

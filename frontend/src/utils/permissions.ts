@@ -952,7 +952,6 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         CONTRACTS_WRITE: true,
         CONTRACTS_CREATE: true,
         CONTRACTS_DELETE: true,
-        CLIENTS_DELETE: true,
         REPORTS_READ: true,
         DASHBOARD_READ: true,
         PROFILE_READ: true,
