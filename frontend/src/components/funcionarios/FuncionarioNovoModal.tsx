@@ -272,8 +272,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     
     // 2. Se NÃO está no modo de edição (funcionário novo, tentar a criação automática se os campos obrigatórios estiverem válidos)
     else if (!isEditMode && !currentEmployeeId && !employeeToEdit) {
-      if (!form.name?.trim() || !form.cpf?.trim() || !form.hireDate) {
-        console.log('📝 [Autosave Novo - Create] Abortando: campos básicos incompletos para criação.');
+      if (!form.name?.trim() || !form.cpf?.trim()) {
+        console.log('📝 [Autosave Novo - Create] Abortando: Name ou CPF ausentes.');
         return;
       }
 
@@ -291,6 +291,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         try {
           const employeeData = { ...form } as Record<string, unknown>;
           delete employeeData.remanejamentoDataInicio;
+
+          // Fornece uma data de admissão padrão (hoje) caso ainda não selecionada
+          if (!employeeData.hireDate) {
+            employeeData.hireDate = new Date().toISOString().split('T')[0];
+            console.log('📝 [Autosave Novo - Create] hireDate padrão aplicada:', employeeData.hireDate);
+          }
 
           const createdEmployee = await employeeService.createEmployee(employeeData);
           console.log('✅ [Autosave Novo - Create] Funcionário criado automaticamente no backend - ID:', createdEmployee.id);
