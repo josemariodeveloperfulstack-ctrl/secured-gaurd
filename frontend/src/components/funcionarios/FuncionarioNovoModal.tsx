@@ -178,15 +178,38 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const isInitialMount = useRef(true);
+  const lastSavedFormRef = useRef<string | null>(null);
+
+  // Monitora a inicialização/carregamento do form
+  useEffect(() => {
+    if (open) {
+      if (employeeToEdit?.id && form.name) {
+        if (lastSavedFormRef.current === null) {
+          lastSavedFormRef.current = JSON.stringify(form);
+        }
+      } else if (!employeeToEdit && lastSavedFormRef.current === null) {
+        lastSavedFormRef.current = JSON.stringify(form);
+      }
+    }
+  }, [open, employeeToEdit, form]);
 
   // Monitor form changes for autosave in FuncionarioNovoModal
   useEffect(() => {
     if (!open) {
       isInitialMount.current = true;
+      lastSavedFormRef.current = null;
       return;
     }
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      return;
+    }
+
+    const currentFormStr = JSON.stringify(form);
+    if (lastSavedFormRef.current === null) {
+      return;
+    }
+    if (currentFormStr === lastSavedFormRef.current) {
       return;
     }
 
@@ -223,6 +246,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
           queryClient.setQueryData(queryKeys.employees.byId(currentEmployeeId), updatedEmployee);
 
+          lastSavedFormRef.current = currentFormStr;
           setSaveStatus('saved');
           const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
           return () => clearTimeout(resetStatusTimeout);
@@ -236,7 +260,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     } 
     
     // 2. Se NÃO está no modo de edição (funcionário novo, tentar a criação automática se os campos obrigatórios estiverem válidos)
-    else if (!isEditMode && !currentEmployeeId) {
+    else if (!isEditMode && !currentEmployeeId && !employeeToEdit) {
       if (!form.name?.trim() || !form.cpf?.trim() || !form.phone?.trim() || !form.hireDate) {
         return;
       }
@@ -270,6 +294,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           queryClient.setQueryData(queryKeys.employees.byId(createdEmployee.id), createdEmployee);
           void clearEmployeeFormDraft(draftStorageKey);
 
+          lastSavedFormRef.current = currentFormStr;
           setSaveStatus('saved');
           const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
           return () => clearTimeout(resetStatusTimeout);
@@ -281,7 +306,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
       return () => clearTimeout(delayDebounceFn);
     }
-  }, [form, isEditMode, currentEmployeeId, open, queryClient]);
+  }, [form, isEditMode, currentEmployeeId, open, queryClient, employeeToEdit]);
 
   const handleOfflineItemSynced = useCallback(
     ({ item, employee }: { item: { id: string; operation: string }; employee?: { id?: string } }) => {
