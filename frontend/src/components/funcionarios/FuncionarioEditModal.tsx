@@ -257,6 +257,68 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const initialWorkPostIdRef = useRef('');
   const workPostSelectReadyRef = useRef(false);
 
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const isInitialMount = useRef(true);
+
+  // Monitor form changes for autosave
+  useEffect(() => {
+    if (!open) {
+      isInitialMount.current = true;
+      return;
+    }
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    if (!funcionario?.id) return;
+
+    if (!form.cpf?.trim() || !form.hireDate || !form.name?.trim()) {
+      return;
+    }
+
+    const cpfDigits = form.cpf.replace(/\D/g, '');
+    if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
+      return;
+    }
+
+    const targetPost = normalizeWorkPostId((form as any).workPostId);
+    if (isWorkPostTransfer(initialWorkPostIdRef.current, targetPost) && !(form as any).remanejamentoDataInicio) {
+      return;
+    }
+
+    setSaveStatus('saving');
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const { remanejamentoDataInicio, ...formRest } = form as any;
+        const employeeData: any = { ...formRest };
+        if (remanejamentoDataInicio && remanejamentoDataInicio.trim()) {
+          employeeData.remanejamentoDataInicio = remanejamentoDataInicio;
+        }
+
+        const updatedEmployee = await employeeService.updateEmployee(funcionario.id, employeeData);
+        syncInitialWorkPostRef(
+          updatedEmployee?.workPostId || updatedEmployee?.workPost?.id || employeeData.workPostId,
+        );
+
+        queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+        if (updatedEmployee?.id) {
+          queryClient.setQueryData(queryKeys.employees.byId(funcionario.id), updatedEmployee);
+        }
+
+        setSaveStatus('saved');
+        const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
+        return () => clearTimeout(resetStatusTimeout);
+      } catch (err) {
+        console.error('Erro no salvamento automático:', err);
+        setSaveStatus('error');
+      }
+    }, 1500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [form, funcionario, queryClient, open]);
+
   const loadEmployeeDependents = async (employeeId: string | undefined, keepOnError = false) => {
     const raw = String(employeeId ?? '').trim();
     if (!raw) {
@@ -1830,12 +1892,28 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       }}>
         <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col overflow-hidden p-0 mx-4 sm:mx-0 bg-seguranca-graphite border-gray-600">
           <DialogHeader className="bg-gradient-to-r shrink-0 from-seguranca-red to-seguranca-yellow p-4 sm:p-6 text-white z-10">
-            <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl md:text-2xl font-bold">
+            <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl md:text-2xl font-bold w-full">
               <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg">
                 <UserIcon className="h-4 w-4 sm:h-6 sm:w-6" />
               </div>
               <span className="truncate">{isEditMode ? 'Editar Funcionário' : 'Editar Funcionário'}</span>
-          </DialogTitle>
+              {saveStatus === 'saving' && (
+                <span className="text-xs font-normal text-white/80 animate-pulse flex items-center gap-1.5 ml-auto bg-black/20 px-3 py-1 rounded-full border border-white/10">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
+                  Salvando...
+                </span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="text-xs font-normal text-green-300 flex items-center gap-1 ml-auto bg-black/20 px-3 py-1 rounded-full border border-green-500/20">
+                  ✓ Salvo automaticamente
+                </span>
+              )}
+              {saveStatus === 'error' && (
+                <span className="text-xs font-normal text-red-300 flex items-center gap-1 ml-auto bg-black/20 px-3 py-1 rounded-full border border-red-500/20">
+                  ⚠ Erro ao salvar
+                </span>
+              )}
+            </DialogTitle>
             <DialogDescription className="text-white/90 text-xs sm:text-sm mt-1">
               Preencha os dados abaixo. Itens obrigatórios estão indicados em vermelho.
           </DialogDescription>
