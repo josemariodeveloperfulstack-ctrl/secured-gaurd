@@ -48,8 +48,7 @@ import { occurrenceService, Occurrence } from '@/services/occurrenceService';
 import { remanejamentoService, Remanejamento } from '@/services/remanejamentoService';
 import timeRecordService, { TimeRecord } from '@/services/timeRecordService';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { formatCPF, formatRG, formatPhone } from '@/utils/formatters';
+import { formatCPF, formatRG, formatPhone, formatDate as formatSystemDate } from '@/utils/formatters';
 
 interface EmployeeViewDetailsModalProps {
     open: boolean;
@@ -188,7 +187,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
     const formatDate = (dateString?: string) => {
         if (!dateString) return '-';
         try {
-            return format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
+            return formatSystemDate(dateString);
         } catch {
             return dateString;
         }

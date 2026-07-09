@@ -826,13 +826,8 @@ public class EmployeeService {
                     "A nova data de admissão deve ser diferente da data do vínculo anterior (preservada no histórico).");
         }
 
-        if (admissionType == EmploymentAdmissionType.READMISSAO
-                && dto.getCompany() != null && dto.getCompany().getId() != null
-                && existing.getCompany() != null
-                && dto.getCompany().getId().equals(existing.getCompany().getId())) {
-            throw new IllegalArgumentException(
-                    "Para readmissão, selecione uma empresa diferente da empresa anterior.");
-        }
+        // Readmissão na mesma empresa é permitida conforme política da empresa.
+        // Não há restrição de empresa para READMISSAO ou PROMOCAO.
 
         String prevCompany = existing.getCompany() != null ? existing.getCompany().getName() : "-";
         LocalDate prevHireDate = existing.getHireDate();
@@ -2133,12 +2128,21 @@ public class EmployeeService {
                     EmployeeDTO.IdOnlyDTO workPostDTO = new EmployeeDTO.IdOnlyDTO();
                     workPostDTO.setId(e.getWorkPost().getId());
                     workPostDTO.setName(e.getWorkPost().getName());
-                    if (e.getWorkPost().getClient() != null) {
-                        workPostDTO.setClientId(e.getWorkPost().getClient().getId());
-                        workPostDTO.setClientName(e.getWorkPost().getClient().getName());
+                    try {
+                        if (e.getWorkPost().getClient() != null) {
+                            workPostDTO.setClientId(e.getWorkPost().getClient().getId());
+                            workPostDTO.setClientName(e.getWorkPost().getClient().getName());
+                        }
+                    } catch (Exception clientEx) {
+                        System.err.println("[WARNING] Erro ao mapear workPost.client: " + clientEx.getMessage());
                     }
-                    if (e.getWorkPost().getEpis() != null) {
-                        workPostDTO.setEpis(new java.util.ArrayList<>(e.getWorkPost().getEpis()));
+                    try {
+                        if (e.getWorkPost().getEpis() != null) {
+                            org.hibernate.Hibernate.initialize(e.getWorkPost().getEpis());
+                            workPostDTO.setEpis(new java.util.ArrayList<>(e.getWorkPost().getEpis()));
+                        }
+                    } catch (Exception episEx) {
+                        System.err.println("[WARNING] Erro ao mapear workPost.epis: " + episEx.getMessage());
                     }
                     dto.setWorkPost(workPostDTO);
                 }
@@ -2270,6 +2274,17 @@ public class EmployeeService {
                 System.err.println("[WARNING] Erro ao mapear dependentes: " + depEx.getMessage());
             }
 
+            try {
+                if (e.getId() != null) {
+                    dto.setPeriodCount(employmentPeriodService.countByEmployeeId(e.getId()));
+                } else {
+                    dto.setPeriodCount(0);
+                }
+            } catch (Exception periodEx) {
+                System.err.println("[WARNING] Erro ao mapear periodCount: " + periodEx.getMessage());
+                dto.setPeriodCount(0);
+            }
+
             System.out.println("[DEBUG] DTO criado com sucesso para: " + dto.getName());
             return dto;
 
@@ -2335,15 +2350,17 @@ public class EmployeeService {
             throw new IllegalArgumentException("Data de admissão é obrigatória");
         }
         if (excludeId == null) {
-            if (documentAlreadyRegistered(dto.getCpf())) {
-                throw new IllegalArgumentException("CPF já cadastrado para outro funcionário");
+            // Permite nova admissão se o funcionário anterior com este CPF foi demitido (TERMINATED).
+            // Só bloqueia se existir registro ATIVO (não demitido) com o mesmo CPF.
+            if (documentAlreadyRegisteredAndNotTerminated(dto.getCpf())) {
+                throw new IllegalArgumentException("CPF já cadastrado para funcionário ativo no sistema");
             }
         } else if (!isSameDocument(dto.getCpf(), existingDocument)
                 && documentAlreadyRegisteredByOther(dto.getCpf(), excludeId)) {
             throw new IllegalArgumentException("CPF já cadastrado para outro funcionário");
         }
         if (cpfUsedByDependent(cpfDigits)) {
-            throw new IllegalArgumentException("CPF já cadastrado no sistema");
+            throw new IllegalArgumentException("CPF já cadastrado como dependente no sistema");
         }
     }
 
@@ -2357,6 +2374,18 @@ public class EmployeeService {
             return false;
         }
         return employeeRepository.existsByNormalizedDocument(normalized);
+    }
+
+    /**
+     * Verifica se existe funcionário com este CPF/documento que NÃO esteja demitido.
+     * Permite nova admissão quando o cadastro anterior foi encerrado (TERMINATED).
+     */
+    private boolean documentAlreadyRegisteredAndNotTerminated(String document) {
+        String normalized = normalizeDocumentDigits(document);
+        if (normalized == null) {
+            return false;
+        }
+        return employeeRepository.existsByNormalizedDocumentAndNotTerminated(normalized);
     }
 
     private boolean documentAlreadyRegisteredByOther(String document, UUID excludeId) {

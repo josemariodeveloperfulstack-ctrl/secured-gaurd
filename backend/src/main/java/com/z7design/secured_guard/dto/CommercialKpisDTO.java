@@ -36,4 +36,11 @@ public class CommercialKpisDTO {
     private String userId;
     private String userName;
     private String periodo;
+
+    // Novos campos solicitados
+    private String ultimoClienteCadastrado;
+    private String ultimoPostoTrabalhoCadastrado;
+    private long contratosVencendo;
+    private long propostasEnviadasReal;
+    private long propostasRetornadas;
 }

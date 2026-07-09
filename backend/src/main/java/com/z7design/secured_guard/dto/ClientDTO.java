@@ -40,6 +40,12 @@ public class ClientDTO {
     @Size(max = 10, message = "CEP deve ter no máximo 10 caracteres")
     private String zipCode;
 
+    private java.util.UUID companyId;
+
+    private String companyName;
+
+    private String companySigla;
+
     @Size(max = 255, message = "Nome do contato deve ter no máximo 255 caracteres")
     private String contactName;
 
@@ -149,6 +155,30 @@ public class ClientDTO {
         this.zipCode = zipCode;
     }
 
+    public java.util.UUID getCompanyId() {
+        return companyId;
+    }
+
+    public void setCompanyId(java.util.UUID companyId) {
+        this.companyId = companyId;
+    }
+
+    public String getCompanyName() {
+        return companyName;
+    }
+
+    public void setCompanyName(String companyName) {
+        this.companyName = companyName;
+    }
+
+    public String getCompanySigla() {
+        return companySigla;
+    }
+
+    public void setCompanySigla(String companySigla) {
+        this.companySigla = companySigla;
+    }
+
     public String getContactName() {
         return contactName;
     }
@@ -226,6 +256,9 @@ public class ClientDTO {
         dto.setCity(entity.getCity());
         dto.setState(entity.getState());
         dto.setZipCode(entity.getZipCode());
+        dto.setCompanyId(entity.getCompany() != null ? entity.getCompany().getId() : null);
+        dto.setCompanyName(entity.getCompany() != null ? entity.getCompany().getName() : null);
+        dto.setCompanySigla(entity.getCompany() != null ? entity.getCompany().getSigla() : null);
         dto.setContactName(entity.getContactName());
         dto.setContactEmail(entity.getContactEmail());
         dto.setContactPhone(entity.getContactPhone());

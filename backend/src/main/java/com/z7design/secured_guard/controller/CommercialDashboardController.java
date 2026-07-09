@@ -109,7 +109,7 @@ public class CommercialDashboardController {
 
     @GetMapping("/expiring-contracts")
     @Operation(summary = "Contratos a vencer", description = "Lista contratos que vencem nos próximos X dias")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public ResponseEntity<List<Map<String, Object>>> getExpiringContracts(
             @RequestParam(defaultValue = "30") int days) {
         return ResponseEntity.ok(commercialDashboardService.getExpiringContracts(days));

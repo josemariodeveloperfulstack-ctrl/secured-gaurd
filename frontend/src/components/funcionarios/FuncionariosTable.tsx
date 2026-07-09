@@ -355,7 +355,14 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1 items-start">
-                    {getStatusBadge(effectiveEmploymentStatus(employee))}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {getStatusBadge(effectiveEmploymentStatus(employee))}
+                      {employee.periodCount && employee.periodCount > 1 && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-400 border border-blue-500/30 whitespace-nowrap">
+                          {employee.periodCount} Vínculos
+                        </Badge>
+                      )}
+                    </div>
                     {pendingAdmissionEmployeeIds?.has(employee.id) && (
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/70 text-amber-300 whitespace-normal text-left leading-tight">
                         Admissão em processo

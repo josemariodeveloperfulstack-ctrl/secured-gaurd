@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -98,19 +99,21 @@ public class AccountingFormStandardPdfService {
                         Table docs = new Table(UnitValue.createPercentArray(new float[] { 18, 32, 18, 32 }))
                                         .useAllAvailableWidth().setFontSize(8f);
                         addRow(docs, "RG", buildRg(employee), "Data Emissão", displayDate(employee.getCarteiraIdentidadeDataEmissao()));
-                        addRow(docs, "Órgão Emissor", employee.getCarteiraIdentidadeOrgaoEmissor(), "UF", employee.getRgUf());
+                        addRow(docs, "Órgão Emissor", resolveRgIssuingAuthority(employee), "UF", employee.getRgUf());
                         addRow(docs, "CPF", employee.getCpf() != null && !employee.getCpf().isBlank() ? employee.getCpf() : employee.getDocument(), "Título de Eleitor", employee.getTituloEleitor());
                         addRow(docs, "Zona/Seção", buildZonaSecao(employee), "PIS", employee.getPis());
                         addRow(docs, "CTPS", CompanyDataFormatter.formatCtps(employee.getCtps()), "Série", employee.getCtpsSeries());
-                        addRow(docs, "CNH", employee.getCnhNumber(), "Validade", displayDate(employee.getCnhExpirationDate()));
-                        addRow(docs, "Certificado Militar", employee.getCertificadoMilitar(), "Carteira de Reservista", "");
+                        addRow(docs, "CTPS Emissão", displayDate(employee.getCtpsIssueDate()), "Órgão Emissor CTPS", employee.getCtpsIssuingAgency());
+                        addRow(docs, "CNH", employee.getCnhNumber(), "Categoria", employee.getCnhCategory());
+                        addRow(docs, "Validade CNH", displayDate(employee.getCnhExpirationDate()), "Certificado Militar", employee.getCertificadoMilitar());
+                        addRow(docs, "Carteira de Reservista", "", "", "");
                         document.add(docs);
 
                         document.add(sectionTitle("Dados do Exame Médico"));
                         Table aso = new Table(UnitValue.createPercentArray(new float[] { 18, 32, 18, 32 }))
                                         .useAllAvailableWidth().setFontSize(8f);
                         addRow(aso, "Data Exame Médico (ASO)", displayDate(employee.getExameMedicoData()), "Tipo Exames Realizados", employee.getExameMedicoTipo());
-                        addRow(aso, "Nome do Médico", employee.getExameMedicoDoctor() != null ? employee.getExameMedicoDoctor().getName() : "", "CRM nº", "");
+                        addRow(aso, "Nome do Médico", employee.getExameMedicoDoctor() != null ? employee.getExameMedicoDoctor().getName() : "", "CRM nº", resolveDoctorCrm(employee));
                         addRow(aso, "Horário", employee.getExameMedicoHorario(), "Intervalos Almoço/Janta", displayYesNo(employee.getExameMedicoIntervalosRefeicao()));
                         addRow(aso, "Horário Intervalo", employee.getExameMedicoHorarioIntervalo(), "Contribuição Sindical paga", displayYesNo(employee.getExameMedicoContribuicaoSindicalPaga()));
                         addRow(aso, "Primeiro Emprego", displayYesNo(employee.getExameMedicoPrimeiroEmprego()), "Observações", employee.getExameMedicoObservacoes());
@@ -148,11 +151,12 @@ public class AccountingFormStandardPdfService {
                         Table empresa = new Table(UnitValue.createPercentArray(new float[] { 18, 32, 18, 32 }))
                                         .useAllAvailableWidth().setFontSize(8f);
                         addRow(empresa, "Data de admissão", displayDate(employee.getHireDate()), "Função", employee.getPosition() != null ? employee.getPosition().getName() : "");
-                        addRow(empresa, "Setor", employee.getUnit() != null ? employee.getUnit().getName() : "", "Salário", employee.getSalario() != null ? String.format("R$ %.2f", employee.getSalario()) : "");
-                        addRow(empresa, "Forma de Pagamento", employee.getPeriodoPagamento(), "Prazo de Experiência", employee.getPrazoExperienciaTexto());
-                        addRow(empresa, "Prorrogação", employee.getProrrogacaoExperiencia(), "Dias de Trabalho", employee.getDiasTrabalho());
+                        addRow(empresa, "Setor", resolveSectorName(employee), "Posto de Trabalho", resolveWorkPostName(employee));
+                        addRow(empresa, "Salário", employee.getSalario() != null ? String.format("R$ %.2f", employee.getSalario()) : "", "Forma de Pagamento", employee.getPeriodoPagamento());
+                        addRow(empresa, "Prazo de Experiência", employee.getPrazoExperienciaTexto(), "Prorrogação", employee.getProrrogacaoExperiencia());
+                        addRow(empresa, "Dias de Trabalho", resolveDiasTrabalho(employee), "Escala de Trabalho", resolveEscalaTrabalho(employee));
                         addRow(empresa, "Horário de Trabalho", employee.getHorarioTrabalho(), "Intervalo", employee.getHorarioTrabalhoIntervalo());
-                        addRow(empresa, "Dias de Folga", employee.getFolgaSemanal(), "Escala de Trabalho", employee.getEscalaTrabalho());
+                        addRow(empresa, "Dias de Folga", employee.getFolgaSemanal(), "Conta PIX", employee.getPixKey());
                         document.add(empresa);
 
                         document.add(sectionTitle("Tipo de Contrato"));
@@ -171,12 +175,24 @@ public class AccountingFormStandardPdfService {
                         beneficios.addHeaderCell(headCell("Valor Diário"));
                         beneficios.addHeaderCell(headCell("% Desconto"));
                         beneficios.addHeaderCell(headCell("Valor Desconto Mensal"));
-                        addBeneficioRow(beneficios, "Vale Transporte", resolveBeneficioPossui(employee, "TRANSPORT"), "", "", "");
-                        addBeneficioRow(beneficios, "Vale Refeição", resolveBeneficioPossui(employee, "MEAL"), "", "", "");
-                        addBeneficioRow(beneficios, "Vale Alimentação", resolveBeneficioPossui(employee, "FOOD", "ALIMENTACAO"), "", "", "");
-                        addBeneficioRow(beneficios, "Vale Assistência Médica", resolveBeneficioPossui(employee, "HEALTH"), "", "", "");
-                        addBeneficioRow(beneficios, "Vale Odontológica", resolveBeneficioPossui(employee, "DENTAL"), "", "", "");
-                        addBeneficioRow(beneficios, "Seguro de Vida", resolveBeneficioPossui(employee, "LIFE_INSURANCE"), "", "", "");
+                        addBeneficioRow(beneficios, "Vale Transporte",
+                                        resolveBeneficioPossui(employee, "Vale Transporte", "TRANSPORT"),
+                                        formatCurrency(resolveBenefitValue(employee, "Vale Transporte", "TRANSPORT")), "", "");
+                        addBeneficioRow(beneficios, "Vale Refeição",
+                                        resolveBeneficioPossui(employee, "Vale Refeição", "MEAL"),
+                                        formatCurrency(resolveBenefitValue(employee, "Vale Refeição", "MEAL")), "", "");
+                        addBeneficioRow(beneficios, "Vale Alimentação",
+                                        resolveBeneficioPossui(employee, "Vale Alimentação", "FOOD", "ALIMENTACAO"),
+                                        formatCurrency(resolveBenefitValue(employee, "Vale Alimentação", "FOOD", "ALIMENTACAO")), "", "");
+                        addBeneficioRow(beneficios, "Vale Assistência Médica",
+                                        resolveBeneficioPossui(employee, "Vale Assistência Médica", "HEALTH"),
+                                        formatCurrency(resolveBenefitValue(employee, "Vale Assistência Médica", "HEALTH")), "", "");
+                        addBeneficioRow(beneficios, "Vale Odontológica",
+                                        resolveBeneficioPossui(employee, "Vale Odontológica", "DENTAL"),
+                                        formatCurrency(resolveBenefitValue(employee, "Vale Odontológica", "DENTAL")), "", "");
+                        addBeneficioRow(beneficios, "Seguro de Vida",
+                                        resolveBeneficioPossui(employee, "Seguro de Vida", "LIFE_INSURANCE"),
+                                        formatCurrency(resolveBenefitValue(employee, "Seguro de Vida", "LIFE_INSURANCE")), "", "");
                         document.add(beneficios);
 
                         document.add(sectionTitle("Pagamento de Salário em Conta"));
@@ -189,7 +205,11 @@ public class AccountingFormStandardPdfService {
                         banco.addCell(bodyCell(employee.getAccountType()));
                         banco.addCell(bodyCell(employee.getBanco()));
                         banco.addCell(bodyCell(employee.getAgencia()));
-                        banco.addCell(bodyCell(employee.getContaCorrente()));
+                        banco.addCell(bodyCell(buildBankAccount(employee)));
+                        banco.addCell(topLabel("Dígito"));
+                        banco.addCell(topValue(employee.getContaDigito()));
+                        banco.addCell(topLabel("Chave PIX"));
+                        banco.addCell(topValue(employee.getPixKey()));
                         document.add(banco);
 
                         document.add(sectionTitle("Documentos Necessários"));
@@ -283,7 +303,7 @@ public class AccountingFormStandardPdfService {
                         rowIndex = addExcelQuadRow(sheet, rowIndex, "RG", buildRg(employee), "Data Emissão",
                                         displayDate(employee.getCarteiraIdentidadeDataEmissao()), labelStyle, valueStyle);
                         rowIndex = addExcelQuadRow(sheet, rowIndex, "Órgão Emissor",
-                                        employee.getCarteiraIdentidadeOrgaoEmissor(), "UF", employee.getRgUf(),
+                                        resolveRgIssuingAuthority(employee), "UF", employee.getRgUf(),
                                         labelStyle, valueStyle);
                         rowIndex = addExcelQuadRow(sheet, rowIndex, "CPF",
                                         employee.getCpf() != null && !employee.getCpf().isBlank() ? employee.getCpf()
@@ -294,11 +314,16 @@ public class AccountingFormStandardPdfService {
                         rowIndex = addExcelQuadRow(sheet, rowIndex, "CTPS",
                                         CompanyDataFormatter.formatCtps(employee.getCtps()), "Série",
                                         employee.getCtpsSeries(), labelStyle, valueStyle);
-                        rowIndex = addExcelQuadRow(sheet, rowIndex, "CNH", employee.getCnhNumber(), "Validade",
-                                        displayDate(employee.getCnhExpirationDate()), labelStyle, valueStyle);
-                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Certificado Militar",
-                                        employee.getCertificadoMilitar(), "Carteira de Reservista", "", labelStyle,
-                                        valueStyle);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "CTPS Emissão",
+                                        displayDate(employee.getCtpsIssueDate()), "Órgão Emissor CTPS",
+                                        employee.getCtpsIssuingAgency(), labelStyle, valueStyle);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "CNH", employee.getCnhNumber(), "Categoria",
+                                        employee.getCnhCategory(), labelStyle, valueStyle);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Validade CNH",
+                                        displayDate(employee.getCnhExpirationDate()), "Certificado Militar",
+                                        employee.getCertificadoMilitar(), labelStyle, valueStyle);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Carteira de Reservista", "", "", "",
+                                        labelStyle, valueStyle);
 
                         rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "Dados do Exame Médico",
                                         lastColumn, workbook);
@@ -308,7 +333,7 @@ public class AccountingFormStandardPdfService {
                         rowIndex = addExcelQuadRow(sheet, rowIndex, "Nome do Médico",
                                         employee.getExameMedicoDoctor() != null ? employee.getExameMedicoDoctor().getName()
                                                         : "",
-                                        "CRM nº", "", labelStyle, valueStyle);
+                                        "CRM nº", resolveDoctorCrm(employee), labelStyle, valueStyle);
                         rowIndex = addExcelQuadRow(sheet, rowIndex, "Horário", employee.getExameMedicoHorario(),
                                         "Intervalos Almoço/Janta",
                                         displayYesNo(employee.getExameMedicoIntervalosRefeicao()), labelStyle, valueStyle);
@@ -363,20 +388,21 @@ public class AccountingFormStandardPdfService {
                                         displayDate(employee.getHireDate()), "Função",
                                         employee.getPosition() != null ? employee.getPosition().getName() : "",
                                         labelStyle, valueStyle);
-                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Setor",
-                                        employee.getUnit() != null ? employee.getUnit().getName() : "", "Salário",
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Setor", resolveSectorName(employee),
+                                        "Posto de Trabalho", resolveWorkPostName(employee), labelStyle, valueStyle);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Salário",
                                         employee.getSalario() != null ? String.format("R$ %.2f", employee.getSalario())
                                                         : "",
-                                        labelStyle, valueStyle);
-                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Forma de Pagamento", employee.getPeriodoPagamento(),
-                                        "Prazo de Experiência", employee.getPrazoExperienciaTexto(), labelStyle,
-                                        valueStyle);
-                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Prorrogação", employee.getProrrogacaoExperiencia(),
-                                        "Dias de Trabalho", employee.getDiasTrabalho(), labelStyle, valueStyle);
+                                        "Forma de Pagamento", employee.getPeriodoPagamento(), labelStyle, valueStyle);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Prazo de Experiência",
+                                        employee.getPrazoExperienciaTexto(), "Prorrogação",
+                                        employee.getProrrogacaoExperiencia(), labelStyle, valueStyle);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Dias de Trabalho", resolveDiasTrabalho(employee),
+                                        "Escala de Trabalho", resolveEscalaTrabalho(employee), labelStyle, valueStyle);
                         rowIndex = addExcelQuadRow(sheet, rowIndex, "Horário de Trabalho", employee.getHorarioTrabalho(),
                                         "Intervalo", employee.getHorarioTrabalhoIntervalo(), labelStyle, valueStyle);
                         rowIndex = addExcelQuadRow(sheet, rowIndex, "Dias de Folga", employee.getFolgaSemanal(),
-                                        "Escala de Trabalho", employee.getEscalaTrabalho(), labelStyle, valueStyle);
+                                        "Conta PIX", employee.getPixKey(), labelStyle, valueStyle);
 
                         rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "Tipo de Contrato", lastColumn,
                                         workbook);
@@ -390,17 +416,23 @@ public class AccountingFormStandardPdfService {
                                         new String[] { "Benefício", "Possui", "Valor Diário", "% Desconto" },
                                         labelStyle);
                         rowIndex = addExcelBeneficioRow(sheet, rowIndex, "Vale Transporte",
-                                        resolveBeneficioPossui(employee, "TRANSPORT"), valueStyle);
+                                        resolveBeneficioPossui(employee, "Vale Transporte", "TRANSPORT"),
+                                        formatCurrency(resolveBenefitValue(employee, "Vale Transporte", "TRANSPORT")), "", valueStyle);
                         rowIndex = addExcelBeneficioRow(sheet, rowIndex, "Vale Refeição",
-                                        resolveBeneficioPossui(employee, "MEAL"), valueStyle);
+                                        resolveBeneficioPossui(employee, "Vale Refeição", "MEAL"),
+                                        formatCurrency(resolveBenefitValue(employee, "Vale Refeição", "MEAL")), "", valueStyle);
                         rowIndex = addExcelBeneficioRow(sheet, rowIndex, "Vale Alimentação",
-                                        resolveBeneficioPossui(employee, "FOOD", "ALIMENTACAO"), valueStyle);
+                                        resolveBeneficioPossui(employee, "Vale Alimentação", "FOOD", "ALIMENTACAO"),
+                                        formatCurrency(resolveBenefitValue(employee, "Vale Alimentação", "FOOD", "ALIMENTACAO")), "", valueStyle);
                         rowIndex = addExcelBeneficioRow(sheet, rowIndex, "Vale Assistência Médica",
-                                        resolveBeneficioPossui(employee, "HEALTH"), valueStyle);
+                                        resolveBeneficioPossui(employee, "Vale Assistência Médica", "HEALTH"),
+                                        formatCurrency(resolveBenefitValue(employee, "Vale Assistência Médica", "HEALTH")), "", valueStyle);
                         rowIndex = addExcelBeneficioRow(sheet, rowIndex, "Vale Odontológica",
-                                        resolveBeneficioPossui(employee, "DENTAL"), valueStyle);
+                                        resolveBeneficioPossui(employee, "Vale Odontológica", "DENTAL"),
+                                        formatCurrency(resolveBenefitValue(employee, "Vale Odontológica", "DENTAL")), "", valueStyle);
                         rowIndex = addExcelBeneficioRow(sheet, rowIndex, "Seguro de Vida",
-                                        resolveBeneficioPossui(employee, "LIFE_INSURANCE"), valueStyle);
+                                        resolveBeneficioPossui(employee, "Seguro de Vida", "LIFE_INSURANCE"),
+                                        formatCurrency(resolveBenefitValue(employee, "Seguro de Vida", "LIFE_INSURANCE")), "", valueStyle);
 
                         rowIndex = excelReportLayoutService.addSection(sheet, rowIndex,
                                         "Pagamento de Salário em Conta", lastColumn, workbook);
@@ -408,8 +440,10 @@ public class AccountingFormStandardPdfService {
                                         new String[] { "Tipo da Conta", "Banco", "Agência", "Conta" }, labelStyle);
                         rowIndex = addExcelHeaderRow(sheet, rowIndex,
                                         new String[] { nvl(employee.getAccountType()), nvl(employee.getBanco()),
-                                                        nvl(employee.getAgencia()), nvl(employee.getContaCorrente()) },
+                                                        nvl(employee.getAgencia()), nvl(buildBankAccount(employee)) },
                                         valueStyle);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Dígito", employee.getContaDigito(), "Chave PIX",
+                                        employee.getPixKey(), labelStyle, valueStyle);
 
                         rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "Documentos Necessários",
                                         lastColumn, workbook);
@@ -500,14 +534,16 @@ public class AccountingFormStandardPdfService {
         private void appendHtmlDocumentos(StringBuilder html, Employee employee) {
                 html.append("<h2>Documentos</h2><table>");
                 htmlRow(html, "RG", buildRg(employee), "Data Emissão", displayDate(employee.getCarteiraIdentidadeDataEmissao()));
-                htmlRow(html, "Órgão Emissor", employee.getCarteiraIdentidadeOrgaoEmissor(), "UF", employee.getRgUf());
+                htmlRow(html, "Órgão Emissor", resolveRgIssuingAuthority(employee), "UF", employee.getRgUf());
                 htmlRow(html, "CPF",
                                 employee.getCpf() != null && !employee.getCpf().isBlank() ? employee.getCpf() : employee.getDocument(),
                                 "Título de Eleitor", employee.getTituloEleitor());
                 htmlRow(html, "Zona/Seção", buildZonaSecao(employee), "PIS", employee.getPis());
                 htmlRow(html, "CTPS", CompanyDataFormatter.formatCtps(employee.getCtps()), "Série", employee.getCtpsSeries());
-                htmlRow(html, "CNH", employee.getCnhNumber(), "Validade", displayDate(employee.getCnhExpirationDate()));
-                htmlRow(html, "Certificado Militar", employee.getCertificadoMilitar(), "Carteira de Reservista", "");
+                htmlRow(html, "CTPS Emissão", displayDate(employee.getCtpsIssueDate()), "Órgão Emissor CTPS", employee.getCtpsIssuingAgency());
+                htmlRow(html, "CNH", employee.getCnhNumber(), "Categoria", employee.getCnhCategory());
+                htmlRow(html, "Validade CNH", displayDate(employee.getCnhExpirationDate()), "Certificado Militar", employee.getCertificadoMilitar());
+                htmlRow(html, "Carteira de Reservista", "", "", "");
                 html.append("</table>");
         }
 
@@ -516,7 +552,7 @@ public class AccountingFormStandardPdfService {
                 htmlRow(html, "Data Exame Médico (ASO)", displayDate(employee.getExameMedicoData()), "Tipo Exames Realizados",
                                 employee.getExameMedicoTipo());
                 htmlRow(html, "Nome do Médico",
-                                employee.getExameMedicoDoctor() != null ? employee.getExameMedicoDoctor().getName() : "", "CRM nº", "");
+                                employee.getExameMedicoDoctor() != null ? employee.getExameMedicoDoctor().getName() : "", "CRM nº", resolveDoctorCrm(employee));
                 htmlRow(html, "Horário", employee.getExameMedicoHorario(), "Intervalos Almoço/Janta",
                                 displayYesNo(employee.getExameMedicoIntervalosRefeicao()));
                 htmlRow(html, "Horário Intervalo", employee.getExameMedicoHorarioIntervalo(), "Contribuição Sindical paga",
@@ -557,14 +593,15 @@ public class AccountingFormStandardPdfService {
                 html.append("<h2>Para Preenchimento da Empresa</h2><table>");
                 htmlRow(html, "Data de admissão", displayDate(employee.getHireDate()), "Função",
                                 employee.getPosition() != null ? employee.getPosition().getName() : "");
-                htmlRow(html, "Setor", employee.getUnit() != null ? employee.getUnit().getName() : "", "Salário",
-                                employee.getSalario() != null ? String.format("R$ %.2f", employee.getSalario()) : "");
-                htmlRow(html, "Forma de Pagamento", employee.getPeriodoPagamento(), "Prazo de Experiência",
-                                employee.getPrazoExperienciaTexto());
-                htmlRow(html, "Prorrogação", employee.getProrrogacaoExperiencia(), "Dias de Trabalho", employee.getDiasTrabalho());
+                htmlRow(html, "Setor", resolveSectorName(employee), "Posto de Trabalho", resolveWorkPostName(employee));
+                htmlRow(html, "Salário", employee.getSalario() != null ? String.format("R$ %.2f", employee.getSalario()) : "", "Forma de Pagamento",
+                                employee.getPeriodoPagamento());
+                htmlRow(html, "Prazo de Experiência", employee.getPrazoExperienciaTexto(), "Prorrogação",
+                                employee.getProrrogacaoExperiencia());
+                htmlRow(html, "Dias de Trabalho", resolveDiasTrabalho(employee), "Escala de Trabalho", resolveEscalaTrabalho(employee));
                 htmlRow(html, "Horário de Trabalho", employee.getHorarioTrabalho(), "Intervalo",
                                 employee.getHorarioTrabalhoIntervalo());
-                htmlRow(html, "Dias de Folga", employee.getFolgaSemanal(), "Escala de Trabalho", employee.getEscalaTrabalho());
+                htmlRow(html, "Dias de Folga", employee.getFolgaSemanal(), "Conta PIX", employee.getPixKey());
                 html.append("</table>");
         }
 
@@ -576,12 +613,24 @@ public class AccountingFormStandardPdfService {
 
         private void appendHtmlBeneficios(StringBuilder html, Employee employee) {
                 html.append("<h2>Benefícios</h2><table><tr><th>Benefício</th><th>Possui</th><th>Valor Diário</th><th>% Desconto</th><th>Valor Desconto Mensal</th></tr>");
-                htmlBeneficioRow(html, "Vale Transporte", resolveBeneficioPossui(employee, "TRANSPORT"));
-                htmlBeneficioRow(html, "Vale Refeição", resolveBeneficioPossui(employee, "MEAL"));
-                htmlBeneficioRow(html, "Vale Alimentação", resolveBeneficioPossui(employee, "FOOD", "ALIMENTACAO"));
-                htmlBeneficioRow(html, "Vale Assistência Médica", resolveBeneficioPossui(employee, "HEALTH"));
-                htmlBeneficioRow(html, "Vale Odontológica", resolveBeneficioPossui(employee, "DENTAL"));
-                htmlBeneficioRow(html, "Seguro de Vida", resolveBeneficioPossui(employee, "LIFE_INSURANCE"));
+                htmlBeneficioRow(html, "Vale Transporte",
+                                resolveBeneficioPossui(employee, "Vale Transporte", "TRANSPORT"),
+                                formatCurrency(resolveBenefitValue(employee, "Vale Transporte", "TRANSPORT")));
+                htmlBeneficioRow(html, "Vale Refeição",
+                                resolveBeneficioPossui(employee, "Vale Refeição", "MEAL"),
+                                formatCurrency(resolveBenefitValue(employee, "Vale Refeição", "MEAL")));
+                htmlBeneficioRow(html, "Vale Alimentação",
+                                resolveBeneficioPossui(employee, "Vale Alimentação", "FOOD", "ALIMENTACAO"),
+                                formatCurrency(resolveBenefitValue(employee, "Vale Alimentação", "FOOD", "ALIMENTACAO")));
+                htmlBeneficioRow(html, "Vale Assistência Médica",
+                                resolveBeneficioPossui(employee, "Vale Assistência Médica", "HEALTH"),
+                                formatCurrency(resolveBenefitValue(employee, "Vale Assistência Médica", "HEALTH")));
+                htmlBeneficioRow(html, "Vale Odontológica",
+                                resolveBeneficioPossui(employee, "Vale Odontológica", "DENTAL"),
+                                formatCurrency(resolveBenefitValue(employee, "Vale Odontológica", "DENTAL")));
+                htmlBeneficioRow(html, "Seguro de Vida",
+                                resolveBeneficioPossui(employee, "Seguro de Vida", "LIFE_INSURANCE"),
+                                formatCurrency(resolveBenefitValue(employee, "Seguro de Vida", "LIFE_INSURANCE")));
                 html.append("</table>");
         }
 
@@ -591,7 +640,10 @@ public class AccountingFormStandardPdfService {
                 html.append("<tr><td>").append(escapeHtml(nvl(employee.getAccountType()))).append("</td>");
                 html.append("<td>").append(escapeHtml(nvl(employee.getBanco()))).append("</td>");
                 html.append("<td>").append(escapeHtml(nvl(employee.getAgencia()))).append("</td>");
-                html.append("<td>").append(escapeHtml(nvl(employee.getContaCorrente()))).append("</td></tr></table>");
+                html.append("<td>").append(escapeHtml(nvl(buildBankAccount(employee)))).append("</td></tr>");
+                html.append("</table><table>");
+                htmlRow(html, "Dígito", employee.getContaDigito(), "Chave PIX", employee.getPixKey());
+                html.append("</table>");
         }
 
         private void htmlRow(StringBuilder html, String l1, String v1, String l2, String v2) {
@@ -599,9 +651,9 @@ public class AccountingFormStandardPdfService {
                 html.append(htmlLabelCell(l2)).append(htmlValueCell(v2)).append("</tr>");
         }
 
-        private void htmlBeneficioRow(StringBuilder html, String beneficio, String possui) {
+        private void htmlBeneficioRow(StringBuilder html, String beneficio, String possui, String valorDiario) {
                 html.append("<tr><td>").append(escapeHtml(beneficio)).append("</td><td>").append(escapeHtml(nvl(possui)));
-                html.append("</td><td> - </td><td> - </td><td> - </td></tr>");
+                html.append("</td><td>").append(escapeHtml(nvl(valorDiario))).append("</td><td> - </td><td> - </td></tr>");
         }
 
         private String htmlLabelCell(String label) {
@@ -649,12 +701,13 @@ public class AccountingFormStandardPdfService {
                 return rowIndex + 1;
         }
 
-        private int addExcelBeneficioRow(Sheet sheet, int rowIndex, String beneficio, String possui, CellStyle valueStyle) {
+        private int addExcelBeneficioRow(Sheet sheet, int rowIndex, String beneficio, String possui, String valorDiario,
+                        String percentual, CellStyle valueStyle) {
                 Row row = sheet.createRow(rowIndex);
                 createStyledCell(row, 0, beneficio, valueStyle);
                 createStyledCell(row, 1, nvl(possui), valueStyle);
-                createStyledCell(row, 2, " - ", valueStyle);
-                createStyledCell(row, 3, " - ", valueStyle);
+                createStyledCell(row, 2, nvl(valorDiario), valueStyle);
+                createStyledCell(row, 3, nvl(percentual), valueStyle);
                 return rowIndex + 1;
         }
 
@@ -697,17 +750,121 @@ public class AccountingFormStandardPdfService {
                         return " - ";
                 }
                 for (com.z7design.secured_guard.model.Benefit benefit : employee.getBenefits()) {
-                        if (benefit.getType() == null) {
-                                continue;
-                        }
                         for (String type : types) {
-                                if (type.equalsIgnoreCase(benefit.getType())
+                                if (matchesBenefit(benefit, type)
                                                 && (benefit.getIsActive() == null || Boolean.TRUE.equals(benefit.getIsActive()))) {
                                         return "Sim";
                                 }
                         }
                 }
                 return " - ";
+        }
+
+        private BigDecimal resolveBenefitValue(Employee employee, String... types) {
+                if (employee.getBenefits() == null || employee.getBenefits().isEmpty()) {
+                        return null;
+                }
+                for (com.z7design.secured_guard.model.Benefit benefit : employee.getBenefits()) {
+                        if (benefit.getIsActive() != null && !Boolean.TRUE.equals(benefit.getIsActive())) {
+                                continue;
+                        }
+                        for (String type : types) {
+                                if (matchesBenefit(benefit, type)) {
+                                        return benefit.getValue();
+                                }
+                        }
+                }
+                return null;
+        }
+
+        private boolean matchesBenefit(com.z7design.secured_guard.model.Benefit benefit, String typeOrName) {
+                if (typeOrName == null || typeOrName.isBlank()) {
+                        return false;
+                }
+                if (benefit.getType() != null && typeOrName.equalsIgnoreCase(benefit.getType())) {
+                        return true;
+                }
+                return benefit.getName() != null && typeOrName.equalsIgnoreCase(benefit.getName());
+        }
+
+        private String formatCurrency(BigDecimal value) {
+                if (value == null) {
+                        return "";
+                }
+                return String.format("R$ %.2f", value);
+        }
+
+        private String resolveSectorName(Employee employee) {
+                if (employee.getDepartment() != null && employee.getDepartment().getName() != null
+                                && !employee.getDepartment().getName().isBlank()) {
+                        return employee.getDepartment().getName();
+                }
+                if (employee.getUnit() != null && employee.getUnit().getName() != null
+                                && !employee.getUnit().getName().isBlank()) {
+                        return employee.getUnit().getName();
+                }
+                return "";
+        }
+
+        private String resolveDiasTrabalho(Employee employee) {
+                if (employee.getDiasTrabalho() != null && !employee.getDiasTrabalho().isBlank()) {
+                        return employee.getDiasTrabalho();
+                }
+                return employee.getEscalaTrabalho() != null ? employee.getEscalaTrabalho() : "";
+        }
+
+        private String resolveEscalaTrabalho(Employee employee) {
+                if (employee.getEscalaTrabalho() != null && !employee.getEscalaTrabalho().isBlank()) {
+                        return employee.getEscalaTrabalho();
+                }
+                return employee.getDiasTrabalho() != null ? employee.getDiasTrabalho() : "";
+        }
+
+        private String resolveRgIssuingAuthority(Employee employee) {
+                if (employee.getCarteiraIdentidadeOrgaoEmissor() != null && !employee.getCarteiraIdentidadeOrgaoEmissor().isBlank()) {
+                        return employee.getCarteiraIdentidadeOrgaoEmissor();
+                }
+                if (employee.getRg() != null && employee.getRg().contains("-")) {
+                        String[] parts = employee.getRg().split("-");
+                        if (parts.length >= 2) {
+                                return parts[1].trim();
+                        }
+                }
+                return "";
+        }
+
+        private String resolveDoctorCrm(Employee employee) {
+                if (employee.getExameMedicoDoctor() == null) {
+                        return "";
+                }
+                String crm = employee.getExameMedicoDoctor().getCrmNumber();
+                String uf = employee.getExameMedicoDoctor().getCrmState();
+                if (crm == null || crm.isBlank()) {
+                        return "";
+                }
+                if (uf == null || uf.isBlank()) {
+                        return crm;
+                }
+                return crm + "/" + uf;
+        }
+
+        private String resolveWorkPostName(Employee employee) {
+                if (employee.getWorkPost() != null && employee.getWorkPost().getName() != null
+                                && !employee.getWorkPost().getName().isBlank()) {
+                        return employee.getWorkPost().getName();
+                }
+                return "";
+        }
+
+        private String buildBankAccount(Employee employee) {
+                String conta = nvl(employee.getContaCorrente());
+                if (" - ".equals(conta)) {
+                        return conta;
+                }
+                if (employee.getContaDigito() != null && !employee.getContaDigito().isBlank()) {
+                        return conta + "-" + employee.getContaDigito().trim();
+                }
+                return conta;
         }
 
         private Paragraph sectionTitle(String title) {

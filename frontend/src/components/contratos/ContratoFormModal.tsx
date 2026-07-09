@@ -38,6 +38,7 @@ import { companyService } from '@/services/companyService';
 import { workPostService } from '@/services/workPostService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { WorkPostDrawer } from './WorkPostDrawer';
+import { formatCpfForInput, formatCnpjForInput } from '@/utils/validation';
 
 type StatusType = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'SUSPENDED';
 type OriginType = 'PROPOSAL' | 'RENEWAL' | 'MANUAL';
@@ -66,6 +67,7 @@ interface ContratoFormData {
   notificar_rh?: boolean;
   notificar_dp?: boolean;
   notificar_operacional?: boolean;
+  notificar_almoxarifado?: boolean;
 
   // Novos campos para minutas comerciais
   contractTemplate?: TemplateTypeForm;
@@ -120,6 +122,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
     notificar_rh: false,
     notificar_dp: false,
     notificar_operacional: false,
+    notificar_almoxarifado: false,
 
     // Minuta default
     contractTemplate: 'ADMINISTRATIVO',
@@ -185,6 +188,21 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
       setClientWorkPosts([]);
     }
   }, [formData.clientId]);
+
+  // Preencher dados do cliente (CNPJ, representante) quando cliente é selecionado
+  useEffect(() => {
+    if (formData.clientId && clients.length > 0) {
+      const selectedClient = clients.find(client => client.id === formData.clientId);
+      if (selectedClient) {
+        setFormData(prev => ({
+          ...prev,
+          contractedCompanyCnpj: selectedClient.cnpj || prev.contractedCompanyCnpj,
+          representativeName: selectedClient.contactName || prev.representativeName,
+          representativeCpf: selectedClient.contactPhone || prev.representativeCpf
+        }));
+      }
+    }
+  }, [formData.clientId, clients]);
 
   const loadUsers = async () => {
     try {
@@ -270,6 +288,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
         notificar_rh: contrato.notificar_rh || false,
         notificar_dp: contrato.notificar_dp || false,
         notificar_operacional: contrato.notificar_operacional || false,
+        notificar_almoxarifado: (contrato as any).notificar_almoxarifado || false,
 
         // Minuta campos
         contractTemplate: (contrato as any).contractTemplate || 'ADMINISTRATIVO',
@@ -299,6 +318,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
         notificar_rh: false,
         notificar_dp: false,
         notificar_operacional: false,
+        notificar_almoxarifado: false,
 
         // Defaults
         contractTemplate: 'ADMINISTRATIVO',
@@ -431,6 +451,15 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
         departamento: 'operacional',
         titulo: 'Novo Contrato - Operacional',
         mensagem: `Novo contrato operacional cadastrado com ${clientName}. Tipo de serviço: ${contratoData.contractType}.`
+      });
+    }
+
+    if (contratoData.notificar_almoxarifado) {
+      notifications.push({
+        contrato_id: contratoId,
+        departamento: 'almoxarifado',
+        titulo: 'Novo Contrato - Almoxarifado',
+        mensagem: `Novo contrato cadastrado com o cliente ${clientName}. Verifique os materiais e equipamentos necessários para implantação.`
       });
     }
 
@@ -685,7 +714,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
                   <Label className="text-xs text-zinc-300 font-bold uppercase">CPF do Representante *</Label>
                   <Input
                     value={formData.representativeCpf}
-                    onChange={(e) => setFormData({ ...formData, representativeCpf: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, representativeCpf: formatCpfForInput(e.target.value) })}
                     placeholder="000.000.000-00"
                     className="bg-black border-zinc-800 text-white placeholder-zinc-600 rounded-none focus-visible:ring-1 focus-visible:ring-yellow-500 h-10 text-xs"
                     required
@@ -980,7 +1009,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
                 <Bell className="h-4 w-4" /> Alertas Automáticos de Implantação
               </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div className="flex items-center space-x-3 p-2.5 bg-black border border-zinc-800 rounded-none">
                   <Checkbox
                     id="notificar_rh"
@@ -1009,6 +1038,16 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
                     className="border-zinc-800 data-[state=checked]:bg-yellow-500 data-[state=checked]:text-black"
                   />
                   <Label htmlFor="notificar_operacional" className="text-zinc-300 text-xs font-bold uppercase cursor-pointer">Operacional (Rondas)</Label>
+                </div>
+
+                <div className="flex items-center space-x-3 p-2.5 bg-black border border-zinc-800 rounded-none">
+                  <Checkbox
+                    id="notificar_almoxarifado"
+                    checked={formData.notificar_almoxarifado}
+                    onCheckedChange={(c) => setFormData({ ...formData, notificar_almoxarifado: !!c })}
+                    className="border-zinc-800 data-[state=checked]:bg-yellow-500 data-[state=checked]:text-black"
+                  />
+                  <Label htmlFor="notificar_almoxarifado" className="text-zinc-300 text-xs font-bold uppercase cursor-pointer">Almoxarifado</Label>
                 </div>
               </div>
 

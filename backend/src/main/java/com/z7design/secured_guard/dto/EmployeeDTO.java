@@ -236,6 +236,13 @@ public class EmployeeDTO {
     private String admissionType;
 
     /**
+     * Número total de vínculos empregatícios registrados para este funcionário.
+     * Valor > 1 indica que o funcionário foi demitido e readmitido ao menos uma vez.
+     * Populado no toDTO() via contagem da tabela employee_employment_periods.
+     */
+    private Integer periodCount;
+
+    /**
      * Usuário do sistema vinculado ao funcionário (opcional).
      * Só deve ser preenchido se o funcionário também for usuário do sistema.
      */

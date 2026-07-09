@@ -17,7 +17,7 @@ public class Remanejamento {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @ManyToOne(optional = true)
     @JoinColumn(name = "employee_id", nullable = false)
     @Fetch(FetchMode.SELECT)
     @JsonIgnoreProperties({ "timeRecords", "payrolls", "documents", "benefits", "schedules", "occurrences", "epis",

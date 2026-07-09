@@ -86,6 +86,7 @@ const Clientes: React.FC = () => {
       try {
         const config = notificationService.loadDepartamentosConfig();
         const notifiedDepts = client.notifiedDepartments || [];
+        const companyLabel = client.companySigla || client.companyName || 'Não informada';
 
         console.log('[DEBUG] Clientes.tsx - Departamentos para notificar:', notifiedDepts);
 
@@ -127,7 +128,16 @@ const Clientes: React.FC = () => {
           const deptEmail = config[deptId as keyof typeof config];
           if (!deptEmail) continue;
 
-          const deptName = deptId.charAt(0).toUpperCase() + deptId.slice(1);
+          const deptNameMap: Record<string, string> = {
+            comercial: 'Comercial',
+            operacional: 'Operacional',
+            pessoal: 'DP / Pessoal',
+            rh: 'Recursos Humanos',
+            financeiro: 'Financeiro',
+            almoxarifado: 'Almoxarifado',
+            administrador: 'Administrador'
+          };
+          const deptName = deptNameMap[deptId] || (deptId.charAt(0).toUpperCase() + deptId.slice(1));
 
           const emailData = {
             to: deptEmail,
@@ -135,7 +145,7 @@ const Clientes: React.FC = () => {
             body: `
               <h2>Novo Cliente Registrado - Notificação para ${deptName}</h2>
               <p><strong>Nome:</strong> ${client.name}</p>
-              <p><strong>Empresa:</strong> Promover</p>
+              <p><strong>Empresa:</strong> ${companyLabel}</p>
               <p><strong>Status:</strong> ${client.status}</p>
               <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
               

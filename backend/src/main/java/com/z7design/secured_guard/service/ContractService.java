@@ -409,14 +409,26 @@ public class ContractService {
 
         if (contract.getClient() != null) {
             try {
-                contract.getClient().getName();
+                // Acessa propriedades para garantir inicialização
+                String clientName = contract.getClient().getName();
+                String clientCnpj = contract.getClient().getCnpj();
+                UUID clientId = contract.getClient().getId();
+                
+                dto.setClientId(clientId);
+                dto.setClientName(clientName);
+                dto.setClientCnpj(clientCnpj);
+                
+                log.info("Convertendo contrato {}: cliente id={}, name={}, cnpj={}", 
+                    contract.getId(), clientId, clientName, clientCnpj);
+            } catch (Exception e) {
+                log.error("Erro ao inicializar cliente para contrato {}: {}", 
+                    contract.getId(), e.getMessage(), e);
                 dto.setClientId(contract.getClient().getId());
-                dto.setClientName(contract.getClient().getName());
-                dto.setClientCnpj(contract.getClient().getCnpj());
-            } catch (org.hibernate.LazyInitializationException e) {
-                dto.setClientId(contract.getClient().getId());
-                log.warn("Não foi possível inicializar o Client para o contrato {}", contract.getId());
+                // Se não conseguir name/CNPJ, use valores padrão para não quebrar a listagem
+                dto.setClientName("Cliente Desconhecido");
             }
+        } else {
+            log.warn("Contrato {} não tem cliente associado!", contract.getId());
         }
         if (contract.getResponsibleCommercial() != null) {
             try {
@@ -504,7 +516,8 @@ public class ContractService {
             UserGroup.GRUPO_FINANCEIRO,
             UserGroup.GRUPO_RH,
             UserGroup.GRUPO_DPE,
-            UserGroup.GRUPO_SUPERVISOR
+            UserGroup.GRUPO_SUPERVISOR,
+            UserGroup.GRUPO_ESTOQUE
         };
 
         // Obter usuário autenticado

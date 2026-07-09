@@ -17,6 +17,7 @@ import api from '@/lib/axios';
 import { StandardReportTemplate } from '../reporting/StandardReportTemplate';
 import { formatCNPJ } from '@/utils/validation';
 import { reportLayoutService } from '@/services/reportLayoutService';
+import { formatDate as formatSystemDate } from '@/utils/formatters';
 
 interface FichaRegistroFuncionarioFormProps {
   employeeId?: string;
@@ -85,8 +86,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
   const formatDateToBR = (isoDate: string | null | undefined): string => {
     if (!isoDate) return '';
     try {
-      const date = new Date(isoDate);
-      return date.toLocaleDateString('pt-BR');
+      return formatSystemDate(isoDate);
     } catch {
       return isoDate;
     }
@@ -330,7 +330,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nascimento</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                          {fullEmployee.birthDate ? new Date(fullEmployee.birthDate).toLocaleDateString('pt-BR') : '-'}
+                          {formatDateToBR(fullEmployee.birthDate) || '-'}
                         </div>
                       </div>
                     </div>
@@ -386,7 +386,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                          {fullEmployee.hireDate ? new Date(fullEmployee.hireDate).toLocaleDateString('pt-BR') : '-'}
+                          {formatDateToBR(fullEmployee.hireDate) || '-'}
                         </div>
                       </div>
                     </div>

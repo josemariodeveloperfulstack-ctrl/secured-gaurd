@@ -56,6 +56,7 @@ export interface Employee {
   terminationReason?: string;
   status?: string;
   notes?: string;
+  periodCount?: number;
 
   // Campos adicionais do backend
   tituloEleitor?: string;

@@ -254,7 +254,8 @@ public class SecurityConfig {
                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_RH",
                                                                 "COMERCIAL", "ROLE_COMERCIAL",
-                                                                "ASSISTENTE_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
+                                                                "ASSISTENTE_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
+                                                                "GESTOR_COMERCIAL", "ROLE_GESTOR_COMERCIAL")
                                                 // Endpoints de solicitações de admissão/demissão
                                                 .requestMatchers("/api/admission-requests/**")
                                                 .hasAnyAuthority("RH", "DEPARTAMENTO_PESSOAL", "SUPER_ADMIN", "ADMIN",
@@ -586,6 +587,7 @@ public class SecurityConfig {
                                                                 "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR",
                                                                 "COMERCIAL", "ROLE_COMERCIAL",
                                                                 "ASSISTENTE_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
+                                                                "GESTOR_COMERCIAL", "ROLE_GESTOR_COMERCIAL",
                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de clientes - temporariamente públicos para debug

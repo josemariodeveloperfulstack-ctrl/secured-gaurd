@@ -476,6 +476,125 @@ public class FileUploadController {
         }
     }
 
+    @PostMapping("/safety-engineers/stamps")
+    @Operation(summary = "Upload de carimbo do engenheiro de segurança", description = "Faz upload de carimbo do engenheiro de segurança (PNG, JPG, JPEG)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Carimbo enviado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Arquivo inválido"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
+    })
+    public ResponseEntity<Map<String, String>> uploadSafetyEngineerStamp(
+            @Parameter(description = "Arquivo do carimbo (PNG, JPG, JPEG)") @RequestParam("file") MultipartFile file) {
+        try {
+            log.info("📤 Iniciando upload de carimbo do engenheiro de segurança - Nome original: {}, Tamanho: {} bytes",
+                    file.getOriginalFilename(), file.getSize());
+
+            if (file.isEmpty()) {
+                log.warn("❌ Arquivo vazio recebido");
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Arquivo não pode estar vazio"));
+            }
+
+            String contentType = file.getContentType();
+            log.info("📄 Content-Type recebido: {}", contentType);
+
+            if (contentType == null || !isValidImageType(contentType)) {
+                log.warn("❌ Tipo de arquivo inválido: {}", contentType);
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Tipo de arquivo não permitido. Use PNG, JPG ou JPEG"));
+            }
+
+            if (file.getSize() > 5 * 1024 * 1024) {
+                log.warn("❌ Arquivo muito grande: {} bytes", file.getSize());
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Arquivo muito grande. Máximo 5MB"));
+            }
+
+            String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
+            String fileExtension = getFileExtension(originalFilename);
+            String uniqueFilename = UUID.randomUUID().toString() + "." + fileExtension;
+
+            log.info("📝 Nome único gerado: {}", uniqueFilename);
+
+            Path uploadPath = Paths.get(uploadDir, "safety-engineers", "stamps").toAbsolutePath().normalize();
+            log.info("📁 Caminho de upload: {}", uploadPath);
+
+            Files.createDirectories(uploadPath);
+            log.info("✅ Diretório verificado/criado: {}", uploadPath);
+
+            Path filePath = uploadPath.resolve(uniqueFilename);
+            log.info("💾 Salvando arquivo em: {}", filePath);
+
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            if (!Files.exists(filePath)) {
+                log.error("❌ Arquivo não foi salvo corretamente: {}", filePath);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Erro ao salvar arquivo: arquivo não encontrado após upload"));
+            }
+
+            log.info("✅ Arquivo salvo com sucesso: {} ({} bytes)", filePath, Files.size(filePath));
+
+            String relativeUrl = "/api/uploads/safety-engineers/stamps/" + uniqueFilename;
+
+            Map<String, String> response = new HashMap<>();
+            response.put("filename", uniqueFilename);
+            response.put("originalName", originalFilename);
+            response.put("path", "safety-engineers/stamps/" + uniqueFilename);
+            response.put("size", String.valueOf(file.getSize()));
+            response.put("contentType", contentType);
+            response.put("url", relativeUrl);
+
+            log.info("✅ Upload concluído com sucesso. URL relativa: {}", relativeUrl);
+            log.info("📁 Arquivo salvo em: {}", filePath.toAbsolutePath());
+
+            return ResponseEntity.ok(response);
+
+        } catch (IOException e) {
+            log.error("❌ Erro ao salvar arquivo de carimbo: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erro ao salvar arquivo: " + e.getMessage()));
+        } catch (Exception e) {
+            log.error("❌ Erro inesperado ao fazer upload de carimbo: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erro inesperado: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/safety-engineers/stamps/{filename:.+}")
+    @Operation(summary = "Obter carimbo do engenheiro de segurança", description = "Retorna o arquivo do carimbo ou 404 se não existir")
+    public ResponseEntity<Resource> getSafetyEngineerStamp(
+            @Parameter(description = "Nome do arquivo (ex: uuid.png)") @PathVariable String filename) {
+        try {
+            if (filename == null || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+                return ResponseEntity.badRequest().build();
+            }
+            Path basePath = Paths.get(uploadDir, "safety-engineers", "stamps").toAbsolutePath().normalize();
+            Path filePath = basePath.resolve(filename).normalize();
+            if (!filePath.startsWith(basePath)) {
+                return ResponseEntity.notFound().build();
+            }
+            Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                return ResponseEntity.notFound().build();
+            }
+            String contentType = Files.probeContentType(filePath);
+            if (contentType == null) {
+                contentType = "image/png";
+            }
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CACHE_CONTROL, "max-age=3600")
+                    .body(resource);
+        } catch (MalformedURLException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IOException e) {
+            log.debug("Carimbo não encontrado ou erro ao ler: {}", filename);
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     // Métodos auxiliares
     private boolean isValidFileType(String contentType) {
         return contentType != null && (contentType.equals("application/pdf") ||

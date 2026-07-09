@@ -42,6 +42,14 @@ public class EmployeeEmploymentPeriodService {
     }
 
     @Transactional(readOnly = true)
+    public int countByEmployeeId(UUID employeeId) {
+        if (employeeId == null) {
+            return 0;
+        }
+        return (int) periodRepository.countByEmployeeId(employeeId);
+    }
+
+    @Transactional(readOnly = true)
     public Optional<Employee> findEligibleForRehireByCpf(String cpf) {
         if (cpf == null || cpf.isBlank()) {
             return Optional.empty();

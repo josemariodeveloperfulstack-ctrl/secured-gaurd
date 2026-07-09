@@ -11,11 +11,16 @@ export interface WorkPost {
   zipCode?: string;
   clientId?: string;
   clientName?: string;
+  clientCnpj?: string;
+  companyId?: string;
+  companyName?: string;
   contractId?: string;
   responsibleId?: string;
   status?: string;
   type?: string;
   requiredVigilantes?: number;
+  primaryPositionId?: string;
+  primaryPositionName?: string;
   workSchedule?: string;
   shiftStart?: string;
   shiftEnd?: string;
@@ -54,9 +59,11 @@ export interface CreateWorkPostRequest {
   state?: string;
   zipCode?: string;
   clientId: string;
+  companyId?: string;
   contractId?: string;
   responsibleId?: string;
   requiredVigilantes: number;
+  primaryPositionId?: string;
   workSchedule: string;
   shiftStart: string;
   shiftEnd: string;

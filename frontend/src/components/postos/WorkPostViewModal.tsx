@@ -132,6 +132,20 @@ const WorkPostViewModal: React.FC<WorkPostViewModalProps> = ({
                   <p className="text-sm text-gray-500">CNPJ: {workPost.clientCnpj}</p>
                 )}
               </div>
+
+              {workPost.companyName && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-600">Empresa</label>
+                  <p>{workPost.companyName}</p>
+                </div>
+              )}
+
+              {workPost.primaryPositionName && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-600">Cargo Principal</label>
+                  <p>{workPost.primaryPositionName}</p>
+                </div>
+              )}
               
               {workPost.description && (
                 <div className="space-y-2">
@@ -183,7 +197,11 @@ const WorkPostViewModal: React.FC<WorkPostViewModalProps> = ({
             
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-600">Vigilantes Necessários</label>
+                <label className="text-sm font-medium text-gray-600">
+                  {workPost.primaryPositionName && !workPost.primaryPositionName.toUpperCase().includes('VIGILANTE')
+                    ? 'Quantidade Necessária'
+                    : 'Vigilantes Necessários'}
+                </label>
                 <p className="text-lg font-semibold">{workPost.requiredVigilantes}</p>
               </div>
               

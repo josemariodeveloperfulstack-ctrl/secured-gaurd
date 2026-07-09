@@ -43,7 +43,7 @@ public class Vacation {
     private UUID id;
     
     @NotNull(message = "Employee is required")
-    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @ManyToOne
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "employee_id", nullable = false)
     @JsonBackReference
@@ -77,7 +77,7 @@ public class Vacation {
     @Builder.Default
     private VacationType vacationType = VacationType.NORMAL;
     
-    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @ManyToOne
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "approved_by")
     private User approvedBy;

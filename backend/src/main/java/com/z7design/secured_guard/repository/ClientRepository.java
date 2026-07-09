@@ -43,4 +43,6 @@ public interface ClientRepository extends JpaRepository<Client, java.util.UUID>,
     
     @Query("SELECT COUNT(c) FROM Client c WHERE c.status = :status")
     long countByStatus(@Param("status") ClientStatus status);
+
+    Optional<Client> findFirstByOrderByCreatedAtDesc();
 } 

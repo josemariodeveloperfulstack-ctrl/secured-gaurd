@@ -14,6 +14,7 @@ import {
 import { Client, ClientFormData, ClientStatus } from '@/types/client';
 import { clientService } from '@/services/clientService';
 import { workPostService, WorkPost } from '@/services/workPostService';
+import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import WorkPostFormModal from '@/components/postos/WorkPostFormModal';
 import WorkPostDeleteDialog from '@/components/postos/WorkPostDeleteDialog';
@@ -26,6 +27,16 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+
+const CLIENT_NOTIFICATION_DEPARTMENTS = [
+  { id: 'comercial', label: 'Comercial' },
+  { id: 'operacional', label: 'Operacional' },
+  { id: 'pessoal', label: 'DP / Pessoal' },
+  { id: 'rh', label: 'Recursos Humanos' },
+  { id: 'financeiro', label: 'Financeiro' },
+  { id: 'almoxarifado', label: 'Almoxarifado' },
+  { id: 'administrador', label: 'Administrador' }
+] as const;
 
 // Funções de máscara
 const formatCNPJ = (value: string): string => {
@@ -90,6 +101,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dados-basicos');
+  const [activeClient, setActiveClient] = useState<Client | undefined>(client);
   const [formData, setFormData] = useState<ClientFormData>({
     name: '',
     cnpj: '',
@@ -114,6 +126,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [selectedPost, setSelectedPost] = useState<WorkPost | null>(null);
   const [editingPost, setEditingPost] = useState<WorkPost | null>(null);
   const [loadingCep, setLoadingCep] = useState(false);
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string; sigla?: string }>>([]);
 
   const buscarCep = async (cep: string) => {
     const cepLimpo = cep.replace(/\D/g, '');
@@ -159,10 +172,10 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   };
 
   const loadWorkPosts = async () => {
-    if (!client?.id) return;
+    if (!activeClient?.id) return;
     try {
       setLoadingPosts(true);
-      const posts = await workPostService.getWorkPostsByClient(client.id);
+      const posts = await workPostService.getWorkPostsByClient(activeClient.id);
       setWorkPosts(posts);
     } catch (error) {
       console.error('Erro ao carregar postos:', error);
@@ -172,16 +185,37 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen && client?.id && activeTab === 'postos-de-trabalho') {
+    if (isOpen && activeClient?.id && activeTab === 'postos-de-trabalho') {
       loadWorkPosts();
     }
-  }, [isOpen, client, activeTab]);
+  }, [isOpen, activeClient, activeTab]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
+    const loadCompanies = async () => {
+      try {
+        const data = await companyService.getAllCompanies();
+        const ordered = [...data].sort((a, b) =>
+          `${a.sigla || a.name || ''}`.localeCompare(`${b.sigla || b.name || ''}`, 'pt-BR', { sensitivity: 'base' })
+        );
+        setCompanies(ordered);
+      } catch (error) {
+        console.error('Erro ao carregar empresas para o cliente:', error);
+        setCompanies([]);
+      }
+    };
+
+    void loadCompanies();
+  }, [isOpen]);
+
+  useEffect(() => {
+    setActiveClient(client);
     if (client) {
       setFormData({
         name: client.name,
         cnpj: formatCNPJ(client.cnpj), // Aplicar máscara ao CNPJ
+        companyId: client.companyId || '',
         email: client.email || '',
         phone: client.phone ? formatPhone(client.phone) : '',
         mobile: client.mobile ? formatPhone(client.mobile) : '',
@@ -193,12 +227,14 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         contactEmail: client.contactEmail || '',
         contactPhone: client.contactPhone ? formatPhone(client.contactPhone) : '',
         status: client.status,
-        notes: client.notes || ''
+        notes: client.notes || '',
+        notifiedDepartments: client.notifiedDepartments || []
       });
     } else {
       setFormData({
         name: '',
         cnpj: '',
+        companyId: '',
         email: '',
         phone: '',
         mobile: '',
@@ -210,7 +246,8 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         contactEmail: '',
         contactPhone: '',
         status: ClientStatus.ACTIVE,
-        notes: ''
+        notes: '',
+        notifiedDepartments: []
       });
     }
     setActiveTab('dados-basicos');
@@ -234,68 +271,70 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const buildClientPayload = () => ({
+    ...formData,
+    cnpj: formData.cnpj.replace(/\D/g, ''),
+    companyId: formData.companyId?.trim() || undefined,
+    email: formData.email?.trim() || undefined,
+    contactEmail: formData.contactEmail?.trim() || undefined,
+    phone: formData.phone?.replace(/\D/g, '') || undefined,
+    mobile: formData.mobile?.replace(/\D/g, '') || undefined,
+    address: formData.address?.trim() || undefined,
+    city: formData.city?.trim() || undefined,
+    state: formData.state?.trim() || undefined,
+    zipCode: formData.zipCode?.replace(/\D/g, '') || undefined,
+    contactName: formData.contactName?.trim() || undefined,
+    contactPhone: formData.contactPhone?.replace(/\D/g, '') || undefined,
+    notes: formData.notes?.trim() || undefined,
+    notifiedDepartments: (formData.notifiedDepartments || []).filter(Boolean)
+  });
+
+  const persistClient = async (options?: { openPostFormAfterSave?: boolean }) => {
     setIsLoading(true);
 
     try {
       console.log('[DEBUG] ClientFormModal - Dados do formulário:', formData);
 
-      if (client) {
-        // Limpar campos vazios e remover máscaras antes de enviar
-        const cleanData = {
-          ...formData,
-          cnpj: formData.cnpj.replace(/\D/g, ''), // Remove todos os caracteres não numéricos
-          email: formData.email?.trim() || undefined,
-          contactEmail: formData.contactEmail?.trim() || undefined,
-          phone: formData.phone?.replace(/\D/g, '') || undefined,
-          mobile: formData.mobile?.replace(/\D/g, '') || undefined,
-          address: formData.address?.trim() || undefined,
-          city: formData.city?.trim() || undefined,
-          state: formData.state?.trim() || undefined,
-          zipCode: formData.zipCode?.replace(/\D/g, '') || undefined,
-          contactName: formData.contactName?.trim() || undefined,
-          contactPhone: formData.contactPhone?.replace(/\D/g, '') || undefined,
-          notes: formData.notes?.trim() || undefined
-        };
+      if (activeClient) {
+        const cleanData = buildClientPayload();
 
-        const saved = await clientService.updateClient(client.id, cleanData);
+        const saved = await clientService.updateClient(activeClient.id, cleanData);
         toast({
           title: "✅ Cliente atualizado",
           description: "As informações do cliente foram atualizadas com sucesso!",
         });
-        onSuccess();
+        setActiveClient(saved);
+        onSuccess(saved);
+        if (options?.openPostFormAfterSave) {
+          setActiveTab('postos-de-trabalho');
+          setEditingPost(null);
+          setIsPostFormOpen(true);
+          return saved;
+        }
+        onClose();
+        return saved;
       } else {
         console.log('[DEBUG] ClientFormModal - Criando novo cliente com dados:', formData);
 
-        // Limpar campos vazios e remover máscaras antes de enviar
-        const cleanData = {
-          ...formData,
-          cnpj: formData.cnpj.replace(/\D/g, ''), // Remove todos os caracteres não numéricos
-          email: formData.email?.trim() || undefined,
-          contactEmail: formData.contactEmail?.trim() || undefined,
-          phone: formData.phone?.replace(/\D/g, '') || undefined,
-          mobile: formData.mobile?.replace(/\D/g, '') || undefined,
-          address: formData.address?.trim() || undefined,
-          city: formData.city?.trim() || undefined,
-          state: formData.state?.trim() || undefined,
-          zipCode: formData.zipCode?.replace(/\D/g, '') || undefined,
-          contactName: formData.contactName?.trim() || undefined,
-          contactPhone: formData.contactPhone?.replace(/\D/g, '') || undefined,
-          notes: formData.notes?.trim() || undefined
-        };
+        const cleanData = buildClientPayload();
 
         console.log('[DEBUG] ClientFormModal - Dados limpos:', cleanData);
         const saved = await clientService.createClient(cleanData);
         console.log('[DEBUG] ClientFormModal - Cliente criado com sucesso:', saved);
+        
+        setActiveClient(saved);
         toast({
           title: "✅ Cliente criado",
-          description: `Cliente ${formData.name} foi criado com sucesso!`,
+          description: `Cliente ${formData.name} foi criado com sucesso! Agora você pode cadastrar postos de trabalho para ele na aba "Postos de Trabalho".`,
         });
         onSuccess(saved);
+        setActiveTab('postos-de-trabalho');
+        if (options?.openPostFormAfterSave) {
+          setEditingPost(null);
+          setIsPostFormOpen(true);
+        }
+        return saved;
       }
-
-      onClose();
     } catch (error: any) {
       console.error('[ERROR] ClientFormModal - Erro ao salvar cliente:', error);
       console.error('[ERROR] ClientFormModal - Response data:', error.response?.data);
@@ -307,6 +346,11 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await persistClient();
   };
 
   const formatCnpj = (value: string) => {
@@ -340,10 +384,10 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
             </div>
             <div>
               <DialogTitle className="text-2xl font-bold text-white flex items-center gap-2">
-                {client ? 'Editar Cliente' : 'Novo Cliente'}
+                {activeClient ? 'Editar Cliente' : 'Novo Cliente'}
               </DialogTitle>
               <p className="text-sm text-gray-400 mt-1">
-                {client ? 'Atualize as informações do cliente' : 'Preencha os dados do novo cliente'}
+                {activeClient ? 'Atualize as informações do cliente' : 'Preencha os dados do novo cliente'}
               </p>
             </div>
           </div>
@@ -423,6 +467,28 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                       className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 font-mono h-11"
                       required
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="companyId" className="text-seguranca-lightgray flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      Empresa <span className="text-seguranca-red">*</span>
+                    </Label>
+                    <Select
+                      value={formData.companyId || ''}
+                      onValueChange={(value) => handleInputChange('companyId', value)}
+                    >
+                      <SelectTrigger className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11">
+                        <SelectValue placeholder="Selecione a empresa" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id} className="text-gray-200 hover:bg-seguranca-graphite">
+                            {company.sigla ? `${company.sigla} - ${company.name}` : company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -654,13 +720,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                   </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { id: 'comercial', label: 'Comercial' },
-                      { id: 'operacional', label: 'Operacional' },
-                      { id: 'pessoal', label: 'DP / Pessoal' },
-                      { id: 'rh', label: 'Recursos Humanos' },
-                      { id: 'financeiro', label: 'Financeiro' }
-                    ].map((dept) => (
+                    {CLIENT_NOTIFICATION_DEPARTMENTS.map((dept) => (
                       <div
                         key={dept.id}
                         className={`flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer ${formData.notifiedDepartments?.includes(dept.id)
@@ -703,7 +763,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                         Gerencie os postos de serviço deste cliente.
                       </p>
                     </div>
-                    {client?.id && (
+                    {activeClient?.id && (
                       <Button
                         type="button"
                         onClick={() => {
@@ -718,7 +778,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                     )}
                   </div>
 
-                  {!client?.id ? (
+                  {!activeClient?.id ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                       <div className="p-4 rounded-full bg-gray-600/10 mb-4">
                         <Save className="h-10 w-10 text-gray-500" />
@@ -727,6 +787,15 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                       <p className="text-gray-400 max-w-xs mt-2">
                         Salve o cliente primeiro para poder cadastrar postos de trabalho para ele.
                       </p>
+                      <Button
+                        type="button"
+                        onClick={() => void persistClient({ openPostFormAfterSave: true })}
+                        disabled={isLoading}
+                        className="mt-6 bg-seguranca-red hover:bg-seguranca-darkred"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {isLoading ? 'Salvando...' : 'Salvar cliente e cadastrar posto'}
+                      </Button>
                     </div>
                   ) : loadingPosts ? (
                     <div className="flex flex-col items-center justify-center py-12">
@@ -830,7 +899,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                   className="bg-seguranca-red hover:bg-seguranca-darkred px-6 shadow-lg shadow-seguranca-red/20"
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  {isLoading ? 'Salvando...' : (client ? 'Atualizar Cliente' : 'Criar Cliente')}
+                  {isLoading ? 'Salvando...' : (activeClient ? 'Atualizar Cliente' : 'Criar Cliente')}
                 </Button>
               </div>
             </div>
@@ -838,7 +907,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         </form>
 
         {/* WorkPost Modals */}
-        {client?.id && (
+        {activeClient?.id && (
           <>
             <WorkPostFormModal
               open={isPostFormOpen}
@@ -849,7 +918,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 setIsPostFormOpen(false);
                 loadWorkPosts();
               }}
-              forcedClientId={client?.id}
+              forcedClientId={activeClient?.id}
               defaultAddress={formData.address}
               defaultCity={formData.city}
               defaultState={formData.state}

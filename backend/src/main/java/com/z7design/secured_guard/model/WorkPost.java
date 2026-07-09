@@ -61,6 +61,11 @@ public class WorkPost {
     @JoinColumn(name = "client_id", nullable = true)
     private Client client;
 
+    // Empresa operacional responsável pelo posto
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
+    private Company company;
+
     /**
      * Expõe {@code clientId} / {@code clientName} no JSON sem serializar o objeto {@link #client}
      * (evita ciclos Client ↔ WorkPost e mantém o contrato esperado pelo frontend nas escalas).
@@ -83,6 +88,10 @@ public class WorkPost {
     // Configuração de Pessoal
     @Column(nullable = false)
     private Integer requiredVigilantes; // Quantidade de vigilantes necessários
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "primary_position_id")
+    private Position primaryPosition;
     
     @Column(nullable = false)
     private String workSchedule; // Escala: 12x36, 6x1, etc.

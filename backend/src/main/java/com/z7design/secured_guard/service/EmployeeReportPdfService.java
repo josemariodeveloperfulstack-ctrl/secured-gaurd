@@ -11,14 +11,12 @@ import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Company.CompanyStatus;
-import com.z7design.secured_guard.model.Remanejamento;
 import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.enums.EmploymentStatus;
 import com.z7design.secured_guard.model.enums.ReportGroupBy;
 import com.z7design.secured_guard.model.enums.ReportOrderBy;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
-import com.z7design.secured_guard.repository.RemanejamentoRepository;
 import com.z7design.secured_guard.util.ReportIssuanceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,12 +28,8 @@ import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 
 /**
@@ -50,7 +44,6 @@ public class EmployeeReportPdfService {
 
     private final EmployeeRepository employeeRepository;
     private final CompanyRepository companyRepository;
-    private final RemanejamentoRepository remanejamentoRepository;
     private final StandardReportLayoutService standardReportLayoutService;
 
     private static final List<String> DEFAULT_COLUMNS = List.of("name", "registrationNumber", "position", "workPost", "company", "status");
@@ -186,9 +179,9 @@ public class EmployeeReportPdfService {
             table.addHeaderCell(standardReportLayoutService.createHeaderCell(header));
         }
 
-        for (Employee emp : sorted) {
+        for (Employee employee : sorted) {
             for (String colKey : columns) {
-                String value = getCellValue(emp, colKey);
+                String value = getCellValue(employee, colKey);
                 table.addCell(standardReportLayoutService.createDataCell(value));
             }
         }
@@ -196,28 +189,6 @@ public class EmployeeReportPdfService {
         document.add(table);
     }
 
-    /**
-     * Retorna todos os postos de trabalho que o funcionário já ocupou (atual + histórico de remanejamentos).
-     */
-    private Set<WorkPost> getAllWorkPostsForEmployee(Employee emp) {
-        Set<WorkPost> posts = new TreeSet<>(Comparator.comparing(
-                (WorkPost w) -> w != null && w.getName() != null ? w.getName() : "",
-                String.CASE_INSENSITIVE_ORDER));
-        if (emp.getWorkPost() != null) {
-            posts.add(emp.getWorkPost());
-        }
-        List<Remanejamento> remanejamentos = remanejamentoRepository.findByEmployeeIdWithRelations(emp.getId());
-        for (Remanejamento r : remanejamentos) {
-            if (r.getOriginWorkstation() != null) posts.add(r.getOriginWorkstation());
-            if (r.getDestinationWorkstation() != null) posts.add(r.getDestinationWorkstation());
-        }
-        return posts;
-    }
-
-    /**
-     * Agrupa por funcionário: cada funcionário com todos os postos que já passou.
-     * Cada linha = funcionário + um posto (uma linha por posto).
-     */
     private void addEmployeesTableGroupedByEmployee(Document document, List<Employee> employees, List<String> columns, ReportOrderBy orderBy) {
         if (employees.isEmpty()) {
             document.add(new Paragraph("Nenhum funcionário encontrado.")
@@ -227,49 +198,9 @@ public class EmployeeReportPdfService {
             return;
         }
 
-        List<Employee> sortedEmployees = sortEmployees(employees, orderBy);
-        Map<Employee, Set<WorkPost>> employeeToPosts = new LinkedHashMap<>();
-        for (Employee emp : sortedEmployees) {
-            employeeToPosts.put(emp, getAllWorkPostsForEmployee(emp));
-        }
-
-        int colCount = columns.size();
-        float[] colWidths = new float[colCount];
-        float equalWidth = 100f / colCount;
-        for (int i = 0; i < colCount; i++) colWidths[i] = equalWidth;
-
-        Table table = new Table(UnitValue.createPercentArray(colWidths))
-                .useAllAvailableWidth()
-                .setMarginTop(10);
-
-        for (String colKey : columns) {
-            String header = getColumnHeader(colKey);
-            table.addHeaderCell(standardReportLayoutService.createHeaderCell(header));
-        }
-
-        for (Employee emp : sortedEmployees) {
-            Set<WorkPost> posts = employeeToPosts.get(emp);
-            if (posts == null || posts.isEmpty()) {
-                for (String colKey : columns) {
-                    String value = getCellValue(emp, colKey);
-                    table.addCell(standardReportLayoutService.createDataCell(value));
-                }
-            } else {
-                for (WorkPost wp : posts) {
-                    for (String colKey : columns) {
-                        String value = getCellValueForWorkPost(emp, wp, colKey);
-                        table.addCell(standardReportLayoutService.createDataCell(value));
-                    }
-                }
-            }
-        }
-
-        document.add(table);
+        addEmployeesTable(document, employees, columns, orderBy);
     }
 
-    /**
-     * Agrupa por posto de trabalho: cada posto com os funcionários que ocuparam.
-     */
     private void addEmployeesTableGroupedByWorkPost(Document document, List<Employee> employees, List<String> columns, ReportOrderBy orderBy) {
         if (employees.isEmpty()) {
             document.add(new Paragraph("Nenhum funcionário encontrado.")
@@ -279,22 +210,7 @@ public class EmployeeReportPdfService {
             return;
         }
 
-        Map<String, List<EmployeeWorkPostRow>> workPostToRows = new LinkedHashMap<>();
-        for (Employee emp : employees) {
-            Set<WorkPost> posts = getAllWorkPostsForEmployee(emp);
-            if (posts.isEmpty()) {
-                String key = "-";
-                workPostToRows.computeIfAbsent(key, k -> new ArrayList<>()).add(new EmployeeWorkPostRow(emp, null));
-            } else {
-                for (WorkPost wp : posts) {
-                    String key = wp.getName() != null ? wp.getName() : "-";
-                    workPostToRows.computeIfAbsent(key, k -> new ArrayList<>()).add(new EmployeeWorkPostRow(emp, wp));
-                }
-            }
-        }
-
-        List<String> sortedPostNames = new ArrayList<>(workPostToRows.keySet());
-        sortedPostNames.sort(String.CASE_INSENSITIVE_ORDER);
+        List<Employee> sortedEmployees = sortEmployees(employees, ReportOrderBy.POSTO_TRABALHO);
 
         int colCount = columns.size();
         float[] colWidths = new float[colCount];
@@ -310,43 +226,30 @@ public class EmployeeReportPdfService {
             table.addHeaderCell(standardReportLayoutService.createHeaderCell(header));
         }
 
-        for (String postName : sortedPostNames) {
-            List<EmployeeWorkPostRow> rows = workPostToRows.get(postName);
-            if (rows == null) continue;
-            rows.sort(Comparator.comparing(r -> r.employee.getName() != null ? r.employee.getName() : "", String.CASE_INSENSITIVE_ORDER));
-            for (EmployeeWorkPostRow row : rows) {
-                for (String colKey : columns) {
-                    String value = getCellValueForWorkPost(row.employee, row.workPost, colKey);
-                    table.addCell(standardReportLayoutService.createDataCell(value));
-                }
+        for (Employee employee : sortedEmployees) {
+            for (String colKey : columns) {
+                String value = getCellValue(employee, colKey);
+                table.addCell(standardReportLayoutService.createDataCell(value));
             }
         }
 
         document.add(table);
     }
 
-    private record EmployeeWorkPostRow(Employee employee, WorkPost workPost) {}
-
     private List<Employee> sortEmployees(List<Employee> employees, ReportOrderBy orderBy) {
         if (orderBy != null && orderBy == ReportOrderBy.POSTO_TRABALHO) {
             return employees.stream()
                     .sorted(Comparator.comparing(
-                            (Employee e) -> e.getWorkPost() != null && e.getWorkPost().getName() != null ? e.getWorkPost().getName() : "",
+                            this::resolveWorkPostName,
                             String.CASE_INSENSITIVE_ORDER)
-                            .thenComparing((Employee e) -> e.getName() != null ? e.getName() : "", String.CASE_INSENSITIVE_ORDER))
+                            .thenComparing((Employee e) -> e.getName() != null ? e.getName() : "", String.CASE_INSENSITIVE_ORDER)
+                            .thenComparing((Employee e) -> e.getHireDate() != null ? e.getHireDate() : java.time.LocalDate.MIN, Comparator.reverseOrder()))
                     .toList();
         }
         return employees.stream()
-                .sorted(Comparator.comparing((Employee e) -> e.getName() != null ? e.getName() : "", String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing((Employee e) -> e.getName() != null ? e.getName() : "", String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing((Employee e) -> e.getHireDate() != null ? e.getHireDate() : java.time.LocalDate.MIN, Comparator.reverseOrder()))
                 .toList();
-    }
-
-    private String getCellValueForWorkPost(Employee emp, WorkPost overrideWorkPost, String key) {
-        if ("workPost".equals(key)) {
-            return overrideWorkPost != null && overrideWorkPost.getName() != null && !overrideWorkPost.getName().isBlank()
-                    ? overrideWorkPost.getName() : "Não alocado";
-        }
-        return getCellValue(emp, key);
     }
 
     private String getColumnHeader(String key) {
@@ -388,19 +291,20 @@ public class EmployeeReportPdfService {
     }
 
     private String getCellValue(Employee emp, String key) {
+        if (emp == null) return "-";
+
         Object val = switch (key) {
             case "name" -> emp.getName();
             case "registrationNumber" -> emp.getRegistrationNumber();
             case "position" -> emp.getPosition() != null ? emp.getPosition().getName() : null;
-            case "workPost" -> emp.getWorkPost() != null && emp.getWorkPost().getName() != null && !emp.getWorkPost().getName().isBlank()
-                    ? emp.getWorkPost().getName() : null;
+            case "workPost" -> resolveWorkPostName(emp);
             case "company" -> emp.getCompany() != null ? (emp.getCompany().getSigla() != null ? emp.getCompany().getSigla() : emp.getCompany().getName()) : null;
             case "status" -> getStatusLabel(emp.getStatus());
             case "cpf" -> emp.getCpf() != null ? emp.getCpf() : emp.getDocument();
             case "rg" -> emp.getRg() != null ? emp.getRg() : emp.getNumeroRg();
             case "birthDate" -> emp.getBirthDate() != null ? emp.getBirthDate().format(DATE_FMT) : null;
             case "hireDate" -> emp.getHireDate() != null ? emp.getHireDate().format(DATE_FMT) : null;
-            case "terminationDate" -> emp.getTerminationDate() != null ? emp.getTerminationDate().format(DATE_FMT) : null;
+            case "terminationDate" -> emp.getDataRescisao() != null ? emp.getDataRescisao().format(DATE_FMT) : (emp.getTerminationDate() != null ? emp.getTerminationDate().format(DATE_FMT) : null);
             case "terminationReason" -> emp.getTerminationReason();
             case "email" -> emp.getEmail();
             case "phone" -> emp.getPhone() != null ? emp.getPhone() : emp.getTelefoneContato();
@@ -430,13 +334,19 @@ public class EmployeeReportPdfService {
         return Objects.toString(val);
     }
 
+    private String resolveWorkPostName(Employee employee) {
+        if (employee == null) return "";
+        WorkPost workPost = employee.getWorkPost();
+        if (workPost != null && workPost.getName() != null && !workPost.getName().isBlank()) {
+            return workPost.getName();
+        }
+        return "";
+    }
+
     private String getStatusLabel(EmploymentStatus status) {
         if (status == null) return "-";
-        return switch (status) {
-            case ACTIVE -> "Ativo";
-            case INACTIVE -> "Inativo";
-            case TERMINATED -> "Demitido";
-            default -> status.name();
-        };
+        if (EmploymentStatus.ACTIVE.equals(status)) return "Ativo";
+        if (EmploymentStatus.TERMINATED.equals(status)) return "Demitido";
+        return status.name();
     }
 }

@@ -495,6 +495,27 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     'Suspenso',
   ];
 
+  const extractBlobErrorMessage = async (err: any, fallback: string) => {
+    const blob = err?.response?.data;
+    if (!(blob instanceof Blob)) {
+      return err?.response?.data?.message || fallback;
+    }
+
+    try {
+      const text = await blob.text();
+      if (!text) return fallback;
+
+      try {
+        const parsed = JSON.parse(text);
+        return parsed?.message || parsed?.error || fallback;
+      } catch {
+        return text;
+      }
+    } catch {
+      return fallback;
+    }
+  };
+
   const handleGenerateOrder = async () => {
     if (!funcionario || !empresa || !clienteExibicao || !form.activities?.trim()) {
       toast({
@@ -531,9 +552,10 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       void refreshEmployeeDocuments(payload.employeeId);
     } catch (err: any) {
       console.error('Erro ao gerar OS:', err);
+      const errorMessage = await extractBlobErrorMessage(err, 'Erro ao gerar Ordem de Serviço.');
       toast({
         title: 'Erro',
-        description: err.response?.data?.message || 'Erro ao gerar Ordem de Serviço.',
+        description: errorMessage,
         variant: 'destructive'
       });
     } finally {
@@ -566,9 +588,10 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
     } catch (err: any) {
       console.error('Erro ao gerar preview:', err);
+      const errorMessage = await extractBlobErrorMessage(err, 'Erro ao gerar preview.');
       toast({
         title: 'Erro',
-        description: 'Erro ao gerar preview.',
+        description: errorMessage,
         variant: 'destructive'
       });
     } finally {
@@ -588,14 +611,22 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
               </CardTitle>
               <CardDescription>
                 Emissão de ordem de serviço para execução de atividades.
+                {activeTemplateLabel ? ` Modelo aplicado: ${activeTemplateLabel}.` : ''}
               </CardDescription>
             </div>
-            {(funcionario && empresa && clienteExibicao && form.activities) && (
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 px-3 py-1">
-                <CheckCircle2 className="h-3 w-3" />
-                Pronto para gerar
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {activeTemplateLabel && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1">
+                  Modelo: {activeTemplateLabel}
+                </Badge>
+              )}
+              {(funcionario && empresa && clienteExibicao && form.activities) && (
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 px-3 py-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Pronto para gerar
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-8">

@@ -45,6 +45,18 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         @Param("normalizedDocument") String normalizedDocument,
                         @Param("excludeId") UUID excludeId);
 
+        /**
+         * Verifica se existe funcionário com este CPF/documento que NÃO esteja demitido (TERMINATED).
+         * Usado para permitir nova admissão quando o cadastro anterior foi encerrado.
+         */
+        @Query(value = "SELECT EXISTS(" +
+                        "SELECT 1 FROM employees WHERE " +
+                        "(REGEXP_REPLACE(COALESCE(document, ''), '[^0-9]', '', 'g') = :normalizedDocument " +
+                        " OR REGEXP_REPLACE(COALESCE(cpf, ''), '[^0-9]', '', 'g') = :normalizedDocument) " +
+                        "AND CAST(status AS text) <> 'TERMINATED')",
+                        nativeQuery = true)
+        boolean existsByNormalizedDocumentAndNotTerminated(@Param("normalizedDocument") String normalizedDocument);
+
         Optional<Employee> findByNameIgnoreCase(String name);
 
         Optional<Employee> findByDocument(String document);

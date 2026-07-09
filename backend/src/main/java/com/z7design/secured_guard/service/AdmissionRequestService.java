@@ -247,36 +247,69 @@ public class AdmissionRequestService {
 
     @Transactional(readOnly = true)
     public AdmissionEmployeeIntegrationDTO getIntegrationContextForEmployees() {
-        List<AdmissionRequestStatus> open = Arrays.asList(
-                AdmissionRequestStatus.PENDING,
-                AdmissionRequestStatus.APPROVED);
+        try {
+            List<AdmissionRequestStatus> open = Arrays.asList(
+                    AdmissionRequestStatus.PENDING,
+                    AdmissionRequestStatus.APPROVED);
 
-        AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot lastHire = employeeRepository
-                .findTopByStatusAndHireDateIsNotNullOrderByHireDateDesc(EmploymentStatus.ACTIVE)
-                .map(e -> AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot.builder()
-                        .employeeId(e.getId())
-                        .name(e.getName())
-                        .date(e.getHireDate())
-                        .build())
-                .orElse(null);
+            AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot lastHire = null;
+            try {
+                lastHire = employeeRepository
+                        .findTopByStatusAndHireDateIsNotNullOrderByHireDateDesc(EmploymentStatus.ACTIVE)
+                        .map(e -> AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot.builder()
+                                .employeeId(e.getId())
+                                .name(e.getName())
+                                .date(e.getHireDate())
+                                .build())
+                        .orElse(null);
+            } catch (Exception e) {
+                System.err.println("[WARNING] Erro ao buscar última admissão: " + e.getMessage());
+            }
 
-        AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot lastTerm = employeeRepository
-                .findTopByStatusAndTerminationDateIsNotNullOrderByTerminationDateDesc(EmploymentStatus.TERMINATED)
-                .map(e -> AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot.builder()
-                        .employeeId(e.getId())
-                        .name(e.getName())
-                        .date(e.getTerminationDate())
-                        .build())
-                .orElse(null);
+            AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot lastTerm = null;
+            try {
+                lastTerm = employeeRepository
+                        .findTopByStatusAndTerminationDateIsNotNullOrderByTerminationDateDesc(EmploymentStatus.TERMINATED)
+                        .map(e -> AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot.builder()
+                                .employeeId(e.getId())
+                                .name(e.getName())
+                                .date(e.getTerminationDate())
+                                .build())
+                        .orElse(null);
+            } catch (Exception e) {
+                System.err.println("[WARNING] Erro ao buscar última demissão: " + e.getMessage());
+            }
 
-        return AdmissionEmployeeIntegrationDTO.builder()
-                .lastHire(lastHire)
-                .lastTermination(lastTerm)
-                .pendingAdmissionEmployeeIds(
-                        admissionRequestRepository.findEmployeeIdsWithInProgressRequests(open, AdmissionRequestType.ADMISSION))
-                .pendingDismissalEmployeeIds(
-                        admissionRequestRepository.findEmployeeIdsWithInProgressRequests(open, AdmissionRequestType.DISMISSAL))
-                .build();
+            List<UUID> pendingAdmissionIds = List.of();
+            try {
+                pendingAdmissionIds = admissionRequestRepository.findEmployeeIdsWithInProgressRequests(open, AdmissionRequestType.ADMISSION);
+            } catch (Exception e) {
+                System.err.println("[WARNING] Erro ao buscar IDs de admissões pendentes: " + e.getMessage());
+            }
+
+            List<UUID> pendingDismissalIds = List.of();
+            try {
+                pendingDismissalIds = admissionRequestRepository.findEmployeeIdsWithInProgressRequests(open, AdmissionRequestType.DISMISSAL);
+            } catch (Exception e) {
+                System.err.println("[WARNING] Erro ao buscar IDs de demissões pendentes: " + e.getMessage());
+            }
+
+            return AdmissionEmployeeIntegrationDTO.builder()
+                    .lastHire(lastHire)
+                    .lastTermination(lastTerm)
+                    .pendingAdmissionEmployeeIds(pendingAdmissionIds)
+                    .pendingDismissalEmployeeIds(pendingDismissalIds)
+                    .build();
+        } catch (Exception ex) {
+            System.err.println("[ERROR] Erro em getIntegrationContextForEmployees: " + ex.getMessage());
+            ex.printStackTrace();
+            return AdmissionEmployeeIntegrationDTO.builder()
+                    .lastHire(null)
+                    .lastTermination(null)
+                    .pendingAdmissionEmployeeIds(List.of())
+                    .pendingDismissalEmployeeIds(List.of())
+                    .build();
+        }
     }
     
     public List<AdmissionRequestDTO> findByStatus(AdmissionRequestStatus status) {

@@ -18,6 +18,11 @@ export interface CommercialKpis {
   userId?: string;
   userName?: string;
   periodo: string;
+  ultimoClienteCadastrado?: string;
+  ultimoPostoTrabalhoCadastrado?: string;
+  contratosVencendo?: number;
+  propostasEnviadasReal?: number;
+  propostasRetornadas?: number;
 }
 
 export interface TeamKpis {

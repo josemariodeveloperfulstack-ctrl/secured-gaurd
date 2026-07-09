@@ -425,6 +425,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'clientes',
     'propostas',
     'orcamentos',
+    'contratos',
     'crm',
     'chat-interno',
     'mensagens',

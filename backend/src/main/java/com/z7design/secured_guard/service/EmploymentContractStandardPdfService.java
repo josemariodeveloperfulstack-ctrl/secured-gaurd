@@ -360,7 +360,7 @@ public class EmploymentContractStandardPdfService {
                 // do contrato (".. vigorando a partir de DATA_INICIO até DATA_FIM ..").
                 LocalDate inicio = request.getAdmissionDate();
                 String dataInicioStr = inicio != null ? formatDate(inicio) : "__/__/____";
-                String dataFimStr = inicio != null ? formatDate(inicio.plusDays(dias)) : "__/__/____";
+                String dataFimStr = inicio != null ? formatDate(inicio.plusDays(dias - 1)) : "__/__/____";
 
                 return applyCommonLongFormPlaceholders(template, request, company)
                                 .replace("{{DIAS_EXPERIENCIA_TEXTO}}", diasExperienciaTexto)

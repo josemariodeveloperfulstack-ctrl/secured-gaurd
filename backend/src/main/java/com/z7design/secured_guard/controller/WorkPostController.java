@@ -60,7 +60,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/all")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_RH', 'RH', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_GESTAO_SUPERVISAO', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'COMERCIAL', 'ROLE_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_RH', 'RH', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_GESTAO_SUPERVISAO', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'COMERCIAL', 'ROLE_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL', 'GESTOR_COMERCIAL', 'ROLE_GESTOR_COMERCIAL')")
     @Operation(summary = "Listar todos os postos de trabalho (sem paginação)", description = "Retorna uma lista completa de todos os postos de trabalho")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
@@ -103,7 +103,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/by-company/{companyId}")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_GESTAO_SUPERVISAO', 'RH', 'ROLE_RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'COMERCIAL', 'ROLE_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_GESTAO_SUPERVISAO', 'RH', 'ROLE_RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'COMERCIAL', 'ROLE_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL', 'GESTOR_COMERCIAL', 'ROLE_GESTOR_COMERCIAL')")
     @Operation(summary = "Listar postos por empresa", description = "Retorna postos de trabalho que possuem funcionários da empresa informada")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
@@ -244,7 +244,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/client/{clientId}")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'COMERCIAL', 'ROLE_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'COMERCIAL', 'ROLE_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL', 'GESTOR_COMERCIAL', 'ROLE_GESTOR_COMERCIAL')")
     @Operation(summary = "Listar postos por cliente", description = "Retorna postos de um cliente específico")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
@@ -259,7 +259,7 @@ public class WorkPostController {
     }
 
     @GetMapping("/client/{clientId}/all")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'COMERCIAL', 'ROLE_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'COMERCIAL', 'ROLE_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL', 'GESTOR_COMERCIAL', 'ROLE_GESTOR_COMERCIAL')")
     @Operation(summary = "Listar todos os postos por cliente (sem paginação)", description = "Retorna todos os postos de um cliente específico")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),

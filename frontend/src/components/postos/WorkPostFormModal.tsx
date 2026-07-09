@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { workPostService, WorkPost, CreateWorkPostRequest } from '@/services/workPostService';
+import { companyService } from '@/services/companyService';
+import { positionService, type Position } from '@/services/positionService';
 import { Client } from '@/types/client';
 
 interface WorkPostFormModalProps {
@@ -46,6 +48,8 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
   defaultState,
   defaultZipCode
 }) => {
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string; sigla?: string }>>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [formData, setFormData] = useState<CreateWorkPostRequest>({
     postCode: '',
     name: '',
@@ -57,7 +61,9 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
     state: '',
     zipCode: '',
     clientId: '',
+    companyId: '',
     requiredVigilantes: 1,
+    primaryPositionId: '',
     workSchedule: '',
     shiftStart: '',
     shiftEnd: '',
@@ -88,6 +94,39 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  const normalizeText = (value?: string) =>
+    (value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .trim();
+
+  const selectedCompany = companies.find((company) => company.id === formData.companyId);
+  const isPromoverVigilancia = normalizeText(selectedCompany?.name).includes('PROMOVER VIGILANCIA PATRIMONIAL');
+  const nonVigilantePositions = positions.filter((position) => !normalizeText(position.name).includes('VIGILANTE'));
+  const vigilantePosition = positions.find((position) => normalizeText(position.name).includes('VIGILANTE'));
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const loadReferenceData = async () => {
+      try {
+        const [companiesData, positionsData] = await Promise.all([
+          companyService.getAllCompanies(),
+          positionService.getPositions()
+        ]);
+        setCompanies(companiesData);
+        setPositions(positionsData);
+      } catch (error) {
+        console.error('Erro ao carregar empresas/cargos do posto:', error);
+      }
+    };
+
+    void loadReferenceData();
+  }, [open]);
+
   const generatePostCodeFromName = (name: string) => {
     if (!name) return '';
     const normalized = name
@@ -114,9 +153,11 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
         state: workPost.state || '',
         zipCode: workPost.zipCode || '',
         clientId: workPost.clientId,
+        companyId: workPost.companyId,
         contractId: workPost.contractId,
         responsibleId: workPost.responsibleId,
         requiredVigilantes: workPost.requiredVigilantes,
+        primaryPositionId: workPost.primaryPositionId,
         workSchedule: workPost.workSchedule,
         shiftStart: workPost.shiftStart,
         shiftEnd: workPost.shiftEnd,
@@ -155,7 +196,9 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
         state: '',
         zipCode: '',
         clientId: '',
+        companyId: '',
         requiredVigilantes: 1,
+        primaryPositionId: '',
         workSchedule: '',
         shiftStart: '',
         shiftEnd: '',
@@ -209,6 +252,24 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
       return;
     }
 
+    if (!formData.companyId) {
+      toast({
+        title: "Erro",
+        description: "Empresa é obrigatória",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isPromoverVigilancia && !formData.primaryPositionId) {
+      toast({
+        title: "Erro",
+        description: "Selecione o cargo principal do posto",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validar dados antes de enviar
     if (!formData.shiftStart || !formData.shiftEnd) {
       toast({
@@ -256,6 +317,35 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
       ...prev,
       [field]: value
     }));
+  };
+
+  useEffect(() => {
+    if (!formData.companyId) {
+      return;
+    }
+
+    if (isPromoverVigilancia) {
+      setFormData((prev) => ({
+        ...prev,
+        primaryPositionId: vigilantePosition?.id || prev.primaryPositionId || ''
+      }));
+      return;
+    }
+
+    if (prevIsVigilanteOnly(formData.primaryPositionId, positions)) {
+      setFormData((prev) => ({
+        ...prev,
+        primaryPositionId: ''
+      }));
+    }
+  }, [formData.companyId, isPromoverVigilancia, vigilantePosition?.id, formData.primaryPositionId, positions]);
+
+  const prevIsVigilanteOnly = (positionId?: string, allPositions: Position[] = []) => {
+    if (!positionId) {
+      return false;
+    }
+    const currentPosition = allPositions.find((position) => position.id === positionId);
+    return !!currentPosition && normalizeText(currentPosition.name).includes('VIGILANTE');
   };
 
   // Função para converter números de forma segura
@@ -368,6 +458,55 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
             </div>
           </div>
 
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="companyId">Empresa *</Label>
+              <Select
+                value={formData.companyId || ''}
+                onValueChange={(value) => handleInputChange('companyId', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.sigla ? `${company.sigla} - ${company.name}` : company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {!isPromoverVigilancia && (
+              <div className="space-y-2">
+                <Label htmlFor="primaryPositionId">Cargo Principal *</Label>
+                <Select
+                  value={formData.primaryPositionId || ''}
+                  onValueChange={(value) => handleInputChange('primaryPositionId', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cargo do posto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {nonVigilantePositions.map((position) => (
+                      <SelectItem key={position.id} value={position.id}>
+                        {position.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {isPromoverVigilancia && (
+              <div className="space-y-2">
+                <Label>Cargo Principal</Label>
+                <Input value={vigilantePosition?.name || 'Vigilante'} disabled />
+              </div>
+            )}
+          </div>
+
           {/* Cliente - Só exibe se não houver um ID forçado */}
           {!forcedClientId && (
             <div className="space-y-2">
@@ -435,7 +574,9 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
           {/* Configuração de Pessoal */}
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="requiredVigilantes">Vigilantes Necessários *</Label>
+              <Label htmlFor="requiredVigilantes">
+                {isPromoverVigilancia ? 'Vigilantes Necessários *' : 'Quantidade Necessária *'}
+              </Label>
               <Input
                 id="requiredVigilantes"
                 type="number"

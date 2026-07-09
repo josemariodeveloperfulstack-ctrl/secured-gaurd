@@ -52,7 +52,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
-import { formatDate } from '@/utils/formatters';
+import { formatDate as formatSystemDate } from '@/utils/formatters';
 import { parseDateFromBackend } from '@/utils/dateUtils';
 
 /** Colunas disponíveis para o relatório PDF (chave usada no backend, label exibido) */
@@ -478,7 +478,7 @@ export function RelatoriosModal({
 
             let dataToExport = await processDataInChunks(fullEmployeesData, (emp) => {
                 const formatReportDate = (dateStr?: string | null) =>
-                    dateStr ? formatDate(dateStr) : '';
+                    dateStr ? formatSystemDate(dateStr) : '';
                 const getAddress = (addr: any) => {
                     if (!addr) return '';
                     if (typeof addr === 'string') return addr;

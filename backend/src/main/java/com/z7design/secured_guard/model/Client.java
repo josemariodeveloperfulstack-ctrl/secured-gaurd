@@ -59,6 +59,11 @@ public class Client {
     @Column(name = "zip_code")
     private String zipCode;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
+    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+    private Company company;
+
     @Size(max = 255, message = "Nome do contato deve ter no máximo 255 caracteres")
     @Column(name = "contact_name")
     private String contactName;
@@ -192,6 +197,14 @@ public class Client {
 
     public void setZipCode(String zipCode) {
         this.zipCode = zipCode;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
     }
 
     public String getContactName() {

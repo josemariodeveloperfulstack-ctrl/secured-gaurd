@@ -9,6 +9,10 @@ import com.z7design.secured_guard.model.enums.ContractStatus;
 import com.z7design.secured_guard.model.enums.LeadStatus;
 import com.z7design.secured_guard.model.enums.ProposalStatus;
 import com.z7design.secured_guard.model.Proposal;
+import com.z7design.secured_guard.model.Client;
+import com.z7design.secured_guard.model.WorkPost;
+import com.z7design.secured_guard.repository.ClientRepository;
+import com.z7design.secured_guard.repository.WorkPostRepository;
 import com.z7design.secured_guard.repository.ContractRepository;
 import com.z7design.secured_guard.repository.LeadRepository;
 import com.z7design.secured_guard.repository.ProposalRepository;
@@ -37,6 +41,8 @@ public class CommercialDashboardService {
     private final ProposalRepository proposalRepository;
     private final ContractRepository contractRepository;
     private final UserRepository userRepository;
+    private final ClientRepository clientRepository;
+    private final WorkPostRepository workPostRepository;
 
     /**
      * Calcula KPIs para um usuário específico ou para toda a equipe.
@@ -101,6 +107,22 @@ public class CommercialDashboardService {
                     .orElse(null);
         }
 
+        // Consultar últimos registros e vencimentos
+        String ultimoCliente = clientRepository.findFirstByOrderByCreatedAtDesc()
+                .map(Client::getName)
+                .orElse("Nenhum cliente cadastrado");
+
+        String ultimoPosto = workPostRepository.findFirstByOrderByCreatedAtDesc()
+                .map(WorkPost::getName)
+                .orElse("Nenhum posto cadastrado");
+
+        long contratosVencendoCount = contractRepository.countActiveContractsExpiringBetween(LocalDate.now(), LocalDate.now().plusDays(30), userId);
+
+        long propostasEnviadasReal = countProposalsByStatus(userId, ProposalStatus.SENT, start, end);
+        long propostasRetornadas = countProposalsByStatus(userId, ProposalStatus.APPROVED, start, end)
+                + countProposalsByStatus(userId, ProposalStatus.REJECTED, start, end)
+                + countProposalsByStatus(userId, ProposalStatus.CONVERTED, start, end);
+
         return CommercialKpisDTO.builder()
                 .leadsRecebidos(leadsRecebidos)
                 .leadsQualificados(leadsQualificados)
@@ -118,6 +140,11 @@ public class CommercialDashboardService {
                 .userId(userId != null ? userId.toString() : null)
                 .userName(userName)
                 .periodo(startDate + " a " + endDate)
+                .ultimoClienteCadastrado(ultimoCliente)
+                .ultimoPostoTrabalhoCadastrado(ultimoPosto)
+                .contratosVencendo(contratosVencendoCount)
+                .propostasEnviadasReal(propostasEnviadasReal)
+                .propostasRetornadas(propostasRetornadas)
                 .build();
     }
 

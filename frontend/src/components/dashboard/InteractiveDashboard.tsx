@@ -1,6 +1,7 @@
-﻿import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { commercialDashboardService, CommercialKpis } from '@/services/commercialDashboardService';
 // import { useResponsive } from '@/hooks/useResponsive';
 import { 
   Users, 
@@ -27,7 +28,12 @@ import {
   MessageSquare,
   HelpCircle,
   Smartphone,
-  Monitor
+  Monitor,
+  Handshake,
+  Target,
+  CheckCircle2,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -64,6 +70,11 @@ const InteractiveDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
+  
+  // Estados para o Dashboard Comercial
+  const [commercialKpis, setCommercialKpis] = useState<CommercialKpis | null>(null);
+  const [loadingKpis, setLoadingKpis] = useState(false);
+
   // const { isMobile, isTablet, isDesktop, breakpoint } = useResponsive();
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
@@ -74,6 +85,32 @@ const InteractiveDashboard: React.FC = () => {
   const isTablet = windowSize.width >= 768 && windowSize.width < 1024;
   const isDesktop = windowSize.width >= 1024;
   const breakpoint = isMobile ? 'md' : isTablet ? 'lg' : 'xl';
+
+  // Verificar se o usuário pertence ao módulo comercial
+  const rawRole = user?.role || 'COLABORADOR';
+  const role = (rawRole as string).replace(/^ROLE_/, '').toUpperCase();
+  const isCommercialUser = role === 'COMERCIAL' || role === 'GESTOR_COMERCIAL' || role === 'ASSISTENTE_COMERCIAL';
+
+  useEffect(() => {
+    if (isCommercialUser) {
+      setLoadingKpis(true);
+      commercialDashboardService.getKpis()
+        .then(data => {
+          setCommercialKpis(data);
+        })
+        .catch(err => {
+          console.error("Erro ao buscar KPIs comerciais:", err);
+          toast({
+            title: "Erro de Conexão",
+            description: "Não foi possível carregar as métricas comerciais do backend.",
+            variant: "destructive"
+          });
+        })
+        .finally(() => {
+          setLoadingKpis(false);
+        });
+    }
+  }, [isCommercialUser]);
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -352,6 +389,231 @@ const InteractiveDashboard: React.FC = () => {
     const isDP = role === 'DEPARTAMENTO_PESSOAL' || role === 'AUX_DEP';
 
     const isRhOrDp = isRH || isDP;
+
+    if (isCommercialUser) {
+      if (loadingKpis) {
+        return (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
+            <p className="text-sm text-gray-400">Carregando indicadores comerciais...</p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-6">
+          {/* Dashboard Comercial Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Contratos Ativos */}
+            <Card 
+              className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-emerald-500/55 hover:shadow-lg hover:shadow-emerald-950/20 transition-all cursor-pointer group"
+              onClick={() => navigate('/contratos')}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-xs sm:text-sm font-medium">Contratos Ativos</p>
+                    <p className="text-3xl font-bold text-seguranca-lightgray mt-1 group-hover:text-emerald-400 transition-colors">
+                      {commercialKpis?.contratosAtivos ?? 0}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-emerald-500/10 rounded-lg text-emerald-400 group-hover:scale-110 transition-transform">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-3 flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3 text-emerald-400" />
+                  Em execução no momento
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Contratos Vencendo */}
+            <Card 
+              className={`bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:shadow-lg transition-all cursor-pointer group ${
+                (commercialKpis?.contratosVencendo ?? 0) > 0 
+                  ? 'hover:border-red-500/55 hover:shadow-red-950/20' 
+                  : 'hover:border-seguranca-yellow/55 hover:shadow-yellow-950/20'
+              }`}
+              onClick={() => navigate('/contratos?filter=expiring')}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-xs sm:text-sm font-medium">Contratos Vencendo</p>
+                    <p className={`text-3xl font-bold mt-1 transition-colors ${
+                      (commercialKpis?.contratosVencendo ?? 0) > 0 
+                        ? 'text-red-400' 
+                        : 'text-seguranca-lightgray group-hover:text-seguranca-yellow'
+                    }`}>
+                      {commercialKpis?.contratosVencendo ?? 0}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-lg group-hover:scale-110 transition-transform ${
+                    (commercialKpis?.contratosVencendo ?? 0) > 0
+                      ? 'bg-red-500/10 text-red-400'
+                      : 'bg-yellow-500/10 text-yellow-400'
+                  }`}>
+                    <AlertCircle className="h-6 w-6" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-3">
+                  {(commercialKpis?.contratosVencendo ?? 0) > 0 
+                    ? 'Ação requerida nos próximos 30 dias' 
+                    : 'Sem contratos vencendo em 30 dias'}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Leads Ativos */}
+            <Card 
+              className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-sky-500/55 hover:shadow-lg hover:shadow-sky-950/20 transition-all cursor-pointer group"
+              onClick={() => navigate('/leads')}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-xs sm:text-sm font-medium">Total de Leads</p>
+                    <p className="text-3xl font-bold text-seguranca-lightgray mt-1 group-hover:text-sky-400 transition-colors">
+                      {commercialKpis?.leadsRecebidos ?? 0}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-sky-500/10 rounded-lg text-sky-400 group-hover:scale-110 transition-transform">
+                    <Target className="h-6 w-6" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-3 flex items-center gap-1">
+                  Qualificados: {commercialKpis?.leadsQualificados ?? 0}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* CRM Comercial */}
+            <Card 
+              className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm hover:border-seguranca-yellow/55 hover:shadow-lg hover:shadow-yellow-950/20 transition-all cursor-pointer group"
+              onClick={() => navigate('/crm')}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-xs sm:text-sm font-medium">CRM Pipeline</p>
+                    <p className="text-3xl font-bold text-seguranca-lightgray mt-1 group-hover:text-seguranca-yellow transition-colors">
+                      Funil
+                    </p>
+                  </div>
+                  <div className="p-3 bg-seguranca-yellow/10 rounded-lg text-seguranca-yellow group-hover:scale-110 transition-transform">
+                    <Handshake className="h-6 w-6" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-3">
+                  Gerenciar quadro Kanban de vendas
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Grid de Propostas & Últimos Cadastros */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Propostas */}
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm lg:col-span-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base sm:text-lg text-seguranca-lightgray flex items-center gap-2">
+                  <FileCheck className="h-5 w-5 text-seguranca-yellow" />
+                  Propostas Comerciais
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Enviadas */}
+                  <div className="p-4 bg-seguranca-black/40 border border-gray-800 rounded-lg hover:border-gray-700/60 transition-colors">
+                    <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold">Enviadas para Cliente</p>
+                    <div className="flex items-baseline gap-2 mt-2">
+                      <p className="text-2xl font-bold text-seguranca-lightgray">
+                        {commercialKpis?.propostasEnviadasReal ?? 0}
+                      </p>
+                      <span className="text-[11px] text-gray-500">no período</span>
+                    </div>
+                    <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
+                      <TrendingUp className="h-3.5 w-3.5 text-seguranca-yellow" />
+                      Total enviado: {commercialKpis?.propostasEnviadas ?? 0}
+                    </div>
+                  </div>
+
+                  {/* Retornadas */}
+                  <div className="p-4 bg-seguranca-black/40 border border-gray-800 rounded-lg hover:border-gray-700/60 transition-colors">
+                    <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold">Retornadas (Decididas)</p>
+                    <div className="flex items-baseline gap-2 mt-2">
+                      <p className="text-2xl font-bold text-emerald-400">
+                        {commercialKpis?.propostasRetornadas ?? 0}
+                      </p>
+                      <span className="text-[11px] text-gray-500">no período</span>
+                    </div>
+                    <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      Conversão: {commercialKpis?.propostasAprovadas ?? 0} aprovadas
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resumo financeiro do período */}
+                <div className="p-4 bg-seguranca-yellow/5 border border-seguranca-yellow/10 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-seguranca-yellow/10 rounded text-seguranca-yellow">
+                      <DollarSign className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider">Receita Contratada</p>
+                      <p className="text-sm font-semibold text-seguranca-lightgray mt-0.5">
+                        R$ {commercialKpis?.receitaContratada?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ?? '0,00'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider">Ticket Médio</p>
+                    <p className="text-sm font-semibold text-seguranca-lightgray mt-0.5">
+                      R$ {commercialKpis?.ticketMedio?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ?? '0,00'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Últimos Cadastros */}
+            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base sm:text-lg text-seguranca-lightgray flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-seguranca-yellow" />
+                  Últimos Registros
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Cliente */}
+                <div className="p-3 bg-seguranca-black/40 border border-gray-800 rounded-lg hover:border-gray-700/60 transition-colors flex items-start gap-3 cursor-pointer" onClick={() => navigate('/clientes')}>
+                  <Building2 className="h-5 w-5 text-cyan-400 mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Último Cliente</p>
+                    <p className="text-sm text-seguranca-lightgray font-medium mt-1 truncate">
+                      {commercialKpis?.ultimoClienteCadastrado}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Posto de Trabalho */}
+                <div className="p-3 bg-seguranca-black/40 border border-gray-800 rounded-lg hover:border-gray-700/60 transition-colors flex items-start gap-3 cursor-pointer" onClick={() => navigate('/postos')}>
+                  <MapPin className="h-5 w-5 text-rose-400 mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Último Posto de Trabalho</p>
+                    <p className="text-sm text-seguranca-lightgray font-medium mt-1 truncate">
+                      {commercialKpis?.ultimoPostoTrabalhoCadastrado}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-6">

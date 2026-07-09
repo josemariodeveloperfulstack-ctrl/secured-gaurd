@@ -66,6 +66,9 @@ public class WorkPostDTO {
     @Schema(description = "ID do cliente", example = "1")
     // Removido @NotNull porque client pode ser null na entidade WorkPost
     private java.util.UUID clientId;
+
+    @Schema(description = "ID da empresa responsável pelo posto", example = "1")
+    private java.util.UUID companyId;
     
     @Schema(description = "ID do contrato", example = "1")
     private java.util.UUID contractId;
@@ -74,6 +77,9 @@ public class WorkPostDTO {
     @Schema(description = "Quantidade de vigilantes necessários", example = "4")
     @NotNull(message = "Quantidade de vigilantes é obrigatória")
     private Integer requiredVigilantes;
+
+    @Schema(description = "ID do cargo principal do posto", example = "1")
+    private java.util.UUID primaryPositionId;
     
     @Schema(description = "Escala de trabalho", example = "12x36")
     @NotBlank(message = "Escala de trabalho é obrigatória")
@@ -167,6 +173,12 @@ public class WorkPostDTO {
     
     @Schema(description = "CNPJ do cliente")
     private String clientCnpj;
+
+    @Schema(description = "Nome da empresa")
+    private String companyName;
+
+    @Schema(description = "Nome do cargo principal")
+    private String primaryPositionName;
     
     @Schema(description = "Nome do responsável")
     private String responsibleName;

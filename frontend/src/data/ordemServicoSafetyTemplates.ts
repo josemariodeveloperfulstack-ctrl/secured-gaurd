@@ -273,18 +273,33 @@ Riscos de Acidentes: Quedas em piso escorregadio.`,
   {
     id: 'vigilante',
     layoutType: 'STANDARD_NR01',
-    matchKeywords: ['VIGILANTE', 'VIGILÂNCIA'],
+    matchKeywords: ['VIGILANTE', 'VIGILÂNCIA', 'VIGILANTE PATRIMONIAL', 'VIGILANTE FERISTA'],
     label: 'Vigilante',
     responsibility: 'VIGILÂNCIA PATRIMONIAL',
+    employeeObligations:
+      'Comunicar todas as condições inseguras presentes no ambiente ao supervisor imediato.\n' +
+      'Cumprir leis e normas expedidas pelo empregador, inclusive esta ordem de serviço.\n' +
+      'Executar as tarefas que lhe forem delegadas pelo superior respectivo para execução da mesma.\n' +
+      'Manter a ordem, disciplina, higiene e segurança no trabalho.\n' +
+      'Participar de treinamentos relacionados à segurança e saúde ocupacional.\n' +
+      'Usar obrigatoriamente os Equipamentos de Proteção Individual indicados para a função.\n' +
+      'Colaborar com a empresa na aplicação das Normas Regulamentadoras, do PGR e do PCMSO.\n' +
+      'É responsabilidade do empregado usar, guardar, conservar e comunicar ao empregador qualquer alteração que torne impróprio o uso do Equipamento de Proteção Individual.',
+    uniformSectionTitle: 'EPI DE USO OBRIGATÓRIO',
     activities:
-      'Garantir a segurança patrimonial e física do local, realizando rondas, controle de acesso e monitoramento. Agir preventivamente e de forma repressiva quando necessário, conforme a legislação.',
+      'VIGILANTE PATRIMONIAL - CBO: 517330\n\n' +
+      'Vigiam dependências com a finalidade de prevenir, controlar e combater delitos como porte ilícito de armas e munições, assaltos e outras irregularidades; zelam pela segurança das pessoas, do patrimônio e pelo cumprimento das leis e regulamentos; recepcionam e controlam a movimentação de pessoas em áreas de acesso livre e restrito; fiscalizam pessoas, cargas e patrimônio; escoltam pessoas e mercadorias; controlam objetos e cargas; comunicam-se via rádio ou telefone e registram ocorrências em livro, sistema ou meios próprios do posto. Executam outras atividades correlatas à função.',
     risks:
-      'Riscos de Acidentes: Violência, assaltos.\nRiscos Ergonômicos: Postura prolongada.\nRiscos Físicos: Exposição a intempéries.',
+      'Ergonômico: Postura inadequada.\n' +
+      'Físico: Ruído; Monotonia; Agressão; Batidas contra; Queda do mesmo nível; Disparo acidental; Radiação não-ionizante.',
     preventiveMeasures:
-      '- Uso de colete balístico (se aplicável).\n- Atenção contínua e protocolos de segurança.\n- Adoção de medidas de proteção coletivas e individuais.',
-    uniform: '- Uniforme tático/padrão completo.\n- Calçado de segurança.',
+      '- Treinamento introdutório.\n- Adoção de medidas de proteção em ordem: coletivas e individuais.',
+    uniform:
+      '- Calçado de segurança (coturno).\n- Uniforme completo (camisa, calça, boné, colete e cinto).\n- Crachá.',
     mandatoryTrainings:
-      '- Reciclagem de Vigilante (obrigatório PF)\n- Treinamento de Ambientação de Segurança do Trabalho\n- Uso Progressivo da Força\n- Defesa Pessoal e Armamento (se aplicável)',
+      '- Treinamento de Ambientação de Segurança do Trabalho.\n' +
+      '- DSS – Diálogo de Segurança e Saúde Ocupacional.\n' +
+      "- Treinamento sobre aspectos legais e técnicos no uso e conservação de EPI's.",
   },
 ];
 

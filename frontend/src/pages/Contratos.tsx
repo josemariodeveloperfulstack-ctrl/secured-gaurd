@@ -19,9 +19,11 @@ import { notificationService } from '@/services/notificationService';
 import { contractService, Contract, ContractFilters } from '@/services/contractService';
 import { isUuid } from '@/utils/uuid';
 import { Plus, Search, Settings, Loader2, AlertCircle, RefreshCw, FileText, Building } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 const Contratos = () => {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [originFilter, setOriginFilter] = useState('all');
@@ -56,15 +58,33 @@ const Contratos = () => {
       // Validar dados recebidos
       if (data && Array.isArray(data)) {
         const validContracts = data.filter(contract => {
-          if (!contract || !contract.clientName) {
-            console.warn('⚠️ Contrato recebido sem dados do cliente:', contract);
+          console.log('🔍 Analisando contrato:', { 
+            id: contract.id, 
+            idType: typeof contract.id, 
+            clientName: contract.clientName, 
+            contract: contract 
+          });
+          
+          if (!contract) {
+            console.warn('⚠️ Contrato nulo/undefined');
             return false;
           }
-          if (!isUuid(String(contract.id))) {
-            console.warn('⚠️ Contrato ignorado — ID inválido (dados mock/stale):', contract.id);
-            return false;
+          
+          // Verifica se o ID é válido (aceita string ou se for UUID objeto convertido para string)
+          const idStr = String(contract.id);
+          const hasValidId = isUuid(idStr);
+          if (!hasValidId) {
+            console.warn('⚠️ Contrato ignorado — ID inválido:', contract.id, idStr);
           }
-          return true;
+          
+          // Aceita clienteName existente (incluindo "Cliente Desconhecido" do backend)
+          const hasClientName = !!contract.clientName;
+          if (!hasClientName) {
+            console.warn('⚠️ Contrato sem clientName, usando fallback:', contract);
+            contract.clientName = "Cliente Desconhecido";
+          }
+          
+          return hasValidId && hasClientName;
         });
         
         console.log('✅ Contratos válidos:', validContracts.length);
@@ -102,6 +122,15 @@ const Contratos = () => {
   useEffect(() => {
     loadContracts();
   }, []);
+
+  // Verificar se há filtro de vencimento na URL
+  useEffect(() => {
+    const filterParam = searchParams.get('filter');
+    if (filterParam === 'expiring') {
+      setExpiringFilter('30');
+      setStatusFilter('all');
+    }
+  }, [searchParams]);
 
   // Aplicar filtros quando mudarem
   useEffect(() => {

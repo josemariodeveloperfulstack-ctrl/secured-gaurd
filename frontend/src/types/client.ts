@@ -4,6 +4,9 @@ export interface Client {
   id: UUID;
   name: string;
   cnpj: string;
+  companyId?: UUID;
+  companyName?: string;
+  companySigla?: string;
   email?: string;
   phone?: string;
   mobile?: string;
@@ -31,6 +34,7 @@ export enum ClientStatus {
 export interface ClientFormData {
   name: string;
   cnpj: string;
+  companyId?: string;
   email?: string;
   phone?: string;
   mobile?: string;

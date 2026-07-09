@@ -98,6 +98,9 @@ public class Company {
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
+    @Column(name = "safety_engineer_id")
+    private UUID safetyEngineerId;
+
     @NotNull(message = "Company status is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

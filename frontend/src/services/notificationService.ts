@@ -25,10 +25,13 @@ export interface EmailNotification {
 }
 
 export interface DepartamentoConfig {
+  comercial: string;
   operacional: string;
   pessoal: string;
   rh: string;
   financeiro: string;
+  almoxarifado: string;
+  administrador: string;
 }
 
 export interface CreateNotificationRequest {
@@ -97,10 +100,13 @@ function mapBackendNotification(raw: BackendNotification): NotificationData {
 class NotificationService {
   // Configuração padrão dos departamentos
   private departamentos: DepartamentoConfig = {
+    comercial: 'comercial@empresa.com',
     operacional: 'operacional@empresa.com',
     pessoal: 'pessoal@empresa.com',
     rh: 'rh@empresa.com',
-    financeiro: 'financeiro@empresa.com'
+    financeiro: 'financeiro@empresa.com',
+    almoxarifado: 'almoxarifado@empresa.com',
+    administrador: 'administrador@empresa.com'
   };
 
   // Carregar configuração dos departamentos

@@ -107,14 +107,20 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     // Precisamos de uma @Query explícita, pois o Spring Data não consegue
     // derivar automaticamente um método chamado "findAllWithRelationships"
     // NOTA: @ElementCollection não pode ser incluída no EntityGraph - deve ser tratada na conversão
-    @EntityGraph(attributePaths = {"client", "contract", "responsible"})
+    @EntityGraph(attributePaths = {"client", "company", "contract", "responsible", "primaryPosition"})
     @Query("SELECT wp FROM WorkPost wp")
     List<WorkPost> findAllWithRelationships();
 
-    @EntityGraph(attributePaths = {"client", "contract", "responsible"})
+    @EntityGraph(attributePaths = {"client", "company", "contract", "responsible", "primaryPosition"})
     @Query("SELECT wp FROM WorkPost wp WHERE wp.id IN :ids")
     List<WorkPost> findByIdInWithRelationships(@Param("ids") List<UUID> ids);
 
+    @EntityGraph(attributePaths = {"client", "company", "contract", "responsible", "primaryPosition"})
+    @Query("SELECT wp FROM WorkPost wp WHERE wp.id = :id")
+    Optional<WorkPost> findByIdWithRelationships(@Param("id") UUID id);
+
     @Query("SELECT wp.name FROM WorkPost wp WHERE wp.id = :id")
     Optional<String> findNameById(@Param("id") UUID id);
+
+    Optional<WorkPost> findFirstByOrderByCreatedAtDesc();
 }

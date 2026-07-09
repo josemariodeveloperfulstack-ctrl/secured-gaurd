@@ -814,6 +814,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         
         console.log('🔍 [DEBUG] formToSet.workPostId:', formToSet.workPostId);
         setForm(formToSet);
+        // Initialize lastSavedFormRef with the complete loaded form data
+        lastSavedFormRef.current = JSON.stringify(formToSet);
+        console.log('✅ Initialized lastSavedFormRef:', lastSavedFormRef.current);
         initialWorkPostIdRef.current = String(formToSet.workPostId || '').toLowerCase();
         workPostSelectReadyRef.current = false;
         if ((formToSet.status || '').toUpperCase() === 'TERMINATED') {
@@ -2190,6 +2193,17 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
               </div>
               <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Data de Emissão do RG</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.carteiraIdentidadeDataEmissao) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, carteiraIdentidadeDataEmissao: formatDateForBackend(date) || '' }))}
+                  className="h-10 sm:h-11"
+                />
+              </div>
+              <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">U.F RG</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
@@ -3134,6 +3148,53 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             )}
                           </div>
                         </div>
+
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Horário</Label>
+                <Input
+                  name="exameMedicoHorario"
+                  value={form.exameMedicoHorario || ''}
+                  onChange={handleChange}
+                  placeholder="Ex: 08:00 às 17:00"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Horário Intervalo</Label>
+                <Input
+                  name="exameMedicoHorarioIntervalo"
+                  value={(form as any).exameMedicoHorarioIntervalo || ''}
+                  onChange={handleChange}
+                  placeholder="Ex: 12:00 às 13:00"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Intervalos Almoço/Janta?</Label>
+                <RadioGroup
+                  value={form.exameMedicoIntervalosRefeicao === true ? 'sim' : form.exameMedicoIntervalosRefeicao === false ? 'nao' : ''}
+                  onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoIntervalosRefeicao: value === 'sim' }))}
+                  className="flex gap-4 mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sim" id="intervalo-refeicao-sim" className="text-seguranca-lightgray" />
+                    <Label htmlFor="intervalo-refeicao-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="nao" id="intervalo-refeicao-nao" className="text-seguranca-lightgray" />
+                    <Label htmlFor="intervalo-refeicao-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium text-gray-200">Observações</Label>
+                <Textarea
+                  name="exameMedicoObservacoes"
+                  value={form.exameMedicoObservacoes || ''}
+                  onChange={handleChange}
+                  className="text-xs sm:text-sm min-h-[80px]"
+                />
+              </div>
 
               <div>
                           <Label className="text-sm font-medium text-gray-200">Este é o primeiro registro (1º emprego)?</Label>

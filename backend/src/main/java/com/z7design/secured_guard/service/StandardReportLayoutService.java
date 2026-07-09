@@ -27,7 +27,9 @@ import com.itextpdf.io.font.constants.StandardFonts;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.SafetyEngineer;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.SafetyEngineerRepository;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +62,7 @@ import jakarta.annotation.PostConstruct;
 public class StandardReportLayoutService {
 
     private final CompanyRepository companyRepository;
+    private final SafetyEngineerRepository safetyEngineerRepository;
 
     /** Mesmo root que {@link WebConfig} e {@code FileUploadController} ({@code app.upload.base-dir}). */
     @Value("${app.upload.base-dir:${app.upload.dir:uploads}}")
@@ -128,6 +131,8 @@ public class StandardReportLayoutService {
     private static final float LOGO_HEIGHT_PT_LANDSCAPE = 50f;
     private static final float LOGO_X_OFFSET_LANDSCAPE = 18f; // margem esquerda na forma escura
     private static final float LOGO_Y_OFFSET_TOP_LANDSCAPE = 14f; // distância do topo da página
+    private static final float FOOTER_RIGHT_BLOCK_WIDTH = 160f;
+    private static final float FOOTER_COLUMN_GAP = 8f;
 
     /**
      * Verifica na inicialização se o template de paisagem existe; caso contrário,
@@ -398,6 +403,64 @@ public class StandardReportLayoutService {
             log.error("❌ Erro ao carregar logo da empresa {}: {}", company.getName(), e.getMessage());
         }
 
+        // Safety Engineer info and stamp on the right side of the header
+        try {
+            SafetyEngineer safetyEngineer = null;
+            if (company.getSafetyEngineerId() != null) {
+                safetyEngineer = safetyEngineerRepository.findById(company.getSafetyEngineerId()).orElse(null);
+            }
+            if (safetyEngineer == null) {
+                // Try to get first safety engineer for the company
+                safetyEngineer = safetyEngineerRepository.findFirstByCompanyIdOrderByNameAsc(company.getId()).orElse(null);
+            }
+
+            if (safetyEngineer != null) {
+                float rightAreaWidth = 250f;
+                float rightAreaX = pageWidth - rightAreaWidth - config.getRightMargin();
+                float rightAreaY = headerTop - 10f;
+
+                // Add safety engineer info
+                Paragraph safetyInfo = new Paragraph()
+                        .setTextAlignment(TextAlignment.RIGHT)
+                        .setMultipliedLeading(1.1f);
+
+                safetyInfo.add(new com.itextpdf.layout.element.Text("Saúde e Segurança do Trabalho\n")
+                        .setFontSize(10f)
+                        .setBold());
+
+                if (safetyEngineer.getName() != null && !safetyEngineer.getName().isEmpty()) {
+                    safetyInfo.add(new com.itextpdf.layout.element.Text(safetyEngineer.getName() + "\n")
+                            .setFontSize(9f));
+                }
+
+                if (safetyEngineer.getCreaNumber() != null && !safetyEngineer.getCreaNumber().isEmpty()) {
+                    safetyInfo.add(new com.itextpdf.layout.element.Text(safetyEngineer.getCreaNumber() + "\n")
+                            .setFontSize(9f));
+                }
+
+                safetyInfo.setFixedPosition(rightAreaX, rightAreaY - 80f, rightAreaWidth);
+                canvas.add(safetyInfo);
+
+                // Add stamp image if available
+                if (safetyEngineer.getStampImageUrl() != null && !safetyEngineer.getStampImageUrl().isEmpty()) {
+                    Image stampImage = loadStampImage(safetyEngineer, pdfDoc);
+                    if (stampImage != null) {
+                        float stampW = 100f;
+                        float stampH = 100f;
+                        float stampX = rightAreaX + (rightAreaWidth - stampW) / 2f;
+                        float stampY = rightAreaY - 190f;
+                        stampImage.setFixedPosition(stampX, stampY);
+                        stampImage.setWidth(stampW);
+                        stampImage.setHeight(stampH);
+                        canvas.add(stampImage);
+                        log.debug("✅ Carimbo do engenheiro {} no cabeçalho ({}, {}) {}x{}", safetyEngineer.getName(), stampX, stampY, stampW, stampH);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("❌ Erro ao carregar dados do engenheiro de segurança: {}", e.getMessage(), e);
+        }
+
         // Título do relatório (centralizado, FORA da barra gradiente)
         // O título deve ficar abaixo da barra gradiente com margin top de 55pt e margin
         // bottom de 45pt
@@ -470,8 +533,8 @@ public class StandardReportLayoutService {
         boolean removeBold = config.isRemoveBoldFromFooterCompanyName();
         boolean useCalibriLight = config.isUseCalibriLightFooter();
         float nameSize = useCalibriLight ? config.getFooterCompanyNameFontSize() : 9f;
-        float addressSize = useCalibriLight ? 9f : 8f;
-        float cnpjSize = useCalibriLight ? 9f : 8f;
+        float addressSize = useCalibriLight ? 7.6f : 7.2f;
+        float cnpjSize = useCalibriLight ? 7.8f : 7.4f;
 
         PdfFont footerFont = null;
         if (useCalibriLight) {
@@ -479,56 +542,50 @@ public class StandardReportLayoutService {
         }
 
         float leftFooterX = config.getLeftMargin();
-        float rightFooterWidth = 240f;
-        float leftFooterWidth = pageWidth - leftFooterX - config.getRightMargin() - rightFooterWidth - 10f;
+        float rightFooterWidth = FOOTER_RIGHT_BLOCK_WIDTH;
+        float leftFooterWidth = pageWidth - leftFooterX - config.getRightMargin() - rightFooterWidth - FOOTER_COLUMN_GAP;
         float rightFooterX = pageWidth - rightFooterWidth - config.getRightMargin();
 
-        // Primeira linha: Nome da empresa (centralizado)
+        // Criação de um parágrafo único para conter Nome, Endereço e CNPJ
+        // Isso evita quebras e sobreposições caso o endereço ocupe mais de uma linha.
+        Paragraph leftBlock = new Paragraph()
+                .setTextAlignment(TextAlignment.LEFT)
+                .setFontColor(DeviceRgb.BLACK)
+                .setMarginBottom(0f)
+                .setMultipliedLeading(1.0f);
+        if (footerFont != null) {
+            leftBlock.setFont(footerFont);
+        }
+
+        // Primeira linha: Nome da empresa
         if (company.getName() != null && !company.getName().isEmpty()) {
-            Paragraph companyNameFooter = new Paragraph(company.getName())
-                    .setFontSize(nameSize)
-                    .setTextAlignment(TextAlignment.LEFT)
-                    .setFontColor(DeviceRgb.BLACK)
-                    .setMarginBottom(0f);
+            com.itextpdf.layout.element.Text nameText = new com.itextpdf.layout.element.Text(company.getName() + "\n")
+                    .setFontSize(nameSize);
             if (!removeBold) {
-                companyNameFooter.setBold();
+                nameText.setBold();
             }
-            if (footerFont != null) {
-                companyNameFooter.setFont(footerFont);
-            }
-            float yPos = useCalibriLight ? yPosition + 37f : yPosition + 30f;
-            canvas.add(companyNameFooter.setFixedPosition(leftFooterX, yPos, leftFooterWidth));
+            leftBlock.add(nameText);
         }
 
-        // Segunda linha: Endereço completo
-        String address = CompanyDataFormatter.formatFullAddress(company);
-        if (!address.isEmpty()) {
-            Paragraph addressFooter = new Paragraph(address)
-                    .setFontSize(addressSize)
-                    .setTextAlignment(TextAlignment.LEFT)
-                    .setFontColor(DeviceRgb.BLACK)
-                    .setMarginBottom(0f);
-            if (footerFont != null) {
-                addressFooter.setFont(footerFont);
-            }
-            float yPos = useCalibriLight ? yPosition + 23f : yPosition + 20f;
-            canvas.add(addressFooter.setFixedPosition(leftFooterX, yPos, leftFooterWidth));
-        }
-
-        // Terceira linha: CNPJ
+        // Segunda linha: CNPJ
         String cnpjText = CompanyDataFormatter.formatCnpjForHeader(company);
         if (!cnpjText.isEmpty()) {
-            Paragraph cnpjFooter = new Paragraph(cnpjText)
-                    .setFontSize(cnpjSize)
-                    .setTextAlignment(TextAlignment.LEFT)
-                    .setFontColor(DeviceRgb.BLACK)
-                    .setMarginBottom(0f);
-            if (footerFont != null) {
-                cnpjFooter.setFont(footerFont);
-            }
-            float yPos = useCalibriLight ? yPosition + 10f : yPosition + 10f;
-            canvas.add(cnpjFooter.setFixedPosition(leftFooterX, yPos, leftFooterWidth));
+            com.itextpdf.layout.element.Text cnpjTxt = new com.itextpdf.layout.element.Text(cnpjText + "\n")
+                    .setFontSize(cnpjSize);
+            leftBlock.add(cnpjTxt);
         }
+
+        // Terceira linha: Endereço completo
+        String address = CompanyDataFormatter.formatFullAddress(company);
+        if (!address.isEmpty()) {
+            com.itextpdf.layout.element.Text addressText = new com.itextpdf.layout.element.Text(address)
+                    .setFontSize(addressSize);
+            leftBlock.add(addressText);
+        }
+
+        // Adiciona o bloco na posição yPosition + 10f. O texto cresce para cima
+        // a partir desta base, adaptando-se caso tenha mais linhas de endereço.
+        canvas.add(leftBlock.setFixedPosition(leftFooterX, yPosition + 10f, leftFooterWidth));
 
         // Bloco direito: usuário e data da geração (acima da numeração), alinhado à direita
         DeviceRgb metaColor = new DeviceRgb(55, 55, 55);
@@ -541,7 +598,7 @@ public class StandardReportLayoutService {
         
         if (userSummary != null && !userSummary.isBlank() && !userSummary.equals("—")) {
             Paragraph userFooter = new Paragraph("Usuário: " + userSummary.trim())
-                    .setFontSize(8)
+                    .setFontSize(7.1f)
                     .setTextAlignment(TextAlignment.RIGHT)
                     .setFontColor(metaColor)
                     .setMarginBottom(0f);
@@ -556,7 +613,7 @@ public class StandardReportLayoutService {
 
         if (reportAt != null && !reportAt.isBlank()) {
             Paragraph dateFooter = new Paragraph("Data do relatório: " + reportAt.trim())
-                    .setFontSize(8)
+                    .setFontSize(7.1f)
                     .setTextAlignment(TextAlignment.RIGHT)
                     .setFontColor(metaColor)
                     .setMarginBottom(0f);
@@ -568,12 +625,12 @@ public class StandardReportLayoutService {
             int pageNum, int totalPages) {
         float pageWidth = pageSize.getWidth();
         float yPosition = 0;
-        float rightFooterWidth = 240f;
+        float rightFooterWidth = FOOTER_RIGHT_BLOCK_WIDTH;
         float rightFooterX = pageWidth - rightFooterWidth - config.getRightMargin();
         DeviceRgb pageNumColor = new DeviceRgb(45, 45, 45);
         String pageText = "Página " + pageNum + " de " + totalPages;
         Paragraph pageNumFooter = new Paragraph(pageText)
-                .setFontSize(10)
+                .setFontSize(9f)
                 .setBold()
                 .setTextAlignment(TextAlignment.RIGHT)
                 .setFontColor(pageNumColor)
@@ -863,6 +920,188 @@ public class StandardReportLayoutService {
         templateDataCache.clear();
         logoDataCache.clear();
         log.info("Cache de templates e logos limpo");
+    }
+
+    /**
+     * Carrega e redimensiona o carimbo do engenheiro de segurança
+     */
+    private Image loadStampImage(SafetyEngineer safetyEngineer, PdfDocument pdfDoc) throws IOException {
+        if (safetyEngineer.getStampImageUrl() == null || safetyEngineer.getStampImageUrl().isEmpty()) {
+            log.debug("Engenheiro de segurança {} não possui carimbo cadastrado", safetyEngineer.getName());
+            return null;
+        }
+
+        try {
+            String stampUrl = safetyEngineer.getStampImageUrl();
+            ImageData imageData;
+
+            // Se for URL HTTP/HTTPS, tentar resolver para arquivo local
+            if (stampUrl.startsWith("http://") || stampUrl.startsWith("https://")) {
+                String pathFromUrl = extractStampUploadPathFromUrl(stampUrl);
+                if (pathFromUrl != null) {
+                    stampUrl = pathFromUrl;
+                }
+            }
+
+            if (stampUrl.startsWith("http://") || stampUrl.startsWith("https://")) {
+                log.debug("Carregando carimbo de URL: {}", stampUrl);
+                try {
+                    imageData = ImageDataFactory.create(stampUrl);
+                } catch (OutOfMemoryError e) {
+                    log.error("❌ Erro de memória ao carregar carimbo de URL {}: imagem muito grande", stampUrl);
+                    return null;
+                }
+            } else {
+                String stampPath = resolveStampPath(stampUrl);
+                if (stampPath == null || !Files.exists(Paths.get(stampPath))) {
+                    log.warn("Carimbo não encontrado no caminho: {}. Tentando URL pública...", stampPath);
+                    String publicStampUrl = buildPublicStampUrl(stampUrl);
+                    if (publicStampUrl != null) {
+                        log.debug("Carregando carimbo via URL HTTP (fallback): {}", publicStampUrl);
+                        try {
+                            imageData = ImageDataFactory.create(publicStampUrl);
+                        } catch (OutOfMemoryError e) {
+                            log.error("❌ Erro de memória ao carregar carimbo de URL pública {}: imagem muito grande",
+                                    publicStampUrl);
+                            return null;
+                        }
+                    } else {
+                        return null;
+                    }
+                } else {
+                    try {
+                        byte[] stampBytes = Files.readAllBytes(Paths.get(stampPath));
+                        imageData = ImageDataFactory.create(stampBytes);
+                    } catch (OutOfMemoryError e) {
+                        log.error(
+                                "❌ Erro de memória ao carregar carimbo do caminho {}: imagem muito grande. Tamanho do arquivo: {} bytes",
+                                stampPath, Files.size(Paths.get(stampPath)));
+                        return null;
+                    }
+                }
+            }
+
+            Image image = new Image(imageData);
+            log.debug("Carimbo do engenheiro {} criado para documento PDF", safetyEngineer.getName());
+            return image;
+        } catch (MalformedURLException e) {
+            log.error("Erro ao criar URL da imagem do carimbo: {}", e.getMessage(), e);
+            return null;
+        } catch (OutOfMemoryError e) {
+            log.error("❌ Erro de memória ao processar carimbo do engenheiro {}: imagem muito grande", safetyEngineer.getName());
+            return null;
+        } catch (Exception e) {
+            if (isCausedByConnectException(e)) {
+                log.warn("Carimbo do engenheiro {} indisponível via HTTP (conexão recusada ou host inalcançável): {}",
+                        safetyEngineer.getName(), e.getMessage());
+                return null;
+            }
+            if (isCausedByFileNotFoundException(e)) {
+                log.warn("⚠️ Carimbo do engenheiro {} não disponível (arquivo não encontrado no disco nem via HTTP)",
+                        safetyEngineer.getName());
+                return null;
+            }
+            log.warn("Erro ao carregar carimbo do engenheiro {}: {}", safetyEngineer.getName(), e.getMessage());
+            log.debug("Detalhe", e);
+            return null;
+        }
+    }
+
+    private String extractStampUploadPathFromUrl(String stampUrl) {
+        try {
+            java.net.URI uri = new java.net.URI(stampUrl);
+            String path = uri.getPath();
+            if (path == null) {
+                return null;
+            }
+            if (path.startsWith("/api/uploads/safety-engineers/stamps/") ||
+                    path.startsWith("/uploads/safety-engineers/stamps/") ||
+                    path.startsWith("/uploads/")) {
+                return path;
+            }
+        } catch (Exception e) {
+            log.debug("Não foi possível extrair path de carimbo URL {}: {}", stampUrl, e.getMessage());
+        }
+        return null;
+    }
+
+    private String resolveStampPath(String stampUrl) {
+        if (stampUrl == null || stampUrl.isEmpty()) {
+            return null;
+        }
+
+        if (stampUrl.startsWith("http://") || stampUrl.startsWith("https://")) {
+            return stampUrl;
+        }
+
+        if (stampUrl.startsWith("/api/uploads/safety-engineers/stamps/")) {
+            String filename = stampUrl.replace("/api/uploads/safety-engineers/stamps/", "");
+            Path stampDir = Paths.get(uploadDir, "safety-engineers", "stamps");
+            return stampDir.resolve(filename).toAbsolutePath().toString();
+        }
+
+        if (stampUrl.startsWith("api/uploads/safety-engineers/stamps/")) {
+            String filename = stampUrl.replace("api/uploads/safety-engineers/stamps/", "");
+            Path stampDir = Paths.get(uploadDir, "safety-engineers", "stamps");
+            return stampDir.resolve(filename).toAbsolutePath().toString();
+        }
+
+        if (stampUrl.startsWith("/uploads/safety-engineers/stamps/")) {
+            String filename = stampUrl.replace("/uploads/safety-engineers/stamps/", "");
+            Path stampDir = Paths.get(uploadDir, "safety-engineers", "stamps");
+            return stampDir.resolve(filename).toAbsolutePath().toString();
+        }
+
+        if (stampUrl.startsWith("uploads/safety-engineers/stamps/")) {
+            String filename = stampUrl.replace("uploads/safety-engineers/stamps/", "");
+            Path stampDir = Paths.get(uploadDir, "safety-engineers", "stamps");
+            return stampDir.resolve(filename).toAbsolutePath().toString();
+        }
+
+        if (stampUrl.startsWith("/uploads/")) {
+            String relativePath = stampUrl.replace("/uploads/", "");
+            Path stampPath = Paths.get(uploadDir, relativePath);
+            return stampPath.toAbsolutePath().toString();
+        }
+
+        if (stampUrl.startsWith("uploads/")) {
+            String relativePath = stampUrl.replace("uploads/", "");
+            Path stampPath = Paths.get(uploadDir, relativePath);
+            return stampPath.toAbsolutePath().toString();
+        }
+
+        if (!stampUrl.contains("/")) {
+            Path stampDir = Paths.get(uploadDir, "safety-engineers", "stamps");
+            return stampDir.resolve(stampUrl).toAbsolutePath().toString();
+        }
+
+        Path stampPath = Paths.get(uploadDir, stampUrl);
+        return stampPath.toAbsolutePath().toString();
+    }
+
+    private String buildPublicStampUrl(String stampUrl) {
+        if (stampUrl == null || stampUrl.isEmpty()) {
+            return null;
+        }
+        if (stampUrl.startsWith("http://") || stampUrl.startsWith("https://")) {
+            return stampUrl;
+        }
+        String path = normalizeStampPathForUrl(stampUrl);
+        if (path.startsWith("/api/")) {
+            return resolveBackendInternalBaseUrl() + path;
+        }
+        String base = appUrl == null ? "" : appUrl.trim();
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base + path;
+    }
+
+    private String normalizeStampPathForUrl(String stampUrl) {
+        if (stampUrl == null) {
+            return "";
+        }
+        return stampUrl.startsWith("/") ? stampUrl : "/" + stampUrl;
     }
 
     /**

@@ -6,6 +6,7 @@ import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
 import com.z7design.secured_guard.service.OperationalServiceOrderPdfService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/operational-service-order")
 @Tag(name = "Documentos - OS Operacional", description = "Geração de Ordem de Serviço Operacional")
+@Slf4j
 public class OperationalServiceOrderController {
 
     private final OperationalServiceOrderPdfService osService;
@@ -43,12 +45,17 @@ public class OperationalServiceOrderController {
         if (request.getStartDate() != null) dados.put("startDate", request.getStartDate().toString());
         if (request.getEndDate() != null) dados.put("endDate", request.getEndDate().toString());
 
-        persistenceService.persistir(
-                request.getEmployeeId(),
-                TipoDocumentoGerado.SERVICE_ORDER,
-                pdfBytes,
-                "os-operacional-" + safeSlug(request.getEmployeeName()) + ".pdf",
-                dados);
+        try {
+            persistenceService.persistir(
+                    request.getEmployeeId(),
+                    TipoDocumentoGerado.SERVICE_ORDER,
+                    pdfBytes,
+                    "os-operacional-" + safeSlug(request.getEmployeeName()) + ".pdf",
+                    dados);
+        } catch (Exception e) {
+            log.warn("Falha ao persistir OS operacional gerada para employeeId={}: {}",
+                    request.getEmployeeId(), e.getMessage(), e);
+        }
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)

@@ -13,5 +13,9 @@ public interface EmployeeEmploymentPeriodRepository extends JpaRepository<Employ
 
     List<EmployeeEmploymentPeriod> findByEmployeeIdOrderByHireDateDesc(UUID employeeId);
 
+    List<EmployeeEmploymentPeriod> findByEmployeeIdInOrderByHireDateDesc(List<UUID> employeeIds);
+
+    long countByEmployeeId(UUID employeeId);
+
     Optional<EmployeeEmploymentPeriod> findFirstByEmployeeIdAndStatusOrderByHireDateDesc(UUID employeeId, String status);
 }

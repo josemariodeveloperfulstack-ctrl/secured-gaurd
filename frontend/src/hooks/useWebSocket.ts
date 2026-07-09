@@ -112,6 +112,16 @@ export const useWebSocket = (config: WebSocketConfig) => {
           }
         });
 
+        client.subscribe(`/user/${config.username}/queue/notifications`, (message) => {
+          try {
+            const systemMessage = JSON.parse(message.body);
+            const { addSystemMessage } = useMessageStore.getState();
+            addSystemMessage(systemMessage);
+          } catch (error) {
+            console.error('[WebSocket] Erro ao processar notificação do sistema:', error);
+          }
+        });
+
         client.subscribe('/topic/chat/group/*', (message) => {
           try {
             const chatMessage: ChatMessage = JSON.parse(message.body);

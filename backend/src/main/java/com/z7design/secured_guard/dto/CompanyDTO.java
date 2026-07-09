@@ -75,6 +75,8 @@ public class CompanyDTO {
     
     @Size(max = 500, message = "Logo URL must not exceed 500 characters")
     private String logoUrl;
+
+    private UUID safetyEngineerId;
     
     @NotNull(message = "Company status is required")
     private CompanyStatus status;
@@ -109,6 +111,7 @@ public class CompanyDTO {
                 .email(company.getEmail())
                 .website(company.getWebsite())
                 .logoUrl(company.getLogoUrl())
+                .safetyEngineerId(company.getSafetyEngineerId())
                 .status(company.getStatus())
                 .defaultEpis(company.getDefaultEpis() != null 
                     ? company.getDefaultEpis().stream()
@@ -139,6 +142,7 @@ public class CompanyDTO {
         company.setEmail(this.email);
         company.setWebsite(this.website);
         company.setLogoUrl(this.logoUrl);
+        company.setSafetyEngineerId(this.safetyEngineerId);
         company.setStatus(this.status);
         return company;
     }

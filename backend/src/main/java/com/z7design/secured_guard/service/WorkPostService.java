@@ -1,26 +1,38 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.WorkPostDTO;
+import com.z7design.secured_guard.dto.MessageRequestDTO;
 import com.z7design.secured_guard.dto.WorkPostReportFilterDTO;
 import com.z7design.secured_guard.exception.BusinessException;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.Client;
+import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Contract;
+import com.z7design.secured_guard.model.Position;
 import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.enums.MessagePriority;
+import com.z7design.secured_guard.model.enums.MessageType;
+import com.z7design.secured_guard.model.enums.UserGroup;
 import com.z7design.secured_guard.model.enums.WorkPostStatus;
 import com.z7design.secured_guard.model.enums.WorkPostType;
 import com.z7design.secured_guard.repository.WorkPostRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.ClientRepository;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.ContractRepository;
+import com.z7design.secured_guard.repository.PositionRepository;
+import com.z7design.secured_guard.repository.UserGroupRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import com.z7design.secured_guard.service.MessageService;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +40,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.math.BigDecimal;
 
@@ -40,8 +53,12 @@ public class WorkPostService {
     private final WorkPostRepository workPostRepository;
     private final EmployeeRepository employeeRepository;
     private final ClientRepository clientRepository;
+    private final CompanyRepository companyRepository;
     private final ContractRepository contractRepository;
+    private final PositionRepository positionRepository;
     private final UserRepository userRepository;
+    private final UserGroupRepository userGroupRepository;
+    private final MessageService messageService;
     
     // Métodos básicos CRUD
     @Transactional(readOnly = true)
@@ -151,7 +168,7 @@ public class WorkPostService {
     }
     
     public WorkPost getById(UUID id) {
-        return workPostRepository.findById(id)
+        return workPostRepository.findByIdWithRelationships(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Posto de trabalho não encontrado com ID: " + id));
     }
     
@@ -304,6 +321,18 @@ public class WorkPostService {
             contract = contractRepository.findById(workPostDTO.getContractId())
                     .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado com ID: " + workPostDTO.getContractId()));
         }
+
+        Company company = null;
+        if (workPostDTO.getCompanyId() != null) {
+            company = companyRepository.findById(workPostDTO.getCompanyId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com ID: " + workPostDTO.getCompanyId()));
+        }
+
+        Position primaryPosition = null;
+        if (workPostDTO.getPrimaryPositionId() != null) {
+            primaryPosition = positionRepository.findById(workPostDTO.getPrimaryPositionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Cargo principal não encontrado com ID: " + workPostDTO.getPrimaryPositionId()));
+        }
         
         // Buscar o responsável (se informado)
         User responsible = null;
@@ -315,13 +344,27 @@ public class WorkPostService {
         WorkPost workPost = new WorkPost();
         updateWorkPostFromDTO(workPost, workPostDTO);
         workPost.setClient(client);
+        workPost.setCompany(company);
         workPost.setContract(contract);
+        workPost.setPrimaryPosition(primaryPosition);
         workPost.setResponsible(responsible);
         workPost.setStatus(workPostDTO.getStatus() != null ? workPostDTO.getStatus() : WorkPostStatus.EM_IMPLANTACAO);
         workPost.setCreatedAt(LocalDateTime.now());
         workPost.setUpdatedAt(LocalDateTime.now());
         
-        return workPostRepository.save(workPost);
+        WorkPost savedWorkPost = workPostRepository.save(workPost);
+
+        // Disparar notificação para os setores envolvidos na implantação
+        try {
+            User sender = resolveNotificationSender();
+            if (sender != null) {
+                notifyDepartmentsNewWorkPost(savedWorkPost, client, sender);
+            }
+        } catch (Exception ex) {
+            log.error("Erro ao enviar notificação de novo posto de trabalho", ex);
+        }
+
+        return savedWorkPost;
     }
     
     public WorkPostDTO updateWorkPost(UUID id, WorkPostDTO workPostDTO) {
@@ -344,6 +387,18 @@ public class WorkPostService {
             contract = contractRepository.findById(workPostDTO.getContractId())
                     .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado com ID: " + workPostDTO.getContractId()));
         }
+
+        Company company = null;
+        if (workPostDTO.getCompanyId() != null) {
+            company = companyRepository.findById(workPostDTO.getCompanyId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com ID: " + workPostDTO.getCompanyId()));
+        }
+
+        Position primaryPosition = null;
+        if (workPostDTO.getPrimaryPositionId() != null) {
+            primaryPosition = positionRepository.findById(workPostDTO.getPrimaryPositionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Cargo principal não encontrado com ID: " + workPostDTO.getPrimaryPositionId()));
+        }
         
         // Buscar o responsável (se informado)
         User responsible = null;
@@ -355,7 +410,9 @@ public class WorkPostService {
         // Atualizar campos
         updateWorkPostFromDTO(existingWorkPost, workPostDTO);
         existingWorkPost.setClient(client);
+        existingWorkPost.setCompany(company);
         existingWorkPost.setContract(contract);
+        existingWorkPost.setPrimaryPosition(primaryPosition);
         existingWorkPost.setResponsible(responsible);
         existingWorkPost.setUpdatedAt(LocalDateTime.now());
         
@@ -535,6 +592,15 @@ public class WorkPostService {
         }
         
         try {
+            if (workPost.getCompany() != null) {
+                dto.setCompanyId(workPost.getCompany().getId());
+                dto.setCompanyName(workPost.getCompany().getName());
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao processar empresa do WorkPost {}: {}", workPost.getId(), e.getMessage());
+        }
+
+        try {
             if (workPost.getContract() != null) {
                 try {
                     dto.setContractId(workPost.getContract().getId());
@@ -561,6 +627,15 @@ public class WorkPostService {
         } catch (Exception e) {
             log.warn("Erro ao processar responsável do WorkPost {}: {}", workPost.getId(), e.getMessage());
             // Responsável não encontrado - não definir responsibleId
+        }
+
+        try {
+            if (workPost.getPrimaryPosition() != null) {
+                dto.setPrimaryPositionId(workPost.getPrimaryPosition().getId());
+                dto.setPrimaryPositionName(workPost.getPrimaryPosition().getName());
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao processar cargo principal do WorkPost {}: {}", workPost.getId(), e.getMessage());
         }
         
         return dto;
@@ -652,7 +727,11 @@ public class WorkPostService {
             dto.setClientId(null);
             dto.setClientName("N/A");
             dto.setClientCnpj("N/A");
+            dto.setCompanyId(null);
+            dto.setCompanyName("N/A");
             dto.setContractId(null);
+            dto.setPrimaryPositionId(null);
+            dto.setPrimaryPositionName("N/A");
             dto.setResponsibleId(null);
             dto.setResponsibleName("N/A");
             return dto;
@@ -660,6 +739,77 @@ public class WorkPostService {
             log.error("Erro ao criar DTO mínimo: {}", e.getMessage());
             return null;
         }
+    }
+
+    private User resolveNotificationSender() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            User authenticatedUser = userRepository.findByUsername(auth.getName()).orElse(null);
+            if (authenticatedUser != null) {
+                return authenticatedUser;
+            }
+        }
+
+        return userRepository.findByActiveTrue().stream()
+                .filter(user -> user.getRoles().stream().anyMatch(role -> {
+                    String roleName = role.getName();
+                    return roleName != null && (roleName.contains("ADMIN") || roleName.contains("SUPER_ADMIN"));
+                }))
+                .findFirst()
+                .orElse(userRepository.findByActiveTrue().stream().findFirst().orElse(null));
+    }
+
+    private void notifyDepartmentsNewWorkPost(WorkPost workPost, Client client, User sender) {
+        UserGroup[] groups = new UserGroup[] {
+                UserGroup.GRUPO_ADMIN,
+                UserGroup.GRUPO_SUPER_ADMIN,
+                UserGroup.GRUPO_RH,
+                UserGroup.GRUPO_GESTOR_RH,
+                UserGroup.GRUPO_DPE,
+                UserGroup.GRUPO_GESTOR_DPE,
+                UserGroup.GRUPO_ESTOQUE,
+                UserGroup.GRUPO_SUPRIMENTOS,
+                UserGroup.GRUPO_ANALISTA_SUPRIMENTOS,
+                UserGroup.GRUPO_COMERCIAL,
+                UserGroup.GRUPO_ASSISTENTE_COMERCIAL,
+                UserGroup.GRUPO_GESTOR_COMERCIAL
+        };
+
+        String title = "Novo Posto de Trabalho Cadastrado: " + workPost.getName();
+        String content = String.format(
+                "Um novo posto de trabalho foi cadastrado no sistema e requer providências para a implantação.\n\n" +
+                        "Posto: %s\n" +
+                        "Código: %s\n" +
+                        "Cliente: %s\n" +
+                        "Empresa: %s\n" +
+                        "Cargo principal: %s\n" +
+                        "Quantidade necessária: %s\n" +
+                        "Data de implantação: %s\n\n" +
+                        "RH, Departamento Pessoal, Almoxarifado, Suprimentos, Administrador e Comercial devem providenciar os recursos necessários para a implantação.",
+                workPost.getName(),
+                workPost.getPostCode(),
+                client != null ? client.getName() : "Não informado",
+                workPost.getCompany() != null ? workPost.getCompany().getName() : "Não informada",
+                workPost.getPrimaryPosition() != null ? workPost.getPrimaryPosition().getName() : "Vigilante",
+                workPost.getRequiredVigilantes() != null ? workPost.getRequiredVigilantes().toString() : "Não informada",
+                workPost.getImplementationDate() != null ? workPost.getImplementationDate().toString() : "Não informada");
+
+        for (UserGroup groupEnum : groups) {
+            userGroupRepository.findByGroupName(groupEnum)
+                    .ifPresent(groupEntity -> sendWorkPostNotificationMessage(title, content, groupEntity.getId(), sender));
+        }
+    }
+
+    private void sendWorkPostNotificationMessage(String title, String content, UUID groupId, User sender) {
+        MessageRequestDTO req = new MessageRequestDTO();
+        req.setTitle(title);
+        req.setContent(content);
+        req.setType(MessageType.GROUP);
+        req.setPriority(MessagePriority.HIGH);
+        req.setSendNotification(true);
+        req.setSendEmail(false);
+        req.setGroupIds(Set.of(groupId));
+        messageService.createMessage(req, sender);
     }
     
     private void updateWorkPostFromDTO(WorkPost workPost, WorkPostDTO dto) {

@@ -4,6 +4,7 @@ import com.z7design.secured_guard.dto.ClientDTO;
 import com.z7design.secured_guard.exception.BusinessException;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Client;
+import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.enums.ClientStatus;
 import com.z7design.secured_guard.repository.ClientRepository;
 import org.springframework.beans.BeanUtils;
@@ -19,6 +20,9 @@ import org.springframework.cache.annotation.Cacheable;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.UserRepository;
 
 @Service
 @Transactional
@@ -27,6 +31,15 @@ public class ClientService {
     
     @Autowired
     private ClientRepository clientRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private CompanyRepository companyRepository;
+
+    @Autowired
+    private MessageService messageService;
     
     @CacheEvict(value = "clients", allEntries = true)
     public ClientDTO createClient(ClientDTO clientDTO) {
@@ -55,6 +68,7 @@ public class ClientService {
             log.info("[DEBUG] CNPJ válido, criando cliente");
             Client client = new Client();
             BeanUtils.copyProperties(clientDTO, client);
+            client.setCompany(resolveCompany(clientDTO.getCompanyId()));
 
             // Forçar salvar CNPJ normalizado
             client.setCnpj(normalizedCnpj);
@@ -87,8 +101,33 @@ public class ClientService {
             Client savedClient = clientRepository.save(client);
             log.info("[DEBUG] Cliente salvo com ID: {}", savedClient.getId());
             
-            ClientDTO savedClientDTO = new ClientDTO();
-            BeanUtils.copyProperties(savedClient, savedClientDTO);
+            // Disparar notificação em tempo real
+            try {
+                org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                User sender = null;
+                if (auth != null && auth.isAuthenticated()) {
+                    sender = userRepository.findByUsername(auth.getName()).orElse(null);
+                }
+                if (sender == null) {
+                    sender = userRepository.findAll().stream()
+                            .filter(u -> u.getRoles().stream().anyMatch(r -> r.getName().contains("ADMIN")))
+                            .findFirst().orElse(null);
+                }
+                if (sender != null) {
+                    String title = "🆕 Novo Cliente Cadastrado: " + savedClient.getName();
+                    String content = String.format(
+                        "O comercial cadastrou um novo cliente no sistema.\n\nNome: %s\nCNPJ: %s\nEmail: %s",
+                        savedClient.getName(),
+                        savedClient.getCnpj(),
+                        savedClient.getEmail() != null ? savedClient.getEmail() : "Não informado"
+                    );
+                    messageService.notifyNewClientOrWorkPost(title, content, sender);
+                }
+            } catch (Exception ex) {
+                log.error("Erro ao enviar notificação de novo cliente", ex);
+            }
+
+            ClientDTO savedClientDTO = toDTO(savedClient);
             
             log.info("[DEBUG] Cliente criado com sucesso: {}", savedClientDTO.getId());
             return savedClientDTO;
@@ -103,21 +142,25 @@ public class ClientService {
     public ClientDTO updateClient(UUID id, ClientDTO clientDTO) {
         Client existingClient = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + id));
-        
-        // Verificar se o CNPJ foi alterado e se já existe outro cliente com o novo CNPJ
-        if (!existingClient.getCnpj().equals(clientDTO.getCnpj()) && 
-            clientRepository.existsByCnpj(clientDTO.getCnpj())) {
-            throw new BusinessException("Já existe um cliente cadastrado com este CNPJ: " + clientDTO.getCnpj());
+
+        String normalizedCnpj = clientDTO.getCnpj() != null ? clientDTO.getCnpj().replaceAll("\\D", "") : null;
+        if (normalizedCnpj == null || normalizedCnpj.isBlank()) {
+            throw new BusinessException("CNPJ é obrigatório");
         }
         
-        BeanUtils.copyProperties(clientDTO, existingClient, "id", "createdAt");
+        // Verificar se o CNPJ foi alterado e se já existe outro cliente com o novo CNPJ
+        if (!existingClient.getCnpj().equals(normalizedCnpj) &&
+            clientRepository.existsByCnpj(normalizedCnpj)) {
+            throw new BusinessException("Já existe um cliente cadastrado com este CNPJ: " + normalizedCnpj);
+        }
+        
+        BeanUtils.copyProperties(clientDTO, existingClient, "id", "createdAt", "company");
+        existingClient.setCnpj(normalizedCnpj);
+        existingClient.setCompany(resolveCompany(clientDTO.getCompanyId()));
         
         Client updatedClient = clientRepository.save(existingClient);
         
-        ClientDTO updatedClientDTO = new ClientDTO();
-        BeanUtils.copyProperties(updatedClient, updatedClientDTO);
-        
-        return updatedClientDTO;
+        return toDTO(updatedClient);
     }
     
     @Cacheable(value = "clients", key = "#id")
@@ -125,10 +168,7 @@ public class ClientService {
         Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + id));
         
-        ClientDTO clientDTO = new ClientDTO();
-        BeanUtils.copyProperties(client, clientDTO);
-        
-        return clientDTO;
+        return toDTO(client);
     }
     
     @Cacheable(value = "clients", key = "#cnpj")
@@ -136,37 +176,22 @@ public class ClientService {
         Client client = clientRepository.findByCnpj(cnpj)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com CNPJ: " + cnpj));
         
-        ClientDTO clientDTO = new ClientDTO();
-        BeanUtils.copyProperties(client, clientDTO);
-        
-        return clientDTO;
+        return toDTO(client);
     }
     
     public Page<ClientDTO> getAllClients(Pageable pageable) {
         Page<Client> clients = clientRepository.findAll(pageable);
-        return clients.map(client -> {
-            ClientDTO clientDTO = new ClientDTO();
-            BeanUtils.copyProperties(client, clientDTO);
-            return clientDTO;
-        });
+        return clients.map(this::toDTO);
     }
     
     public Page<ClientDTO> searchClients(String searchTerm, Pageable pageable) {
         Page<Client> clients = clientRepository.findBySearchTerm(searchTerm, pageable);
-        return clients.map(client -> {
-            ClientDTO clientDTO = new ClientDTO();
-            BeanUtils.copyProperties(client, clientDTO);
-            return clientDTO;
-        });
+        return clients.map(this::toDTO);
     }
     
     public Page<ClientDTO> getClientsByStatus(ClientStatus status, Pageable pageable) {
         Page<Client> clients = clientRepository.findByStatus(status, pageable);
-        return clients.map(client -> {
-            ClientDTO clientDTO = new ClientDTO();
-            BeanUtils.copyProperties(client, clientDTO);
-            return clientDTO;
-        });
+        return clients.map(this::toDTO);
     }
     
     public Page<ClientDTO> getClientsByStatus(ClientStatus status, String searchTerm, Pageable pageable) {
@@ -178,21 +203,13 @@ public class ClientService {
             clients = clientRepository.findByStatus(status, pageable);
         }
         
-        return clients.map(client -> {
-            ClientDTO clientDTO = new ClientDTO();
-            BeanUtils.copyProperties(client, clientDTO);
-            return clientDTO;
-        });
+        return clients.map(this::toDTO);
     }
     
     @Cacheable(value = "clients", key = "'status-list-' + #status")
     public List<ClientDTO> getClientsByStatus(ClientStatus status) {
         List<Client> clients = clientRepository.findByStatus(status);
-        return clients.stream().map(client -> {
-            ClientDTO clientDTO = new ClientDTO();
-            BeanUtils.copyProperties(client, clientDTO);
-            return clientDTO;
-        }).collect(Collectors.toList());
+        return clients.stream().map(this::toDTO).collect(Collectors.toList());
     }
     
     @CacheEvict(value = "clients", allEntries = true)
@@ -224,6 +241,26 @@ public class ClientService {
     public long countClientsByStatus(ClientStatus status) {
         return clientRepository.countByStatus(status);
     }
+
+    private Company resolveCompany(UUID companyId) {
+        if (companyId == null) {
+            throw new BusinessException("Empresa é obrigatória");
+        }
+        return companyRepository.findById(companyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com ID: " + companyId));
+    }
+
+    private ClientDTO toDTO(Client client) {
+        ClientDTO clientDTO = new ClientDTO();
+        BeanUtils.copyProperties(client, clientDTO);
+        if (client.getCompany() != null) {
+            clientDTO.setCompanyId(client.getCompany().getId());
+            clientDTO.setCompanyName(client.getCompany().getName());
+            clientDTO.setCompanySigla(client.getCompany().getSigla());
+        }
+        return clientDTO;
+    }
+    
     
     public boolean existsByCnpj(String cnpj) {
         return clientRepository.existsByCnpj(cnpj);

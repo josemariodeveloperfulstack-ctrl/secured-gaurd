@@ -22,6 +22,7 @@ import com.z7design.secured_guard.model.Message;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.MessageType;
 import com.z7design.secured_guard.model.enums.MessageStatus;
+import com.z7design.secured_guard.model.enums.MessagePriority;
 import com.z7design.secured_guard.model.MessageDeletionLog;
 import com.z7design.secured_guard.repository.DepartmentRepository;
 import com.z7design.secured_guard.repository.MessageRepository;
@@ -628,5 +629,48 @@ public class MessageService {
         }
 
         return dto;
+    }
+
+    /**
+     * Envia notificação em tempo real para todos os setores sobre novo cliente ou posto
+     */
+    public void notifyNewClientOrWorkPost(String title, String content, User sender) {
+        try {
+            log.info("Notificando setores sobre novo cliente/posto: {}", title);
+            
+            // Buscar todos os usuários ativos exceto Colaborador, TI e Auditor
+            Set<User> recipients = userRepository.findAll().stream()
+                    .filter(u -> u.isActive() && u.getRoles().stream().anyMatch(role -> {
+                        String rName = role.getName().replace("ROLE_", "").toUpperCase();
+                        return !rName.equals("COLABORADOR") && 
+                               !rName.equals("TI_SUPORTE") && 
+                               !rName.equals("AUDITOR");
+                    }))
+                    .collect(Collectors.toSet());
+            
+            if (recipients.isEmpty()) {
+                log.warn("Nenhum destinatário elegível encontrado para a notificação");
+                return;
+            }
+            
+            Message message = new Message();
+            message.setTitle(title);
+            message.setContent(content);
+            message.setType(MessageType.NOTIFICATION);
+            message.setPriority(MessagePriority.HIGH);
+            message.setSender(sender);
+            message.setRecipients(recipients);
+            message.setSendEmail(false);
+            message.setSendNotification(true);
+            message.setCreatedAt(LocalDateTime.now());
+            message.setUpdatedAt(LocalDateTime.now());
+            
+            message = messageRepository.save(message);
+            sendMessageNow(message);
+            
+            log.info("Notificação de novo cliente/posto enviada para {} destinatários", recipients.size());
+        } catch (Exception e) {
+            log.error("Erro ao enviar notificação de novo cliente/posto", e);
+        }
     }
 }
