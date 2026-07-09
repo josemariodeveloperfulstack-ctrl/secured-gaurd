@@ -37,7 +37,7 @@ import { userService } from '@/services/userService';
 import { companyService } from '@/services/companyService';
 import { workPostService } from '@/services/workPostService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { WorkPostDrawer } from './WorkPostDrawer';
+import WorkPostFormModal from '@/components/postos/WorkPostFormModal';
 import { formatCpfForInput, formatCnpjForInput } from '@/utils/validation';
 
 type StatusType = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'SUSPENDED';
@@ -104,7 +104,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
   const [companiesList, setCompaniesList] = useState<any[]>([]);
   const [clientWorkPosts, setClientWorkPosts] = useState<any[]>([]);
   const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
-  const [workPostDrawerOpen, setWorkPostDrawerOpen] = useState(false);
+  const [workPostModalOpen, setWorkPostModalOpen] = useState(false);
   const [lastAddedPostName, setLastAddedPostName] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<ContratoFormData>({
@@ -421,6 +421,8 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
       }
     });
   };
+
+  const selectedClient = clients.find(client => client.id === formData.clientId);
 
   const createNotifications = async (contratoId: string, contratoData: ContratoFormData) => {
     const notifications = [];
@@ -903,7 +905,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
                 </h3>
                 <Button
                   type="button"
-                  onClick={() => setWorkPostDrawerOpen(true)}
+                  onClick={() => setWorkPostModalOpen(true)}
                   disabled={!formData.clientId}
                   className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold uppercase tracking-wider rounded-none h-7 px-3 text-[10px]"
                 >
@@ -956,7 +958,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
                     <p>Nenhum posto de trabalho cadastrado para este cliente.</p>
                     <Button
                       type="button"
-                      onClick={() => setWorkPostDrawerOpen(true)}
+                      onClick={() => setWorkPostModalOpen(true)}
                       className="bg-zinc-900 border border-zinc-700 hover:bg-yellow-500 hover:text-black rounded-none h-7 px-3 text-[10px] uppercase font-bold"
                     >
                       Criar Primeiro Posto
@@ -1095,15 +1097,26 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
           </div>
         </form>
 
-        {/* Stacked Drawer Lateral Inline para cadastro de postos */}
-        {workPostDrawerOpen && (
-          <WorkPostDrawer
-            open={workPostDrawerOpen}
-            onClose={() => setWorkPostDrawerOpen(false)}
-            clientId={formData.clientId}
-            onSuccess={handleWorkPostSuccess}
-          />
-        )}
+        <WorkPostFormModal
+          open={workPostModalOpen}
+          onOpenChange={setWorkPostModalOpen}
+          clients={clients}
+          onSubmit={(savedWorkPost) => {
+            setWorkPostModalOpen(false);
+            if (savedWorkPost) {
+              handleWorkPostSuccess(savedWorkPost);
+              return;
+            }
+            if (formData.clientId) {
+              void loadClientWorkPosts(formData.clientId);
+            }
+          }}
+          forcedClientId={formData.clientId || undefined}
+          defaultAddress={selectedClient?.address}
+          defaultCity={selectedClient?.city}
+          defaultState={selectedClient?.state}
+          defaultZipCode={selectedClient?.zipCode}
+        />
 
       </DialogContent>
     </Dialog>

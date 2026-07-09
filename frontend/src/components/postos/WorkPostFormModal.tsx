@@ -28,7 +28,7 @@ interface WorkPostFormModalProps {
   onOpenChange: (open: boolean) => void;
   workPost?: WorkPost | null;
   clients: Client[];
-  onSubmit: () => void;
+  onSubmit: (savedWorkPost?: WorkPost) => void;
   forcedClientId?: string;
   defaultAddress?: string;
   defaultCity?: string;
@@ -282,24 +282,25 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
 
     try {
       setLoading(true);
+      let savedWorkPost: WorkPost;
 
       console.log('Dados do formulário antes do envio:', formData);
 
       if (workPost) {
-        await workPostService.updateWorkPost(workPost.id, formData);
+        savedWorkPost = await workPostService.updateWorkPost(workPost.id, formData);
         toast({
           title: "Sucesso",
           description: "Posto de trabalho atualizado com sucesso",
         });
       } else {
-        await workPostService.createWorkPost(formData);
+        savedWorkPost = await workPostService.createWorkPost(formData);
         toast({
           title: "Sucesso",
           description: "Posto de trabalho criado com sucesso",
         });
       }
 
-      onSubmit();
+      onSubmit(savedWorkPost);
     } catch (error: any) {
       console.error('Erro ao salvar posto:', error);
       toast({

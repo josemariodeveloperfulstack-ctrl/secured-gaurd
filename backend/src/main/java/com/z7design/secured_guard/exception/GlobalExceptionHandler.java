@@ -185,7 +185,18 @@ public class GlobalExceptionHandler {
         String causeMsg = ex.getCause() != null ? ex.getCause().getMessage() : "";
         String fullMsg = msg + " " + causeMsg;
 
-        if (fullMsg.contains("username") || (fullMsg.contains("UK_") && fullMsg.contains("username"))) {
+        if ((path.contains("/clients") || path.contains("clients"))
+                && (fullMsg.toLowerCase().contains("clients_cnpj")
+                        || fullMsg.toLowerCase().contains("clients_cnpj_key")
+                        || fullMsg.toLowerCase().contains("uk")
+                        && fullMsg.toLowerCase().contains("cnpj")
+                        || fullMsg.toLowerCase().contains("duplicate key")
+                                && fullMsg.toLowerCase().contains("cnpj"))) {
+            message = "Já existe um cliente cadastrado com este CNPJ.";
+        } else if ((path.contains("/clients") || path.contains("clients"))
+                && fullMsg.toLowerCase().contains("company_id")) {
+            message = "Empresa é obrigatória ou inválida para o cliente.";
+        } else if (fullMsg.contains("username") || (fullMsg.contains("UK_") && fullMsg.contains("username"))) {
             message = "Nome de usuário já está em uso";
         } else if (fullMsg.contains("email") || (fullMsg.contains("UK_") && fullMsg.contains("email"))) {
             message = "Email já está em uso";

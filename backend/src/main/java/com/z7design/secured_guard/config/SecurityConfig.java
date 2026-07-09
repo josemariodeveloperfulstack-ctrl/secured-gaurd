@@ -177,10 +177,16 @@ public class SecurityConfig {
                                                 .hasAnyAuthority("USERS_READ", "USERS_WRITE", "USERS_CREATE",
                                                                 "USERS_DELETE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
-                                                // Endpoints de grupos - permitir consulta de próprios grupos para
-                                                // usuários
-                                                // autenticados
-                                                .requestMatchers("/api/groups/user/**").authenticated()
+                                                // Endpoints de grupos usados na central de mensagens:
+                                                // qualquer usuário autenticado pode consultar grupos e membros.
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/groups")
+                                                .authenticated()
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/groups/user/**")
+                                                .authenticated()
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/groups/*")
+                                                .authenticated()
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/groups/*/users")
+                                                .authenticated()
                                                 // Endpoints de grupos - operações administrativas requerem permissões
                                                 // específicas
                                                 .requestMatchers("/api/groups/**")
@@ -564,7 +570,11 @@ public class SecurityConfig {
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
                                                                 "ROLE_SUPERVISOR",
                                                                 "ROLE_ESTOQUE", "ROLE_COMPRAS", "ROLE_SUPRIMENTOS", "ROLE_ALMOXARIFADO")
-                                                // Endpoints de departamentos - requerem permissões de RH ou admin
+                                                // Endpoints de departamentos usados por mensagens/notificações:
+                                                // qualquer usuário autenticado pode consultar listagens.
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/departments/**")
+                                                .authenticated()
+                                                // Endpoints de departamentos - escrita requer permissões de RH ou admin
                                                 .requestMatchers("/api/departments/**")
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "RH", "DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_RH",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,6 +37,12 @@ const CLIENT_NOTIFICATION_DEPARTMENTS = [
   { id: 'almoxarifado', label: 'Almoxarifado' },
   { id: 'administrador', label: 'Administrador' }
 ] as const;
+
+const CLIENT_EMAIL_PLACEHOLDERS = new Set([
+  'contato@empresa.com',
+  'email@empresa.com',
+  'cliente@empresa.com'
+]);
 
 // Funções de máscara
 const formatCNPJ = (value: string): string => {
@@ -275,8 +281,8 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     ...formData,
     cnpj: formData.cnpj.replace(/\D/g, ''),
     companyId: formData.companyId?.trim() || undefined,
-    email: formData.email?.trim() || undefined,
-    contactEmail: formData.contactEmail?.trim() || undefined,
+    email: normalizeOptionalEmail(formData.email),
+    contactEmail: normalizeOptionalEmail(formData.contactEmail),
     phone: formData.phone?.replace(/\D/g, '') || undefined,
     mobile: formData.mobile?.replace(/\D/g, '') || undefined,
     address: formData.address?.trim() || undefined,
@@ -288,6 +294,14 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     notes: formData.notes?.trim() || undefined,
     notifiedDepartments: (formData.notifiedDepartments || []).filter(Boolean)
   });
+
+  const normalizeOptionalEmail = (value?: string) => {
+    const normalized = value?.trim().toLowerCase() || '';
+    if (!normalized || CLIENT_EMAIL_PLACEHOLDERS.has(normalized)) {
+      return undefined;
+    }
+    return normalized;
+  };
 
   const persistClient = async (options?: { openPostFormAfterSave?: boolean }) => {
     setIsLoading(true);
@@ -375,7 +389,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-2 border-gray-600/50 text-white p-0">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-4xl max-h-[95vh] overflow-hidden bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-2 border-gray-600/50 text-white p-0 sm:w-full">
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-600/30 bg-seguranca-black/50">
           <div className="flex items-center gap-3">
@@ -391,11 +405,14 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
               </p>
             </div>
           </div>
+          <DialogDescription className="sr-only">
+            Modal para criar ou editar cliente, notificações e postos de trabalho vinculados.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Form Content */}
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
-          <div className="flex-1 overflow-y-auto px-6 py-4">
+          <form onSubmit={handleSubmit} autoComplete="off" className="flex h-full min-h-0 flex-col">
+          <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="flex w-full overflow-x-auto bg-seguranca-black/50 border border-gray-600/30 p-1 no-scrollbar space-x-1">
                 <TabsTrigger
@@ -527,10 +544,13 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                     </Label>
                     <Input
                       id="email"
+                      name="client_optional_email"
                       type="email"
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
                       placeholder="contato@empresa.com"
+                      autoComplete="new-password"
+                      spellCheck={false}
                       className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
                     />
                   </div>
@@ -668,10 +688,13 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                     </Label>
                     <Input
                       id="contactEmail"
+                      name="client_optional_contact_email"
                       type="email"
                       value={formData.contactEmail}
                       onChange={(e) => handleInputChange('contactEmail', e.target.value)}
                       placeholder="contato@empresa.com"
+                      autoComplete="new-password"
+                      spellCheck={false}
                       className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
                     />
                   </div>
@@ -752,8 +775,8 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
               {/* Postos de Trabalho */}
               <TabsContent value="postos-de-trabalho" className="space-y-4 mt-4">
-                <div className="bg-seguranca-black/50 border border-gray-600/30 rounded-xl p-6 min-h-[400px]">
-                  <div className="flex justify-between items-center mb-6">
+                <div className="bg-seguranca-black/50 border border-gray-600/30 rounded-xl p-4 sm:p-6 min-h-[260px] sm:min-h-[400px]">
+                  <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h4 className="text-lg font-semibold flex items-center gap-2">
                         <Briefcase className="h-5 w-5 text-seguranca-red" />
@@ -770,7 +793,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                           setEditingPost(null);
                           setIsPostFormOpen(true);
                         }}
-                        className="bg-seguranca-red hover:bg-seguranca-darkred"
+                        className="w-full bg-seguranca-red hover:bg-seguranca-darkred sm:w-auto"
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Novo Posto
@@ -812,6 +835,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                     </div>
                   ) : (
                     <div className="rounded-xl border border-gray-600/30 overflow-hidden">
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader className="bg-seguranca-black/80">
                           <TableRow className="hover:bg-transparent border-gray-600/30">
@@ -869,6 +893,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -877,17 +902,17 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-600/30 bg-seguranca-black/50">
-            <div className="flex justify-between items-center gap-4">
-              <p className="text-sm text-gray-400">
+          <div className="border-t border-gray-600/30 bg-seguranca-black/90 px-3 py-4 backdrop-blur supports-[backdrop-filter]:bg-seguranca-black/70 sm:px-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <p className="text-center text-sm text-gray-400 xl:text-left">
                 <span className="text-seguranca-red">*</span> Campos obrigatórios
               </p>
-              <div className="flex gap-3">
+              <div className="flex w-full flex-col gap-3 sm:flex-row xl:w-auto xl:justify-end">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={onClose}
-                  className="border-gray-600 text-white hover:bg-seguranca-black hover:text-white px-6"
+                  className="w-full border-gray-600 px-6 text-white hover:bg-seguranca-black hover:text-white xl:w-auto"
                   disabled={isLoading}
                 >
                   <X className="h-4 w-4 mr-2" />
@@ -896,7 +921,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="bg-seguranca-red hover:bg-seguranca-darkred px-6 shadow-lg shadow-seguranca-red/20"
+                  className="w-full bg-seguranca-red px-6 shadow-lg shadow-seguranca-red/20 hover:bg-seguranca-darkred xl:w-auto"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {isLoading ? 'Salvando...' : (activeClient ? 'Atualizar Cliente' : 'Criar Cliente')}
