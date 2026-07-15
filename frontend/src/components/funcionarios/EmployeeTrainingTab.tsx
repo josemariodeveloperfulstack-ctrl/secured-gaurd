@@ -40,6 +40,7 @@ type TrainingRow = {
   sector?: string;
   workSchedule?: string;
   validUntil: string;
+  hireDate?: string;
   status: 'valid' | 'expiring' | 'expired';
   lastUpdate?: string;
   trainingType: string;
@@ -165,6 +166,7 @@ const EmployeeTrainingTab = () => {
             employeeName: c.employeeName,
             employeePosition: c.employeePosition,
             employeeDepartment: c.employeeDepartment,
+            employeeHireDate: c.employeeHireDate,
             workPostName: c.workPostName,
             employeeId: c.employeeId
           });
@@ -186,6 +188,7 @@ const EmployeeTrainingTab = () => {
             position: c.employeePosition || '',
             sector: sectorName,
             validUntil,
+            hireDate: c.employeeHireDate,
             status,
             trainingType: c.trainingName || 'Treinamento',
             hours: c.renewalPeriodMonths ? c.renewalPeriodMonths * 8 : undefined, // Estimativa: 8h por mês
@@ -338,30 +341,31 @@ const EmployeeTrainingTab = () => {
       const certs: EmployeeCertification[] = await trainingService.getEmployeeCertifications();
 
       const rows: TrainingRow[] = certs.map(c => {
-        const validUntil = c.expirationDate || '';
-        const status = getTrainingStatus(validUntil);
+          const validUntil = c.expirationDate || '';
+          const status = getTrainingStatus(validUntil);
 
-        // Priorizar workPostName da certificação, senão usar employeeDepartment
-        let sectorName = '';
-        if (c.workPostName) {
-          sectorName = c.workPostName;
-        } else if (c.employeeDepartment) {
-          sectorName = c.employeeDepartment;
-        }
+          // Priorizar workPostName da certificação, senão usar employeeDepartment
+          let sectorName = '';
+          if (c.workPostName) {
+            sectorName = c.workPostName;
+          } else if (c.employeeDepartment) {
+            sectorName = c.employeeDepartment;
+          }
 
-        return {
-          id: c.id,
-          employeeId: c.employeeId, // ID do funcionário para edição
-          employee: c.employeeName || 'Funcionário',
-          cpf: c.employeeDocument || '',
-          position: c.employeePosition || '',
-          sector: sectorName,
-          validUntil,
-          status,
-          trainingType: c.trainingName || 'Treinamento',
-          hours: c.renewalPeriodMonths ? c.renewalPeriodMonths * 8 : undefined, // Estimativa: 8h por mês
-        };
-      });
+          return {
+            id: c.id,
+            employeeId: c.employeeId, // ID do funcionário para edição
+            employee: c.employeeName || 'Funcionário',
+            cpf: c.employeeDocument || '',
+            position: c.employeePosition || '',
+            sector: sectorName,
+            validUntil,
+            hireDate: c.employeeHireDate,
+            status,
+            trainingType: c.trainingName || 'Treinamento',
+            hours: c.renewalPeriodMonths ? c.renewalPeriodMonths * 8 : undefined, // Estimativa: 8h por mês
+          };
+        });
 
       console.log('✅ Lista de treinamentos recarregada:', rows.length);
       setTrainings(rows);
@@ -566,6 +570,7 @@ const EmployeeTrainingTab = () => {
                   <th className="px-3 py-2 border text-left">Setor</th>
                   <th className="px-3 py-2 border text-left">Treinamento</th>
                   <th className="px-3 py-2 border text-left">Validade</th>
+                  <th className="px-3 py-2 border text-left">Data de Admissão</th>
                   <th className="px-3 py-2 border text-left">Status</th>
                   <th className="px-3 py-2 border text-left">Ações</th>
                 </tr>
@@ -573,7 +578,7 @@ const EmployeeTrainingTab = () => {
               <tbody>
                 {filteredTrainings.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-seguranca-lightgray">
+                    <td colSpan={8} className="text-center py-8 text-seguranca-lightgray">
                       <div className="flex flex-col items-center gap-2">
                         <FileText className="h-8 w-8 text-gray-400" />
                         <p>Nenhum treinamento encontrado</p>
@@ -607,6 +612,9 @@ const EmployeeTrainingTab = () => {
                             {Math.ceil((new Date(t.validUntil).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} dias
                           </div>
                         </div>
+                      </td>
+                      <td className="px-3 py-3 border text-seguranca-lightgray">
+                        {t.hireDate ? new Date(t.hireDate).toLocaleDateString('pt-BR') : 'N/A'}
                       </td>
                       <td className="px-3 py-3 border">
                         <div className="flex items-center gap-2">
@@ -657,6 +665,7 @@ const EmployeeTrainingTab = () => {
                       <div className="text-seguranca-lightgray"><span className="font-medium">Setor:</span> {t.sector || 'N/A'}</div>
                       <div className="text-seguranca-lightgray"><span className="font-medium">Treinamento:</span> {t.trainingType}</div>
                       <div className="text-seguranca-lightgray"><span className="font-medium">Validade:</span> {new Date(t.validUntil).toLocaleDateString('pt-BR')}</div>
+                      <div className="text-seguranca-lightgray"><span className="font-medium">Data de Admissão:</span> {t.hireDate ? new Date(t.hireDate).toLocaleDateString('pt-BR') : 'N/A'}</div>
                       <div className="text-seguranca-lightgray"><span className="font-medium">Carga Horária:</span> {t.hours || 0}h</div>
                     </div>
 

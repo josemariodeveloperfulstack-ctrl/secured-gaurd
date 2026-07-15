@@ -36,6 +36,7 @@ export interface EmployeeCertification {
   employeeDocument?: string;
   employeePosition?: string;
   employeeDepartment?: string;
+  employeeHireDate?: string;
   trainingId: string;
   trainingName?: string;
   renewalPeriodMonths?: number;

@@ -15,6 +15,7 @@ public record EmployeeCertificationResponse(
         String employeeDocument,
         String employeePosition,
         String employeeDepartment,
+        LocalDate employeeHireDate,
         UUID trainingId,
         String trainingName,
         Integer renewalPeriodMonths,
@@ -34,6 +35,7 @@ public record EmployeeCertificationResponse(
         String employeeDocument = null;
         String positionName = null;
         String departmentName = null;
+        LocalDate employeeHireDate = null;
 
         var employee = certification.getEmployee();
         if (employee != null) {
@@ -41,6 +43,7 @@ public record EmployeeCertificationResponse(
             employeeDocument = employee.getDocument() != null && !employee.getDocument().isBlank()
                     ? employee.getDocument()
                     : employee.getCpf();
+            employeeHireDate = employee.getHireDate();
 
             // Tentar obter o cargo (Position)
             var position = employee.getPosition();
@@ -89,6 +92,7 @@ public record EmployeeCertificationResponse(
                 .employeeDocument(employeeDocument)
                 .employeePosition(positionName)
                 .employeeDepartment(departmentName)
+                .employeeHireDate(employeeHireDate)
                 .trainingId(certification.getTraining() != null ? certification.getTraining().getId() : null)
                 .trainingName(certification.getTraining() != null ? certification.getTraining().getName() : null)
                 .renewalPeriodMonths(
