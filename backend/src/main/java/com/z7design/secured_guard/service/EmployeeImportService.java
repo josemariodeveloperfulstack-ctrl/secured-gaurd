@@ -100,7 +100,7 @@ public class EmployeeImportService {
         }
 
         try (InputStream is = file.getInputStream();
-                Workbook workbook = new XSSFWorkbook(is)) {
+                Workbook workbook = WorkbookFactory.create(is)) {
 
             Sheet sheet = workbook.getSheetAt(0);
             int totalLinhas = sheet.getLastRowNum();

@@ -112,6 +112,7 @@ const mockTrainings: TrainingRow[] = [
 ];
 
 const trainingTypes = [
+  'NR-06 (Equipamentos de Proteção Individual - EPI)',
   'NR-33 (Espaços Confinados)',
   'NR-35 (Trabalho em Altura)',
   'NR-10 (Instalações Elétricas)',

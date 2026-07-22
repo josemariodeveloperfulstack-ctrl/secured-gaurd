@@ -79,7 +79,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN FETCH e.department " +
                         "WHERE LOWER(e.name) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
                         "LOWER(COALESCE(e.document, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
-                        "LOWER(COALESCE(e.cpf, '')) LIKE LOWER(CONCAT('%', :q, '%')) " +
+                        "LOWER(COALESCE(e.cpf, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+                        "LOWER(COALESCE(e.matriculaEsocial, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+                        "LOWER(COALESCE(e.registrationNumber, '')) LIKE LOWER(CONCAT('%', :q, '%')) " +
                         "ORDER BY e.name ASC")
         List<Employee> findForSimpleSearch(@Param("q") String q);
 
@@ -156,10 +158,18 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN companies c ON e.company_id = c.id " +
                         "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
                         "LEFT JOIN departments d ON e.department_id = d.id " +
-                        "WHERE UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
-                        "OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) "
-                        +
-                        "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "WHERE (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.document, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.cpf, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.matricula_esocial, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.registration_number, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND (" +
+                        "    REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        "    OR REGEXP_REPLACE(COALESCE(e.cpf, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        "    OR REGEXP_REPLACE(COALESCE(e.matricula_esocial, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        "    OR REGEXP_REPLACE(COALESCE(e.registration_number, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        ")) " +
+                        "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) " +
                         "ORDER BY e.name ASC", nativeQuery = true)
         List<Object[]> findBasicDataBySearchTerm(@Param("searchTerm") String searchTerm);
 
@@ -173,8 +183,16 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
                         "LEFT JOIN departments d ON e.department_id = d.id " +
                         "WHERE (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
-                        "OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) "
-                        +
+                        "OR UPPER(COALESCE(e.document, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.cpf, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.matricula_esocial, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.registration_number, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND (" +
+                        "    REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        "    OR REGEXP_REPLACE(COALESCE(e.cpf, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        "    OR REGEXP_REPLACE(COALESCE(e.matricula_esocial, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        "    OR REGEXP_REPLACE(COALESCE(e.registration_number, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        ")) " +
                         "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) " +
                         "AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
                         "ORDER BY e.name ASC " +
@@ -194,8 +212,16 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
                         "LEFT JOIN departments d ON e.department_id = d.id " +
                         "WHERE (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
-                        "OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) "
-                        +
+                        "OR UPPER(COALESCE(e.document, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.cpf, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.matricula_esocial, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.registration_number, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND (" +
+                        "    REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        "    OR REGEXP_REPLACE(COALESCE(e.cpf, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        "    OR REGEXP_REPLACE(COALESCE(e.matricula_esocial, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        "    OR REGEXP_REPLACE(COALESCE(e.registration_number, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
+                        ")) " +
                         "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) " +
                         "AND e.company_id = :companyId AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
                         "ORDER BY e.name ASC " +

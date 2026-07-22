@@ -301,7 +301,7 @@ const administrativoMenuItems = [
   { icon: Users, text: 'Usuários', to: '/usuarios', id: 'usuarios' },
   { icon: Users, text: 'Grupos de Usuários', to: '/grupos', id: 'grupos' },
   { icon: Key, text: 'Roles', to: '/roles', id: 'roles' },
-  { icon: Upload, text: 'Importar WhatsApp (PDF)', to: '/sistema/importar-whatsapp', id: 'sistema-importar-whatsapp' },
+  { icon: Upload, text: 'Importar Excel (Funcionários)', to: '/sistema/importar-whatsapp', id: 'sistema-importar-whatsapp' },
 ];
 
 export function AppSidebar() {

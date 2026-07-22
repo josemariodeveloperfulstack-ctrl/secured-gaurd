@@ -1175,7 +1175,16 @@ public class EmployeeService {
         boolean hasSearch = searchTerm != null && !searchTerm.trim().isEmpty();
         if (hasSearch) {
             sql.append("AND (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
-                    .append("OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) ")
+                    .append("OR UPPER(COALESCE(e.document, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.cpf, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.matricula_esocial, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.registration_number, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND (")
+                    .append("    REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
+                    .append("    OR REGEXP_REPLACE(COALESCE(e.cpf, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
+                    .append("    OR REGEXP_REPLACE(COALESCE(e.matricula_esocial, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
+                    .append("    OR REGEXP_REPLACE(COALESCE(e.registration_number, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')")
+                    .append(")) ")
                     .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) ");
         }
         if (companyId != null) {

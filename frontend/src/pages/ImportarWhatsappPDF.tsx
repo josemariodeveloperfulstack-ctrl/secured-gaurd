@@ -36,10 +36,14 @@ const ImportarWhatsappPDF: React.FC = () => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.type !== 'application/pdf') {
+      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || 
+                      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                      file.type === 'application/vnd.ms-excel';
+
+      if (!isExcel) {
         toast({
-          title: "Erro",
-          description: "Por favor, selecione um arquivo PDF válido.",
+          title: "Erro de Formato",
+          description: "Por favor, selecione somente uma planilha Excel (.xlsx, .xls) válida.",
           variant: "destructive"
         });
         return;
@@ -53,7 +57,7 @@ const ImportarWhatsappPDF: React.FC = () => {
     if (!selectedFile) {
       toast({
         title: "Atenção",
-        description: "Por favor, selecione um arquivo PDF.",
+        description: "Por favor, selecione uma planilha Excel (.xlsx ou .xls).",
         variant: "destructive"
       });
       return;
@@ -71,7 +75,7 @@ const ImportarWhatsappPDF: React.FC = () => {
       });
 
       setResult({
-        success: true,
+        success: response.data.success,
         message: response.data.message || 'Importação realizada com sucesso!',
         totalProcessed: response.data.totalProcessed,
         totalSuccess: response.data.totalSuccess,
@@ -79,10 +83,18 @@ const ImportarWhatsappPDF: React.FC = () => {
         errors: response.data.errors
       });
 
-      toast({
-        title: "Sucesso",
-        description: "Funcionários importados com sucesso!",
-      });
+      if (response.data.success) {
+        toast({
+          title: "Sucesso",
+          description: "Importação de planilha concluída com sucesso!",
+        });
+      } else {
+        toast({
+          title: "Aviso na Importação",
+          description: "Importação concluída. Verifique os avisos/erros na tela.",
+          variant: "destructive"
+        });
+      }
 
       // Limpar arquivo após sucesso
       setSelectedFile(null);
@@ -91,12 +103,12 @@ const ImportarWhatsappPDF: React.FC = () => {
 
     } catch (error: any) {
       console.error('Erro ao importar:', error);
-      const errorMessage = error.response?.data?.message || 'Erro ao processar o arquivo PDF.';
+      const errorMessage = error.response?.data?.message || 'Erro ao processar a planilha de importação.';
       
       setResult({
         success: false,
         message: errorMessage,
-        errors: error.response?.data?.errors
+        errors: error.response?.data?.errors || [errorMessage]
       });
 
       toast({
@@ -110,30 +122,29 @@ const ImportarWhatsappPDF: React.FC = () => {
   };
 
   const downloadTemplate = () => {
-    // Template de exemplo - ajustar conforme necessário
     toast({
-      title: "Download de Template",
-      description: "Funcionalidade em desenvolvimento. Use um PDF de conversa do WhatsApp exportado.",
+      title: "Colunas da Planilha Excel",
+      description: "CNPJ, Nome, Matrícula eSocial, Município Nascimento, UF Nascimento, Mãe, Pai, Nacionalidade, Estado Civil, CPF, RG, PIS/PASEP, Setor de Trabalho, Data de Admissão, Cargo, CBO, Salário Base, Rua, Bairro, CEP, Cidade, UF.",
     });
   };
 
   return (
     <StandardLayout
-      title="Importar Funcionários via WhatsApp (PDF)"
-      subtitle="Importe dados de funcionários através de conversas exportadas do WhatsApp"
+      title="Importar Funcionários (Excel)"
+      subtitle="Importe o cadastro de funcionários exclusivamente via planilha de Excel (.xlsx, .xls)"
     >
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Instruções */}
-        <Alert>
-          <Info className="h-4 w-4" />
+        <Alert className="border-seguranca-yellow/40 bg-seguranca-graphite/40">
+          <Info className="h-4 w-4 text-seguranca-yellow" />
           <AlertDescription>
             <div className="space-y-2">
-              <p className="font-medium">Como usar esta funcionalidade:</p>
-              <ol className="list-decimal list-inside space-y-1 text-sm ml-2">
-                <li>Exporte a conversa do WhatsApp contendo os dados dos funcionários em formato PDF</li>
-                <li>Selecione o arquivo PDF exportado</li>
-                <li>Clique em "Processar Importação"</li>
-                <li>Aguarde o processamento e verifique os resultados</li>
+              <p className="font-medium text-seguranca-yellow">Instruções para Importação via Excel:</p>
+              <ol className="list-decimal list-inside space-y-1.5 text-sm text-gray-300 ml-2">
+                <li>Selecione uma planilha de Excel (formatos <strong>.xlsx</strong> ou <strong>.xls</strong>).</li>
+                <li><strong>Validação de Empresa (CNPJ):</strong> O CNPJ informado na planilha deve estar previamente cadastrado no sistema. Se não estiver cadastrado, a linha não será importada.</li>
+                <li><strong>Validação de Duplicidade (CPF):</strong> O sistema verifica se o CPF já existe no banco de dados. Se o CPF já estiver cadastrado, o funcionário <strong>NÃO será importado</strong>.</li>
+                <li><strong>Colunas reconhecidas:</strong> CNPJ, Nome, Matrícula eSocial, Município Nascimento, UF Nascimento, Mãe, Pai, Nacionalidade, Estado Civil, CPF, RG, PIS/PASEP, Setor de Trabalho, Data de Admissão, Cargo, CBO, Salário Base, Rua, Bairro, CEP, Cidade, UF.</li>
               </ol>
             </div>
           </AlertDescription>
@@ -144,20 +155,20 @@ const ImportarWhatsappPDF: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5 text-seguranca-yellow" />
-              Upload de Arquivo PDF
+              Upload de Planilha de Excel
             </CardTitle>
             <CardDescription>
-              Selecione o arquivo PDF da conversa do WhatsApp
+              Selecione a planilha de Excel contendo os dados dos funcionários
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="pdf-file">Arquivo PDF</Label>
+              <Label htmlFor="pdf-file">Planilha Excel (.xlsx, .xls)</Label>
               <div className="flex items-center gap-4">
                 <Input
                   id="pdf-file"
                   type="file"
-                  accept=".pdf"
+                  accept=".xlsx,.xls"
                   onChange={handleFileChange}
                   disabled={uploading}
                   className="flex-1"
@@ -168,7 +179,7 @@ const ImportarWhatsappPDF: React.FC = () => {
                   disabled={uploading}
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  Exemplo
+                  Ver Colunas
                 </Button>
               </div>
               {selectedFile && (
@@ -182,17 +193,17 @@ const ImportarWhatsappPDF: React.FC = () => {
             <Button
               onClick={handleUpload}
               disabled={!selectedFile || uploading}
-              className="w-full bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-black"
+              className="w-full bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-black font-semibold"
             >
               {uploading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processando...
+                  Processando Planilha Excel...
                 </>
               ) : (
                 <>
                   <Upload className="h-4 w-4 mr-2" />
-                  Processar Importação
+                  Processar Importação Excel
                 </>
               )}
             </Button>
@@ -207,12 +218,12 @@ const ImportarWhatsappPDF: React.FC = () => {
                 {result.success ? (
                   <>
                     <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    Importação Concluída
+                    Importação Processada
                   </>
                 ) : (
                   <>
                     <AlertCircle className="h-5 w-5 text-red-500" />
-                    Erro na Importação
+                    Erro no Processamento
                   </>
                 )}
               </CardTitle>
@@ -227,21 +238,21 @@ const ImportarWhatsappPDF: React.FC = () => {
               {result.totalProcessed !== undefined && (
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-seguranca-graphite p-4 rounded-lg">
-                    <p className="text-sm text-gray-400">Total Processados</p>
+                    <p className="text-sm text-gray-400">Total Analisado</p>
                     <p className="text-2xl font-bold text-seguranca-lightgray flex items-center gap-2">
                       <Users className="h-5 w-5" />
                       {result.totalProcessed}
                     </p>
                   </div>
                   <div className="bg-green-900/20 p-4 rounded-lg border border-green-500/30">
-                    <p className="text-sm text-gray-400">Sucesso</p>
+                    <p className="text-sm text-gray-400">Cadastrados com Sucesso</p>
                     <p className="text-2xl font-bold text-green-500 flex items-center gap-2">
                       <CheckCircle2 className="h-5 w-5" />
                       {result.totalSuccess}
                     </p>
                   </div>
                   <div className="bg-red-900/20 p-4 rounded-lg border border-red-500/30">
-                    <p className="text-sm text-gray-400">Erros</p>
+                    <p className="text-sm text-gray-400">Não Importados / Erros</p>
                     <p className="text-2xl font-bold text-red-500 flex items-center gap-2">
                       <AlertCircle className="h-5 w-5" />
                       {result.totalErrors}
@@ -252,8 +263,8 @@ const ImportarWhatsappPDF: React.FC = () => {
 
               {result.errors && result.errors.length > 0 && (
                 <div className="space-y-2">
-                  <p className="font-medium text-red-500">Erros Encontrados:</p>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-400">
+                  <p className="font-medium text-red-400">Detalhes de Ocorrências / Registros não importados:</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-300 bg-red-950/20 p-3 rounded border border-red-900/30 max-h-60 overflow-y-auto">
                     {result.errors.map((error, index) => (
                       <li key={index}>{error}</li>
                     ))}
@@ -267,24 +278,24 @@ const ImportarWhatsappPDF: React.FC = () => {
         {/* Informações Adicionais */}
         <Card className="bg-seguranca-graphite">
           <CardHeader>
-            <CardTitle className="text-seguranca-lightgray">Informações Importantes</CardTitle>
+            <CardTitle className="text-seguranca-lightgray">Regras de Validação da Planilha</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-gray-400">
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 mt-0.5 text-seguranca-yellow flex-shrink-0" />
-              <p>O PDF deve ser exportado diretamente do WhatsApp (Configurações → Exportar conversa)</p>
+              <p>Formato aceito: Apenas arquivos Excel no formato <strong>.xlsx</strong> ou <strong>.xls</strong>.</p>
             </div>
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 mt-0.5 text-seguranca-yellow flex-shrink-0" />
-              <p>As mensagens devem seguir um formato específico para que os dados sejam extraídos corretamente</p>
+              <p>Validação de CNPJ da Empresa: O CNPJ deve corresponder a uma empresa já cadastrada no sistema. Se não for encontrada, o funcionário não será importado.</p>
             </div>
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 mt-0.5 text-seguranca-yellow flex-shrink-0" />
-              <p>Funcionários já cadastrados serão atualizados se houver correspondência por CPF</p>
+              <p>Validação de CPF Único: Se o CPF do funcionário já estiver cadastrado no banco de dados, o sistema <strong>não irá importar</strong> a linha para evitar duplicidade.</p>
             </div>
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 mt-0.5 text-seguranca-yellow flex-shrink-0" />
-              <p>Após a importação, revise os dados cadastrados na lista de funcionários</p>
+              <p>Vínculo de Setor de Trabalho: Se a coluna "Setor de Trabalho" estiver preenchida, o funcionário será associado ao posto/setor correspondente.</p>
             </div>
           </CardContent>
         </Card>

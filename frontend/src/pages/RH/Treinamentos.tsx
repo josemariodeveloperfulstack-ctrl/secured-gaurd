@@ -47,6 +47,8 @@ import {
   Calendar,
   Edit,
   Trash2,
+  Award,
+  FileText,
 } from 'lucide-react';
 
 type CertificationFilter = 'all' | 'dueSoon' | 'expired' | 'compliant';
@@ -112,6 +114,61 @@ const Treinamentos: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [trainingToDelete, setTrainingToDelete] = useState<Training | null>(null);
   const [isDeletingTraining, setIsDeletingTraining] = useState(false);
+
+  const [isNR06ModalOpen, setIsNR06ModalOpen] = useState(false);
+  const [selectedNR06EmployeeId, setSelectedNR06EmployeeId] = useState('');
+  const [isGeneratingNR06, setIsGeneratingNR06] = useState(false);
+  const [downloadingCertId, setDownloadingCertId] = useState<string | null>(null);
+
+  const handleDownloadNR06ByCert = async (cert: EmployeeCertification) => {
+    setDownloadingCertId(cert.id);
+    try {
+      await trainingService.baixarCertificadoNR06(cert.id, cert.employeeName);
+      toast({
+        title: 'Certificado Gerado',
+        description: `Certificado NR-06 gerado em PDF com sucesso para ${cert.employeeName ?? 'colaborador'}.`,
+      });
+    } catch (err: any) {
+      console.error('Erro ao gerar certificado NR-06:', err);
+      toast({
+        title: 'Erro ao gerar certificado',
+        description: 'Não foi possível gerar o PDF do Certificado NR-06.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingCertId(null);
+    }
+  };
+
+  const handleGenerateNR06ByEmployee = async () => {
+    if (!selectedNR06EmployeeId) {
+      toast({
+        title: 'Selecione um funcionário',
+        description: 'Por favor, selecione um colaborador para emitir o certificado.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const emp = employees.find((e) => e.id === selectedNR06EmployeeId);
+    setIsGeneratingNR06(true);
+    try {
+      await trainingService.baixarCertificadoNR06PorFuncionario(selectedNR06EmployeeId, emp?.name);
+      toast({
+        title: 'Certificado NR-06 Emitido',
+        description: `Certificado gerado com sucesso para ${emp?.name ?? 'colaborador'}.`,
+      });
+      setIsNR06ModalOpen(false);
+    } catch (err: any) {
+      console.error('Erro ao gerar certificado NR-06:', err);
+      toast({
+        title: 'Erro ao emitir certificado',
+        description: 'Falha ao conectar com o servidor para emitir o certificado PDF.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingNR06(false);
+    }
+  };
 
   const [trainingForm, setTrainingForm] = useState({
     name: '',
@@ -597,15 +654,26 @@ const Treinamentos: React.FC = () => {
                 Cadastre os cursos exigidos para vigilantes e acompanhe a quantidade de colaboradores cobertos.
               </CardDescription>
             </div>
-            <Button 
-              onClick={openNewTrainingModal} 
-              className="gap-2 w-full sm:w-auto"
-              size="sm"
-            >
-              <GraduationCap className="h-4 w-4" />
-              <span className="hidden sm:inline">Novo treinamento</span>
-              <span className="sm:hidden">Novo</span>
-            </Button>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <Button 
+                variant="outline"
+                size="sm"
+                className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 gap-2 w-full sm:w-auto"
+                onClick={() => setIsNR06ModalOpen(true)}
+              >
+                <Award className="h-4 w-4" />
+                <span>Emitir Certificado NR-06 (PDF)</span>
+              </Button>
+              <Button 
+                onClick={openNewTrainingModal} 
+                className="gap-2 w-full sm:w-auto"
+                size="sm"
+              >
+                <GraduationCap className="h-4 w-4" />
+                <span className="hidden sm:inline">Novo treinamento</span>
+                <span className="sm:hidden">Novo</span>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-6">
             <div className="min-w-full">
@@ -921,20 +989,36 @@ const Treinamentos: React.FC = () => {
                       <td className="py-3 px-2 text-gray-300">{formatDate(cert.expirationDate)}</td>
                       <td className="py-3 px-2">{renderStatusBadge(cert)}</td>
                       <td className="py-3 px-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-gray-600 text-gray-200"
-                          onClick={() => handleRenewCertification(cert)}
-                          disabled={cert.status === 'CANCELLED' || renewingCertificationId === cert.id}
-                        >
-                          {renewingCertificationId === cert.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RefreshCcw className="h-4 w-4" />
-                          )}
-                          <span className="ml-2">Renovar</span>
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-emerald-600/50 text-emerald-400 hover:bg-emerald-600/10 gap-1.5"
+                            onClick={() => handleDownloadNR06ByCert(cert)}
+                            disabled={downloadingCertId === cert.id}
+                          >
+                            {downloadingCertId === cert.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Award className="h-4 w-4" />
+                            )}
+                            <span>Certificado NR-06</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-gray-600 text-gray-200"
+                            onClick={() => handleRenewCertification(cert)}
+                            disabled={cert.status === 'CANCELLED' || renewingCertificationId === cert.id}
+                          >
+                            {renewingCertificationId === cert.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCcw className="h-4 w-4" />
+                            )}
+                            <span className="ml-2">Renovar</span>
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1342,6 +1426,70 @@ const Treinamentos: React.FC = () => {
             >
               {isDeletingTraining && <Loader2 className="h-4 w-4 animate-spin" />}
               Excluir treinamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Emitir Certificado NR-06 */}
+      <Dialog open={isNR06ModalOpen} onOpenChange={setIsNR06ModalOpen}>
+        <DialogContent className="w-[95vw] sm:max-w-md bg-seguranca-black border-gray-700 text-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-lg text-emerald-400 flex items-center gap-2">
+              <Award className="h-5 w-5" />
+              Emitir Certificado NR-06 (PDF)
+            </DialogTitle>
+            <DialogDescription className="text-gray-400 text-sm">
+              Selecione o colaborador para gerar o Certificado de Treinamento NR-06 em 2 páginas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            <div className="space-y-2">
+              <Label className="text-gray-300 font-medium">Colaborador / Vigilante</Label>
+              <Select value={selectedNR06EmployeeId} onValueChange={setSelectedNR06EmployeeId}>
+                <SelectTrigger className="bg-seguranca-graphite border-gray-700 text-white">
+                  <SelectValue placeholder="Selecione um funcionário..." />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-graphite border-gray-700 text-white max-h-60">
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name} {emp.cpf ? `(CPF: ${emp.cpf})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="bg-seguranca-graphite/80 border border-gray-800 rounded-lg p-3 space-y-2 text-xs text-gray-300">
+              <p className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                <Award className="h-4 w-4" /> Detalhes do Certificado Oficial:
+              </p>
+              <p>• <strong>Treinamento:</strong> NR 06 Equipamentos de Proteção Individual e Riscos Ocupacionais (03h)</p>
+              <p>• <strong>Empresa:</strong> Promover Vigilância Patrimonial Ltda</p>
+              <p>• <strong>Data do Certificado:</strong> Data de Admissão do funcionário</p>
+              <p>• <strong>Formato:</strong> PDF oficial em 2 páginas (Frente + Conteúdo Programático)</p>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-gray-600 text-gray-200 w-full sm:w-auto"
+              onClick={() => setIsNR06ModalOpen(false)}
+              disabled={isGeneratingNR06}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="gap-2 w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white"
+              onClick={handleGenerateNR06ByEmployee}
+              disabled={isGeneratingNR06 || !selectedNR06EmployeeId}
+            >
+              {isGeneratingNR06 ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
+              Gerar Certificado PDF
             </Button>
           </DialogFooter>
         </DialogContent>

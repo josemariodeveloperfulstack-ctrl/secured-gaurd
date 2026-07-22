@@ -17,13 +17,15 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.SafetyEngineerRepository;
 
 class StandardReportLayoutPageNumberTest {
 
     @Test
     void stampPageNumbersOnPdf_shouldIncludePaginaText() throws Exception {
         StandardReportLayoutService service = new StandardReportLayoutService(
-                Mockito.mock(CompanyRepository.class));
+                Mockito.mock(CompanyRepository.class),
+                Mockito.mock(SafetyEngineerRepository.class));
 
         byte[] rawPdf;
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {

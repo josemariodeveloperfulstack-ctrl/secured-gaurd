@@ -286,6 +286,8 @@ public class EmployeeReportPdfService {
             case "fatherName" -> "Nome Pai";
             case "escalaTrabalho" -> "Escala";
             case "horarioTrabalho" -> "Horário";
+            case "bankAccount" -> "Conta Bancária";
+            case "pixKey" -> "Chave PIX";
             default -> key;
         };
     }
@@ -326,12 +328,34 @@ public class EmployeeReportPdfService {
             case "fatherName" -> emp.getNomePai();
             case "escalaTrabalho" -> emp.getEscalaTrabalho();
             case "horarioTrabalho" -> emp.getHorarioTrabalho();
+            case "bankAccount" -> resolveBankAccount(emp);
+            case "pixKey" -> emp.getPixKey();
             default -> null;
         };
         if (val == null || Objects.toString(val).isBlank()) {
             return "workPost".equals(key) ? "Não alocado" : "-";
         }
         return Objects.toString(val);
+    }
+
+    private String resolveBankAccount(Employee emp) {
+        if (emp == null) return "";
+        StringBuilder sb = new StringBuilder();
+        if (emp.getBanco() != null && !emp.getBanco().isBlank()) {
+            sb.append(emp.getBanco());
+        }
+        if (emp.getAgencia() != null && !emp.getAgencia().isBlank()) {
+            if (sb.length() > 0) sb.append(" | ");
+            sb.append("Ag: ").append(emp.getAgencia());
+        }
+        if (emp.getContaCorrente() != null && !emp.getContaCorrente().isBlank()) {
+            if (sb.length() > 0) sb.append(" | ");
+            sb.append("Cc: ").append(emp.getContaCorrente());
+            if (emp.getContaDigito() != null && !emp.getContaDigito().isBlank()) {
+                sb.append("-").append(emp.getContaDigito());
+            }
+        }
+        return sb.toString();
     }
 
     private String resolveWorkPostName(Employee employee) {

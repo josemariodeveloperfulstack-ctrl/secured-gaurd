@@ -45,9 +45,13 @@ public class EmployeeImportRowService {
             Company company,
             boolean[] isNewRef) {
 
-        Optional<Employee> existing = employeeRepository.findByDocument(cpf);
-        Employee emp = existing.orElseGet(Employee::new);
-        isNewRef[0] = existing.isEmpty();
+        // Garantir proteção total: se o funcionário já existir no banco, cancela para NUNCA alterar registros existentes
+        if (employeeRepository.existsByNormalizedDocument(cpf)) {
+            throw new IllegalStateException("Funcionário com CPF " + cpf + " já existe na base de dados. O cadastro existente foi preservado sem alterações.");
+        }
+
+        Employee emp = new Employee();
+        isNewRef[0] = true;
 
         emp.setName(truncate(nome != null ? nome.trim().toUpperCase() : null, 500));
         emp.setDocument(truncate(cpf, 14));

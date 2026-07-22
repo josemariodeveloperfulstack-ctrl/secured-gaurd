@@ -18,6 +18,8 @@ import com.z7design.secured_guard.model.enums.CertificationStatus;
 import com.z7design.secured_guard.repository.EmployeeCertificationRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.TrainingRepository;
+import com.z7design.secured_guard.repository.SSTTrainingRepository;
+import com.z7design.secured_guard.model.SSTTraining;
 
 import lombok.RequiredArgsConstructor;
 
@@ -28,6 +30,7 @@ public class EmployeeCertificationService {
     private final EmployeeCertificationRepository certificationRepository;
     private final EmployeeRepository employeeRepository;
     private final TrainingRepository trainingRepository;
+    private final SSTTrainingRepository sstTrainingRepository;
     private final com.z7design.secured_guard.repository.WorkPostRepository workPostRepository;
 
     @Transactional
@@ -36,8 +39,27 @@ public class EmployeeCertificationService {
         Employee employee = employeeRepository.findById(request.getEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado"));
 
-        Training training = trainingRepository.findById(request.getTrainingId())
-                .orElseThrow(() -> new ResourceNotFoundException("Treinamento não encontrado"));
+        Training training = trainingRepository.findById(request.getTrainingId()).orElse(null);
+        if (training == null) {
+            // Fallback para sst_trainings se o treinamento for do módulo SST
+            SSTTraining sst = sstTrainingRepository.findById(request.getTrainingId()).orElse(null);
+            if (sst != null) {
+                training = Training.builder()
+                        .id(sst.getId())
+                        .name(sst.getName())
+                        .description(sst.getDescription())
+                        .provider(sst.getProvider() != null && !sst.getProvider().isBlank() ? sst.getProvider() : "Promover Serviços")
+                        .duration(sst.getDurationHours() != null ? sst.getDurationHours() : 8)
+                        .renewalPeriodMonths(sst.getValidityMonths() != null ? sst.getValidityMonths() : 12)
+                        .mandatoryForGuards(Boolean.TRUE)
+                        .build();
+                training = trainingRepository.save(training);
+            }
+        }
+
+        if (training == null) {
+            throw new ResourceNotFoundException("Treinamento não encontrado");
+        }
 
         // Buscar WorkPost se fornecido (por ID ou nome)
         com.z7design.secured_guard.model.WorkPost workPost = null;
@@ -194,12 +216,23 @@ public class EmployeeCertificationService {
 
     @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findAll() {
-        List<EmployeeCertification> entities = certificationRepository.findAllWithDetails();
-        System.out
-                .println("📋 EmployeeCertificationService.findAll - Entidades encontradas no Repo: " + entities.size());
-        List<EmployeeCertificationResponse> responses = convertToResponse(entities);
-        System.out.println("📋 EmployeeCertificationService.findAll - Responses convertidas: " + responses.size());
-        return responses;
+        try {
+            List<EmployeeCertification> entities = certificationRepository.findAllWithDetails();
+            System.out.println("📋 EmployeeCertificationService.findAll - Entidades encontradas no Repo: " + entities.size());
+            List<EmployeeCertificationResponse> responses = convertToResponse(entities);
+            System.out.println("📋 EmployeeCertificationService.findAll - Responses convertidas: " + responses.size());
+            return responses;
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeCertificationService.findAll - Erro ao buscar certificações com detalhes: " + e.getMessage());
+            e.printStackTrace();
+            try {
+                List<EmployeeCertification> fallbackEntities = certificationRepository.findAll();
+                return convertToResponse(fallbackEntities);
+            } catch (Exception ex) {
+                System.err.println("❌ EmployeeCertificationService.findAll - Fallback também falhou: " + ex.getMessage());
+                return List.of();
+            }
+        }
     }
 
     private List<EmployeeCertificationResponse> convertToResponse(List<EmployeeCertification> entities) {

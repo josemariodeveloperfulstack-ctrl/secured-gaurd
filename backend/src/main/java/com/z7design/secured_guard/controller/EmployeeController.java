@@ -31,6 +31,9 @@ import java.time.LocalDate;
 
 import com.z7design.secured_guard.service.EmployeeExcelImportService;
 import com.z7design.secured_guard.service.EmployeeImportService;
+import com.z7design.secured_guard.service.EmployeeImportExcelCustomService;
+import com.z7design.secured_guard.service.ImportService;
+import com.z7design.secured_guard.dto.ImportResultDto;
 
 import com.z7design.secured_guard.dto.EmployeeChangeHistoryDTO;
 import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
@@ -64,6 +67,8 @@ public class EmployeeController {
     private final EmployeeChangeHistoryService employeeChangeHistoryService;
     private final EmployeeEmploymentPeriodService employmentPeriodService;
     private final DocumentoGeradoPersistenceService documentoGeradoPersistenceService;
+    private final EmployeeImportExcelCustomService employeeImportExcelCustomService;
+    private final ImportService importService;
 
     @GetMapping("/count")
     @Operation(summary = "Contar funcionários", description = "Retorna o número total de funcionários")
@@ -1315,5 +1320,61 @@ public class EmployeeController {
             workPost.put("orphanWorkPost", Boolean.TRUE);
         }
         employee.put("workPost", workPost);
+    }
+
+    /**
+     * 📥 Importar funcionários via WhatsApp (PDF) ou planilha Excel
+     */
+    @PostMapping("/import/whatsapp-pdf")
+    @Operation(summary = "Importar funcionários via WhatsApp (PDF) ou Excel", description = "Importa dados de funcionários a partir de conversa do WhatsApp (PDF) ou planilha Excel customizada.")
+    @PreAuthorize("hasAnyAuthority('RH_FUNCIONARIOS_CREATE', 'SUPER_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<Map<String, Object>> importEmployeesCustom(@RequestParam("file") MultipartFile file) {
+        try {
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Arquivo vazio"));
+            }
+
+            String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+
+            if (filename.endsWith(".pdf")) {
+                System.out.println("📥 Importando conversa do WhatsApp (PDF): " + file.getOriginalFilename());
+                ImportResultDto pdfResult = importService.importPdf(file);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", String.format("Importação de PDF concluída: %d processados, %d atualizados, %d pulados.",
+                        pdfResult.getTotalRows(), pdfResult.getUpdated(), pdfResult.getSkipped()));
+                response.put("totalProcessed", pdfResult.getTotalRows());
+                response.put("totalSuccess", pdfResult.getInserted() + pdfResult.getUpdated());
+                response.put("totalErrors", pdfResult.getSkipped());
+                response.put("errors", pdfResult.getErrors());
+                return ResponseEntity.ok(response);
+            } else if (filename.endsWith(".xlsx") || filename.endsWith(".xls")) {
+                System.out.println("📥 Importando planilha Excel customizada: " + file.getOriginalFilename());
+                EmployeeImportExcelCustomService.CustomImportResult excelResult = employeeImportExcelCustomService.importarPlanilhaCustom(file);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", excelResult.erros() == 0 || excelResult.criados() > 0);
+                response.put("message", String.format("Importação de Excel concluída: %d total processado, %d cadastrados, %d não importados/erros.",
+                        excelResult.total(), excelResult.criados(), excelResult.erros()));
+                response.put("totalProcessed", excelResult.total());
+                response.put("totalSuccess", excelResult.criados());
+                response.put("totalErrors", excelResult.erros());
+                response.put("errors", excelResult.mensagens());
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Formato de arquivo não suportado. Envie apenas uma planilha Excel (.xlsx, .xls)"));
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ importEmployeesCustom - Erro: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Erro ao processar importação: " + e.getMessage(),
+                    "errors", List.of(e.getMessage())));
+        }
     }
 }

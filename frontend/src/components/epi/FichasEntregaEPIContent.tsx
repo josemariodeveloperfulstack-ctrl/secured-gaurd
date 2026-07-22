@@ -45,6 +45,7 @@ import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import FichaEntregaEPIForm from '@/components/funcionarios/FichaEntregaEPIForm';
+import FichaEntregaEPIManualForm from '@/components/funcionarios/FichaEntregaEPIManualForm';
 import EPIDeliveryReportModal from './EPIDeliveryReportModal';
 
 const DELIVERY_TYPE_LABELS: Record<string, string> = {
@@ -82,6 +83,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
   const [selectedFicha, setSelectedFicha] = useState<EPIDeliveryForm | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
+  const [manualBlankPdfModalOpen, setManualBlankPdfModalOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
@@ -298,6 +300,15 @@ export const FichasEntregaEPIContent: React.FC = () => {
                   >
                     <Plus className="h-4 w-4" />
                     Nova Entrega Manual
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setManualBlankPdfModalOpen(true)}
+                    className="flex items-center gap-2 border-emerald-500/50 text-emerald-400 hover:bg-emerald-950/40"
+                  >
+                    <FileDown className="h-4 w-4 text-emerald-400" />
+                    Ficha Manual (PDF)
                   </Button>
                   <Button
                     variant="outline"
@@ -687,6 +698,25 @@ export const FichasEntregaEPIContent: React.FC = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        {/* Modal de Geração de Ficha de EPI Manual (PDF) */}
+        <Dialog open={manualBlankPdfModalOpen} onOpenChange={setManualBlankPdfModalOpen}>
+          <DialogContent className="max-w-2xl bg-seguranca-graphite border-gray-700 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-seguranca-yellow flex items-center gap-2">
+                <FileDown className="h-5 w-5 text-seguranca-yellow" />
+                Gerar Ficha de Entrega de EPI em Branco (PDF)
+              </DialogTitle>
+              <DialogDescription className="text-gray-300 text-sm">
+                Selecione a empresa para gerar a ficha oficial de entrega de EPI em PDF para impressão e preenchimento manual no papel.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-2">
+              <FichaEntregaEPIManualForm />
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <EPIDeliveryReportModal 
           isOpen={reportModalOpen}
           onClose={() => setReportModalOpen(false)}

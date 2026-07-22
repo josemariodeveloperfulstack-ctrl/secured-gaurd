@@ -273,33 +273,36 @@ Riscos de Acidentes: Quedas em piso escorregadio.`,
   {
     id: 'vigilante',
     layoutType: 'STANDARD_NR01',
-    matchKeywords: ['VIGILANTE', 'VIGILÂNCIA', 'VIGILANTE PATRIMONIAL', 'VIGILANTE FERISTA'],
-    label: 'Vigilante',
+    matchKeywords: ['VIGILANTE', 'VIGILÂNCIA', 'VIGILANTE PATRIMONIAL', 'VIGILANTE FERISTA', 'VIG'],
+    label: 'Vigilante (VIG)',
     responsibility: 'VIGILÂNCIA PATRIMONIAL',
     employeeObligations:
-      'Comunicar todas as condições inseguras presentes no ambiente ao supervisor imediato.\n' +
-      'Cumprir leis e normas expedidas pelo empregador, inclusive esta ordem de serviço.\n' +
-      'Executar as tarefas que lhe forem delegadas pelo superior respectivo para execução da mesma.\n' +
-      'Manter a ordem, disciplina, higiene e segurança no trabalho.\n' +
-      'Participar de treinamentos relacionados à segurança e saúde ocupacional.\n' +
-      'Usar obrigatoriamente os Equipamentos de Proteção Individual indicados para a função.\n' +
-      'Colaborar com a empresa na aplicação das Normas Regulamentadoras, do PGR e do PCMSO.\n' +
-      'É responsabilidade do empregado usar, guardar, conservar e comunicar ao empregador qualquer alteração que torne impróprio o uso do Equipamento de Proteção Individual.',
+      'Comunicar todas as condições inseguras presentes no ambiente ao supervisor imediato;\n' +
+      'Cumprir todas as normas expedidas pelo Empregador, inclusive esta ordem de serviço;\n' +
+      'Executar as tarefas que lhe forem delegadas após treinamento específico para execução da mesma;\n' +
+      'Manter a ordem, disciplina, higiene e segurança no trabalho;\n' +
+      'Participar de treinamentos relacionados à segurança e saúde ocupacional;\n' +
+      'Usar obrigatoriamente os Equipamentos de Proteção Individual indicado para a função;\n' +
+      'Colaborar com a empresa na aplicação das Normas Regulamentadoras – NR\'s (PGR – PCMSO);\n' +
+      'É responsabilidade do empregado usar, guardar, conservar, e comunicar ao empregador qualquer alteração que torne impróprio o uso do Equipamento de Proteção Individual.\n' +
+      'É vedado o uso de máquinas fotográficas, tablets, celulares, etc. (de uso pessoal).',
     uniformSectionTitle: 'EPI DE USO OBRIGATÓRIO',
     activities:
-      'VIGILANTE PATRIMONIAL - CBO: 517330\n\n' +
-      'Vigiam dependências com a finalidade de prevenir, controlar e combater delitos como porte ilícito de armas e munições, assaltos e outras irregularidades; zelam pela segurança das pessoas, do patrimônio e pelo cumprimento das leis e regulamentos; recepcionam e controlam a movimentação de pessoas em áreas de acesso livre e restrito; fiscalizam pessoas, cargas e patrimônio; escoltam pessoas e mercadorias; controlam objetos e cargas; comunicam-se via rádio ou telefone e registram ocorrências em livro, sistema ou meios próprios do posto. Executam outras atividades correlatas à função.',
+      'Vigilante Patrimonial - CBO: 517330\n\n' +
+      'Vigiam dependências com a finalidade de prevenir, controlar e combater delitos como porte indevido de armas e munições e outras irregularidades; zelam pela segurança das pessoas, do patrimônio e pelo cumprimento das leis e regulamentos; recepcionam e controlam a movimentação de pessoas em áreas de acesso livre e restrito; fiscalizam pessoas, cargas e patrimônio; escoltam pessoas e mercadorias. Controlam objetos e cargas; vigilam parques e reservas florestais, combatendo inclusive focos de incêndio. Comunicam-se através de rádio ou telefone e prestam informações ao público e aos órgãos competentes..',
     risks:
-      'Ergonômico: Postura inadequada.\n' +
-      'Físico: Ruído; Monotonia; Agressão; Batidas contra; Queda do mesmo nível; Disparo acidental; Radiação não-ionizante.',
+      'Ergonômicos: Posturas Inadequadas;\n' +
+      'Físicos: Ruído; Monotonia e Agressão; Batidas contra; Queda do mesmo nível; Disparo acidental; Radiação não-ionizante.',
     preventiveMeasures:
-      '- Treinamento introdutório.\n- Adoção de medidas de proteção em ordem: coletivas e individuais.',
+      '- Treinamento introdutório.\n' +
+      '- Adoção de medidas de proteção em ordem: coletivas e individuais.',
     uniform:
-      '- Calçado de segurança (coturno).\n- Uniforme completo (camisa, calça, boné, colete e cinto).\n- Crachá.',
+      '- Calçado de Segurança (Coturno)\n' +
+      '- Uniforme completo (Camisa, Calça, Jaqueta, Colete e Cinto)',
     mandatoryTrainings:
-      '- Treinamento de Ambientação de Segurança do Trabalho.\n' +
-      '- DSS – Diálogo de Segurança e Saúde Ocupacional.\n' +
-      "- Treinamento sobre aspectos legais e técnicos no uso e conservação de EPI's.",
+      '- Treinamento de Ambientação de Segurança do Trabalho;\n' +
+      '- DSS – Diálogo de Segurança e Saúde Ocupacional;\n' +
+      '- Treinamento sobre aspectos legais e técnicos no uso e conservação de EPIs.',
   },
 ];
 

@@ -218,8 +218,9 @@ public class EmployeeExcelImportService {
                 return importFromCsv(file.getInputStream(), result);
             }
 
-            // Ler planilha Excel
-            Workbook workbook = WorkbookFactory.create(file.getInputStream());
+            // Ler planilha Excel (.xlsx ou .xls)
+            InputStream is = new java.io.BufferedInputStream(file.getInputStream());
+            Workbook workbook = WorkbookFactory.create(is);
             Sheet sheet = workbook.getSheetAt(0); // Primeira aba
 
             if (sheet == null || sheet.getPhysicalNumberOfRows() < 2) {
@@ -383,8 +384,7 @@ public class EmployeeExcelImportService {
                         continue;
                     }
 
-                    // Análise: se já existir no banco (por CPF ou matrícula eSocial), apenas
-                    // atualiza
+                    // Análise: se já existir no banco (por CPF ou matrícula eSocial), NÃO IMPORTE
                     String normalizedCpf = employeeDTO.getCpf().replaceAll("[^0-9]", "");
                     Optional<Employee> existingEmployee = employeeService.findByCpfExact(normalizedCpf);
 
@@ -392,19 +392,14 @@ public class EmployeeExcelImportService {
                             && !employeeDTO.getMatriculaEsocial().trim().isEmpty()) {
                         existingEmployee = employeeService
                                 .findByMatriculaEsocial(employeeDTO.getMatriculaEsocial().trim());
-                        if (existingEmployee.isPresent()) {
-                            log.info("📋 Funcionário encontrado por matrícula eSocial: {}. Atualizando...",
-                                    employeeDTO.getMatriculaEsocial());
-                        }
                     }
 
                     if (existingEmployee.isPresent()) {
-                        log.info(
-                                "✅ Funcionário já existe (CPF: {}). Atualizando com dados da planilha (setor, empresa, etc.).",
+                        log.warn(
+                                "⚠️ Funcionário com CPF/Matrícula já existe na base (CPF: {}). Registro não importado.",
                                 normalizedCpf);
-                        employeeDTO.setId(existingEmployee.get().getId());
-                        employeeService.update(existingEmployee.get().getId(), employeeDTO);
-                        result.incrementUpdated();
+                        result.addWarning("Linha " + (rowIndex + 1) + " (Funcionário: " + employeeDTO.getName() + "): CPF/Matrícula já cadastrado na base de dados - registro não importado.");
+                        result.addError("Linha " + (rowIndex + 1) + ": CPF " + normalizedCpf + " já cadastrado.");
                     } else {
                         employeeService.create(employeeDTO);
                         result.incrementCreated();

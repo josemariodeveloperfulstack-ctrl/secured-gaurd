@@ -89,6 +89,8 @@ const REPORT_COLUMNS: { key: string; label: string }[] = [
     { key: 'fatherName', label: 'Nome Pai' },
     { key: 'escalaTrabalho', label: 'Escala' },
     { key: 'horarioTrabalho', label: 'Horário' },
+    { key: 'bankAccount', label: 'Conta Bancária' },
+    { key: 'pixKey', label: 'Chave PIX' },
 ];
 
 const DEFAULT_PDF_COLUMNS = ['name', 'registrationNumber', 'position', 'workPost', 'company', 'status'];
@@ -522,6 +524,19 @@ export function RelatoriosModal({
                 if (columnsToUse.includes('fatherName')) row['Nome Pai'] = emp.fatherName || emp.nomePai || '';
                 if (columnsToUse.includes('escalaTrabalho')) row['Escala'] = emp.escalaTrabalho || '';
                 if (columnsToUse.includes('horarioTrabalho')) row['Horário'] = emp.horarioTrabalho || '';
+                if (columnsToUse.includes('bankAccount')) {
+                    const bName = emp.banco || emp.bankName || emp.bancoNome || '';
+                    const ag = emp.agencia || emp.bankAgency || '';
+                    const cc = emp.contaCorrente || emp.conta || '';
+                    const dig = emp.contaDigito || '';
+                    const fullAccount = cc ? (dig ? `${cc}-${dig}` : cc) : '';
+                    row['Conta Bancária'] = [bName, ag ? `Ag: ${ag}` : '', fullAccount ? `Cc: ${fullAccount}` : ''].filter(Boolean).join(' | ') || (emp.dadosBancarios || '');
+                }
+                if (columnsToUse.includes('pixKey')) {
+                    const key = emp.pixKey || emp.chavePix || '';
+                    const type = emp.accountType || emp.tipoChavePix || '';
+                    row['Chave PIX'] = type ? `${type}: ${key}` : key;
+                }
 
                 return row;
             }, 100);

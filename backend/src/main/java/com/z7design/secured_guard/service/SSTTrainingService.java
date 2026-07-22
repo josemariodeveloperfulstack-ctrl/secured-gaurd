@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 public class SSTTrainingService {
 
     private final SSTTrainingRepository trainingRepository;
+    private final com.z7design.secured_guard.repository.TrainingRepository coreTrainingRepository;
     private final TrainingParticipationRepository participationRepository;
     private final SSTAlertService alertService;
 
@@ -39,7 +40,9 @@ public class SSTTrainingService {
      */
     public SSTTraining createTraining(SSTTraining training) {
         log.info("Criando treinamento: {}", training.getName());
-        return trainingRepository.save(training);
+        SSTTraining saved = trainingRepository.save(training);
+        syncCoreTraining(saved);
+        return saved;
     }
 
     /**
@@ -58,7 +61,30 @@ public class SSTTrainingService {
                 .isActive(dto.getIsActive() != null ? dto.getIsActive() : true)
                 .requiredForRisks(dto.getRequiredForRisks())
                 .build();
-        return trainingRepository.save(training);
+        SSTTraining saved = trainingRepository.save(training);
+        syncCoreTraining(saved);
+        return saved;
+    }
+
+    private void syncCoreTraining(SSTTraining sst) {
+        if (sst == null || sst.getId() == null) return;
+        try {
+            com.z7design.secured_guard.model.Training core = coreTrainingRepository.findById(sst.getId()).orElse(null);
+            if (core == null) {
+                core = com.z7design.secured_guard.model.Training.builder()
+                        .id(sst.getId())
+                        .name(sst.getName())
+                        .description(sst.getDescription())
+                        .provider(sst.getProvider() != null && !sst.getProvider().isBlank() ? sst.getProvider() : "Promover Serviços")
+                        .duration(sst.getDurationHours() != null ? sst.getDurationHours() : 8)
+                        .renewalPeriodMonths(sst.getValidityMonths() != null ? sst.getValidityMonths() : 12)
+                        .mandatoryForGuards(Boolean.TRUE)
+                        .build();
+                coreTrainingRepository.save(core);
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao sincronizar treinamento core para SST: {}", e.getMessage());
+        }
     }
 
     /**

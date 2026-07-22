@@ -25,14 +25,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Configuração de Cache usando Redis
+ * Configuracao de Cache usando Redis
  * 
- * Estratégia de Cache:
- * - Dashboard/Estatísticas: 5 minutos (dados atualizados frequentemente)
+ * Estrategia de Cache:
+ * - Dashboard/Estatisticas: 5 minutos (dados atualizados frequentemente)
  * - Entidades principais (Employees, Vehicles, etc.): 30 minutos
  * - Listas/Combos (Departments, Units, etc.): 1 hora (dados raramente mudam)
- * - Configurações: 24 horas (dados quase estáticos)
- * - Relatórios: 2 horas (dados processados)
+ * - Configuracoes: 24 horas (dados quase estaticos)
+ * - Relatorios: 2 horas (dados processados)
  */
 @Configuration
 @EnableCaching
@@ -44,23 +44,23 @@ public class RedisCacheConfig {
 
     /**
      * Configura ObjectMapper com suporte a Java 8 date/time types (LocalDate, LocalDateTime, etc.)
-     * e com tratamento de referências circulares
+     * e com tratamento de referencias circulares
      */
     private ObjectMapper createObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
-        // Registrar módulo JSR310 para suporte a LocalDate, LocalDateTime, etc.
+        // Registrar modulo JSR310 para suporte a LocalDate, LocalDateTime, etc.
         mapper.registerModule(new JavaTimeModule());
         
-        // Configurações de serialização
+        // Configuracoes de serializacao
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         mapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
         
-        // Configurações de deserialização
+        // Configuracoes de deserializacao
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         mapper.configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true);
         
-        // Habilitar suporte a anotações (@JsonIgnore, @JsonIgnoreProperties, etc.)
+        // Habilitar suporte a anotacoes (@JsonIgnore, @JsonIgnoreProperties, etc.)
         mapper.configure(MapperFeature.USE_ANNOTATIONS, true);
         
         // Configurar para tratar proxies do Hibernate
@@ -78,7 +78,7 @@ public class RedisCacheConfig {
     }
 
     /**
-     * Configuração padrão do cache Redis
+     * Configuracao padrao do cache Redis
      */
     @Bean
     @Primary
@@ -86,19 +86,19 @@ public class RedisCacheConfig {
         // Criar serializer com suporte a LocalDate e outros tipos Java 8
         GenericJackson2JsonRedisSerializer jsonSerializer = createJsonSerializer();
         
-        // Configuração padrão
+        // Configuracao padrao
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofSeconds(defaultTtlSeconds))
                 .serializeKeysWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(jsonSerializer))
-                .disableCachingNullValues(); // Não cachear valores null
+                .disableCachingNullValues(); // Nao cachear valores null
 
-        // Configurações específicas por tipo de cache
+        // Configuracoes especificas por tipo de cache
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
 
-        // ===== DASHBOARD E ESTATÍSTICAS (5 minutos) =====
+        // ===== DASHBOARD E ESTATISTICAS (5 minutos) =====
         cacheConfigurations.put("dashboard", defaultConfig.entryTtl(Duration.ofMinutes(5)));
         cacheConfigurations.put("dashboard-summary", defaultConfig.entryTtl(Duration.ofMinutes(5)));
         cacheConfigurations.put("dashboard-stats", defaultConfig.entryTtl(Duration.ofMinutes(5)));
@@ -127,18 +127,18 @@ public class RedisCacheConfig {
         cacheConfigurations.put("categories", defaultConfig.entryTtl(Duration.ofHours(1)));
         cacheConfigurations.put("distinct-values", defaultConfig.entryTtl(Duration.ofHours(1)));
 
-        // ===== CONFIGURAÇÕES (24 horas) =====
+        // ===== CONFIGURACOES (24 horas) =====
         cacheConfigurations.put("config", defaultConfig.entryTtl(Duration.ofHours(24)));
         cacheConfigurations.put("security-settings", defaultConfig.entryTtl(Duration.ofHours(24)));
         cacheConfigurations.put("notification-settings", defaultConfig.entryTtl(Duration.ofHours(24)));
         cacheConfigurations.put("company-settings", defaultConfig.entryTtl(Duration.ofHours(24)));
 
-        // ===== RELATÓRIOS (2 horas) =====
+        // ===== RELATORIOS (2 horas) =====
         cacheConfigurations.put("reports", defaultConfig.entryTtl(Duration.ofHours(2)));
         cacheConfigurations.put("fuel-reports", defaultConfig.entryTtl(Duration.ofHours(2)));
         cacheConfigurations.put("vehicle-reports", defaultConfig.entryTtl(Duration.ofHours(2)));
 
-        // ===== DADOS TEMPORÁRIOS (15 minutos) =====
+        // ===== DADOS TEMPORARIOS (15 minutos) =====
         cacheConfigurations.put("sessions", defaultConfig.entryTtl(Duration.ofMinutes(15)));
         cacheConfigurations.put("temp-data", defaultConfig.entryTtl(Duration.ofMinutes(15)));
 

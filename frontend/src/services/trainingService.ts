@@ -140,6 +140,38 @@ class TrainingService {
   async deleteEmployeeCertification(id: string): Promise<void> {
     await api.delete(`/employee-certifications/${id}`);
   }
+
+  async baixarCertificadoNR06(certificationId: string, employeeName?: string): Promise<void> {
+    const response = await api.get(`/employee-certifications/${certificationId}/nr06-pdf`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const nameStr = employeeName ? employeeName.replace(/[^a-zA-Z0-9]/g, '_') : certificationId;
+    link.setAttribute('download', `Certificado_NR06_${nameStr}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  }
+
+  async baixarCertificadoNR06PorFuncionario(employeeId: string, employeeName?: string): Promise<void> {
+    const response = await api.get(`/employee-certifications/employee/${employeeId}/nr06-pdf`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const nameStr = employeeName ? employeeName.replace(/[^a-zA-Z0-9]/g, '_') : employeeId;
+    link.setAttribute('download', `Certificado_NR06_${nameStr}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  }
 }
 
 export const trainingService = new TrainingService();

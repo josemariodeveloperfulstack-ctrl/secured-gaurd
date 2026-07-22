@@ -319,7 +319,7 @@ const sistemaMenuItems = [
   { icon: UserCog, text: 'Usuários', to: '/usuarios', id: 'usuarios' },
   { icon: UserCheck, text: 'Grupos', to: '/grupos', id: 'grupos' },
   { icon: MessageCircle, text: 'Conexão WhatsApp', to: '/whatsapp-connection', id: 'whatsapp-connection' },
-  { icon: Upload, text: 'Importar WhatsApp (PDF)', to: '/sistema/importar-whatsapp', id: 'sistema-importar-whatsapp' },
+  { icon: Upload, text: 'Importar Excel (Funcionários)', to: '/sistema/importar-whatsapp', id: 'sistema-importar-whatsapp' },
   { icon: Settings, text: 'Gestão de Atividades', to: '/atividades', id: 'atividades' },
   { icon: Shield, text: 'Sistema', to: '/sistema', id: 'sistema' },
   { icon: Database, text: 'Backup', to: '/configuracoes/backup', id: 'backup' },

@@ -66,6 +66,7 @@ public class EmployeeCertificationController {
 
     private final EmployeeCertificationService certificationService;
     private final TrainingListStandardPdfService trainingListPdfService;
+    private final com.z7design.secured_guard.service.NR06CertificatePdfService nr06CertificatePdfService;
     private final AuthenticatedCpfResolver authenticatedCpfResolver;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
@@ -142,6 +143,38 @@ public class EmployeeCertificationController {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDispositionFormData("attachment", "lista-treinamentos.pdf");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(pdf);
+    }
+
+    @Operation(summary = "Gera Certificado NR-06 em PDF para a certificação")
+    @GetMapping("/{id}/nr06-pdf")
+    public ResponseEntity<byte[]> generateNr06PdfByCertification(@PathVariable UUID id) {
+        EmployeeCertification cert = certificationService.findById(id);
+        if (cert == null || cert.getEmployee() == null) {
+            return ResponseEntity.notFound().build();
+        }
+        byte[] pdf = nr06CertificatePdfService.generateCertificatePdf(cert.getEmployee());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "certificado-nr06-" + cert.getEmployee().getName().replaceAll("[^a-zA-Z0-9]", "_") + ".pdf");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(pdf);
+    }
+
+    @Operation(summary = "Gera Certificado NR-06 em PDF pelo ID do funcionário")
+    @GetMapping("/employee/{employeeId}/nr06-pdf")
+    public ResponseEntity<byte[]> generateNr06PdfByEmployee(@PathVariable UUID employeeId) {
+        byte[] pdf = nr06CertificatePdfService.generateCertificatePdf(employeeId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "certificado-nr06-" + employeeId + ".pdf");
 
         return ResponseEntity.ok()
                 .headers(headers)

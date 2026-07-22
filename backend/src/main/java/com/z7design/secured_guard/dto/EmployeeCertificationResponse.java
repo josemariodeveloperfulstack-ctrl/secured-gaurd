@@ -85,6 +85,32 @@ public record EmployeeCertificationResponse(
             }
         }
 
+        UUID trainingId = null;
+        String trainingName = null;
+        Integer renewalPeriodMonths = null;
+        try {
+            var training = certification.getTraining();
+            if (training != null) {
+                trainingId = training.getId();
+                trainingName = training.getName();
+                renewalPeriodMonths = training.getRenewalPeriodMonths();
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Erro ao acessar dados do treinamento para certificação: " + certification.getId());
+        }
+
+        UUID workPostId = null;
+        String workPostName = null;
+        try {
+            var workPost = certification.getWorkPost();
+            if (workPost != null) {
+                workPostId = workPost.getId();
+                workPostName = workPost.getName();
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Erro ao acessar dados do posto para certificação: " + certification.getId());
+        }
+
         return EmployeeCertificationResponse.builder()
                 .id(certification.getId())
                 .employeeId(employee != null ? employee.getId() : null)
@@ -93,13 +119,11 @@ public record EmployeeCertificationResponse(
                 .employeePosition(positionName)
                 .employeeDepartment(departmentName)
                 .employeeHireDate(employeeHireDate)
-                .trainingId(certification.getTraining() != null ? certification.getTraining().getId() : null)
-                .trainingName(certification.getTraining() != null ? certification.getTraining().getName() : null)
-                .renewalPeriodMonths(
-                        certification.getTraining() != null ? certification.getTraining().getRenewalPeriodMonths()
-                                : null)
-                .workPostId(certification.getWorkPost() != null ? certification.getWorkPost().getId() : null)
-                .workPostName(certification.getWorkPost() != null ? certification.getWorkPost().getName() : null)
+                .trainingId(trainingId)
+                .trainingName(trainingName)
+                .renewalPeriodMonths(renewalPeriodMonths)
+                .workPostId(workPostId)
+                .workPostName(workPostName)
                 .certificationNumber(certification.getCertificationNumber())
                 .issueDate(certification.getIssueDate())
                 .expirationDate(certification.getExpirationDate())

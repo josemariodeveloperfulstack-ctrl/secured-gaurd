@@ -25,11 +25,19 @@ import {
   Loader2,
   Building2,
   Users as UsersIcon,
-  Eye
+  Eye,
+  Award,
+  UserPlus,
+  FileCheck
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { sstService, SSTTraining, CreateSSTTrainingDTO } from '@/services/sstService';
+import { trainingService, EmployeeCertification } from '@/services/trainingService';
+import { employeeService } from '@/services/employeeService';
+import { Employee } from '@/types/employee';
+import api from '@/lib/axios';
 import TrainingFormModal from '@/components/sst/TrainingFormModal';
 
 const SSTTreinamentos: React.FC = () => {
@@ -46,6 +54,114 @@ const SSTTreinamentos: React.FC = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTraining, setSelectedTraining] = useState<SSTTraining | null>(null);
+
+  // Estados para Modal de Participantes
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [participantsTraining, setParticipantsTraining] = useState<SSTTraining | null>(null);
+  const [participants, setParticipants] = useState<EmployeeCertification[]>([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [employeesList, setEmployeesList] = useState<Employee[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isAddingParticipant, setIsAddingParticipant] = useState(false);
+  const [isDownloadingCertId, setIsDownloadingCertId] = useState<string | null>(null);
+
+  const handleOpenParticipantsModal = async (training: SSTTraining) => {
+    setParticipantsTraining(training);
+    setShowParticipantsModal(true);
+    setLoadingParticipants(true);
+    try {
+      const [certList, empList] = await Promise.all([
+        trainingService.getEmployeeCertifications({ trainingId: training.id }),
+        employeeService.getEmployees({ pageSize: 500 }).catch(() => [])
+      ]);
+      setParticipants(certList || []);
+      setEmployeesList(empList || []);
+    } catch (err) {
+      console.error('Erro ao carregar participantes:', err);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os participantes",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingParticipants(false);
+    }
+  };
+
+  const handleAddParticipant = async () => {
+    if (!selectedEmployeeId || !participantsTraining) return;
+    try {
+      setIsAddingParticipant(true);
+      const selectedEmp = employeesList.find(e => e.id === selectedEmployeeId);
+      const certNum = `NR06-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+      await trainingService.createEmployeeCertification({
+        employeeId: selectedEmployeeId,
+        trainingId: participantsTraining.id,
+        certificationNumber: certNum,
+        issueDate: issueDate || new Date().toISOString().split('T')[0],
+      });
+      toast({
+        title: "Sucesso",
+        description: `Participante ${selectedEmp?.name || ''} vinculado ao treinamento.`,
+      });
+      setSelectedEmployeeId('');
+      const certList = await trainingService.getEmployeeCertifications({ trainingId: participantsTraining.id });
+      setParticipants(certList || []);
+      loadTrainings();
+    } catch (err) {
+      console.error('Erro ao adicionar participante:', err);
+      toast({
+        title: "Erro",
+        description: "Não foi possível vincular o colaborador ao treinamento.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingParticipant(false);
+    }
+  };
+
+  const handleDownloadCert = async (cert: EmployeeCertification) => {
+    try {
+      setIsDownloadingCertId(cert.id);
+      await trainingService.baixarCertificadoNR06(cert.id, cert.employeeName || 'funcionario');
+      toast({
+        title: "Sucesso",
+        description: "Certificado NR-06 gerado e baixado com sucesso!",
+      });
+    } catch (err) {
+      console.error('Erro ao gerar certificado NR-06:', err);
+      toast({
+        title: "Erro",
+        description: "Não foi possível gerar o certificado PDF.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDownloadingCertId(null);
+    }
+  };
+
+  const handleRemoveParticipant = async (certId: string) => {
+    try {
+      await api.delete(`/employee-certifications/${certId}`);
+      toast({
+        title: "Removido",
+        description: "Participante removido do treinamento.",
+      });
+      if (participantsTraining) {
+        const certList = await trainingService.getEmployeeCertifications({ trainingId: participantsTraining.id });
+        setParticipants(certList || []);
+        loadTrainings();
+      }
+    } catch (err) {
+      console.error('Erro ao remover participante:', err);
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover o participante.",
+        variant: "destructive"
+      });
+    }
+  };
 
   // Carregar treinamentos
   useEffect(() => {
@@ -315,103 +431,256 @@ const SSTTreinamentos: React.FC = () => {
                                     <span>Próxima: {new Date(training.nextScheduledDate).toLocaleDateString('pt-BR')}</span>
                                   </div>
                                 )}
-                                
-                                <div className="flex items-center gap-2">
-                                  <UsersIcon className="h-4 w-4" />
-                                  <span>{training.totalParticipants || 0} participantes</span>
-                                </div>
                               </div>
-                              
-                              {training.certificatesExpiring && training.certificatesExpiring > 0 && (
-                                <div className="flex items-center gap-2 text-yellow-500 text-sm">
-                                  <AlertTriangle className="h-4 w-4" />
-                                  <span>{training.certificatesExpiring} certificado(s) próximo(s) do vencimento</span>
-                                </div>
-                              )}
                             </div>
                             
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEditTraining(training)}
-                                className="border-gray-600 text-seguranca-lightgray text-xs sm:text-sm"
-                              >
-                                <Edit className="h-4 w-4 mr-1" />
-                                Editar
-                              </Button>
-                            </div>
+                            {training.certificatesExpiring && training.certificatesExpiring > 0 && (
+                              <div className="flex items-center gap-2 text-yellow-500 text-sm">
+                                <AlertTriangle className="h-4 w-4" />
+                                <span>{training.certificatesExpiring} certificado(s) próximo(s) do vencimento</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-2 items-center">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenParticipantsModal(training)}
+                              className="border-blue-600/50 text-blue-300 hover:bg-blue-950/40 text-xs sm:text-sm gap-1"
+                            >
+                              <UsersIcon className="h-4 w-4 text-blue-400" />
+                              Participantes ({training.totalParticipants || 0})
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm gap-1"
+                              onClick={() => handleOpenParticipantsModal(training)}
+                            >
+                              <Award className="h-4 w-4" />
+                              Certificado NR-06 (PDF)
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditTraining(training)}
+                              className="border-gray-600 text-seguranca-lightgray text-xs sm:text-sm"
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Editar
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-seguranca-lightgray">Nenhum treinamento encontrado</p>
-                    <p className="text-gray-400 text-sm mt-1">
-                      {searchTerm || typeFilter !== 'all' || statusFilter !== 'all' 
-                        ? 'Tente ajustar os filtros de busca'
-                        : 'Clique em "Novo Treinamento" para criar o primeiro treinamento'
-                      }
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-seguranca-lightgray">Nenhum treinamento encontrado</p>
+                  <p className="text-gray-400 text-sm mt-1">
+                    {searchTerm || typeFilter !== 'all' || statusFilter !== 'all' 
+                      ? 'Tente ajustar os filtros de busca'
+                      : 'Clique em "Novo Treinamento" para criar o primeiro treinamento'
+                    }
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          {/* Outras tabs com conteúdo similar */}
-          <TabsContent value="nr35" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
-            <Card className="bg-seguranca-graphite border-gray-600">
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg text-seguranca-lightgray">Treinamentos NR-35</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-400 text-sm sm:text-base">Treinamentos de Trabalho em Altura conforme NR-35</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
+        {/* Outras tabs com conteúdo similar */}
+        <TabsContent value="nr35" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
+          <Card className="bg-seguranca-graphite border-gray-600">
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg text-seguranca-lightgray">Treinamentos NR-35</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-400 text-sm sm:text-base">Treinamentos de Trabalho em Altura conforme NR-35</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="cipa" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
-            <Card className="bg-seguranca-graphite border-gray-600">
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg text-seguranca-lightgray">Treinamentos de CIPA</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-400 text-sm sm:text-base">Treinamentos da Comissão Interna de Prevenção de Acidentes</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
+        <TabsContent value="cipa" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
+          <Card className="bg-seguranca-graphite border-gray-600">
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg text-seguranca-lightgray">Treinamentos de CIPA</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-400 text-sm sm:text-base">Treinamentos da Comissão Interna de Prevenção de Acidentes</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="certificates" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
-            <Card className="bg-seguranca-graphite border-gray-600">
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg text-seguranca-lightgray">Controle de Certificados</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-400 text-sm sm:text-base">Gestão de certificados e vencimentos de treinamentos</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        <TabsContent value="certificates" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
+          <Card className="bg-seguranca-graphite border-gray-600">
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg text-seguranca-lightgray">Controle de Certificados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-400 text-sm sm:text-base">Gestão de certificados e vencimentos de treinamentos</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-        {/* Modal de Criação/Edição */}
-        <TrainingFormModal
-          open={showCreateModal}
-          onOpenChange={(open) => {
-            setShowCreateModal(open);
-            if (!open) {
-              setSelectedTraining(null);
-            }
-          }}
-          training={selectedTraining}
-          onSubmit={handleSubmitTraining}
-        />
-      </div>
-    </StandardLayout>
-  );
+      {/* Modal de Criação/Edição */}
+      <TrainingFormModal
+        open={showCreateModal}
+        onOpenChange={(open) => {
+          setShowCreateModal(open);
+          if (!open) {
+            setSelectedTraining(null);
+          }
+        }}
+        training={selectedTraining}
+        onSubmit={handleSubmitTraining}
+      />
+
+      {/* Modal de Gerenciamento de Participantes e Emissão de Certificados NR-06 */}
+      <Dialog open={showParticipantsModal} onOpenChange={setShowParticipantsModal}>
+        <DialogContent className="max-w-2xl bg-seguranca-graphite border-gray-700 text-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-lg text-emerald-400 flex items-center gap-2">
+              <UsersIcon className="h-5 w-5 text-blue-400" />
+              Participantes do Treinamento: <span className="text-white font-bold">{participantsTraining?.name}</span>
+            </DialogTitle>
+            <DialogDescription className="text-gray-400 text-sm">
+              Vincule colaboradores a este treinamento e emita os Certificados Oficiais NR-06 em PDF.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Formulário para Adicionar Colaborador */}
+            <div className="bg-seguranca-black border border-gray-700 rounded-lg p-3 space-y-3">
+              <Label className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <UserPlus className="h-4 w-4" /> Vincular Colaborador / Participante
+              </Label>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                <div className="sm:col-span-6 space-y-1">
+                  <Label className="text-xs text-gray-300">Selecione o Funcionário</Label>
+                  <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                    <SelectTrigger className="bg-seguranca-graphite border-gray-700 text-white h-9 text-xs">
+                      <SelectValue placeholder="Selecione um funcionário..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-graphite border-gray-700 text-white max-h-56">
+                      {employeesList.map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.name} {emp.cpf ? `(CPF: ${emp.cpf})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="sm:col-span-3 space-y-1">
+                  <Label className="text-xs text-gray-300">Data de Emissão</Label>
+                  <Input
+                    type="date"
+                    value={issueDate}
+                    onChange={(e) => setIssueDate(e.target.value)}
+                    className="bg-seguranca-graphite border-gray-700 text-white h-9 text-xs"
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <Button
+                    type="button"
+                    className="w-full h-9 bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1"
+                    onClick={handleAddParticipant}
+                    disabled={isAddingParticipant || !selectedEmployeeId}
+                  >
+                    {isAddingParticipant ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                    Vincular
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Lista de Participantes Vinculados */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center justify-between">
+                <span>Participantes do Treinamento ({participants.length})</span>
+                <span className="text-[11px] text-emerald-400 font-normal">Ações em cada participante:</span>
+              </h4>
+
+              {loadingParticipants ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
+                </div>
+              ) : participants.length > 0 ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {participants.map((cert) => (
+                    <div
+                      key={cert.id}
+                      className="flex items-center justify-between p-2.5 bg-seguranca-black border border-gray-800 rounded-md text-xs"
+                    >
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-white">{cert.employeeName || 'Funcionário'}</p>
+                        <p className="text-gray-400 text-[11px]">
+                          {cert.employeeDocument ? `CPF: ${cert.employeeDocument} • ` : ''}
+                          {cert.employeePosition ? `Cargo: ${cert.employeePosition} • ` : ''}
+                          Emissão: {cert.issueDate ? new Date(cert.issueDate).toLocaleDateString('pt-BR') : 'N/A'}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          className="h-8 bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1 px-2.5"
+                          onClick={() => handleDownloadCert(cert)}
+                          disabled={isDownloadingCertId === cert.id}
+                        >
+                          {isDownloadingCertId === cert.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Award className="h-3.5 w-3.5" />
+                          )}
+                          Certificado NR-06 (PDF)
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-950/40"
+                          onClick={() => handleRemoveParticipant(cert.id)}
+                          title="Remover participante"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 bg-seguranca-black/40 border border-dashed border-gray-800 rounded-md">
+                  <UsersIcon className="h-8 w-8 text-gray-500 mx-auto mb-2" />
+                  <p className="text-gray-300 text-xs font-medium">Nenhum participante vinculado a este treinamento ainda.</p>
+                  <p className="text-gray-400 text-[11px] mt-0.5">Selecione um funcionário no campo acima para adicioná-lo ao treinamento.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-gray-800 pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+              onClick={() => setShowParticipantsModal(false)}
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  </StandardLayout>
+);
 };
 
 export default SSTTreinamentos;

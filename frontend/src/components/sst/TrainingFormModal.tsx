@@ -173,6 +173,7 @@ export default function TrainingFormModal({
   };
 
   const trainingTypeOptions = [
+    { value: 'NR_06', label: 'NR-06 - Equipamentos de Proteção Individual (EPI)' },
     { value: 'NR_35', label: 'NR-35 - Trabalho em Altura' },
     { value: 'CIPA', label: 'CIPA - Comissão Interna de Prevenção de Acidentes' },
     { value: 'NR_10', label: 'NR-10 - Segurança em Instalações e Serviços em Eletricidade' },
@@ -283,7 +284,7 @@ export default function TrainingFormModal({
                       </SelectTrigger>
                       <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
                         {suppliers.length === 0 && !loadingSuppliers ? (
-                          <SelectItem value="" disabled className="text-gray-500">
+                          <SelectItem value="none" disabled className="text-gray-500">
                             Nenhum fornecedor cadastrado
                           </SelectItem>
                         ) : (
