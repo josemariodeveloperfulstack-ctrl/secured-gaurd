@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
 import { Checkbox } from '@/components/ui/checkbox';
-import { formatDate as formatDatePtBr } from '@/utils/formatters';
+import { formatDate as formatDatePtBr, formatCPF } from '@/utils/formatters';
 
 interface FuncionariosTableProps {
   employees: Employee[];
@@ -110,6 +110,9 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
     const wp = (employee.workPost as any)?.name;
     const wpId = (employee.workPost as any)?.id;
     const wps = (employee as any)?.workPosts;
+    const deptName = (employee as any).department?.name;
+    const unitName = (employee as any).unit?.name;
+
     if (Array.isArray(wps) && wps.length) {
       const names = wps.map((x: any) => x?.name).filter(Boolean);
       if (names.length) return names.join(', ');
@@ -118,12 +121,13 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
     if (wp) return wp;
     // Sem nome mas com id: FK órfã (posto apagado) ou resposta antiga — usar unidade/setor como pista
     if (wpId) {
-      const unitName = (employee as any).unit?.name;
-      const deptName = (employee as any).department?.name;
       if (unitName) return `${unitName} (posto indisponível — atualize o cadastro)`;
       if (deptName) return `${deptName} (posto indisponível — atualize o cadastro)`;
       return 'Posto removido ou inexistente (atualize o cadastro)';
     }
+    // Importação/legado: setor gravado em department quando não houve match com posto
+    if (deptName) return deptName;
+    if (unitName) return unitName;
     return null;
   };
 
@@ -196,7 +200,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                 <SortHead k="company">Empresa</SortHead>
               </TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">
-                <SortHead k="workPost">Posto de Trabalho</SortHead>
+                <SortHead k="workPost">Setor de Trabalho</SortHead>
               </TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">
                 <SortHead k="escalaTrabalho">Escala</SortHead>
@@ -248,14 +252,9 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                           return <span className="italic text-gray-500">Nome não informado</span>;
                         })()}
                       </div>
-                      {employee.registrationNumber && employee.name && !/^\d+$/.test(employee.name) && (
+                      {(employee.cpf || employee.registrationNumber || (employee as any).document) && (
                         <div className="text-xs text-gray-400 mt-0.5 font-mono leading-tight">
-                          Mat: {employee.registrationNumber}
-                        </div>
-                      )}
-                      {employee.cpf && (
-                        <div className="text-xs text-gray-500 mt-0.5 font-mono leading-tight">
-                          CPF: {employee.cpf}
+                          CPF: {formatCPF(employee.cpf || employee.registrationNumber || (employee as any).document)}
                         </div>
                       )}
                     </div>
@@ -296,28 +295,15 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
                     {(() => {
                       const workPostsLabel = getWorkPostsLabel(employee);
-                      const departmentName = (employee as any).department?.name;
-                      
-                      return (
-                        <div className="flex flex-col gap-1">
-                          {workPostsLabel ? (
-                            <div className="flex items-center gap-2" title="Posto de Trabalho">
-                              <MapPin className="h-3.5 w-3.5 text-seguranca-yellow" />
-                              <span className="truncate max-w-[200px]">{workPostsLabel}</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2" title="Sem Posto de Trabalho">
-                              <MapPin className="h-3.5 w-3.5 text-gray-500" />
-                              <span className="text-gray-500 italic text-xs">Sem posto</span>
-                            </div>
-                          )}
-                          
-                              {departmentName && !workPostsLabel && (
-                                <div className="flex items-center gap-2" title="Posto de Trabalho">
-                                  <MapPin className="h-3.5 w-3.5 text-seguranca-yellow" />
-                                  <span className="truncate max-w-[200px]">{departmentName}</span>
-                                </div>
-                              )}
+                      return workPostsLabel ? (
+                        <div className="flex items-center gap-2" title="Setor de Trabalho">
+                          <MapPin className="h-3.5 w-3.5 text-seguranca-yellow" />
+                          <span className="truncate max-w-[200px]">{workPostsLabel}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2" title="Sem Setor de Trabalho">
+                          <MapPin className="h-3.5 w-3.5 text-gray-500" />
+                          <span className="text-gray-500 italic text-xs">Sem setor</span>
                         </div>
                       );
                     })()}
@@ -503,9 +489,9 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                         return 'Nome não informado';
                       })()}
                     </h3>
-                    {employee.registrationNumber && employee.name && !/^\d+$/.test(employee.name) && (
+                    {(employee.cpf || employee.registrationNumber || (employee as any).document) && (
                       <p className="text-[10px] text-gray-500 font-mono">
-                        Mat: {employee.registrationNumber}
+                        CPF: {formatCPF(employee.cpf || employee.registrationNumber || (employee as any).document)}
                       </p>
                     )}
                   </div>
@@ -541,24 +527,12 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                 )}
                 {(() => {
                   const workPostsLabel = getWorkPostsLabel(employee);
-                  const departmentName = (employee as any).department?.name;
-                  
-                  return (
-                    <div className="flex flex-col gap-0.5">
-                      {workPostsLabel && (
-                        <div className="flex items-center gap-1.5 text-gray-400 min-w-0" title="Posto de Trabalho">
-                          <MapPin className="h-3 w-3 flex-shrink-0 text-seguranca-yellow/70" />
-                          <span className="truncate">{workPostsLabel}</span>
-                        </div>
-                      )}
-                      {departmentName && !workPostsLabel && (
-                        <div className="flex items-center gap-1.5 text-gray-500 min-w-0" title="Posto de Trabalho">
-                          <MapPin className="h-2.5 w-2.5 flex-shrink-0 text-seguranca-yellow/70" />
-                          <span className="truncate text-[10px]">{departmentName}</span>
-                        </div>
-                      )}
+                  return workPostsLabel ? (
+                    <div className="flex items-center gap-1.5 text-gray-400 min-w-0" title="Setor de Trabalho">
+                      <MapPin className="h-3 w-3 flex-shrink-0 text-seguranca-yellow/70" />
+                      <span className="truncate">{workPostsLabel}</span>
                     </div>
-                  );
+                  ) : null;
                 })()}
                 {employee.escalaTrabalho && (
                   <div className="flex items-center gap-1.5 text-gray-400 min-w-0" title="Escala de Trabalho">

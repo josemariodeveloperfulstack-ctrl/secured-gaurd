@@ -88,16 +88,23 @@ public class EmployeeImportRowService {
 
         if (departamentoNome != null && !departamentoNome.isBlank()) {
             String setorClean = departamentoNome.trim();
-            // Prioridade 1: Tentar vincular a um Posto de Trabalho (WorkPost) pelo nome
+            // Match apenas exato (case-insensitive) — evita trocar posto errado em produção
+            // por substring (ex.: "BH" casar com "BH BUS CENTRO").
             Optional<WorkPost> workPostOpt = workPostRepository.findByName(setorClean)
-                    .or(() -> workPostRepository.findByNameContainingIgnoreCase(setorClean).stream().findFirst());
+                    .or(() -> workPostRepository.findByNameIgnoreCase(setorClean));
 
             if (workPostOpt.isPresent()) {
                 emp.setWorkPost(workPostOpt.get());
-                log.info("📌 Posto de Trabalho '{}' vinculado ao funcionário", setorClean);
-            } else {
-                // Prioridade 2: Tentar vincular a Unidade ou Departamento pelo nome (legado)
+                log.info("📌 Posto de Trabalho '{}' vinculado ao funcionário", workPostOpt.get().getName());
+            } else if (emp.getWorkPost() == null) {
+                // Só grava departamento se o funcionário ainda NÃO tiver posto.
+                // Nunca remove work_post_id existente quando o nome da planilha não casa.
                 emp.setDepartment(resolveOrCreateDepartment(setorClean));
+                log.warn("⚠️ Posto '{}' não encontrado — mantido work_post atual (se houver); setor salvo como departamento",
+                        setorClean);
+            } else {
+                log.warn("⚠️ Posto '{}' não encontrado na planilha — mantido posto atual '{}' (não alterado)",
+                        setorClean, emp.getWorkPost().getName());
             }
         }
         if (funcaoNome != null && !funcaoNome.isBlank()) {

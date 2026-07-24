@@ -55,6 +55,9 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     
     // Buscar por nome (busca exata)
     java.util.Optional<WorkPost> findByName(String name);
+
+    /** Match de setor/posto na importação (planilha costuma divergir só em maiúsculas). */
+    java.util.Optional<WorkPost> findByNameIgnoreCase(String name);
     
     // Buscar por nome (busca parcial)
     List<WorkPost> findByNameContainingIgnoreCase(String name);
@@ -123,4 +126,27 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     Optional<String> findNameById(@Param("id") UUID id);
 
     Optional<WorkPost> findFirstByOrderByCreatedAtDesc();
+
+    @Query(value = "SELECT EXISTS (" +
+           "SELECT 1 FROM visit_controls WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM work_schedules WHERE location_id = :id UNION ALL " +
+           "SELECT 1 FROM rondas WHERE local_id = :id UNION ALL " +
+           "SELECT 1 FROM employees WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM employee_employment_periods WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM equipments WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM work_post_assignments WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM visits WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM supervisor_visits WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM time_records WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM schedules WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM overtime WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM qrcode_work_posts WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM activity_reports WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM accounts_receivable WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM absences WHERE coverage_work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM remanejamentos WHERE origin_workstation_id = :id OR destination_workstation_id = :id UNION ALL " +
+           "SELECT 1 FROM equipment_movements WHERE work_post_id = :id UNION ALL " +
+           "SELECT 1 FROM employee_certifications WHERE work_post_id = :id" +
+           ")", nativeQuery = true)
+    boolean isWorkPostReferenced(@Param("id") UUID id);
 }

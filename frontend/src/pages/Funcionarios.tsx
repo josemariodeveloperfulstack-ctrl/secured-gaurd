@@ -553,8 +553,9 @@ const Funcionarios: React.FC = () => {
       const cpfMatch = searchDigits ? (employee.cpf || '').replace(/\D/g, '').includes(searchDigits) : false;
       const positionMatch = (employee.position?.name || '').toLowerCase().includes(normalizedSearch);
       const workPostMatch = ((employee.workPost as any)?.name || '').toLowerCase().includes(normalizedSearch);
+      const departmentMatch = ((employee as any).department?.name || '').toLowerCase().includes(normalizedSearch);
 
-      return nameMatch || emailMatch || registrationMatch || cpfMatch || positionMatch || workPostMatch;
+      return nameMatch || emailMatch || registrationMatch || cpfMatch || positionMatch || workPostMatch || departmentMatch;
     })();
 
     return matchesStatus && matchesSearch && matchesCompany && matchesPosition && matchesWorkPost
@@ -585,7 +586,7 @@ const Funcionarios: React.FC = () => {
         case 'name': return e.name || '';
         case 'position': return e.position?.name || '';
         case 'company': return (e.company as any)?.sigla || (e.company as any)?.name || '';
-        case 'workPost': return (e.workPost as any)?.name || '';
+        case 'workPost': return (e.workPost as any)?.name || (e as any).department?.name || (e as any).unit?.name || '';
         case 'status': return e.status || '';
         case 'escalaTrabalho': return e.escalaTrabalho || '';
         case 'horarioTrabalho': return e.horarioTrabalho || '';

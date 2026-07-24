@@ -2536,12 +2536,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                           </div>
                           <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Setor/Posto de Trabalho</span>
+                              <span className="truncate">Setor de Trabalho</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
                             <SearchableSelect
                               options={[
-                                { value: 'none', label: 'Nenhum posto' },
+                                { value: 'none', label: 'Nenhum setor de trabalho' },
                                 ...workPosts.map((wp) => ({
                                   value: String(wp.id).toLowerCase(),
                                   label: wp.name,
@@ -2553,11 +2553,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                                 const resolvedValue = value === 'all' ? String((form as any).workPostId || 'none').toLowerCase() : value;
                                 handleWorkPostChange(resolvedValue === 'none' ? '' : resolvedValue);
                               }}
-                              placeholder="Selecione um posto"
-                              searchPlaceholder="Buscar posto de trabalho..."
-                              emptyPlaceholder="Nenhum posto encontrado"
-                              minSearchChars={3}
-                              minCharsMessage="Digite pelo menos 3 caracteres para pesquisar o posto..."
+                              placeholder="Selecione um setor de trabalho"
+                              searchPlaceholder="Buscar setor de trabalho..."
+                              emptyPlaceholder="Nenhum setor encontrado"
+                              minSearchChars={0}
                             />
                           </div>
                         </div>
@@ -2618,6 +2617,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             value={form.rg || ''}
                             onChange={handleChange}
                             placeholder="00.000.000-0"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Órgão Emissor</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="carteiraIdentidadeOrgaoEmissor"
+                            value={form.carteiraIdentidadeOrgaoEmissor || ''}
+                            onChange={handleChange}
+                            placeholder="Ex: SSP-MG"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                           />
                         </div>
