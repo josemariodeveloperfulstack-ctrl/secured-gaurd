@@ -19,7 +19,9 @@ import {
   Play,
   Calendar,
   QrCode,
-  Printer
+  Printer,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +59,77 @@ import { StandardLayout } from '@/components/StandardLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import qrCodeService, { QRCodeWorkPost } from '@/services/qrCodeService';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Funções utilitárias de formatação
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'ATIVO': return 'bg-green-100 text-green-800';
+    case 'EM_IMPLANTACAO': return 'bg-blue-100 text-blue-800';
+    case 'INATIVO': return 'bg-gray-100 text-gray-800';
+    case 'SUSPENSO': return 'bg-yellow-100 text-yellow-800';
+    case 'CANCELADO': return 'bg-red-100 text-red-800';
+    case 'EM_ANALISE': return 'bg-purple-100 text-purple-800';
+    case 'PENDENTE': return 'bg-orange-100 text-orange-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+};
+
+const getStatusText = (status: string) => {
+  switch (status) {
+    case 'ATIVO': return 'Ativo';
+    case 'EM_IMPLANTACAO': return 'Em Implantação';
+    case 'INATIVO': return 'Inativo';
+    case 'SUSPENSO': return 'Suspenso';
+    case 'CANCELADO': return 'Cancelado';
+    case 'EM_ANALISE': return 'Em Análise';
+    case 'PENDENTE': return 'Pendente';
+    default: return status;
+  }
+};
+
+const getTypeText = (type: string) => {
+  switch (type) {
+    case 'POSTO_24H': return 'Posto 24h';
+    case 'POSTO_SDF': return 'Posto SDF';
+    case 'POSTO_12H_NOTURNO': return '12h Noturno';
+    case 'POSTO_12H_DIURNO': return '12h Diurno';
+    case 'POSTO_6H': return 'Posto 6h';
+    case 'POSTO_8H': return 'Posto 8h';
+    case 'OUTROS': return 'Outros';
+    default: return type;
+  }
+};
+
+const INVALID_SECTOR_KEYWORDS = [
+  'ENSINO FUNDAMENTAL',
+  'ENSINO MÉDIO',
+  'ENSINO MEDIO',
+  'EDUCAÇÃO SUPERIOR',
+  'EDUCACAO SUPERIOR',
+  'PÓS-GRADUAÇÃO',
+  'POS-GRADUACAO',
+  'MESTRADO',
+  'DOUTORADO',
+  'ANALFABETO',
+  'PRETA',
+  'BRANCA',
+  'PARDA',
+  'AMARELA',
+  'INDÍGENA',
+  'INDIGENA'
+];
+
+const isValidSector = (workPost: WorkPost) => {
+  const nameUpper = (workPost.name || '').trim().toUpperCase();
+  const codeUpper = (workPost.postCode || '').trim().toUpperCase();
+
+  for (const kw of INVALID_SECTOR_KEYWORDS) {
+    if (nameUpper === kw || codeUpper === kw || (kw.length > 5 && nameUpper.includes(kw))) {
+      return false;
+    }
+  }
+  return true;
+};
 
 const Postos: React.FC = () => {
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
@@ -120,10 +193,13 @@ const Postos: React.FC = () => {
 
   // Filtrar postos
   const filteredWorkPosts = workPosts.filter(workPost => {
+    if (!isValidSector(workPost)) return false;
+
     const matchesSearch = !searchTerm || 
       workPost.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       workPost.postCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      workPost.address.toLowerCase().includes(searchTerm.toLowerCase());
+      workPost.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (workPost.clientName && workPost.clientName.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesStatus = statusFilter === 'all'
       ? (workPost.status !== 'INATIVO' && workPost.status !== 'CANCELADO')
@@ -136,9 +212,129 @@ const Postos: React.FC = () => {
     return matchesSearch && matchesStatus && matchesType && matchesClient && matchesCity && matchesState;
   });
 
+  // Accordion de Clientes
+  const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
+
+  const toggleClientExpanded = (clientKey: string) => {
+    setExpandedClients((prev) => ({
+      ...prev,
+      [clientKey]: !prev[clientKey],
+    }));
+  };
+
+  // Grouping by Client
+  const clientGroups = React.useMemo(() => {
+    const groupsMap: Record<string, {
+      clientKey: string;
+      clientId?: string;
+      clientName: string;
+      clientCnpj?: string;
+      posts: WorkPost[];
+      sectors: string[];
+      postTypes: string[];
+      locations: string[];
+      statuses: string[];
+      implementationDates: string[];
+    }> = {};
+
+    filteredWorkPosts.forEach((workPost) => {
+      const postNameNorm = (workPost.name || '').trim().toLowerCase();
+      const clientNameNorm = (workPost.clientName || '').trim().toLowerCase();
+
+      // 1. Tentar resolver o cliente diretamente pelo ID do posto (workPost.clientId)
+      let matchedClient = workPost.clientId ? clients.find((c) => c.id === workPost.clientId) : undefined;
+
+      if (matchedClient) {
+        const cNameNorm = matchedClient.name.trim().toLowerCase();
+        // Se o nome do posto NÃO bate com o cliente do ID, mas é o nome exato de OUTRO cliente cadastrado
+        if (postNameNorm !== cNameNorm) {
+          const otherClient = clients.find((c) => {
+            const otherNorm = c.name.trim().toLowerCase();
+            return otherNorm === postNameNorm || (postNameNorm.length > 5 && otherNorm.includes(postNameNorm));
+          });
+          if (otherClient) {
+            matchedClient = otherClient;
+          }
+        }
+      } else {
+        // Se o posto não tinha clientId válido, tentar pelo nome do posto ou clientName
+        matchedClient = clients.find((c) => {
+          const cNameNorm = c.name.trim().toLowerCase();
+          return cNameNorm === postNameNorm || (postNameNorm.length > 5 && cNameNorm.includes(postNameNorm));
+        });
+
+        if (!matchedClient && clientNameNorm && clientNameNorm !== 'cliente não encontrado') {
+          matchedClient = clients.find((c) => c.name.trim().toLowerCase() === clientNameNorm);
+        }
+      }
+
+      // 2. Definir a chave de agrupamento
+      const clientKey = matchedClient
+        ? matchedClient.id
+        : (workPost.clientId || (workPost.clientName && workPost.clientName !== 'Cliente não encontrado' ? `name_${workPost.clientName.trim()}` : `name_${workPost.name.trim()}`));
+
+      const clientName = matchedClient
+        ? matchedClient.name
+        : (workPost.clientName && workPost.clientName !== 'Cliente não encontrado' ? workPost.clientName : workPost.name);
+
+      const clientCnpj = matchedClient?.cnpj || (workPost.clientCnpj && workPost.clientCnpj !== 'N/A' ? workPost.clientCnpj : '');
+      const sectorName = (workPost.name || workPost.postCode || 'Setor Geral').trim();
+      const postType = getTypeText(workPost.type);
+      const location = workPost.city && workPost.state 
+        ? `${workPost.city}, ${workPost.state}` 
+        : (workPost.address ? workPost.address.substring(0, 30) : 'Não informada');
+      const status = workPost.status || 'ATIVO';
+      const implDate = workPost.implementationDate;
+
+      if (!groupsMap[clientKey]) {
+        groupsMap[clientKey] = {
+          clientKey,
+          clientId: matchedClient?.id || workPost.clientId,
+          clientName,
+          clientCnpj,
+          posts: [],
+          sectors: [],
+          postTypes: [],
+          locations: [],
+          statuses: [],
+          implementationDates: [],
+        };
+      }
+
+      groupsMap[clientKey].posts.push(workPost);
+
+      if (sectorName && !groupsMap[clientKey].sectors.includes(sectorName)) {
+        groupsMap[clientKey].sectors.push(sectorName);
+      }
+      if (postType && !groupsMap[clientKey].postTypes.includes(postType)) {
+        groupsMap[clientKey].postTypes.push(postType);
+      }
+      if (location && !groupsMap[clientKey].locations.includes(location)) {
+        groupsMap[clientKey].locations.push(location);
+      }
+      if (status && !groupsMap[clientKey].statuses.includes(status)) {
+        groupsMap[clientKey].statuses.push(status);
+      }
+      if (implDate && !groupsMap[clientKey].implementationDates.includes(implDate)) {
+        groupsMap[clientKey].implementationDates.push(implDate);
+      }
+    });
+
+    return Object.values(groupsMap);
+  }, [filteredWorkPosts, clients]);
+
   // Handlers
+  const [forcedClientId, setForcedClientId] = useState<string | undefined>(undefined);
+
   const handleCreateWorkPost = () => {
     setEditingWorkPost(null);
+    setForcedClientId(undefined);
+    setIsFormModalOpen(true);
+  };
+
+  const handleCreateForClient = (clientId?: string) => {
+    setEditingWorkPost(null);
+    setForcedClientId(clientId);
     setIsFormModalOpen(true);
   };
 
@@ -380,47 +576,7 @@ const Postos: React.FC = () => {
     }
   };
 
-  // Função para obter cor do status
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ATIVO': return 'bg-green-100 text-green-800';
-      case 'EM_IMPLANTACAO': return 'bg-blue-100 text-blue-800';
-      case 'INATIVO': return 'bg-gray-100 text-gray-800';
-      case 'SUSPENSO': return 'bg-yellow-100 text-yellow-800';
-      case 'CANCELADO': return 'bg-red-100 text-red-800';
-      case 'EM_ANALISE': return 'bg-purple-100 text-purple-800';
-      case 'PENDENTE': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
-  // Função para obter texto do status
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'ATIVO': return 'Ativo';
-      case 'EM_IMPLANTACAO': return 'Em Implantação';
-      case 'INATIVO': return 'Inativo';
-      case 'SUSPENSO': return 'Suspenso';
-      case 'CANCELADO': return 'Cancelado';
-      case 'EM_ANALISE': return 'Em Análise';
-      case 'PENDENTE': return 'Pendente';
-      default: return status;
-    }
-  };
-
-  // Função para obter texto do tipo
-  const getTypeText = (type: string) => {
-    switch (type) {
-      case 'POSTO_24H': return 'Posto 24h';
-      case 'POSTO_SDF': return 'Posto SDF';
-      case 'POSTO_12H_NOTURNO': return '12h Noturno';
-      case 'POSTO_12H_DIURNO': return '12h Diurno';
-      case 'POSTO_6H': return 'Posto 6h';
-      case 'POSTO_8H': return 'Posto 8h';
-      case 'OUTROS': return 'Outros';
-      default: return type;
-    }
-  };
 
   // Estatísticas (conjunto completo)
   const stats = {
@@ -482,9 +638,9 @@ const Postos: React.FC = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Gestão de Postos de Trabalho</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Gestão de Setores e Postos de Trabalho</h1>
             <p className="text-muted-foreground">
-              Gerencie os postos de trabalho e suas implantações
+              Gerencie os setores de trabalho e seus postos de serviço
             </p>
           </div>
           <div className="flex gap-2">
@@ -494,7 +650,7 @@ const Postos: React.FC = () => {
             </Button>
             <Button onClick={handleCreateWorkPost}>
               <Plus className="h-4 w-4 mr-2" />
-              Novo Posto
+              Novo Setor de Trabalho
             </Button>
           </div>
         </div>
@@ -650,109 +806,299 @@ const Postos: React.FC = () => {
         {/* Tabela */}
         <Card>
           <CardHeader>
-            <CardTitle>Postos de Trabalho ({filteredWorkPosts.length})</CardTitle>
+            <CardTitle>Setores de Trabalho ({filteredWorkPosts.length})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Nome</TableHead>
                     <TableHead>Cliente</TableHead>
-                    <TableHead>Tipo</TableHead>
+                    <TableHead>Setor de Trabalho</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Localização</TableHead>
-                    <TableHead>Vigilantes</TableHead>
-                    <TableHead>Escala</TableHead>
                     <TableHead>Implantação</TableHead>
+                    <TableHead>Postos</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredWorkPosts.length === 0 ? (
+                  {clientGroups.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8">
+                      <TableCell colSpan={6} className="text-center py-8">
                         <div className="flex flex-col items-center gap-2">
                           <Building className="h-8 w-8 text-muted-foreground" />
-                          <p className="text-muted-foreground">Nenhum posto encontrado</p>
+                          <p className="text-muted-foreground">Nenhum setor ou cliente encontrado</p>
                         </div>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredWorkPosts.map((workPost) => (
-                      <TableRow key={workPost.id}>
-                        <TableCell className="font-medium">{workPost.postCode}</TableCell>
-                        <TableCell>{workPost.name}</TableCell>
-                        <TableCell>{workPost.clientName || 'N/A'}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{getTypeText(workPost.type)}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(workPost.status)}>
-                            {getStatusText(workPost.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            <span className="text-sm">
-                              {workPost.city && workPost.state 
-                                ? `${workPost.city}, ${workPost.state}`
-                                : workPost.address.substring(0, 30) + '...'
-                              }
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            <span>{workPost.requiredVigilantes}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{workPost.workSchedule}</TableCell>
-                        <TableCell>
-                          {workPost.implementationDate ? (
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              <span className="text-sm">
-                                {new Date(workPost.implementationDate).toLocaleDateString('pt-BR')}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">Não definida</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Abrir menu</span>
-                                <FileText className="h-4 w-4" />
+                    clientGroups.map((group) => {
+                      const isExpanded = !!expandedClients[group.clientKey];
+                      const hasMultiplePosts = group.posts.length > 1;
+                      const firstPost = group.posts[0];
+
+                      return (
+                        <React.Fragment key={group.clientKey}>
+                          <TableRow
+                            onClick={() => toggleClientExpanded(group.clientKey)}
+                            className="cursor-pointer hover:bg-muted/40 font-medium transition-colors select-none"
+                          >
+                            {/* 1. Cliente */}
+                            <TableCell className="font-medium max-w-[280px]">
+                              <div className="flex items-center gap-2">
+                                <Building className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <div className="flex flex-col truncate">
+                                  <span className="font-semibold text-foreground truncate" title={group.clientName}>
+                                    {group.clientName}
+                                  </span>
+                                  {group.clientCnpj && (
+                                    <span className="text-[11px] text-muted-foreground font-normal">
+                                      CNPJ: {group.clientCnpj}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+
+                            {/* 2. Setores de Trabalho */}
+                            <TableCell className="max-w-[300px]">
+                              <div className="flex flex-wrap gap-1 items-center">
+                                {group.sectors.slice(0, 2).map((sec, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs bg-background truncate max-w-[260px]">
+                                    {sec}
+                                  </Badge>
+                                ))}
+                                {group.sectors.length > 2 && (
+                                  <Badge variant="secondary" className="text-xs shrink-0 font-normal">
+                                    +{group.sectors.length - 2} outros
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            {/* 4. Status */}
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {group.statuses.map((st, idx) => (
+                                  <Badge key={idx} className={getStatusColor(st)}>
+                                    {getStatusText(st)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+
+                            {/* 5. Implantação */}
+                            <TableCell>
+                              {group.implementationDates.length > 0 ? (
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  <span className="text-sm">
+                                    {group.implementationDates
+                                      .map((d) => new Date(d).toLocaleDateString('pt-BR'))
+                                      .join(', ')}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">Não definida</span>
+                              )}
+                            </TableCell>
+
+                            {/* 6. Postos */}
+                            <TableCell className="max-w-[220px]">
+                              <div className="flex flex-wrap gap-1 items-center">
+                                {group.postTypes.slice(0, 2).map((pt, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">
+                                    {pt}
+                                  </Badge>
+                                ))}
+                                {group.postTypes.length > 2 && (
+                                  <Badge variant="secondary" className="text-xs shrink-0 font-normal">
+                                    +{group.postTypes.length - 2} mais
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            {/* 7. Ações / Accordion Indicator */}
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleClientExpanded(group.clientKey);
+                                }}
+                                className="h-8 text-xs flex items-center gap-1.5 float-right"
+                              >
+                                <span>{isExpanded ? 'Recolher' : 'Ver Setores'}</span>
+                                <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                               </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleViewWorkPost(workPost)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                Visualizar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleEditWorkPost(workPost)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openQrModalForWorkPost(workPost)}>
-                                <QrCode className="mr-2 h-4 w-4" />
-                                QR Codes do Posto
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDeleteWorkPost(workPost)}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                            </TableCell>
+                          </TableRow>
+
+                          {/* Conteúdo do Accordion quando expandido */}
+                          {isExpanded && (
+                            <TableRow className="bg-muted/15 hover:bg-muted/15">
+                              <TableCell colSpan={6} className="p-4">
+                                <div className="space-y-4">
+                                  <div className="flex items-center justify-between border-b pb-2">
+                                    <div className="flex items-center gap-2">
+                                      <Building className="h-4 w-4 text-primary" />
+                                      <span className="font-semibold text-base text-foreground">
+                                        Setores e Postos de Trabalho — {group.clientName}
+                                      </span>
+                                      {group.clientCnpj && (
+                                        <Badge variant="outline" className="text-xs font-normal">
+                                          CNPJ: {group.clientCnpj}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-xs flex items-center gap-1"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleCreateForClient(group.clientId);
+                                        }}
+                                      >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        Novo Setor
+                                      </Button>
+                                      <Badge variant="outline" className="text-xs">
+                                        {group.sectors.length} Setor{group.sectors.length > 1 ? 'es' : ''} | {group.posts.length} Posto{group.posts.length > 1 ? 's' : ''}
+                                      </Badge>
+                                    </div>
+                                  </div>
+
+                                  {/* Agrupamento por Setor de Trabalho */}
+                                  {(() => {
+                                    const sectorsMap: Record<string, { code: string; name: string; posts: WorkPost[] }> = {};
+                                    group.posts.forEach((post) => {
+                                      const sectorKey = (post.name || post.postCode || 'Setor Geral').trim();
+                                      if (!sectorsMap[sectorKey]) {
+                                        sectorsMap[sectorKey] = {
+                                          code: post.postCode || 'SETOR',
+                                          name: post.name || 'Setor sem nome',
+                                          posts: [],
+                                        };
+                                      }
+                                      sectorsMap[sectorKey].posts.push(post);
+                                    });
+
+                                    const sectorList = Object.values(sectorsMap);
+
+                                    return sectorList.map((sector, secIdx) => (
+                                      <div key={secIdx} className="rounded-lg border bg-card p-4 space-y-3 shadow-sm">
+                                        <div className="flex items-center justify-between bg-muted/40 p-2.5 rounded-md">
+                                          <div className="flex items-center gap-2">
+                                            <Badge variant="default" className="text-xs font-semibold">
+                                              Setor: {sector.code}
+                                            </Badge>
+                                            <span className="font-medium text-sm text-foreground">{sector.name}</span>
+                                          </div>
+                                          <Badge variant="secondary" className="text-xs">
+                                            {sector.posts.length} Posto{sector.posts.length > 1 ? 's' : ''} de Trabalho
+                                          </Badge>
+                                        </div>
+
+                                        <div className="rounded-md border overflow-x-auto bg-background">
+                                          <Table>
+                                            <TableHeader>
+                                              <TableRow className="bg-muted/30 text-xs">
+                                                <TableHead>Posto de Trabalho</TableHead>
+                                                <TableHead>Localização</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead>Implantação</TableHead>
+                                                <TableHead>Escala / Vigilantes</TableHead>
+                                                <TableHead className="text-right">Ações do Posto</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {sector.posts.map((post) => (
+                                                <TableRow key={post.id} className="hover:bg-muted/30">
+                                                  <TableCell>
+                                                    <div className="font-semibold text-sm">
+                                                      {getTypeText(post.type)}
+                                                    </div>
+                                                    {post.primaryPositionName && (
+                                                      <div className="text-xs text-muted-foreground">
+                                                        {post.primaryPositionName}
+                                                      </div>
+                                                    )}
+                                                  </TableCell>
+                                                  <TableCell>
+                                                    <div className="flex items-center gap-1 text-xs">
+                                                      <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                      <span>
+                                                        {post.city && post.state
+                                                          ? `${post.city}, ${post.state}`
+                                                          : (post.address ? post.address.substring(0, 30) + '...' : 'Não informada')}
+                                                      </span>
+                                                    </div>
+                                                  </TableCell>
+                                                  <TableCell>
+                                                    <Badge className={getStatusColor(post.status)}>
+                                                      {getStatusText(post.status)}
+                                                    </Badge>
+                                                  </TableCell>
+                                                  <TableCell>
+                                                    <span className="text-xs text-muted-foreground">
+                                                      {post.implementationDate
+                                                        ? new Date(post.implementationDate).toLocaleDateString('pt-BR')
+                                                        : 'Não definida'}
+                                                    </span>
+                                                  </TableCell>
+                                                  <TableCell>
+                                                    <div className="text-xs">
+                                                      <div>{post.requiredVigilantes || 1} vigilante(s)</div>
+                                                      <div className="text-muted-foreground">{post.workSchedule || '12X36'}</div>
+                                                    </div>
+                                                  </TableCell>
+                                                  <TableCell className="text-right">
+                                                    <DropdownMenu>
+                                                      <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                          <span className="sr-only">Abrir menu</span>
+                                                          <FileText className="h-4 w-4" />
+                                                        </Button>
+                                                      </DropdownMenuTrigger>
+                                                      <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => handleViewWorkPost(post)}>
+                                                          <Eye className="mr-2 h-4 w-4" />
+                                                          Visualizar Posto
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleEditWorkPost(post)}>
+                                                          <Edit className="mr-2 h-4 w-4" />
+                                                          Editar Posto
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => openQrModalForWorkPost(post)}>
+                                                          <QrCode className="mr-2 h-4 w-4" />
+                                                          QR Codes do Posto
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleDeleteWorkPost(post)}>
+                                                          <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                                                          Excluir Posto
+                                                        </DropdownMenuItem>
+                                                      </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                  </TableCell>
+                                                </TableRow>
+                                              ))}
+                                            </TableBody>
+                                          </Table>
+                                        </div>
+                                      </div>
+                                    ));
+                                  })()}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -766,6 +1112,7 @@ const Postos: React.FC = () => {
           onOpenChange={setIsFormModalOpen}
           workPost={editingWorkPost}
           clients={clients}
+          forcedClientId={forcedClientId}
           onSubmit={handleFormSubmit}
         />
 

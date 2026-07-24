@@ -93,6 +93,56 @@ export interface CreateWorkPostRequest {
 
 export type UpdateWorkPostRequest = Partial<CreateWorkPostRequest>;
 
+const VALID_WORK_POST_TYPES = [
+  'POSTO_24H',
+  'POSTO_12H_DIURNO',
+  'POSTO_12H_NOTURNO',
+  'POSTO_8H_DIURNO',
+  'POSTO_8H_NOTURNO',
+  'POSTO_SDF',
+  'POSTO_ESPECIAL',
+  'POSTO_6H',
+  'POSTO_8H',
+  'OUTROS'
+];
+
+function sanitizeUUID(id?: string | null): string | undefined {
+  if (!id || typeof id !== 'string') return undefined;
+  const trimmed = id.split(',')[0].trim();
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(trimmed) ? trimmed : undefined;
+}
+
+function prepareWorkPostPayload(data: any): any {
+  const payload = { ...data };
+
+  // Sanear UUIDs para evitar erros de deserialização no Jackson (HTTP 400)
+  if ('clientId' in data) payload.clientId = sanitizeUUID(data.clientId);
+  if ('companyId' in data) payload.companyId = sanitizeUUID(data.companyId);
+  if ('primaryPositionId' in data) payload.primaryPositionId = sanitizeUUID(data.primaryPositionId);
+  if ('contractId' in data) payload.contractId = sanitizeUUID(data.contractId);
+  if ('responsibleId' in data) payload.responsibleId = sanitizeUUID(data.responsibleId);
+
+  // Se o tipo do posto for um nome customizado (ex: "01 Portaria 12 x 36"),
+  // converter para 'OUTROS' para aceitação do enum no backend Java
+  if (data.type && !VALID_WORK_POST_TYPES.includes(data.type)) {
+    payload.type = 'OUTROS';
+    if (!payload.description) {
+      payload.description = data.type;
+    }
+  }
+
+  // Garantir campos numéricos válidos
+  if ('requiredVigilantes' in data) payload.requiredVigilantes = Number(data.requiredVigilantes) || 1;
+  if ('costAllowanceValue' in data) payload.costAllowanceValue = Number(data.costAllowanceValue) || 0;
+  if ('cars' in data) payload.cars = Number(data.cars) || 0;
+  if ('motorcycles' in data) payload.motorcycles = Number(data.motorcycles) || 0;
+  if ('radios' in data) payload.radios = Number(data.radios) || 0;
+  if ('corporates' in data) payload.corporates = Number(data.corporates) || 0;
+
+  return payload;
+}
+
 export const workPostService = {
   // Buscar todos os postos de trabalho
   async getAllWorkPosts(): Promise<WorkPost[]> {
@@ -194,7 +244,8 @@ export const workPostService = {
   // Criar posto de trabalho
   async createWorkPost(data: CreateWorkPostRequest): Promise<WorkPost> {
     try {
-      const response = await api.post('/api/work-posts', data);
+      const payload = prepareWorkPostPayload(data);
+      const response = await api.post('/api/work-posts', payload);
       return response.data;
     } catch (error: unknown) {
       console.error('Erro ao criar posto de trabalho:', error);
@@ -214,7 +265,8 @@ export const workPostService = {
   // Atualizar posto de trabalho
   async updateWorkPost(id: string, data: UpdateWorkPostRequest): Promise<WorkPost> {
     try {
-      const response = await api.put(`/api/work-posts/${id}`, data);
+      const payload = prepareWorkPostPayload(data);
+      const response = await api.put(`/api/work-posts/${id}`, payload);
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar posto de trabalho:', error);

@@ -423,16 +423,22 @@ public class WorkPostService {
     public void deleteWorkPost(UUID id) {
         WorkPost workPost = workPostRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Posto de trabalho não encontrado com ID: " + id));
-        try {
-            workPostRepository.delete(workPost);
-            workPostRepository.flush(); // Força a execução imediata no banco para capturar falha de chave estrangeira
-            log.info("✅ Posto de trabalho {} deletado fisicamente com sucesso.", id);
-        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
-            log.warn("⚠️ Posto {} possui vínculos históricos e não pode ser deletado fisicamente. Aplicando soft-delete (INATIVO)...", id);
+        
+        boolean hasDependencies = workPostRepository.isWorkPostReferenced(id);
+        if (hasDependencies) {
+            log.warn("⚠️ Posto {} possui vínculos históricos. Aplicando soft-delete (INATIVO)...", id);
             workPost.setStatus(WorkPostStatus.INATIVO);
             workPost.setUpdatedAt(LocalDateTime.now());
-            workPostRepository.saveAndFlush(workPost);
+            workPostRepository.save(workPost);
             log.info("✅ Soft-delete executado com sucesso: Posto {} agora está INATIVO.", id);
+        } else {
+            // Limpar element collections antes de deletar para evitar FK constraints
+            if (workPost.getNrs() != null) workPost.getNrs().clear();
+            if (workPost.getEpis() != null) workPost.getEpis().clear();
+            if (workPost.getTrainings() != null) workPost.getTrainings().clear();
+            workPostRepository.saveAndFlush(workPost);
+            workPostRepository.delete(workPost);
+            log.info("✅ Posto de trabalho {} deletado fisicamente com sucesso.", id);
         }
     }
     
@@ -775,24 +781,28 @@ public class WorkPostService {
                 UserGroup.GRUPO_GESTOR_COMERCIAL
         };
 
-        String title = "Novo Posto de Trabalho Cadastrado: " + workPost.getName();
+        String clientName = client != null ? client.getName() : "Não informado";
+        String workPostLink = "/clientes?highlight=" + workPost.getId();
+        String title = "🆕 Novo Setor de Trabalho: " + workPost.getName() + " | " + clientName;
         String content = String.format(
-                "Um novo posto de trabalho foi cadastrado no sistema e requer providências para a implantação.\n\n" +
-                        "Posto: %s\n" +
-                        "Código: %s\n" +
-                        "Cliente: %s\n" +
-                        "Empresa: %s\n" +
-                        "Cargo principal: %s\n" +
-                        "Quantidade necessária: %s\n" +
-                        "Data de implantação: %s\n\n" +
+                "Um novo Setor de Trabalho foi cadastrado e requer providências para a implantação.\n\n" +
+                        "📋 Cliente: %s\n" +
+                        "🏢 Setor de Trabalho: %s\n" +
+                        "🔖 Código: %s\n" +
+                        "🏗️ Empresa: %s\n" +
+                        "👤 Cargo principal: %s\n" +
+                        "👥 Vigilantes necessários: %s\n" +
+                        "📅 Data de implantação: %s\n\n" +
+                        "🔗 Acesse o Setor de Trabalho: %s\n\n" +
                         "RH, Departamento Pessoal, Almoxarifado, Suprimentos, Administrador e Comercial devem providenciar os recursos necessários para a implantação.",
+                clientName,
                 workPost.getName(),
                 workPost.getPostCode(),
-                client != null ? client.getName() : "Não informado",
                 workPost.getCompany() != null ? workPost.getCompany().getName() : "Não informada",
                 workPost.getPrimaryPosition() != null ? workPost.getPrimaryPosition().getName() : "Vigilante",
                 workPost.getRequiredVigilantes() != null ? workPost.getRequiredVigilantes().toString() : "Não informada",
-                workPost.getImplementationDate() != null ? workPost.getImplementationDate().toString() : "Não informada");
+                workPost.getImplementationDate() != null ? workPost.getImplementationDate().toString() : "Não informada",
+                workPostLink);
 
         for (UserGroup groupEnum : groups) {
             userGroupRepository.findByGroupName(groupEnum)

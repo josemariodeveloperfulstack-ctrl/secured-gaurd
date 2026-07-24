@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles } from 'lucide-react';
+import { X, Sparkles, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -90,6 +91,225 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
     implementationTime: '',
     observations: ''
   });
+
+  const DEFAULT_POST_TYPES = [
+    '01 Portaria 12 x 36',
+    '01 - Dia (12x36)',
+    '01 Portaria Noturna 12 x 36',
+    'POSTO_24H',
+    'POSTO_SDF',
+    'POSTO_12H_NOTURNO',
+    'POSTO_12H_DIURNO',
+    'POSTO_6H',
+    'POSTO_8H',
+    'OUTROS'
+  ];
+
+  const [availablePostTypes, setAvailablePostTypes] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('secured_guard_custom_post_types');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return Array.from(new Set([...DEFAULT_POST_TYPES, ...parsed]));
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_POST_TYPES;
+  });
+
+  const [isAddPostTypeOpen, setIsAddPostTypeOpen] = useState(false);
+  const [newPostTypeName, setNewPostTypeName] = useState('');
+
+  const handleAddNewPostType = () => {
+    const trimmed = newPostTypeName.trim();
+    if (!trimmed) return;
+
+    if (!availablePostTypes.includes(trimmed)) {
+      const updated = [...availablePostTypes, trimmed];
+      setAvailablePostTypes(updated);
+      try {
+        const customOnly = updated.filter(t => !DEFAULT_POST_TYPES.includes(t));
+        localStorage.setItem('secured_guard_custom_post_types', JSON.stringify(customOnly));
+      } catch {
+        // ignore
+      }
+    }
+
+    handleInputChange('type', trimmed);
+    setNewPostTypeName('');
+    setIsAddPostTypeOpen(false);
+    toast({
+      title: "Posto de Trabalho cadastrado",
+      description: `O posto de trabalho "${trimmed}" foi adicionado e selecionado.`,
+    });
+  };
+
+  const getTypeText = (type: string) => {
+    switch (type) {
+      case 'POSTO_24H': return 'Posto 24h';
+      case 'POSTO_SDF': return 'Posto SDF';
+      case 'POSTO_12H_NOTURNO': return '12h Noturno';
+      case 'POSTO_12H_DIURNO': return '12h Diurno';
+      case 'POSTO_6H': return 'Posto 6h';
+      case 'POSTO_8H': return 'Posto 8h';
+      case 'OUTROS': return 'Outros';
+      default: return type;
+    }
+  };
+
+  // Gestão de Seleção Múltipla de Empresas
+  const selectedCompanyIds = React.useMemo(() => {
+    if (!formData.companyId) return [];
+    return formData.companyId.split(',').map(id => id.trim()).filter(Boolean);
+  }, [formData.companyId]);
+
+  const handleToggleCompany = (companyId: string, checked: boolean) => {
+    let newIds: string[];
+    if (checked) {
+      newIds = Array.from(new Set([...selectedCompanyIds, companyId]));
+    } else {
+      newIds = selectedCompanyIds.filter(id => id !== companyId);
+    }
+    handleInputChange('companyId', newIds.join(','));
+  };
+
+  // Gestão de EPIs Padrão e Customizados
+  const STANDARD_EPIS = [
+    'Colete à Prova de Balas',
+    'Calçado de Segurança / Botina',
+    'Protetor Auricular',
+    'Óculos de Proteção',
+    'Luvas de Proteção / Táticas',
+    'Capacete de Segurança',
+    'Capa de Chuva',
+    'Lanterna Tática',
+    'Máscara Respiratória / PFF2',
+    'Cinto Tático'
+  ];
+
+  const [customEpiInput, setCustomEpiInput] = useState('');
+  const currentEpis = Array.isArray(formData.epis) ? formData.epis : [];
+
+  const handleToggleEpi = (epiName: string, checked: boolean) => {
+    let updated: string[];
+    if (checked) {
+      updated = Array.from(new Set([...currentEpis, epiName]));
+    } else {
+      updated = currentEpis.filter((e) => e !== epiName);
+    }
+    handleInputChange('epis', updated);
+  };
+
+  const handleAddCustomEpi = () => {
+    const trimmed = customEpiInput.trim();
+    if (!trimmed) return;
+
+    if (!currentEpis.includes(trimmed)) {
+      handleInputChange('epis', [...currentEpis, trimmed]);
+    }
+    setCustomEpiInput('');
+    toast({
+      title: "EPI Adicionado",
+      description: `O EPI "${trimmed}" foi adicionado à lista.`,
+    });
+  };
+
+  const handleRemoveEpi = (epiName: string) => {
+    handleInputChange('epis', currentEpis.filter((e) => e !== epiName));
+  };
+
+  // Gestão de Treinamentos Padrão e Customizados
+  const STANDARD_TRAININGS = [
+    'Curso de Formação de Vigilante',
+    'Reciclagem de Vigilante',
+    'Primeiros Socorros / APH',
+    'Combate a Incêndio / Brigada',
+    'Gerenciamento de Crises e Conflitos',
+    'Defesa Pessoal / Manuseio de Tonfa',
+    'Relações Humanas no Trabalho',
+    'Uso de Equipamentos não Letais',
+    'Segurança Física de Instalações',
+    'Supervisão e Liderança de Equipes'
+  ];
+
+  const [customTrainingInput, setCustomTrainingInput] = useState('');
+  const currentTrainings = Array.isArray(formData.trainings) ? formData.trainings : [];
+
+  const handleToggleTraining = (trainingName: string, checked: boolean) => {
+    let updated: string[];
+    if (checked) {
+      updated = Array.from(new Set([...currentTrainings, trainingName]));
+    } else {
+      updated = currentTrainings.filter((t) => t !== trainingName);
+    }
+    handleInputChange('trainings', updated);
+  };
+
+  const handleAddCustomTraining = () => {
+    const trimmed = customTrainingInput.trim();
+    if (!trimmed) return;
+
+    if (!currentTrainings.includes(trimmed)) {
+      handleInputChange('trainings', [...currentTrainings, trimmed]);
+    }
+    setCustomTrainingInput('');
+    toast({
+      title: "Treinamento Adicionado",
+      description: `O treinamento "${trimmed}" foi adicionado à lista.`,
+    });
+  };
+
+  const handleRemoveTraining = (trainingName: string) => {
+    handleInputChange('trainings', currentTrainings.filter((t) => t !== trainingName));
+  };
+
+  // Gestão de NRs Padrão e Customizadas
+  const STANDARD_NRS = [
+    'NR-1 (Gerenciamento de Riscos Ocupacionais)',
+    'NR-5 (CIPA)',
+    'NR-6 (Equipamentos de Proteção Individual - EPI)',
+    'NR-7 (PCMSO)',
+    'NR-9 (Avaliação e Controle de Exposições)',
+    'NR-10 (Segurança em Eletricidade)',
+    'NR-12 (Segurança em Máquinas e Equipamentos)',
+    'NR-17 (Ergonomia)',
+    'NR-23 (Proteção Contra Incêndios)',
+    'NR-35 (Trabalho em Altura)'
+  ];
+
+  const [customNrInput, setCustomNrInput] = useState('');
+  const currentNrs = Array.isArray(formData.nrs) ? formData.nrs : [];
+
+  const handleToggleNr = (nrName: string, checked: boolean) => {
+    let updated: string[];
+    if (checked) {
+      updated = Array.from(new Set([...currentNrs, nrName]));
+    } else {
+      updated = currentNrs.filter((n) => n !== nrName);
+    }
+    handleInputChange('nrs', updated);
+  };
+
+  const handleAddCustomNr = () => {
+    const trimmed = customNrInput.trim();
+    if (!trimmed) return;
+
+    if (!currentNrs.includes(trimmed)) {
+      handleInputChange('nrs', [...currentNrs, trimmed]);
+    }
+    setCustomNrInput('');
+    toast({
+      title: "NR Adicionada",
+      description: `A norma "${trimmed}" foi adicionada à lista.`,
+    });
+  };
+
+  const handleRemoveNr = (nrName: string) => {
+    handleInputChange('nrs', currentNrs.filter((n) => n !== nrName));
+  };
 
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -371,24 +591,25 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl h-[85vh] max-h-[850px] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 py-4 border-b">
           <DialogTitle>
-            {workPost ? 'Editar Posto de Trabalho' : 'Novo Posto de Trabalho'}
+            {workPost ? 'Editar Setor de Trabalho' : 'Novo Setor de Trabalho'}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="flex flex-1 flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Informações Básicas */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="postCode">Código do Posto *</Label>
+              <Label htmlFor="postCode">Código do Setor de Trabalho *</Label>
               <div className="flex items-center gap-2">
                 <Input
                   id="postCode"
                   value={formData.postCode}
                   onChange={(e) => handleInputChange('postCode', e.target.value)}
-                  placeholder="Ex: POSTO-001"
+                  placeholder="Ex: SETOR-001"
                   required
                 />
                 <Button
@@ -397,7 +618,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                   onClick={() => {
                     const code = generatePostCodeFromName(formData.name);
                     if (!code) {
-                      toast({ title: 'Informe o Nome do Posto', description: 'Preencha o campo Nome do Posto para gerar o código automaticamente.', variant: 'default' });
+                      toast({ title: 'Informe o Nome do Setor', description: 'Preencha o campo Nome do Setor de Trabalho para gerar o código automaticamente.', variant: 'default' });
                       return;
                     }
                     setFormData(prev => ({ ...prev, postCode: code }));
@@ -412,30 +633,39 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="name">Nome do Posto *</Label>
+              <Label htmlFor="name">Nome do Setor de Trabalho *</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder="Ex: Posto Principal - Barbosa Mello"
+                placeholder="Ex: Setor Cidade Nova / Portaria Central"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Tipo *</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="type">Posto de Trabalho *</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsAddPostTypeOpen(true)}
+                  className="h-6 text-xs text-primary hover:underline px-1"
+                >
+                  + Cadastrar Novo Posto
+                </Button>
+              </div>
               <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione o Posto de Trabalho" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="POSTO_24H">Posto 24h</SelectItem>
-                  <SelectItem value="POSTO_SDF">Posto SDF</SelectItem>
-                  <SelectItem value="POSTO_12H_NOTURNO">12h Noturno</SelectItem>
-                  <SelectItem value="POSTO_12H_DIURNO">12h Diurno</SelectItem>
-                  <SelectItem value="POSTO_6H">Posto 6h</SelectItem>
-                  <SelectItem value="POSTO_8H">Posto 8h</SelectItem>
-                  <SelectItem value="OUTROS">Outros</SelectItem>
+                  {availablePostTypes.map((pt) => (
+                    <SelectItem key={pt} value={pt}>
+                      {getTypeText(pt)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -461,22 +691,47 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="companyId">Empresa *</Label>
-              <Select
-                value={formData.companyId || ''}
-                onValueChange={(value) => handleInputChange('companyId', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.sigla ? `${company.sigla} - ${company.name}` : company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Empresa(s) *</Label>
+              <div className="border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto bg-background">
+                {companies.length === 0 ? (
+                  <span className="text-sm text-muted-foreground">Carregando empresas...</span>
+                ) : (
+                  companies.map((company) => {
+                    const isChecked = selectedCompanyIds.includes(company.id);
+                    return (
+                      <div key={company.id} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`company-${company.id}`}
+                          checked={isChecked}
+                          onChange={(e) => handleToggleCompany(company.id, e.target.checked)}
+                          className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                        />
+                        <Label htmlFor={`company-${company.id}`} className="cursor-pointer text-sm font-medium">
+                          {company.sigla ? `${company.sigla} - ${company.name}` : company.name}
+                        </Label>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {selectedCompanyIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {selectedCompanyIds.map((id) => {
+                    const comp = companies.find((c) => c.id === id);
+                    if (!comp) return null;
+                    return (
+                      <Badge key={id} variant="secondary" className="text-xs flex items-center gap-1.5 py-1 px-2.5">
+                        <span>{comp.sigla || comp.name}</span>
+                        <X
+                          className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground"
+                          onClick={() => handleToggleCompany(id, false)}
+                        />
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {!isPromoverVigilancia && (
@@ -865,48 +1120,266 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label htmlFor="nrs">Normas Regulamentadoras (NRs)</Label>
-              <Input
-                id="nrs"
-                value={Array.isArray(formData.nrs) ? formData.nrs.join(', ') : ''}
-                onChange={(e) => handleInputChange('nrs', e.target.value.split(',').map(nr => nr.trim()).filter(nr => nr))}
-                placeholder="Ex: NR-1, NR-5, NR-6, NR-23"
-              />
+
+              {/* Checkboxes de NRs Padrão */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border rounded-md p-3 bg-muted/10">
+                {STANDARD_NRS.map((nr) => {
+                  const isChecked = currentNrs.includes(nr);
+                  return (
+                    <div key={nr} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`nr-${nr}`}
+                        checked={isChecked}
+                        onChange={(e) => handleToggleNr(nr, e.target.checked)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <Label htmlFor={`nr-${nr}`} className="cursor-pointer text-xs font-medium">
+                        {nr}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Inserção Manual de NR */}
+              <div className="flex gap-2 items-center">
+                <Input
+                  id="customNr"
+                  placeholder="Digitar outra NR que não está na lista (ex: NR-33)..."
+                  value={customNrInput}
+                  onChange={(e) => setCustomNrInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddCustomNr();
+                    }
+                  }}
+                  className="text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddCustomNr}
+                  disabled={!customNrInput.trim()}
+                  className="shrink-0"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar
+                </Button>
+              </div>
+
+              {/* Badges de NRs Selecionadas */}
+              {currentNrs.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-muted-foreground">NRs Selecionadas ({currentNrs.length}):</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentNrs.map((nr) => (
+                      <Badge key={nr} variant="secondary" className="text-xs flex items-center gap-1.5 py-1 px-2.5">
+                        <span>{nr}</span>
+                        <X
+                          className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground"
+                          onClick={() => handleRemoveNr(nr)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label htmlFor="epis">EPIs Necessários</Label>
-              <Input
-                id="epis"
-                value={Array.isArray(formData.epis) ? formData.epis.join(', ') : ''}
-                onChange={(e) => handleInputChange('epis', e.target.value.split(',').map(epi => epi.trim()).filter(epi => epi))}
-                placeholder="Ex: Uniforme, Colete à prova de balas, Rádio comunicador"
-              />
+
+              {/* Checkboxes de EPIs Padrão */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border rounded-md p-3 bg-muted/10">
+                {STANDARD_EPIS.map((epi) => {
+                  const isChecked = currentEpis.includes(epi);
+                  return (
+                    <div key={epi} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`epi-${epi}`}
+                        checked={isChecked}
+                        onChange={(e) => handleToggleEpi(epi, e.target.checked)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <Label htmlFor={`epi-${epi}`} className="cursor-pointer text-xs font-medium">
+                        {epi}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Inserção Manual de EPI */}
+              <div className="flex gap-2 items-center">
+                <Input
+                  id="customEpi"
+                  placeholder="Digitar outro EPI que não está na lista..."
+                  value={customEpiInput}
+                  onChange={(e) => setCustomEpiInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddCustomEpi();
+                    }
+                  }}
+                  className="text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddCustomEpi}
+                  disabled={!customEpiInput.trim()}
+                  className="shrink-0"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar
+                </Button>
+              </div>
+
+              {/* Badges de EPIs Selecionados */}
+              {currentEpis.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-muted-foreground">EPIs Selecionados ({currentEpis.length}):</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentEpis.map((epi) => (
+                      <Badge key={epi} variant="secondary" className="text-xs flex items-center gap-1.5 py-1 px-2.5">
+                        <span>{epi}</span>
+                        <X
+                          className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground"
+                          onClick={() => handleRemoveEpi(epi)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label htmlFor="trainings">Treinamentos Necessários</Label>
-              <Input
-                id="trainings"
-                value={Array.isArray(formData.trainings) ? formData.trainings.join(', ') : ''}
-                onChange={(e) => handleInputChange('trainings', e.target.value.split(',').map(training => training.trim()).filter(training => training))}
-                placeholder="Ex: Curso de Vigilante, Primeiros Socorros, Combate a Incêndio"
-              />
+
+              {/* Checkboxes de Treinamentos Padrão */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border rounded-md p-3 bg-muted/10">
+                {STANDARD_TRAININGS.map((training) => {
+                  const isChecked = currentTrainings.includes(training);
+                  return (
+                    <div key={training} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`training-${training}`}
+                        checked={isChecked}
+                        onChange={(e) => handleToggleTraining(training, e.target.checked)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <Label htmlFor={`training-${training}`} className="cursor-pointer text-xs font-medium">
+                        {training}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Inserção Manual de Treinamento */}
+              <div className="flex gap-2 items-center">
+                <Input
+                  id="customTraining"
+                  placeholder="Digitar outro treinamento que não está na lista..."
+                  value={customTrainingInput}
+                  onChange={(e) => setCustomTrainingInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddCustomTraining();
+                    }
+                  }}
+                  className="text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddCustomTraining}
+                  disabled={!customTrainingInput.trim()}
+                  className="shrink-0"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar
+                </Button>
+              </div>
+
+              {/* Badges de Treinamentos Selecionados */}
+              {currentTrainings.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-muted-foreground">Treinamentos Selecionados ({currentTrainings.length}):</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentTrainings.map((training) => (
+                      <Badge key={training} variant="secondary" className="text-xs flex items-center gap-1.5 py-1 px-2.5">
+                        <span>{training}</span>
+                        <X
+                          className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-foreground"
+                          onClick={() => handleRemoveTraining(training)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             </div>
           </div>
 
-          {/* Botões */}
-          <div className="flex justify-end gap-2">
+          {/* Botões Fixos no Rodapé */}
+          <div className="shrink-0 border-t bg-background px-6 py-3 flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Salvando...' : (workPost ? 'Atualizar' : 'Criar')}
+              {loading ? 'Salvando...' : (workPost ? 'Atualizar Setor' : 'Criar Setor')}
             </Button>
           </div>
         </form>
       </DialogContent>
+
+      {/* Modal auxiliar de Cadastro de Novo Posto de Trabalho */}
+      <Dialog open={isAddPostTypeOpen} onOpenChange={setIsAddPostTypeOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cadastrar Novo Posto de Trabalho</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="newPostType">Descrição do Posto de Trabalho *</Label>
+              <Input
+                id="newPostType"
+                placeholder="Ex: 01 Portaria 12 x 36"
+                value={newPostTypeName}
+                onChange={(e) => setNewPostTypeName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddNewPostType();
+                  }
+                }}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" type="button" onClick={() => setIsAddPostTypeOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={handleAddNewPostType} disabled={!newPostTypeName.trim()}>
+                Salvar e Selecionar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };
