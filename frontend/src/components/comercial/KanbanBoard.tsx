@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DndContext, DragOverlay, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { 
   Plus, 
   Search, 
@@ -24,7 +25,8 @@ import {
   AlertCircle,
   XCircle,
   Star,
-  Trash2
+  Trash2,
+  Send
 } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import styles from './KanbanBoard.module.css';
@@ -36,11 +38,13 @@ import {
   createKanbanStatus,
   deleteOpportunity,
   deleteMultipleOpportunities,
-  deleteAllOpportunities
+  deleteAllOpportunities,
+  createInteractionHistory
 } from '@/services/crmService';
 import { userService } from '@/services/userService';
 import leadService from '@/services/leadService';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface KanbanStatus {
   id: string | number;
@@ -286,7 +290,12 @@ export default function KanbanBoard() {
   const [deleteMode, setDeleteMode] = useState<'bulk' | 'single' | 'all'>('bulk');
   const [deleteReason, setDeleteReason] = useState('Exclusão em massa via sistema');
   const [deleteSingleId, setDeleteSingleId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [messageModal, setMessageModal] = useState<{ open: boolean; opp: Opportunity | null; text: string }>({
+    open: false, opp: null, text: ''
+  });
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
 
   const isOpportunityUuid = (id: string) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -718,7 +727,7 @@ export default function KanbanBoard() {
       statusId: statusIdStr,
       closeDate: '',
       estimatedValue: '',
-      assignedToId: '',
+      assignedToId: currentUser?.id || '',
       leadId: ''
     });
     setEditing(null);
@@ -938,13 +947,109 @@ export default function KanbanBoard() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
+    if (!dateString) return '—';
+    const d = new Date(dateString);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('pt-BR');
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const activeOpportunity = activeId
+    ? uniqueOpportunities.find(opp => String(opp.id) === activeId) ?? null
+    : null;
+
+  const recordInteraction = async (opp: Opportunity, action: string, note: string) => {
+    try {
+      const isUuid = (v: unknown) =>
+        typeof v === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+      const payload: Record<string, unknown> = {
+        opportunityId: opp.id,
+        action,
+        note,
+      };
+      if (isUuid(opp.lead?.id)) {
+        payload.leadId = opp.lead.id;
+      }
+      await createInteractionHistory(payload);
+    } catch (err) {
+      console.error('Erro ao registrar interação:', err);
+    }
+  };
+
+  const handleSendEmail = (opp: Opportunity) => {
+    const email = opp.lead?.email;
+    if (!email) return;
+    const subject = encodeURIComponent(`Oportunidade: ${opp.title}`);
+    window.open(`mailto:${email}?subject=${subject}`, '_blank');
+    recordInteraction(opp, 'EMAIL_SENT', `E-mail enviado para ${email}`);
+  };
+
+  const handleSendWhatsApp = (opp: Opportunity) => {
+    const phone = opp.lead?.phone?.replace(/\D/g, '');
+    if (!phone) return;
+    const text = encodeURIComponent(`Olá ${opp.lead?.name || ''}, tudo bem?`);
+    window.open(`https://wa.me/55${phone}?text=${text}`, '_blank');
+    recordInteraction(opp, 'WHATSAPP_SENT', `WhatsApp enviado para ${opp.lead?.phone}`);
+  };
+
+  const handleSendMessage = (opp: Opportunity) => {
+    setMessageModal({ open: true, opp, text: '' });
+  };
+
+  const handleDragStart = (event: any) => {
+    setActiveId(String(event.active.id));
+  };
+
+  const handleDragEnd = async (event: any) => {
+    setActiveId(null);
+    const { active, over } = event;
+    if (!over || !active) return;
+
+    const oppId = String(active.id);
+    const newStatusId = over.id as string;
+
+    const opp = uniqueOpportunities.find(o => String(o.id) === oppId);
+    if (!opp || String(opp.statusId) === newStatusId) return;
+
+    try {
+      const opportunityData: any = {
+        title: opp.title,
+        description: opp.description,
+        statusId: newStatusId,
+      };
+      await updateOpportunity(oppId, opportunityData);
+      setOpportunities(prev => prev.map(o =>
+        String(o.id) === oppId ? { ...o, statusId: newStatusId } : o
+      ));
+    } catch (err) {
+      console.error('Erro ao mover oportunidade:', err);
+      toast({
+        title: 'Erro ao mover',
+        description: 'Não foi possível mover a oportunidade. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
   };
 
   if (loading) return <div className="flex items-center justify-center p-8">Carregando Kanban...</div>;
   if (error) return <div className="text-red-500 p-8">{error}</div>;
 
   return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
     <div className="space-y-6 w-full min-w-0">
       {/* Header com estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1111,60 +1216,110 @@ export default function KanbanBoard() {
           const totalValue = statusOpportunities.reduce((sum, opp) => sum + opp.value, 0);
           
           return (
-            <div
-              key={`col-${status.id}`}
-              className={styles['kanban-column']}
-              style={{ borderLeft: `4px solid ${status.color}` }}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-seguranca-lightgray">{status.name}</h3>
-                  <p className="text-sm text-gray-400">
-                    {statusOpportunities.length} oportunidades • {formatCurrency(totalValue)}
-                  </p>
+            <ColumnDroppable key={`col-${status.id}`} id={String(status.id)}>
+              <div
+                className={styles['kanban-column']}
+                style={{ borderLeft: `4px solid ${status.color}` }}
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-seguranca-lightgray">{status.name}</h3>
+                    <p className="text-sm text-gray-400">
+                      {statusOpportunities.length} oportunidades • {formatCurrency(totalValue)}
+                    </p>
+                  </div>
+                  <Button 
+                    size="sm"
+                    onClick={() => openModal(status.id)}
+                    className="bg-seguranca-yellow text-black hover:bg-yellow-500"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
+                
+                <div className="space-y-3">
+                  {statusOpportunities.map(opp => (
+                    <KanbanCard
+                      key={`${status.id}-${opp.id}`}
+                      opportunity={opp}
+                      onEdit={openEditModal}
+                      getPriorityColor={getPriorityColor}
+                      getLeadStatusColor={getLeadStatusColor}
+                      getLeadStatusText={getLeadStatusText}
+                      selected={selectedOppIds.includes(String(opp.id))}
+                      onSelect={toggleSelect}
+                      onDelete={openSingleDeleteDialog}
+                      onSendEmail={handleSendEmail}
+                      onSendWhatsApp={handleSendWhatsApp}
+                      onSendMessage={handleSendMessage}
+                      formatCurrency={formatCurrency}
+                      formatDate={formatDate}
+                    />
+                  ))}
+                </div>
+                
                 <Button 
-                  size="sm"
+                  variant="outline"
                   onClick={() => openModal(status.id)}
-                  className="bg-seguranca-yellow text-black hover:bg-yellow-500"
+                  disabled={!hasValidStatuses}
+                  className="w-full mt-4 border-dashed border-gray-600 text-gray-400 hover:bg-seguranca-black disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!hasValidStatuses ? "Crie status no backend antes de adicionar oportunidades" : "Adicionar oportunidade"}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Oportunidade
                 </Button>
               </div>
-              
-              <div className="space-y-3">
-                {statusOpportunities.map(opp => (
-                  <KanbanCard
-                    key={`${status.id}-${opp.id}`}
-                    opportunity={opp}
-                    onEdit={openEditModal}
-                    onDragStart={() => {}}
-                    getPriorityColor={getPriorityColor}
-                    getLeadStatusColor={getLeadStatusColor}
-                    getLeadStatusText={getLeadStatusText}
-                    selected={selectedOppIds.includes(String(opp.id))}
-                    onSelect={toggleSelect}
-                    onDelete={openSingleDeleteDialog}
-                    formatCurrency={formatCurrency}
-                    formatDate={formatDate}
-                  />
-                ))}
-              </div>
-              
-              <Button 
-                variant="outline"
-                onClick={() => openModal(status.id)}
-                disabled={!hasValidStatuses}
-                className="w-full mt-4 border-dashed border-gray-600 text-gray-400 hover:bg-seguranca-black disabled:opacity-50 disabled:cursor-not-allowed"
-                title={!hasValidStatuses ? "Crie status no backend antes de adicionar oportunidades" : "Adicionar oportunidade"}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Oportunidade
-              </Button>
-            </div>
+            </ColumnDroppable>
           );
         })}
       </div>
+
+      {/* Modal de mensagem */}
+      <Dialog open={messageModal.open} onOpenChange={(open) => setMessageModal(prev => ({ ...prev, open }))}>
+        <DialogContent className="sm:max-w-md border border-gray-600 bg-seguranca-graphite p-6 text-seguranca-lightgray shadow-2xl [&>button]:text-seguranca-lightgray">
+          <DialogHeader>
+            <DialogTitle className="text-seguranca-lightgray">
+              Mensagem para {messageModal.opp?.lead?.name || 'Lead'}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Registra a mensagem no histórico de interações da oportunidade.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={messageModal.text}
+            onChange={(e) => setMessageModal(prev => ({ ...prev, text: e.target.value }))}
+            placeholder="Digite sua mensagem..."
+            className="bg-seguranca-black border-gray-600 text-seguranca-lightgray min-h-[120px]"
+          />
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setMessageModal({ open: false, opp: null, text: '' })}
+              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const opp = messageModal.opp;
+                const text = messageModal.text.trim();
+                if (!opp || !text) return;
+                recordInteraction(opp, 'MESSAGE_SENT', text);
+                setMessageModal({ open: false, opp: null, text: '' });
+                toast({
+                  title: 'Mensagem registrada',
+                  description: 'A mensagem foi salva no histórico de interações.',
+                });
+              }}
+              className="bg-seguranca-yellow text-black hover:bg-yellow-500"
+              disabled={!messageModal.text.trim()}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Enviar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmação de exclusão (tema CRM) */}
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
@@ -1225,6 +1380,11 @@ export default function KanbanBoard() {
             <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-semibold text-seguranca-lightgray">
               {editing ? 'Editar Oportunidade' : 'Nova Oportunidade'}
             </DialogTitle>
+            <DialogDescription className="text-gray-400 text-sm">
+              {editing
+                ? 'Atualize os dados da oportunidade no funil comercial.'
+                : 'Preencha os dados para criar uma nova oportunidade no Kanban.'}
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={(e) => { e.preventDefault(); handleSaveOpportunity(); }} className="space-y-4 sm:space-y-6 px-4 sm:px-0">
@@ -1310,13 +1470,16 @@ export default function KanbanBoard() {
                 Responsável
               </Label>
               <Select 
-                value={form.assignedToId ? form.assignedToId : undefined} 
-                onValueChange={(value) => setForm(f => ({ ...f, assignedToId: value }))}
+                value={form.assignedToId || 'none'} 
+                onValueChange={(value) => setForm(f => ({ ...f, assignedToId: value === 'none' ? '' : value }))}
               >
                 <SelectTrigger id="assignedTo" className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-10">
                   <SelectValue placeholder="Selecione o responsável (opcional)" />
                 </SelectTrigger>
                 <SelectContent className="bg-seguranca-graphite border-gray-600">
+                  <SelectItem value="none" className="text-seguranca-lightgray hover:bg-seguranca-black">
+                    Não atribuído
+                  </SelectItem>
                   {users.map(user => (
                     <SelectItem key={String(user.id)} value={String(user.id)} className="text-seguranca-lightgray hover:bg-seguranca-black">
                       {user.name}
@@ -1331,8 +1494,12 @@ export default function KanbanBoard() {
                 Lead
               </Label>
               <Select 
-                value={form.leadId ? form.leadId : undefined} 
+                value={form.leadId || 'none'} 
                 onValueChange={(value) => {
+                  if (value === 'none') {
+                    setForm(f => ({ ...f, leadId: '', leadSource: '' }));
+                    return;
+                  }
                   const selectedLead = leads.find(l => String(l.id) === value);
                   // Buscar source do lead - pode estar como objeto (enum) ou string
                   let sourceValue = '';
@@ -1355,6 +1522,9 @@ export default function KanbanBoard() {
                   <SelectValue placeholder="Selecione o lead (opcional)" />
                 </SelectTrigger>
                 <SelectContent className="bg-seguranca-graphite border-gray-600">
+                  <SelectItem value="none" className="text-seguranca-lightgray hover:bg-seguranca-black">
+                    Nenhum lead
+                  </SelectItem>
                   {leads.map(lead => (
                     <SelectItem key={String(lead.id)} value={String(lead.id)} className="text-seguranca-lightgray hover:bg-seguranca-black">
                       {lead.name || lead.company || `Lead #${lead.id}`}
@@ -1370,13 +1540,14 @@ export default function KanbanBoard() {
                   Fonte do Lead
                 </Label>
                 <Select 
-                  value={form.leadSource || undefined} 
-                  onValueChange={(value) => setForm(f => ({ ...f, leadSource: value }))}
+                  value={form.leadSource || 'none'} 
+                  onValueChange={(value) => setForm(f => ({ ...f, leadSource: value === 'none' ? '' : value }))}
                 >
                   <SelectTrigger id="leadSource" className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-10">
                     <SelectValue placeholder="Selecione a fonte do lead" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="none" className="text-seguranca-lightgray hover:bg-seguranca-black">Não informado</SelectItem>
                     <SelectItem value="WEBSITE" className="text-seguranca-lightgray hover:bg-seguranca-black">Website</SelectItem>
                     <SelectItem value="REFERRAL" className="text-seguranca-lightgray hover:bg-seguranca-black">Indicação</SelectItem>
                     <SelectItem value="COLD_CALL" className="text-seguranca-lightgray hover:bg-seguranca-black">Ligação a Frio</SelectItem>
@@ -1410,6 +1581,38 @@ export default function KanbanBoard() {
           </form>
         </DialogContent>
       </Dialog>
+    </div>
+      <DragOverlay
+        dropAnimation={null}
+        zIndex={10000}
+        style={{ zIndex: 10000 }}
+        className="cursor-grabbing"
+      >
+        {activeOpportunity ? (
+          <KanbanCard
+            opportunity={activeOpportunity}
+            isDragOverlay
+            onEdit={() => {}}
+            getPriorityColor={getPriorityColor}
+            getLeadStatusColor={getLeadStatusColor}
+            getLeadStatusText={getLeadStatusText}
+            formatCurrency={formatCurrency}
+            formatDate={formatDate}
+          />
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+}
+
+function ColumnDroppable({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`transition-colors ${isOver ? 'bg-seguranca-yellow/10 ring-2 ring-seguranca-yellow/40 rounded-lg' : ''}`}
+    >
+      {children}
     </div>
   );
 } 

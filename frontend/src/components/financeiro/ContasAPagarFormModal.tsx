@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, CheckCircle } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
-import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
+import { contasAPagarService, Supplier, CategoriaPai, Subcategoria, EmployeeSelect } from '@/services/contasAPagarService';
 import SupplierFormModal from '@/components/estoque/SupplierFormModal';
 
 export interface ContaAPagar {
@@ -21,7 +21,6 @@ export interface ContaAPagar {
   fornecedorId?: string;
   empresa?: string;
   empresaId?: string;
-  companySigla?: string;
   descricao: string;
   tipo: 'FIXA' | 'VARIAVEL';
   valor: number;
@@ -32,6 +31,8 @@ export interface ContaAPagar {
   observacoes?: string;
   comprovante?: File;
   categoria?: string | undefined;
+  subcategoriaId?: string | undefined;
+  employeeId?: string | undefined;
   centroCusto?: string | undefined;
   createdAt?: Date;
 }
@@ -83,6 +84,13 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   const [newCategoryModalOpen, setNewCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [paymentConfirmDate, setPaymentConfirmDate] = useState<Date | null>(new Date());
+
+  // Plano de Contas state
+  const [categoriasPai, setCategoriasPai] = useState<CategoriaPai[]>([]);
+  const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
+  const [selectedCategoriaPaiId, setSelectedCategoriaPaiId] = useState<string>('');
+  const [employees, setEmployees] = useState<EmployeeSelect[]>([]);
+  const [selectedSubcategoria, setSelectedSubcategoria] = useState<Subcategoria | null>(null);
 
   // Helpers para moeda BRL com 2 casas decimais
   const formatToBRL = (raw: string | number): string => {
@@ -230,6 +238,19 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
             'Logística'
           ]);
         });
+
+      // Carregar Plano de Contas
+      contasAPagarService.getCategoriasPai()
+        .then(data => setCategoriasPai(Array.isArray(data) ? data : []))
+        .catch(() => setCategoriasPai([]));
+
+      contasAPagarService.getSubcategorias()
+        .then(data => setSubcategorias(Array.isArray(data) ? data : []))
+        .catch(() => setSubcategorias([]));
+
+      contasAPagarService.getEmployeeList()
+        .then(data => setEmployees(Array.isArray(data) ? data : []))
+        .catch(() => setEmployees([]));
     }
   }, [open]);
 
@@ -252,7 +273,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           dataEmissao: (typeof initialData.dataEmissao === 'string' ? parseDateFromBackend(initialData.dataEmissao) : initialData.dataEmissao) || new Date(),
           vencimento: (typeof initialData.vencimento === 'string' ? parseDateFromBackend(initialData.vencimento) : initialData.vencimento) || new Date(),
           fornecedor: initialData.fornecedor || '',
-          fornecedorId: fornecedorIdStr, // Usar string convertida
+          fornecedorId: fornecedorIdStr,
           empresa: initialData.empresa || '',
           empresaId: initialData.empresaId ? (typeof initialData.empresaId === 'string' ? initialData.empresaId : String(initialData.empresaId)) : '',
           companySigla: initialData.companySigla || '',
@@ -265,10 +286,20 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           dataPagamento: (typeof initialData.dataPagamento === 'string' ? parseDateFromBackend(initialData.dataPagamento) : initialData.dataPagamento) || undefined,
           observacoes: initialData.observacoes || '',
           categoria: initialData.categoria || '',
+          subcategoriaId: initialData.subcategoriaId || '',
+          employeeId: initialData.employeeId || '',
           centroCusto: initialData.centroCusto || ''
         });
         setValorDisplay(formatToBRL(initialData.valor ?? 0));
         setPaymentConfirmDate((typeof initialData.dataPagamento === 'string' ? parseDateFromBackend(initialData.dataPagamento) : initialData.dataPagamento) || new Date());
+        // Restaurar subcategoria selecionada
+        if (initialData.subcategoriaId) {
+          const sub = subcategorias.find(s => s.id === initialData.subcategoriaId);
+          if (sub) {
+            setSelectedSubcategoria(sub);
+            setSelectedCategoriaPaiId(sub.categoriaPaiId);
+          }
+        }
       } else {
         // Resetar formulário para modo de criação
         setFormData({
@@ -287,8 +318,12 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           dataPagamento: undefined,
           observacoes: '',
           categoria: undefined,
+          subcategoriaId: '',
+          employeeId: '',
           centroCusto: undefined
         });
+        setSelectedCategoriaPaiId('');
+        setSelectedSubcategoria(null);
         setValorDisplay('R$ 0,00');
         setPaymentConfirmDate(new Date());
       }
@@ -573,9 +608,94 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
               />
             </div>
 
-            {/* Categoria */}
+            {/* Categoria Pai (Plano de Contas) */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Categoria</label>
+              <Select
+                value={selectedCategoriaPaiId || 'none'}
+                onValueChange={(value) => {
+                  setSelectedCategoriaPaiId(value === 'none' ? '' : value);
+                  setSelectedSubcategoria(null);
+                  handleInputChange('subcategoriaId', '');
+                }}
+              >
+                <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-600">
+                  <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
+                    Nenhuma
+                  </SelectItem>
+                  {categoriasPai.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      {cat.codigo} - {cat.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Subcategoria (dependente da categoria pai) */}
+            {selectedCategoriaPaiId && selectedCategoriaPaiId !== 'none' && selectedCategoriaPaiId.length > 20 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray">Subcategoria</label>
+                <Select
+                  value={formData.subcategoriaId || ''}
+                  onValueChange={(value) => {
+                    handleInputChange('subcategoriaId', value);
+                    const sub = subcategorias.find(s => s.id === value);
+                    setSelectedSubcategoria(sub || null);
+                    if (!sub?.requerVinculoFuncionario) {
+                      handleInputChange('employeeId', '');
+                    }
+                  }}
+                >
+                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue placeholder="Selecione uma subcategoria" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {subcategorias
+                      .filter(s => s.categoriaPaiId === selectedCategoriaPaiId)
+                      .map((sub) => (
+                        <SelectItem key={sub.id} value={sub.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                          {sub.codigo} - {sub.nome}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Funcionário (condicional) */}
+            {selectedSubcategoria?.requerVinculoFuncionario && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-yellow-400 flex items-center gap-2">
+                  <Users size={14} />
+                  Funcionário *
+                </label>
+                <Select
+                  value={formData.employeeId || ''}
+                  onValueChange={(value) => handleInputChange('employeeId', value)}
+                  required
+                >
+                  <SelectTrigger className="border-yellow-500 bg-seguranca-black text-seguranca-lightgray focus:border-yellow-400 focus:ring-yellow-400">
+                    <SelectValue placeholder="Selecione um funcionário" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    {employees.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                        {emp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-yellow-500/80">Esta subcategoria exige vínculo com um funcionário.</p>
+              </div>
+            )}
+
+            {/* Categoria antiga (fallback) */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400">Categoria (texto livre)</label>
               <Select
                 value={(formData.categoria && formData.categoria !== '') ? formData.categoria : 'NENHUMA'}
                 onValueChange={(value) => handleInputChange('categoria', value)}

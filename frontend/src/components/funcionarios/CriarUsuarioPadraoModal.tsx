@@ -7,12 +7,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { userService } from '@/services/userService';
-import { User, CreateUserDTO } from '@/types/user';
+import { userService, User as ServiceUser } from '@/services/userService';
+import { User } from '@/types/user';
 import { roleService, Role } from '@/services/roleService';
 import { 
   UserPlus, Loader2, CheckCircle, AlertCircle, User as UserIcon, 
-  Mail, Lock, Shield, Eye, EyeOff, Sparkles, KeyRound 
+  Mail, Lock, Shield, Eye, EyeOff, Sparkles, KeyRound, RefreshCw 
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,6 +24,16 @@ interface CriarUsuarioPadraoModalProps {
   employeeName: string;
   employeeCpf: string;
   employeePhone: string;
+}
+
+/** Senha padrão: CPF@PromoverAAAA (ex.: 14705707699@Promover2026) */
+export function buildDefaultEmployeePassword(cpf: string): string {
+  const digits = (cpf || '').replace(/\D/g, '');
+  const year = new Date().getFullYear();
+  if (digits.length === 11) {
+    return `${digits}@Promover${year}`;
+  }
+  return `usuario@Promover${year}`;
 }
 
 const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
@@ -51,14 +61,18 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [existingUserId, setExistingUserId] = useState<string | null>(null);
   
   const { toast } = useToast();
+  const isUpdateMode = !!existingUserId;
 
-  // Carregar roles disponíveis
   React.useEffect(() => {
     if (open) {
       loadRoles();
       generateDefaultCredentials();
+      detectExistingUser();
+    } else {
+      setExistingUserId(null);
     }
   }, [open, employeeName, employeeCpf]);
 
@@ -80,23 +94,52 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
   };
 
   const generateDefaultCredentials = () => {
-    if (employeeName && employeeCpf) {
-      // Gerar username baseado no nome e CPF
-      const firstName = employeeName.split(' ')[0].toLowerCase();
-      const lastName = employeeName.split(' ').pop()?.toLowerCase() || '';
-      const cpfNumbers = employeeCpf.replace(/\D/g, '');
-      const cpfSuffix = cpfNumbers.slice(-4);
-      
-      // Adicionar timestamp para garantir unicidade
-      const timestamp = Date.now().toString().slice(-3);
-      const generatedUsername = `${firstName}.${lastName}.${cpfSuffix}.${timestamp}`;
-      const generatedEmail = `${firstName}.${lastName}.${cpfSuffix}@securedguard.com`;
-      
-      setForm(prev => ({
-        ...prev,
-        username: generatedUsername,
-        email: generatedEmail
-      }));
+    const cpfNumbers = (employeeCpf || '').replace(/\D/g, '');
+    const firstName = (employeeName || 'usuario').trim().split(/\s+/)[0].toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '') || 'usuario';
+
+    const generatedUsername = cpfNumbers.length === 11 ? cpfNumbers : firstName;
+    const generatedEmail = cpfNumbers.length === 11
+      ? `${cpfNumbers}@securedguard.local`
+      : `${firstName}.${Date.now().toString().slice(-4)}@securedguard.local`;
+    const defaultPassword = buildDefaultEmployeePassword(employeeCpf);
+
+    setForm(prev => ({
+      ...prev,
+      username: generatedUsername,
+      email: generatedEmail,
+      password: defaultPassword,
+      confirmPassword: defaultPassword,
+    }));
+  };
+
+  const detectExistingUser = async () => {
+    const cpfNumbers = (employeeCpf || '').replace(/\D/g, '');
+    if (cpfNumbers.length !== 11) {
+      setExistingUserId(null);
+      return;
+    }
+    try {
+      const users = await userService.searchUsers(cpfNumbers);
+      const match = (users || []).find(
+        (u) =>
+          u.username === cpfNumbers ||
+          (u.email || '').toLowerCase() === `${cpfNumbers}@securedguard.local`
+      );
+      if (match?.id) {
+        setExistingUserId(match.id);
+        setForm((prev) => ({
+          ...prev,
+          username: match.username || prev.username,
+          email: match.email || prev.email,
+          isActive: match.active !== false,
+        }));
+      } else {
+        setExistingUserId(null);
+      }
+    } catch {
+      setExistingUserId(null);
     }
   };
 
@@ -147,6 +190,19 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
     return true;
   };
 
+  const buildPayload = (selectedRoleName: string) => {
+    const whatsappDigits = employeePhone ? employeePhone.replace(/\D/g, '') : '';
+    return {
+      username: form.username.trim(),
+      email: form.email.trim(),
+      password: form.password,
+      roles: [selectedRoleName],
+      active: form.isActive,
+      name: (employeeName || '').trim() || form.username.trim(),
+      ...(whatsappDigits.length >= 9 ? { whatsapp: whatsappDigits } : {}),
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -158,53 +214,88 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
     setError(null);
     
     try {
-      // Encontrar o role selecionado para pegar o nome
       const selectedRole = roles.find(r => r.id === form.roleId);
       if (!selectedRole) {
         setError('Role selecionado não encontrado');
         return;
       }
 
-      const userData = {
-        username: form.username.trim(),
-        email: form.email.trim(),
-        password: form.password,
-        roles: [selectedRole.name], // Backend espera array de strings com os nomes dos roles
-        active: form.isActive,
-        name: employeeName,
-        whatsapp: employeePhone ? employeePhone.replace(/\D/g, '') : undefined // Backend espera whatsapp, não phone
-      };
+      const userData = buildPayload(selectedRole.name);
+      let savedUser: ServiceUser;
+
+      if (existingUserId) {
+        savedUser = await userService.updateUser(existingUserId, userData);
+        toast({
+          title: 'Usuário atualizado',
+          description: 'Credenciais e permissões atualizadas com sucesso.',
+        });
+      } else {
+        try {
+          savedUser = await userService.createUser(userData);
+          toast({
+            title: 'Sucesso!',
+            description: 'Usuário criado com sucesso.',
+          });
+        } catch (createErr: any) {
+          const msg = String(createErr.response?.data?.message || '');
+          const alreadyExists =
+            /já está em uso|já existe|already exists|duplicate/i.test(msg);
+
+          if (!alreadyExists) {
+            throw createErr;
+          }
+
+          // Usuário já existe: localizar e atualizar senha/dados
+          const users = await userService.searchUsers(form.username.trim());
+          const match = (users || []).find(
+            (u) =>
+              u.username === form.username.trim() ||
+              (u.email || '').toLowerCase() === form.email.trim().toLowerCase()
+          );
+          if (!match?.id) {
+            throw createErr;
+          }
+          setExistingUserId(match.id);
+          savedUser = await userService.updateUser(match.id, userData);
+          toast({
+            title: 'Usuário atualizado',
+            description: 'O usuário já existia; senha e dados foram atualizados.',
+          });
+        }
+      }
       
-      const newUser = await userService.createUser(userData);
-      
-      toast({
-        title: 'Sucesso!',
-        description: 'Usuário criado com sucesso.',
-      });
-      
-      onUsuarioCreated(newUser);
+      onUsuarioCreated(savedUser as unknown as User);
       onClose();
       
     } catch (error: any) {
-      console.error('Erro ao criar usuário:', error);
+      console.error('Erro ao salvar usuário:', error);
       
-      let errorMessage = 'Erro ao criar usuário';
+      let errorMessage = isUpdateMode ? 'Erro ao atualizar usuário' : 'Erro ao criar usuário';
+      const data = error.response?.data;
+      const fieldErrors = data?.fieldErrors;
       
-      // Verificar se é erro de username duplicado
-      if (error.response?.data?.message?.includes('já está em uso') || 
-          error.response?.data?.message?.includes('já existe')) {
-        errorMessage = 'Nome de usuário ou email já está em uso. Tente gerar novamente.';
-        // Gerar novo username automaticamente
-        generateDefaultCredentials();
-      } else {
-        errorMessage = error.response?.data?.message || 'Erro ao criar usuário';
+      if (fieldErrors && typeof fieldErrors === 'object') {
+        errorMessage = Object.values(fieldErrors as Record<string, string>).filter(Boolean).join(' · ');
+      } else if (Array.isArray(data?.errors) && data.errors.length > 0) {
+        errorMessage = data.errors
+          .map((e: { defaultMessage?: string; message?: string } | string) =>
+            typeof e === 'string' ? e : (e.defaultMessage || e.message)
+          )
+          .filter(Boolean)
+          .join(' · ');
+      } else if (typeof data?.message === 'string' && data.message !== 'Dados inválidos fornecidos') {
+        errorMessage = data.message;
+      } else if (typeof data?.error === 'string' && data.error !== 'VALIDATION_ERROR') {
+        errorMessage = data.error;
+      } else if (typeof error?.message === 'string' && error.message.includes('Backend')) {
+        errorMessage = error.message;
       }
       
-      setError(errorMessage);
+      setError(errorMessage || 'Dados inválidos fornecidos');
       
       toast({
-        title: 'Erro ao criar usuário',
-        description: errorMessage,
+        title: isUpdateMode ? 'Erro ao atualizar usuário' : 'Erro ao criar usuário',
+        description: errorMessage || 'Dados inválidos fornecidos',
         variant: 'destructive'
       });
     } finally {
@@ -222,14 +313,13 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
       isActive: true,
       sendEmailNotification: true
     });
+    setExistingUserId(null);
     setError(null);
     onClose();
   };
 
-  // Selecionar role padrão baseada na posição
   React.useEffect(() => {
     if (roles.length > 0 && !form.roleId) {
-      // Tentar encontrar uma role baseada na posição
       const defaultRole = roles.find(role => 
         role.name.toLowerCase().includes('funcionario') ||
         role.name.toLowerCase().includes('vigilante') ||
@@ -245,23 +335,28 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
     }
   }, [roles, form.roleId]);
 
+  const passwordHint = buildDefaultEmployeePassword(employeeCpf);
+
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl w-full max-h-[95vh] overflow-y-auto p-0 mx-4 sm:mx-0">
-        <DialogHeader className="bg-gradient-to-r from-seguranca-red to-seguranca-yellow p-4 sm:p-6 text-white sticky top-0 z-10">
+    <Dialog open={open} onOpenChange={(next) => { if (!next) handleClose(); }}>
+      <DialogContent className="max-w-2xl w-full max-h-[95vh] overflow-hidden p-0 mx-4 sm:mx-0 flex flex-col gap-0">
+        <DialogHeader className="bg-gradient-to-r from-seguranca-red to-seguranca-yellow p-4 sm:p-6 pr-12 text-white shrink-0">
           <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl font-bold">
             <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg">
-              <UserPlus className="h-4 w-4 sm:h-6 sm:w-6" />
+              {isUpdateMode ? <RefreshCw className="h-4 w-4 sm:h-6 sm:w-6" /> : <UserPlus className="h-4 w-4 sm:h-6 sm:w-6" />}
             </div>
-            <span className="truncate">Criar Usuário Padrão</span>
+            <span className="truncate">
+              {isUpdateMode ? 'Atualizar Usuário Padrão' : 'Criar Usuário Padrão'}
+            </span>
           </DialogTitle>
           <DialogDescription className="text-white/90 text-sm sm:text-base mt-1">
-            Configure as credenciais de acesso para o funcionário
+            {isUpdateMode
+              ? 'Usuário já existe — você pode alterar senha, permissão e dados'
+              : 'Configure as credenciais de acesso para o funcionário'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-          {/* Informações do Funcionário */}
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto min-h-0 flex-1">
           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
             <div className="p-3 sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -286,11 +381,15 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
                   </Badge>
                 </div>
               </div>
+              {isUpdateMode && (
+                <Badge className="mt-3 bg-amber-500/20 text-amber-300 border-amber-500/40">
+                  Usuário já cadastrado — modo atualização
+                </Badge>
+              )}
             </div>
           </Card>
 
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-            {/* Credenciais de Acesso */}
             <div className="space-y-3 sm:space-y-4">
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
@@ -298,9 +397,14 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
                 </div>
                 <h3 className="text-base sm:text-lg font-semibold text-white">Credenciais de Acesso</h3>
               </div>
+              <p className="text-xs text-gray-400 -mt-2 mb-2">
+                Padrão: <span className="text-seguranca-yellow font-mono">usuário = CPF</span>,{' '}
+                <span className="text-seguranca-yellow font-mono">senha = CPF@Promover{new Date().getFullYear()}</span>
+                {passwordHint ? <> (ex.: <span className="font-mono text-gray-300">{passwordHint}</span>)</> : null}
+                , nome = funcionário.
+              </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {/* Nome de Usuário */}
                 <div className="space-y-2">
                   <Label htmlFor="username" className="text-xs sm:text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2">
                     <UserIcon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -316,7 +420,6 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
                   />
                 </div>
 
-                {/* Email */}
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-xs sm:text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2">
                     <Mail className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -335,7 +438,6 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {/* Senha */}
                 <div className="space-y-2">
                   <Label htmlFor="password" className="text-xs sm:text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2">
                     <Lock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -368,7 +470,6 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
                   </div>
                 </div>
 
-                {/* Confirmar Senha */}
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword" className="text-xs sm:text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2">
                     <Lock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -403,7 +504,6 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
               </div>
             </div>
 
-            {/* Permissões e Configurações */}
             <div className="space-y-3 sm:space-y-4">
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <div className="p-1.5 sm:p-2 bg-seguranca-red/20 rounded-lg">
@@ -412,7 +512,6 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
                 <h3 className="text-base sm:text-lg font-semibold text-white">Permissões e Configurações</h3>
               </div>
 
-              {/* Permissão */}
               <div className="space-y-2">
                 <Label htmlFor="role" className="text-xs sm:text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2">
                   <Shield className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -443,7 +542,6 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
                 </Select>
               </div>
 
-              {/* Opções */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2.5 sm:p-3 bg-seguranca-graphite rounded-lg border border-gray-600">
                   <Checkbox
@@ -479,7 +577,6 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
               </div>
             </div>
 
-            {/* Erro */}
             {error && (
               <Card className="bg-red-500/10 border-red-500/30">
                 <div className="p-3 sm:p-4">
@@ -509,12 +606,12 @@ const CriarUsuarioPadraoModal: React.FC<CriarUsuarioPadraoModalProps> = ({
                 {loading ? (
                   <>
                     <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 animate-spin" />
-                    <span className="truncate">Criando...</span>
+                    <span className="truncate">{isUpdateMode ? 'Atualizando...' : 'Criando...'}</span>
                   </>
                 ) : (
                   <>
                     <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-                    <span className="truncate">Criar Usuário</span>
+                    <span className="truncate">{isUpdateMode ? 'Atualizar Usuário' : 'Criar Usuário'}</span>
                   </>
                 )}
               </Button>

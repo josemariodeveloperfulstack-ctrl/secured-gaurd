@@ -150,12 +150,10 @@ public class UserService {
             throw new IllegalArgumentException("Senha deve ter pelo menos 6 caracteres");
         }
 
-        // Permitir exceção para padrão cpf@2025
-        boolean isCpfDefault = request.getPassword().matches("^\\d{11}@2025$");
-        if (!isCpfDefault
-                && !request.getPassword().matches("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*$")) {
+        // Permitir senha padrão de funcionários (CPF@PromoverAAAA, CPF@2025, 1234556)
+        if (!isAllowedEmployeeOrStrongPassword(request.getPassword())) {
             throw new IllegalArgumentException(
-                    "Senha deve conter pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial");
+                    "Senha deve conter pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial, ou ser no formato CPF@PromoverAAAA");
         }
 
         List<String> roleNamesToLookup = resolveRoleNamesForLookup(request.getRoles());
@@ -248,12 +246,10 @@ public class UserService {
             throw new IllegalArgumentException("Senha deve ter pelo menos 6 caracteres");
         }
 
-        // Permitir exceção para padrão cpf@2025 usado em criação automática de
-        // COLABORADOR
-        boolean isCpfDefault = user.getPassword().matches("^\\d{11}@2025$");
-        if (!isCpfDefault && !user.getPassword().matches("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*$")) {
+        // Permitir padrão cpf@PromoverAAAA / cpf@2025 usado em criação automática
+        if (!isAllowedEmployeeOrStrongPassword(user.getPassword())) {
             throw new IllegalArgumentException(
-                    "Senha deve conter pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial");
+                    "Senha deve conter pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial, ou ser no formato CPF@PromoverAAAA");
         }
 
         // Definir valores padrão
@@ -476,13 +472,27 @@ public class UserService {
         if (password.length() < 6) {
             throw new IllegalArgumentException("Senha deve ter no mínimo 6 caracteres");
         }
-        if (password.matches("^\\d{11}@2025$")) {
-            return;
-        }
-        if (!password.matches("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*$")) {
+        if (!isAllowedEmployeeOrStrongPassword(password)) {
             throw new IllegalArgumentException(
-                    "Senha deve ser forte (maiúscula, minúscula, dígito, especial) ou no formato CPF@2025");
+                    "Senha deve ser forte (maiúscula, minúscula, dígito, especial) ou no formato CPF@PromoverAAAA");
         }
+    }
+
+    /** Senha forte OU padrões de funcionário: CPF@PromoverAAAA, CPF@2025, 1234556. */
+    private static boolean isAllowedEmployeeOrStrongPassword(String password) {
+        if (password == null) {
+            return false;
+        }
+        if ("1234556".equals(password)) {
+            return true;
+        }
+        if (password.matches("^\\d{11}@Promover\\d{4}$")) {
+            return true;
+        }
+        if (password.matches("^\\d{11}@2025$")) {
+            return true;
+        }
+        return password.matches("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*$");
     }
 
     /**

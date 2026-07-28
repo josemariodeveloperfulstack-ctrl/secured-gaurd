@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
 import { Company } from '@/types/company';
 import { reportLayoutService } from '@/services/reportLayoutService';
 import { StandardReportTemplate } from '@/components/reporting/StandardReportTemplate';
@@ -19,12 +20,25 @@ export interface StockReportExportParams {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+async function preloadReportBackgrounds(): Promise<void> {
+  await Promise.all([
+    new Promise<void>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+      img.src = '/report-background-template.png';
+    }),
+    new Promise<void>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+      img.src = '/report-background-landscape.jpg';
+    }),
+  ]);
+}
+
 /**
- * Gera um PDF de relatório de estoque no frontend usando o mesmo layout premium
- * utilizado no módulo de Frota (barra gradiente, logo, cabeçalho e rodapé).
- *
- * O conteúdo é renderizado em um container oculto com `StandardReportTemplate`
- * + `StockReportPrintable` e capturado por `reportLayoutService.generatePremiumPDF`.
+ * Gera PDF de estoque com o layout oficial (retrato: template.png / paisagem: landscape.jpg).
  */
 export async function generateStockReportPDF(params: StockReportExportParams): Promise<void> {
   if (typeof document === 'undefined') {
@@ -40,31 +54,36 @@ export async function generateStockReportPDF(params: StockReportExportParams): P
     filename
   } = params;
 
-  // Container oculto para renderizar o layout premium
+  await preloadReportBackgrounds();
+
   const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '-9999px';
+  container.style.position = 'fixed';
+  container.style.top = '0';
+  container.style.left = '0';
   container.style.width = '800px';
+  container.style.minHeight = '1100px';
   container.style.backgroundColor = '#ffffff';
+  container.style.zIndex = '99999';
+  container.style.pointerEvents = 'none';
 
   document.body.appendChild(container);
 
   const root = createRoot(container);
 
   try {
-    root.render(
-      <StandardReportTemplate title={reportTitle} company={company}>
-        <StockReportPrintable
-          reports={reports}
-          stats={stats}
-          periodLabel={periodLabel}
-        />
-      </StandardReportTemplate>
-    );
+    flushSync(() => {
+      root.render(
+        <StandardReportTemplate title={reportTitle} company={company} orientation="portrait">
+          <StockReportPrintable
+            reports={reports}
+            stats={stats}
+            periodLabel={periodLabel}
+          />
+        </StandardReportTemplate>
+      );
+    });
 
-    // Dar um tick para o React montar o conteúdo antes da captura
-    await sleep(50);
+    await sleep(600);
 
     const normalizedTitle = reportTitle.trim().replace(/\s+/g, '_').toLowerCase();
     const effectiveFilename =
@@ -74,7 +93,8 @@ export async function generateStockReportPDF(params: StockReportExportParams): P
       title: reportTitle,
       filename: effectiveFilename,
       company,
-      elementHasFullLayout: true
+      elementHasFullLayout: true,
+      orientation: 'portrait'
     });
   } finally {
     try {

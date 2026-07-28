@@ -822,6 +822,27 @@ export const employeeService = {
   },
 
   /**
+   * Cancela demissão indevida: status Ativo, reabre vínculo, sem Readmissão.
+   */
+  async cancelDismissal(
+    id: string,
+    justification: string,
+    periodId?: string,
+  ): Promise<Employee> {
+    try {
+      const response = await api.post(`/api/employees/${id}/cancel-dismissal`, {
+        justification,
+        periodId: periodId || undefined,
+      });
+      return this.normalizeEmployee(response.data) as Employee;
+    } catch (error: any) {
+      console.error('Erro ao cancelar demissão:', error);
+      rethrowIfConnectionError(error);
+      throw new Error(getApiErrorMessage(error, 'Erro ao cancelar demissão'));
+    }
+  },
+
+  /**
    * Buscar funcionário demitido elegível para recontratação pelo CPF
    */
   async findEligibleForRehire(cpf: string): Promise<Employee | null> {

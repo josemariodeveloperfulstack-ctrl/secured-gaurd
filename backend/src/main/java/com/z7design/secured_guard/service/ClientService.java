@@ -114,12 +114,22 @@ public class ClientService {
                             .findFirst().orElse(null);
                 }
                 if (sender != null) {
+                    String clientLink = "/clientes?search=" + java.net.URLEncoder.encode(savedClient.getName(), java.nio.charset.StandardCharsets.UTF_8);
                     String title = "🆕 Novo Cliente Cadastrado: " + savedClient.getName();
                     String content = String.format(
-                        "O comercial cadastrou um novo cliente no sistema.\n\nNome: %s\nCNPJ: %s\nEmail: %s",
+                        "Um novo cliente foi cadastrado no sistema.\n\n" +
+                        "📋 Nome: %s\n" +
+                        "🔖 CNPJ: %s\n" +
+                        "📧 Email: %s\n" +
+                        "📍 Localização: %s\n\n" +
+                        "🔗 Acesse o cliente e seus Setores de Trabalho: %s\n\n" +
+                        "Comercial, RH e Operacional devem verificar as informações e providenciar os recursos necessários.",
                         savedClient.getName(),
                         savedClient.getCnpj(),
-                        savedClient.getEmail() != null ? savedClient.getEmail() : "Não informado"
+                        savedClient.getEmail() != null ? savedClient.getEmail() : "Não informado",
+                        (savedClient.getCity() != null ? savedClient.getCity() : "") +
+                        (savedClient.getState() != null ? " - " + savedClient.getState() : ""),
+                        clientLink
                     );
                     messageService.notifyNewClientOrWorkPost(title, content, sender);
                 }

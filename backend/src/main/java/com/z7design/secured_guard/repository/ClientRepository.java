@@ -25,18 +25,18 @@ public interface ClientRepository extends JpaRepository<Client, java.util.UUID>,
     Page<Client> findByStatus(ClientStatus status, Pageable pageable);
     
     @Query("SELECT c FROM Client c WHERE " +
-           "LOWER(c.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(c.cnpj) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(c.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(c.contactName) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
+           "(c.name IS NOT NULL AND LOWER(c.name) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
+           "(c.cnpj IS NOT NULL AND LOWER(c.cnpj) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
+           "(c.email IS NOT NULL AND LOWER(c.email) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
+           "(c.contactName IS NOT NULL AND LOWER(c.contactName) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
     Page<Client> findBySearchTerm(@Param("searchTerm") String searchTerm, Pageable pageable);
     
     @Query("SELECT c FROM Client c WHERE " +
-           "(:status IS NULL OR c.status = :status) AND " +
-           "(LOWER(c.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(c.cnpj) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(c.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           "LOWER(c.contactName) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
+           "(:status IS NULL OR c.status = :status) AND (" +
+           "(c.name IS NOT NULL AND LOWER(c.name) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
+           "(c.cnpj IS NOT NULL AND LOWER(c.cnpj) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
+           "(c.email IS NOT NULL AND LOWER(c.email) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
+           "(c.contactName IS NOT NULL AND LOWER(c.contactName) LIKE LOWER(CONCAT('%', :searchTerm, '%'))))")
     Page<Client> findByStatusAndSearchTerm(@Param("status") ClientStatus status, 
                                           @Param("searchTerm") String searchTerm, 
                                           Pageable pageable);

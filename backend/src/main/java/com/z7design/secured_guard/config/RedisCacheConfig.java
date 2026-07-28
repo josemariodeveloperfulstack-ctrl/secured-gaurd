@@ -104,6 +104,7 @@ public class RedisCacheConfig {
         cacheConfigurations.put("dashboard-stats", defaultConfig.entryTtl(Duration.ofMinutes(5)));
         cacheConfigurations.put("dashboard-quick-stats", defaultConfig.entryTtl(Duration.ofMinutes(2)));
         cacheConfigurations.put("statistics", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        cacheConfigurations.put("commercial-dashboard", defaultConfig.entryTtl(Duration.ofMinutes(2)));
 
         // ===== ENTIDADES PRINCIPAIS (30 minutos) =====
         cacheConfigurations.put("employees", defaultConfig.entryTtl(Duration.ofMinutes(30)));

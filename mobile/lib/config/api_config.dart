@@ -8,10 +8,17 @@ class ApiConfig {
   ApiConfig._();
 
   /// Base URL da API (sem trailing slash).
-  /// Para produção, definir via construtor ou env-var futuramente.
+  /// Produção por padrão. Para emulador local:
+  /// `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8083`
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8083',
+    defaultValue: 'https://app.z7botsolutions.com.br',
+  );
+
+  /// URL pública da Política de Privacidade (obrigatória no Google Play).
+  static const String privacyPolicyUrl = String.fromEnvironment(
+    'PRIVACY_POLICY_URL',
+    defaultValue: 'https://app.z7botsolutions.com.br/politicas-privacidade',
   );
 
   // Auth

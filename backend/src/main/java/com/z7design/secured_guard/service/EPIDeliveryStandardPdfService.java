@@ -727,17 +727,36 @@ public class EPIDeliveryStandardPdfService {
 
                 LocalDate deliveryDate = form.getDeliveryDate();
                 EPIDeliveryType deliveryType = form.getDeliveryType();
-                String substitutionInfo = "";
-                String substitutionReason = "";
-                if (deliveryType == EPIDeliveryType.SUBSTITUICAO || deliveryType == EPIDeliveryType.TROCA) {
-                        substitutionInfo = formatDate(deliveryDate);
-                        substitutionReason = deliveryType.getDescription();
-                } else if (deliveryType == EPIDeliveryType.DEVOLUCAO) {
-                        substitutionReason = deliveryType.getDescription();
-                }
 
                 for (EPIDeliveryFormItem item : form.getItems()) {
                         int qty = item.getQuantity() != null && item.getQuantity() > 0 ? item.getQuantity() : 1;
+
+                        String substitutionInfo = "";
+                        String substitutionReason = "";
+
+                        // Preferência: campos preenchidos por item no formulário
+                        if (item.getSubstitutedDate() != null) {
+                                substitutionInfo = formatDate(item.getSubstitutedDate());
+                        }
+                        if (item.getReplacementReason() != null && !item.getReplacementReason().isBlank()) {
+                                substitutionReason = item.getReplacementReason().trim();
+                        }
+
+                        // Fallback pelo tipo da ficha (comportamento anterior)
+                        if (substitutionInfo.isEmpty() || substitutionReason.isEmpty()) {
+                                if (deliveryType == EPIDeliveryType.SUBSTITUICAO || deliveryType == EPIDeliveryType.TROCA) {
+                                        if (substitutionInfo.isEmpty()) {
+                                                substitutionInfo = formatDate(deliveryDate);
+                                        }
+                                        if (substitutionReason.isEmpty() && deliveryType != null) {
+                                                substitutionReason = deliveryType.getDescription();
+                                        }
+                                } else if (deliveryType == EPIDeliveryType.DEVOLUCAO && substitutionReason.isEmpty()
+                                                && deliveryType != null) {
+                                        substitutionReason = deliveryType.getDescription();
+                                }
+                        }
+
                         rows.add(new EpiMovementRow(
                                         item.getEpiName(),
                                         item.getCa(),

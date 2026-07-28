@@ -766,6 +766,31 @@ public class EmployeeController {
         return ResponseEntity.ok(updatedEmployee);
     }
 
+    @PostMapping("/{id}/cancel-dismissal")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR')")
+    @Operation(summary = "Cancelar demissão indevida",
+            description = "Reverte o status para Ativo, reabre o vínculo mais recente e registra auditoria com justificativa. Não gera Readmissão.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Demissão cancelada com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Funcionário não está demitido ou justificativa inválida"),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado")
+    })
+    public ResponseEntity<EmployeeDTO> cancelDismissal(
+            @PathVariable String id,
+            @Valid @RequestBody com.z7design.secured_guard.dto.CancelDismissalRequest request) {
+        UUID changedByUserId = null;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User) {
+            changedByUserId = ((User) auth.getPrincipal()).getId();
+        }
+        EmployeeDTO result = employeeService.cancelDismissal(
+                UUID.fromString(id),
+                request.getJustification(),
+                request.getPeriodId(),
+                changedByUserId);
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping("/{id}/rehire")
     @PreAuthorize("hasAnyAuthority('EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR')")
     @Operation(summary = "Recontratar funcionário demitido", description = "Readmissão ou promoção reutilizando o cadastro existente")

@@ -12,12 +12,19 @@ public class InteractionHistory {
     private java.util.UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "opportunity_id", nullable = false)
+    @JoinColumn(name = "opportunity_id", nullable = true)
     private Opportunity opportunity;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lead_id", nullable = true)
+    private Lead lead;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @Column(name = "action", length = 100)
+    private String action;
 
     @Column(columnDefinition = "TEXT")
     private String note;
@@ -47,12 +54,28 @@ public class InteractionHistory {
         this.opportunity = opportunity;
     }
 
+    public Lead getLead() {
+        return lead;
+    }
+
+    public void setLead(Lead lead) {
+        this.lead = lead;
+    }
+
     public User getUser() {
         return user;
     }
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public String getAction() {
+        return action;
+    }
+
+    public void setAction(String action) {
+        this.action = action;
     }
 
     public String getNote() {
@@ -70,6 +93,4 @@ public class InteractionHistory {
     public void setCreatedAt(java.time.LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
-
-    // ...
 } 

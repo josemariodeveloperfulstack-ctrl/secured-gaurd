@@ -62,6 +62,14 @@ public class EPIDeliveryFormItem {
 
     @Column(name = "stock_item_id")
     private UUID stockItemId;
+
+    /** Data em que o EPI foi substituído (coluna SUBSTITUÍDO no PDF). */
+    @Column(name = "substituted_date")
+    private LocalDate substitutedDate;
+
+    /** Motivo da substituição (coluna MOTIVO DA SUBST. no PDF). */
+    @Column(name = "replacement_reason", length = 255)
+    private String replacementReason;
 }
 
 

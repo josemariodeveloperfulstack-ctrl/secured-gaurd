@@ -14,6 +14,8 @@ public class EPIDeliveryFormItemDTO {
     private String uniformPiece;
     private String observations;
     private UUID stockItemId;
+    private LocalDate substitutedDate;
+    private String replacementReason;
 
     public EPIDeliveryFormItemDTO() {
     }
@@ -25,6 +27,22 @@ public class EPIDeliveryFormItemDTO {
 
     public void setStockItemId(UUID stockItemId) {
         this.stockItemId = stockItemId;
+    }
+
+    public LocalDate getSubstitutedDate() {
+        return substitutedDate;
+    }
+
+    public void setSubstitutedDate(LocalDate substitutedDate) {
+        this.substitutedDate = substitutedDate;
+    }
+
+    public String getReplacementReason() {
+        return replacementReason;
+    }
+
+    public void setReplacementReason(String replacementReason) {
+        this.replacementReason = replacementReason;
     }
     public UUID getId() {
         return id;

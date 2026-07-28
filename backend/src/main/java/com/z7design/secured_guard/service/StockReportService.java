@@ -48,6 +48,7 @@ public class StockReportService {
         ReportLayoutConfig config = ReportLayoutConfig.builder()
                 .companyId(companyId)
                 .reportTitle("RELATÓRIO DE ESTOQUE BAIXO")
+                .landscape(false)
                 .build();
 
         StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer, config);
@@ -72,6 +73,7 @@ public class StockReportService {
         ReportLayoutConfig config = ReportLayoutConfig.builder()
                 .companyId(companyId)
                 .reportTitle("RELATÓRIO GERAL DE ESTOQUE" + (category != null ? " - " + category.toString() : ""))
+                .landscape(false)
                 .build();
 
         StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer, config);
@@ -99,6 +101,7 @@ public class StockReportService {
                 .companyId(companyId)
                 .reportTitle("RELATÓRIO DE MOVIMENTAÇÕES DE ESTOQUE")
                 .reportSubTitle(period)
+                .landscape(false)
                 .build();
 
         StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer, config);
@@ -122,20 +125,21 @@ public class StockReportService {
                 .companyId(companyId)
                 .reportTitle("PLANILHA DE CONFERÊNCIA FÍSICA (INVENTÁRIO)")
                 .reportSubTitle("Data de geração: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                .landscape(false)
                 .build();
 
         StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer, config);
         Document document = docWithPdf.getDocument();
 
-        Table table = new Table(UnitValue.createPercentArray(new float[] { 15, 35, 15, 15, 20 }))
+        Table table = new Table(UnitValue.createPercentArray(new float[] { 16, 40, 18, 13, 13 }))
                 .useAllAvailableWidth()
                 .setMarginTop(20);
 
         table.addHeaderCell(layoutService.createHeaderCell("Código"));
         table.addHeaderCell(layoutService.createHeaderCell("Item"));
         table.addHeaderCell(layoutService.createHeaderCell("Categoria"));
-        table.addHeaderCell(layoutService.createHeaderCell("Estoque Sist."));
-        table.addHeaderCell(layoutService.createHeaderCell("Estoque Físico"));
+        table.addHeaderCell(layoutService.createHeaderCell("Sist."));
+        table.addHeaderCell(layoutService.createHeaderCell("Físico"));
 
         for (StockItemDTO item : items) {
             table.addCell(layoutService.createDataCell(item.getCode()));
@@ -168,6 +172,7 @@ public class StockReportService {
                 .companyId(companyId)
                 .reportTitle("RELATÓRIO CONSOLIDADO DE REQUISIÇÕES")
                 .reportSubTitle(period)
+                .landscape(false)
                 .build();
 
         StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer, config);
@@ -212,6 +217,7 @@ public class StockReportService {
                 .companyId(companyId)
                 .reportTitle("RELATÓRIO CONSOLIDADO DE ESTOQUE")
                 .reportSubTitle(periodo)
+                .landscape(false)
                 .build();
 
         StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer, config);
@@ -275,31 +281,28 @@ public class StockReportService {
             document.add(new Paragraph("Nenhuma requisição criada no período.").setItalic());
             return;
         }
-        Table table = new Table(UnitValue.createPercentArray(new float[] { 16, 14, 10, 18, 18, 8, 16 }))
+        Table table = new Table(UnitValue.createPercentArray(new float[] { 22, 18, 18, 22, 20 }))
                 .useAllAvailableWidth()
                 .setMarginTop(8);
-        table.addHeaderCell(layoutService.createHeaderCell("Nº"));
-        table.addHeaderCell(layoutService.createHeaderCell("Data"));
+        table.addHeaderCell(layoutService.createHeaderCell("Nº / Data"));
         table.addHeaderCell(layoutService.createHeaderCell("Status"));
+        table.addHeaderCell(layoutService.createHeaderCell("Itens"));
         table.addHeaderCell(layoutService.createHeaderCell("Funcionário"));
         table.addHeaderCell(layoutService.createHeaderCell("Motivo"));
-        table.addHeaderCell(layoutService.createHeaderCell("Itens"));
-        table.addHeaderCell(layoutService.createHeaderCell("Solicitante"));
 
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         for (StockRequisitionListItemDTO r : requisitions) {
-            table.addCell(layoutService.createDataCell(r.getRequisitionNumber()));
-            table.addCell(layoutService.createDataCell(
-                    r.getCreatedAt() != null ? r.getCreatedAt().format(dtf) : "-"));
+            String numDate = (r.getRequisitionNumber() != null ? r.getRequisitionNumber() : "-")
+                    + "\n"
+                    + (r.getCreatedAt() != null ? r.getCreatedAt().format(dtf) : "-");
+            table.addCell(layoutService.createDataCell(numDate));
             table.addCell(layoutService.createDataCell(
                     r.getStatus() != null ? r.getStatus().name() : "N/A"));
+            table.addCell(layoutService.createDataCell(String.valueOf(r.getLinesCount())));
             table.addCell(layoutService.createDataCell(
                     r.getEmployeeName() != null ? r.getEmployeeName() : "-"));
             table.addCell(layoutService.createDataCell(
                     r.getMovementReasonLabel() != null ? r.getMovementReasonLabel() : "-"));
-            table.addCell(layoutService.createDataCell(String.valueOf(r.getLinesCount())));
-            table.addCell(layoutService.createDataCell(
-                    r.getRequestedByName() != null ? r.getRequestedByName() : "-"));
         }
         document.add(table);
     }
@@ -332,7 +335,7 @@ public class StockReportService {
             document.add(new Paragraph("Nenhum item de estoque para exibir.").setItalic());
             return;
         }
-        Table table = new Table(UnitValue.createPercentArray(new float[] { 15, 30, 20, 15, 20 }))
+        Table table = new Table(UnitValue.createPercentArray(new float[] { 16, 34, 18, 14, 18 }))
                 .useAllAvailableWidth()
                 .setMarginTop(20);
 
@@ -359,7 +362,7 @@ public class StockReportService {
             document.add(new Paragraph("Nenhuma movimentação no período.").setItalic());
             return;
         }
-        Table table = new Table(UnitValue.createPercentArray(new float[] { 15, 12, 12, 31, 15, 15 }))
+        Table table = new Table(UnitValue.createPercentArray(new float[] { 18, 14, 12, 34, 22 }))
                 .useAllAvailableWidth()
                 .setMarginTop(20);
 
@@ -367,21 +370,26 @@ public class StockReportService {
         table.addHeaderCell(layoutService.createHeaderCell("Tipo"));
         table.addHeaderCell(layoutService.createHeaderCell("Qtd"));
         table.addHeaderCell(layoutService.createHeaderCell("Item"));
-        table.addHeaderCell(layoutService.createHeaderCell("Responsável"));
-        table.addHeaderCell(layoutService.createHeaderCell("Destino"));
+        table.addHeaderCell(layoutService.createHeaderCell("Responsável / Destino"));
 
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
         for (StockMovementDTO movement : movements) {
+            String responsavel = movement.getUserName() != null ? movement.getUserName() : "-";
+            String destino = movement.getUnitName() != null
+                    ? movement.getUnitName()
+                    : (movement.getEmployeeName() != null ? movement.getEmployeeName() : null);
+            String respDestino = destino != null && !destino.equals(responsavel)
+                    ? responsavel + " / " + destino
+                    : responsavel;
+
             table.addCell(layoutService.createDataCell(
                     movement.getMovementDate() != null ? movement.getMovementDate().format(dtf) : "N/A"));
             table.addCell(layoutService.createDataCell(
                     movement.getMovementType() != null ? movement.getMovementType().getDescription() : "N/A"));
             table.addCell(layoutService.createDataCell(String.valueOf(movement.getQuantity())));
             table.addCell(layoutService.createDataCell(movement.getStockItemName()));
-            table.addCell(layoutService.createDataCell(movement.getUserName()));
-            table.addCell(layoutService.createDataCell(
-                    movement.getUnitName() != null ? movement.getUnitName() : (movement.getEmployeeName() != null ? movement.getEmployeeName() : "-")));
+            table.addCell(layoutService.createDataCell(respDestino));
         }
 
         document.add(table);

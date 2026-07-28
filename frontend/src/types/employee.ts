@@ -261,6 +261,9 @@ export interface Employee {
     name?: string;
     postCode?: string;
     description?: string;
+    type?: string;
+    workSchedule?: string;
+    primaryPositionName?: string;
   };
   department?: {
     id: UUID;

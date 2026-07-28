@@ -270,7 +270,7 @@ const GestaoFuncionarios: React.FC = () => {
             </SelectContent>
           </Select>
           <Input
-            placeholder="Posto de Trabalho"
+            placeholder="Setor de Trabalho"
             value={filters.positionDescription}
             onChange={e => setFilters(f => ({ ...f, positionDescription: e.target.value }))}
             className="col-span-1"
@@ -299,7 +299,7 @@ const GestaoFuncionarios: React.FC = () => {
               <th className="px-4 py-2">Nome do Funcionário</th>
               <th className="px-4 py-2">Matrícula</th>
               <th className="px-4 py-2">Cargo</th>
-              <th className="px-4 py-2">Posto de Trabalho</th>
+              <th className="px-4 py-2">Setor de Trabalho</th>
               <th className="px-4 py-2">Unidade</th>
               <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2">Ações</th>

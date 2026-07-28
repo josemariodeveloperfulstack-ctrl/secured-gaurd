@@ -70,6 +70,8 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [supplierComboboxOpen, setSupplierComboboxOpen] = useState(false);
   const [unitCostDisplay, setUnitCostDisplay] = useState('');
+  const [previousUnitCost, setPreviousUnitCost] = useState<number | null>(null);
+  const [savedUnitCost, setSavedUnitCost] = useState<number | null>(null);
   const [shelves, setShelves] = useState<StorageShelf[]>([]);
   const [loadingShelves, setLoadingShelves] = useState(false);
   const [formData, setFormData] = useState<CreateStockItemDTO>({
@@ -117,17 +119,80 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
   };
 
   useEffect(() => {
-    if (open) {
-      console.log('📦 StockItemModal: Modal aberto, carregando dados...');
-      loadSuppliers();
-      loadShelves();
-    } else {
-      // Reset quando modal fecha
-      console.log('📦 StockItemModal: Modal fechado, resetando dados');
-      setSuppliers([]);
-      setShelves([]);
-    }
+    if (!open) return;
+
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        setLoadingSuppliers(true);
+        const data = await contasAPagarService.getFornecedores();
+        if (cancelled) return;
+
+        const list = Array.isArray(data) ? data : [];
+        const filtered = list.filter((s) => {
+          if (!s) return false;
+          const id = s.id != null ? String(s.id) : '';
+          const name = (s.name || (s as { nome?: string }).nome || '').trim();
+          if (!id || !name) return false;
+          if (s.isActive === false) return false;
+          // Normalizar name se veio como nome
+          if (!s.name && (s as { nome?: string }).nome) {
+            (s as Supplier).name = (s as { nome?: string }).nome as string;
+          }
+          return true;
+        });
+        setSuppliers(filtered);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Erro ao carregar fornecedores:', error);
+          setSuppliers([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingSuppliers(false);
+      }
+
+      try {
+        setLoadingShelves(true);
+        const shelvesData = await stockService.getAllShelves();
+        if (!cancelled) setShelves(shelvesData || []);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Erro ao carregar prateleiras:', error);
+          setShelves([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingShelves(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
+
+  // Removido loadShelves/loadSuppliers duplicados do effect antigo
+  const loadSuppliers = async () => {
+    try {
+      setLoadingSuppliers(true);
+      const data = await contasAPagarService.getFornecedores();
+      const list = Array.isArray(data) ? data : [];
+      const filtered = list.filter((s) => {
+        if (!s?.id) return false;
+        const name = (s.name || (s as { nome?: string }).nome || '').trim();
+        if (!name) return false;
+        if (!s.name) (s as Supplier).name = name;
+        return s.isActive !== false;
+      });
+      setSuppliers(filtered);
+    } catch (error) {
+      console.error('Erro ao carregar fornecedores:', error);
+      setSuppliers([]);
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  };
 
   const loadShelves = async () => {
     try {
@@ -136,37 +201,60 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
       setShelves(data || []);
     } catch (error) {
       console.error('Erro ao carregar prateleiras:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar as prateleiras',
-        variant: 'destructive',
-      });
     } finally {
       setLoadingShelves(false);
     }
   };
 
   useEffect(() => {
-    if (item) {
+    if (!open) return;
+
+    let cancelled = false;
+
+    const applyItemToForm = (source: StockItem) => {
       setFormData({
-        code: item.code,
-        name: item.name,
-        category: item.category,
-        sizeVariation: item.sizeVariation || '',
-        description: item.description || '',
-        currentQuantity: item.currentQuantity,
-        minimumQuantity: item.minimumQuantity,
-        unitCost: item.unitCost || 0,
-        supplier: item.supplier || '',
-        barcode: item.barcode || '',
-        notes: item.notes || ''
+        code: source.code,
+        name: source.name,
+        category: source.category,
+        sizeVariation: source.sizeVariation || '',
+        description: source.description || '',
+        currentQuantity: source.currentQuantity,
+        minimumQuantity: source.minimumQuantity,
+        unitCost: source.unitCost || 0,
+        supplier: source.supplier || '',
+        barcode: source.barcode || '',
+        notes: source.notes || ''
       });
-      // Formatar o valor do custo unitário para exibição
-      if (item.unitCost) {
-        setUnitCostDisplay(formatCurrencyFromNumber(item.unitCost));
+      if (source.unitCost) {
+        setUnitCostDisplay(formatCurrencyFromNumber(source.unitCost));
       } else {
         setUnitCostDisplay('');
       }
+      const prev =
+        source.previousUnitCost != null && Number(source.previousUnitCost) > 0
+          ? Number(source.previousUnitCost)
+          : null;
+      const saved =
+        source.unitCost != null && Number(source.unitCost) > 0
+          ? Number(source.unitCost)
+          : null;
+      setPreviousUnitCost(prev);
+      setSavedUnitCost(saved);
+    };
+
+    if (item?.id) {
+      applyItemToForm(item);
+      // Recarrega do backend para garantir previousUnitCost atualizado
+      (async () => {
+        try {
+          const fresh = await stockService.getItemById(item.id);
+          if (!cancelled && fresh) {
+            applyItemToForm(fresh);
+          }
+        } catch (err) {
+          console.warn('Não foi possível recarregar item para valor unitário anterior:', err);
+        }
+      })();
     } else {
       setFormData({
         code: '',
@@ -184,95 +272,23 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
         initialFloor: ''
       });
       setUnitCostDisplay('');
+      setPreviousUnitCost(null);
+      setSavedUnitCost(null);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [item, open]);
 
-  const loadSuppliers = async () => {
-    try {
-      setLoadingSuppliers(true);
-      console.log('📦 StockItemModal: Carregando fornecedores...');
-      const data = await contasAPagarService.getFornecedores();
-      console.log('📦 StockItemModal: Dados recebidos da API:', data);
-      console.log('📦 StockItemModal: Tipo dos dados:', typeof data, 'É array?', Array.isArray(data));
-      console.log('📦 StockItemModal: Tamanho do array:', Array.isArray(data) ? data.length : 'N/A');
-      
-      if (Array.isArray(data)) {
-        console.log('📦 StockItemModal: Total de fornecedores recebidos:', data.length);
-        
-        if (data.length > 0) {
-          // Log detalhado de cada fornecedor
-          data.forEach((s, idx) => {
-            console.log(`📦 StockItemModal: Fornecedor ${idx + 1}:`, {
-              id: s?.id,
-              name: s?.name,
-              cnpj: s?.cnpj,
-              isActive: s?.isActive,
-              isActiveType: typeof s?.isActive,
-              isActiveCheck: s?.isActive !== false,
-              object: s
-            });
-          });
-          
-          // Filtrar apenas fornecedores válidos (não nulos) e que não estejam explicitamente inativos
-          // Aceitar: isActive === true, isActive === undefined, isActive === null (tratar como ativo)
-          // Remover apenas se isActive === false explicitamente
-          const filtered = data.filter(s => {
-            if (!s) {
-              console.warn('📦 StockItemModal: Fornecedor nulo encontrado, removendo');
-              return false;
-            }
-            if (!s.id || !s.name) {
-              console.warn('📦 StockItemModal: Fornecedor sem ID ou nome encontrado, removendo:', s);
-              return false;
-            }
-            // Se isActive é explicitamente false, remover. Caso contrário, incluir
-            const isIncluded = s.isActive !== false;
-            if (!isIncluded) {
-              console.log(`📦 StockItemModal: Fornecedor ${s.name} (ID: ${s.id}) removido porque isActive = ${s.isActive}`);
-            }
-            return isIncluded;
-          });
-          
-          console.log('📦 StockItemModal: Fornecedores após filtro:', filtered.length);
-          console.log('📦 StockItemModal: Fornecedores filtrados:', filtered.map(s => ({ id: s.id, name: s.name, isActive: s.isActive })));
-          
-          setSuppliers(filtered);
-        } else {
-          console.warn('📦 StockItemModal: Array vazio recebido da API');
-          setSuppliers([]);
-        }
-      } else {
-        console.warn('📦 StockItemModal: Dados não são um array, definindo lista vazia');
-        console.warn('📦 StockItemModal: Tipo:', typeof data, 'Valor:', data);
-        setSuppliers([]);
-      }
-    } catch (error: any) {
-      console.error('❌ StockItemModal: Erro ao carregar fornecedores:', error);
-      console.error('❌ StockItemModal: Erro detalhado:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status
-      });
-      setSuppliers([]);
-    } finally {
-      setLoadingSuppliers(false);
-    }
-  };
-
   const filteredSuppliers = useMemo(() => {
-    console.log('📦 StockItemModal: Filtrando fornecedores. Total:', suppliers.length, 'Termo de busca:', supplierSearchTerm);
-    if (!supplierSearchTerm) {
-      console.log('📦 StockItemModal: Sem termo de busca, retornando todos os', suppliers.length, 'fornecedores');
-      return suppliers;
-    }
+    if (!supplierSearchTerm) return suppliers;
     const term = supplierSearchTerm.toLowerCase();
-    const filtered = suppliers.filter(s => {
+    return suppliers.filter((s) => {
       const nameMatch = s?.name?.toLowerCase().includes(term);
       const cnpjMatch = s?.cnpj?.toLowerCase().includes(term);
       return nameMatch || cnpjMatch;
     });
-    console.log('📦 StockItemModal: Após filtro por termo,', filtered.length, 'fornecedores encontrados');
-    return filtered;
   }, [suppliers, supplierSearchTerm]);
 
   const selectedSupplier = suppliers.find(s => s.name === formData.supplier);
@@ -631,9 +647,62 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                 <span className="truncate">Informações Comerciais</span>
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {item && (previousUnitCost != null || savedUnitCost != null) && (() => {
+                  // Anterior = último preço salvo antes do atual (histórico real no banco)
+                  // Atual (salvo) = preço vigente
+                  // Variação ao digitar: compara o digitado com o atual salvo (prévia da próxima troca)
+                  const anteriorLabel = previousUnitCost != null
+                    ? `R$ ${formatCurrencyFromNumber(previousUnitCost)}`
+                    : '—';
+                  const atualSalvoLabel = savedUnitCost != null
+                    ? `R$ ${formatCurrencyFromNumber(savedUnitCost)}`
+                    : '—';
+                  const baseline = savedUnitCost;
+                  const curr = formData.unitCost || 0;
+                  let variationNode: React.ReactNode = <p className="text-gray-400 mt-1">—</p>;
+                  if (baseline != null && baseline > 0 && curr) {
+                    const diff = curr - baseline;
+                    const pct = (diff / baseline) * 100;
+                    const up = diff > 0;
+                    const same = Math.abs(diff) < 0.005;
+                    let variationText = 'Sem variação';
+                    let variationClass = 'text-gray-300';
+                    if (!same) {
+                      variationText = `${up ? '+' : ''}R$ ${formatCurrencyFromNumber(Math.abs(diff))} (${up ? '+' : ''}${pct.toFixed(1)}%)`;
+                      variationClass = up ? 'text-red-400' : 'text-green-400';
+                    }
+                    variationNode = <p className={`font-medium mt-1 ${variationClass}`}>{variationText}</p>;
+                  }
+                  return (
+                  <div className="space-y-2 sm:col-span-2 rounded-lg border border-gray-600/40 bg-seguranca-black/40 p-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <Label className="text-gray-400 text-xs">Valor Unitário Anterior</Label>
+                        <p className="text-white font-medium mt-1">{anteriorLabel}</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {previousUnitCost != null
+                            ? 'Último valor antes da alteração salva'
+                            : 'Aparece após a 1ª troca de preço salva'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-400 text-xs">Valor Unitário Atual (salvo)</Label>
+                        <p className="text-seguranca-yellow font-medium mt-1">{atualSalvoLabel}</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">Valor vigente até salvar a alteração</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-400 text-xs">Variação</Label>
+                        {variationNode}
+                        <p className="text-[10px] text-gray-500 mt-0.5">Compara atual salvo × valor digitado</p>
+                      </div>
+                    </div>
+                  </div>
+                  );
+                })()}
+
                 <div className="space-y-2">
                   <Label htmlFor="unitCost" className="text-gray-300 text-sm sm:text-base">
-                    Custo Unitário (R$)
+                    Valor Unitário Atual (R$)
                   </Label>
                   <Input
                     id="unitCost"
@@ -643,6 +712,11 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                     placeholder="0,00"
                     className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
                   />
+                  <p className="text-[10px] text-gray-500">
+                    {item
+                      ? 'Ao salvar um valor diferente, o atual passa a ser o anterior automaticamente.'
+                      : 'Informe o valor unitário deste cadastro.'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -658,25 +732,36 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                     </div>
                   ) : suppliers.length === 0 ? (
                     <div className="space-y-2">
-                      <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                        <p className="text-xs sm:text-sm text-yellow-400 mb-2">
-                          {loadingSuppliers 
-                            ? 'Carregando fornecedores...' 
-                            : 'Nenhum fornecedor cadastrado. Cadastre um fornecedor para continuar.'}
-                        </p>
-                        <p className="text-xs text-gray-400 mb-2">
-                          Verifique o console do navegador (F12) para mais detalhes.
-                        </p>
+                      <Input
+                        id="supplier"
+                        value={formData.supplier || ''}
+                        onChange={(e) => handleInputChange('supplier', e.target.value)}
+                        placeholder="Digite o nome do fornecedor"
+                        className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 h-10 sm:h-11 text-sm sm:text-base"
+                      />
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => loadSuppliers()}
+                          className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs h-8"
+                          size="sm"
+                        >
+                          Recarregar lista
+                        </Button>
                         <Button
                           type="button"
                           onClick={() => setIsSupplierModalOpen(true)}
-                          className="w-full bg-seguranca-red hover:bg-seguranca-darkred text-white text-xs sm:text-sm h-8 sm:h-9"
+                          className="bg-seguranca-red hover:bg-seguranca-darkred text-white text-xs h-8"
                           size="sm"
                         >
-                          <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                          <Plus className="h-3 w-3 mr-1" />
                           Cadastrar Fornecedor
                         </Button>
                       </div>
+                      <p className="text-[10px] text-gray-500">
+                        Nenhum fornecedor na lista. Digite o nome ou cadastre um novo.
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -689,10 +774,10 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                             aria-expanded={supplierComboboxOpen}
                             className="w-full justify-between bg-seguranca-black/50 border-gray-600/30 text-white hover:bg-seguranca-graphite hover:border-seguranca-red/50 focus:border-seguranca-red/50 h-10 sm:h-11 text-sm sm:text-base"
                           >
-                            {selectedSupplier ? (
+                            {selectedSupplier || formData.supplier ? (
                               <div className="flex items-center gap-2 truncate">
                                 <Building2 className="h-4 w-4 flex-shrink-0 text-seguranca-red" />
-                                <span className="truncate">{selectedSupplier.name}</span>
+                                <span className="truncate">{selectedSupplier?.name || formData.supplier}</span>
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">

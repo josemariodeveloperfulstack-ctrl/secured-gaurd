@@ -8,6 +8,8 @@ export interface StockItem {
   currentQuantity: number;
   minimumQuantity: number;
   unitCost?: number;
+  /** Valor unitário do último cadastro (antes da atualização atual). */
+  previousUnitCost?: number;
   supplier?: string;
   barcode?: string;
   qrCode?: string;

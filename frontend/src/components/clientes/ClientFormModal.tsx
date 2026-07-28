@@ -131,8 +131,72 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [isPostDeleteDialogOpen, setIsPostDeleteDialogOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<WorkPost | null>(null);
   const [editingPost, setEditingPost] = useState<WorkPost | null>(null);
+  const [selectedPostIds, setSelectedPostIds] = useState<string[]>([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [loadingCep, setLoadingCep] = useState(false);
   const [companies, setCompanies] = useState<Array<{ id: string; name: string; sigla?: string }>>([]);
+
+  const handleToggleSelectAllPosts = (checked: boolean) => {
+    if (checked) {
+      setSelectedPostIds(workPosts.map((p) => p.id));
+    } else {
+      setSelectedPostIds([]);
+    }
+  };
+
+  const handleToggleSelectPost = (postId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedPostIds((prev) => Array.from(new Set([...prev, postId])));
+    } else {
+      setSelectedPostIds((prev) => prev.filter((id) => id !== postId));
+    }
+  };
+
+  const handleExecuteBulkDeletePosts = async () => {
+    if (selectedPostIds.length === 0) return;
+    setIsBulkDeleting(true);
+    try {
+      await Promise.all(selectedPostIds.map((id) => workPostService.deleteWorkPost(id)));
+      toast({
+        title: "✅ Exclusão em Massa Concluída",
+        description: `${selectedPostIds.length} setor(es) de trabalho foi(ram) excluído(s) com sucesso.`,
+      });
+      setSelectedPostIds([]);
+      setIsBulkDeleteDialogOpen(false);
+      loadWorkPosts();
+    } catch (error) {
+      console.error('Erro ao excluir setores em massa:', error);
+      toast({
+        title: "❌ Erro na Exclusão",
+        description: "Ocorreu um erro ao excluir alguns setores de trabalho.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const handleExecuteDeletePost = async (post: WorkPost) => {
+    try {
+      await workPostService.deleteWorkPost(post.id);
+      toast({
+        title: "✅ Setor de Trabalho removido",
+        description: `O setor de trabalho "${post.name}" foi excluído com sucesso.`,
+      });
+      loadWorkPosts();
+    } catch (error) {
+      console.error('Erro ao excluir setor de trabalho:', error);
+      toast({
+        title: "❌ Erro ao excluir",
+        description: "Não foi possível excluir o setor de trabalho.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingPostId(null);
+    }
+  };
 
   const buscarCep = async (cep: string) => {
     const cepLimpo = cep.replace(/\D/g, '');
@@ -277,6 +341,27 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     }));
   };
 
+  // Seleção múltipla de Empresas para o Cliente
+  const selectedCompanyIds = (formData.companyId || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  const handleToggleCompany = (companyId: string, checked: boolean) => {
+    let updated: string[];
+    if (checked) {
+      updated = Array.from(new Set([...selectedCompanyIds, companyId]));
+    } else {
+      updated = selectedCompanyIds.filter((id) => id !== companyId);
+    }
+    handleInputChange('companyId', updated.join(','));
+  };
+
+  const handleRemoveCompany = (companyId: string) => {
+    const updated = selectedCompanyIds.filter((id) => id !== companyId);
+    handleInputChange('companyId', updated.join(','));
+  };
+
   const buildClientPayload = () => ({
     ...formData,
     cnpj: formData.cnpj.replace(/\D/g, ''),
@@ -389,18 +474,18 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[calc(100vw-1rem)] max-w-4xl max-h-[95vh] overflow-hidden bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-2 border-gray-600/50 text-white p-0 sm:w-full">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-4xl h-[85vh] max-h-[850px] flex flex-col overflow-hidden bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-2 border-gray-600/50 text-white p-0 sm:w-full">
         {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-600/30 bg-seguranca-black/50">
+        <DialogHeader className="shrink-0 px-6 pt-5 pb-3 border-b border-gray-600/30 bg-seguranca-black/50">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-seguranca-red/20 border border-seguranca-red/30">
-              <Building2 className="h-6 w-6 text-seguranca-red" />
+            <div className="p-2.5 rounded-xl bg-seguranca-red/20 border border-seguranca-red/30">
+              <Building2 className="h-5 w-5 text-seguranca-red" />
             </div>
             <div>
-              <DialogTitle className="text-2xl font-bold text-white flex items-center gap-2">
+              <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
                 {activeClient ? 'Editar Cliente' : 'Novo Cliente'}
               </DialogTitle>
-              <p className="text-sm text-gray-400 mt-1">
+              <p className="text-xs text-gray-400 mt-0.5">
                 {activeClient ? 'Atualize as informações do cliente' : 'Preencha os dados do novo cliente'}
               </p>
             </div>
@@ -411,7 +496,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         </DialogHeader>
 
         {/* Form Content */}
-          <form onSubmit={handleSubmit} autoComplete="off" className="flex h-full min-h-0 flex-col">
+        <form onSubmit={handleSubmit} autoComplete="off" className="flex flex-1 flex-col min-h-0 overflow-hidden">
           <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="flex w-full overflow-x-auto bg-seguranca-black/50 border border-gray-600/30 p-1 no-scrollbar space-x-1">
@@ -448,7 +533,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                   className="min-w-fit px-4 flex-1 data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-gray-400 whitespace-nowrap"
                 >
                   <Briefcase className="h-4 w-4 mr-2" />
-                  Postos de Trabalho
+                  Setores de Trabalho
                 </TabsTrigger>
               </TabsList>
 
@@ -464,7 +549,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                       id="name"
                       value={formData.name}
                       onChange={(e) => handleInputChange('name', e.target.value)}
-                      placeholder="Ex: Empresa XYZ Ltda"
+                      placeholder="Nome completo do cliente"
                       className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
                       required
                     />
@@ -486,26 +571,57 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                     />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-3 md:col-span-2">
                     <Label htmlFor="companyId" className="text-seguranca-lightgray flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
-                      Empresa <span className="text-seguranca-red">*</span>
+                      Empresas Vinculadas <span className="text-seguranca-red">*</span>
                     </Label>
-                    <Select
-                      value={formData.companyId || ''}
-                      onValueChange={(value) => handleInputChange('companyId', value)}
-                    >
-                      <SelectTrigger className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11">
-                        <SelectValue placeholder="Selecione a empresa" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-seguranca-black border-gray-600">
-                        {companies.map((company) => (
-                          <SelectItem key={company.id} value={company.id} className="text-gray-200 hover:bg-seguranca-graphite">
-                            {company.sigla ? `${company.sigla} - ${company.name}` : company.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    
+                    {/* Lista de Checkboxes de Empresas */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border border-gray-600/60 rounded-lg p-3 bg-seguranca-black/70">
+                      {companies.map((company) => {
+                        const isChecked = selectedCompanyIds.includes(company.id);
+                        const labelText = company.sigla ? `${company.sigla} - ${company.name}` : company.name;
+                        return (
+                          <div key={company.id} className="flex items-center space-x-2 p-1.5 rounded hover:bg-seguranca-graphite/40 transition-colors">
+                            <input
+                              type="checkbox"
+                              id={`client-company-${company.id}`}
+                              checked={isChecked}
+                              onChange={(e) => handleToggleCompany(company.id, e.target.checked)}
+                              className="rounded border-gray-500 text-amber-500 focus:ring-amber-500 h-4 w-4 accent-amber-500 cursor-pointer"
+                            />
+                            <Label htmlFor={`client-company-${company.id}`} className="cursor-pointer text-xs font-medium text-gray-200">
+                              {labelText}
+                            </Label>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Badges de Empresas Selecionadas */}
+                    {selectedCompanyIds.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-xs font-medium text-gray-400">
+                          Empresas Selecionadas ({selectedCompanyIds.length}):
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedCompanyIds.map((compKey) => {
+                            const compObj = companies.find((c) => c.id === compKey);
+                            const name = compObj ? (compObj.sigla ? `${compObj.sigla} - ${compObj.name}` : compObj.name) : compKey;
+                            return (
+                              <Badge key={compKey} variant="secondary" className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs flex items-center gap-1.5 py-1 px-2.5">
+                                <span>{name}</span>
+                                <X
+                                  className="h-3.5 w-3.5 cursor-pointer text-amber-300/70 hover:text-white"
+                                  onClick={() => handleRemoveCompany(compKey)}
+                                />
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -580,7 +696,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                       value={formData.notes}
                       onChange={(e) => handleInputChange('notes', e.target.value)}
                       placeholder="Informações adicionais sobre o cliente..."
-                      rows={4}
+                      rows={3}
                       className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 resize-none"
                     />
                   </div>
@@ -590,76 +706,69 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
               {/* Endereço */}
               <TabsContent value="endereco" className="space-y-4 mt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="address" className="text-seguranca-lightgray flex items-center gap-2">
-                      <Home className="h-4 w-4" />
-                      Endereço Completo
-                    </Label>
-                    <Input
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => handleInputChange('address', e.target.value)}
-                      placeholder="Rua, Avenida, Número, Complemento"
-                      className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
-                    />
-                  </div>
-
                   <div className="space-y-2">
-                    <Label htmlFor="city" className="text-seguranca-lightgray flex items-center gap-2">
+                    <Label htmlFor="zipCode" className="text-seguranca-lightgray flex items-center gap-2">
                       <MapPin className="h-4 w-4" />
-                      Cidade
+                      CEP
                     </Label>
                     <Input
-                      id="city"
-                      value={formData.city}
-                      onChange={(e) => handleInputChange('city', e.target.value)}
-                      placeholder="São Paulo"
-                      className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
+                      id="zipCode"
+                      value={formData.zipCode}
+                      onChange={(e) => {
+                        const val = formatZipCode(e.target.value);
+                        handleInputChange('zipCode', val);
+                        void buscarCep(val.replace(/\D/g, ''));
+                      }}
+                      placeholder="00000-000"
+                      maxLength={9}
+                      className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 font-mono h-11"
                     />
+                    {loadingCep && (
+                      <p className="text-xs text-seguranca-yellow animate-pulse">Buscando endereço via CEP...</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="state" className="text-seguranca-lightgray flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
+                      <Home className="h-4 w-4" />
                       Estado (UF)
                     </Label>
                     <Input
                       id="state"
                       value={formData.state}
                       onChange={(e) => handleInputChange('state', e.target.value.toUpperCase())}
-                      placeholder="SP"
+                      placeholder="UF"
                       maxLength={2}
                       className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 uppercase h-11"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="zipCode" className="text-seguranca-lightgray flex items-center gap-2">
-                      <Hash className="h-4 w-4" />
-                      CEP
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="address" className="text-seguranca-lightgray flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Endereço Completo
                     </Label>
-                    <div className="flex gap-2 items-center">
-                      <Input
-                        id="zipCode"
-                        value={formData.zipCode}
-                        onChange={(e) => {
-                          const valor = formatZipCode(e.target.value);
-                          handleInputChange('zipCode', valor);
-                          const cepLimpo = valor.replace(/\D/g, '');
-                          if (cepLimpo.length === 8) {
-                            buscarCep(cepLimpo);
-                          }
-                        }}
-                        placeholder="00000-000"
-                        maxLength={9}
-                        className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 font-mono h-11"
-                      />
-                      {loadingCep && (
-                        <div className="flex-shrink-0 text-seguranca-yellow">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-seguranca-yellow" />
-                        </div>
-                      )}
-                    </div>
+                    <Input
+                      id="address"
+                      value={formData.address}
+                      onChange={(e) => handleInputChange('address', e.target.value)}
+                      placeholder="Rua, Número, Bairro, Complemento"
+                      className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="city" className="text-seguranca-lightgray flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      Cidade
+                    </Label>
+                    <Input
+                      id="city"
+                      value={formData.city}
+                      onChange={(e) => handleInputChange('city', e.target.value)}
+                      placeholder="Nome da cidade"
+                      className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
+                    />
                   </div>
                 </div>
               </TabsContent>
@@ -676,7 +785,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                       id="contactName"
                       value={formData.contactName}
                       onChange={(e) => handleInputChange('contactName', e.target.value)}
-                      placeholder="João da Silva"
+                      placeholder="Nome da pessoa responsável pelo contato"
                       className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
                     />
                   </div>
@@ -692,7 +801,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                       type="email"
                       value={formData.contactEmail}
                       onChange={(e) => handleInputChange('contactEmail', e.target.value)}
-                      placeholder="contato@empresa.com"
+                      placeholder="contato.responsavel@empresa.com"
                       autoComplete="new-password"
                       spellCheck={false}
                       className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
@@ -701,14 +810,14 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
                   <div className="space-y-2">
                     <Label htmlFor="contactPhone" className="text-seguranca-lightgray flex items-center gap-2">
-                      <Smartphone className="h-4 w-4" />
+                      <Phone className="h-4 w-4" />
                       Telefone do Contato
                     </Label>
                     <Input
                       id="contactPhone"
                       value={formData.contactPhone}
                       onChange={(e) => handleInputChange('contactPhone', formatPhone(e.target.value))}
-                      placeholder="(00) 00000-0000"
+                      placeholder="(00) 0000-0000"
                       maxLength={15}
                       className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
                     />
@@ -717,7 +826,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                   <div className="space-y-2">
                     <Label htmlFor="mobile" className="text-seguranca-lightgray flex items-center gap-2">
                       <Smartphone className="h-4 w-4" />
-                      Celular Adicional
+                      Celular / WhatsApp
                     </Label>
                     <Input
                       id="mobile"
@@ -731,59 +840,73 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 </div>
               </TabsContent>
 
-              {/* Notificações */}
+              {/* Notificações por Departamento */}
               <TabsContent value="notificacoes" className="space-y-4 mt-4">
-                <div className="bg-seguranca-black/50 border border-gray-600/30 rounded-xl p-6">
-                  <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Mail className="h-5 w-5 text-seguranca-red" />
-                    Departamentos para Notificar
-                  </h4>
-                  <p className="text-sm text-gray-400 mb-6">
-                    Selecione quais departamentos devem receber uma notificação sobre este novo cliente.
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {CLIENT_NOTIFICATION_DEPARTMENTS.map((dept) => (
-                      <div
-                        key={dept.id}
-                        className={`flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer ${formData.notifiedDepartments?.includes(dept.id)
-                          ? 'bg-seguranca-red/10 border-seguranca-red/50 text-white'
-                          : 'bg-seguranca-black/30 border-gray-600/30 text-gray-400 hover:border-gray-600'
-                          }`}
-                        onClick={() => {
-                          const currentDepts = formData.notifiedDepartments || [];
-                          const nextDepts = currentDepts.includes(dept.id)
-                            ? currentDepts.filter(id => id !== dept.id)
-                            : [...currentDepts, dept.id];
-                          setFormData(prev => ({ ...prev, notifiedDepartments: nextDepts }));
-                        }}
-                      >
-                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.notifiedDepartments?.includes(dept.id)
-                          ? 'bg-seguranca-red border-seguranca-red'
-                          : 'border-gray-600'
-                          }`}>
-                          {formData.notifiedDepartments?.includes(dept.id) && (
-                            <CheckCircle className="h-3.5 w-3.5 text-white" />
-                          )}
-                        </div>
-                        <span className="font-medium">{dept.label}</span>
-                      </div>
-                    ))}
+                <div className="bg-seguranca-black/50 border border-gray-600/30 rounded-xl p-4 sm:p-6">
+                  <div className="mb-4">
+                    <h4 className="text-base font-semibold flex items-center gap-2 text-white">
+                      <Mail className="h-4 w-4 text-seguranca-red" />
+                      Departamentos para Notificação de Ocorrências
+                    </h4>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Selecione quais departamentos desta empresa de segurança devem receber alertas e notificações automáticas de ocorrências geradas para este cliente.
+                    </p>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                    {CLIENT_NOTIFICATION_DEPARTMENTS.map((dept) => {
+                      const isChecked = (formData.notifiedDepartments || []).includes(dept.id);
+                      return (
+                        <label
+                          key={dept.id}
+                          htmlFor={`client-dept-${dept.id}`}
+                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                            isChecked
+                              ? 'bg-seguranca-red/15 border-seguranca-red/50 text-white'
+                              : 'bg-seguranca-black/40 border-gray-600/40 text-gray-300 hover:bg-seguranca-graphite/40'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            id={`client-dept-${dept.id}`}
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const current = formData.notifiedDepartments || [];
+                              const updated = e.target.checked
+                                ? Array.from(new Set([...current, dept.id]))
+                                : current.filter((id) => id !== dept.id);
+                              handleInputChange('notifiedDepartments', updated as any);
+                            }}
+                            className="rounded border-gray-500 text-seguranca-red focus:ring-seguranca-red h-4 w-4 accent-red-600 cursor-pointer"
+                          />
+                          <span className="text-sm font-medium">{dept.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {(formData.notifiedDepartments || []).length > 0 && (
+                    <div className="mt-4 pt-3 border-t border-gray-600/30 flex items-center gap-2 text-xs text-seguranca-yellow">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      <span>
+                        {(formData.notifiedDepartments || []).length} departamento(s) selecionado(s) para receber notificações.
+                      </span>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
-              {/* Postos de Trabalho */}
+              {/* Setores de Trabalho */}
               <TabsContent value="postos-de-trabalho" className="space-y-4 mt-4">
                 <div className="bg-seguranca-black/50 border border-gray-600/30 rounded-xl p-4 sm:p-6 min-h-[260px] sm:min-h-[400px]">
                   <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h4 className="text-lg font-semibold flex items-center gap-2">
                         <Briefcase className="h-5 w-5 text-seguranca-red" />
-                        Postos de Trabalho Vinculados
+                        Setores de Trabalho Vinculados
                       </h4>
                       <p className="text-sm text-gray-400 mt-1">
-                        Gerencie os postos de serviço deste cliente.
+                        Gerencie os setores de trabalho deste cliente.
                       </p>
                     </div>
                     {activeClient?.id && (
@@ -796,7 +919,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                         className="w-full bg-seguranca-red hover:bg-seguranca-darkred sm:w-auto"
                       >
                         <Plus className="h-4 w-4 mr-2" />
-                        Novo Posto
+                        Novo Setor de Trabalho
                       </Button>
                     )}
                   </div>
@@ -808,7 +931,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                       </div>
                       <h5 className="text-white font-medium">Cliente ainda não salvo</h5>
                       <p className="text-gray-400 max-w-xs mt-2">
-                        Salve o cliente primeiro para poder cadastrar postos de trabalho para ele.
+                        Salve o cliente primeiro para poder cadastrar setores de trabalho para ele.
                       </p>
                       <Button
                         type="button"
@@ -817,82 +940,135 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                         className="mt-6 bg-seguranca-red hover:bg-seguranca-darkred"
                       >
                         <Save className="h-4 w-4 mr-2" />
-                        {isLoading ? 'Salvando...' : 'Salvar cliente e cadastrar posto'}
+                        {isLoading ? 'Salvando...' : 'Salvar cliente e cadastrar setor'}
                       </Button>
                     </div>
                   ) : loadingPosts ? (
                     <div className="flex flex-col items-center justify-center py-12">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-seguranca-red"></div>
-                      <p className="text-gray-400 mt-4">Carregando postos...</p>
+                      <p className="text-gray-400 mt-4">Carregando setores de trabalho...</p>
                     </div>
                   ) : workPosts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-gray-600/30 rounded-xl">
                       <Briefcase className="h-10 w-10 text-gray-600 mb-4" />
-                      <h5 className="text-white font-medium">Nenhum posto encontrado</h5>
+                      <h5 className="text-white font-medium">Nenhum setor de trabalho encontrado</h5>
                       <p className="text-gray-400 max-w-xs mt-2">
-                        Este cliente ainda não possui postos de trabalho cadastrados.
+                        Este cliente ainda não possui setores de trabalho cadastrados.
                       </p>
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-gray-600/30 overflow-hidden">
-                      <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader className="bg-seguranca-black/80">
-                          <TableRow className="hover:bg-transparent border-gray-600/30">
-                            <TableHead className="text-gray-300 font-bold">Código</TableHead>
-                            <TableHead className="text-gray-300 font-bold">Nome</TableHead>
-                            <TableHead className="text-gray-300 font-bold">Tipo</TableHead>
-                            <TableHead className="text-gray-300 font-bold">Status</TableHead>
-                            <TableHead className="text-right text-gray-300 font-bold">Ações</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {workPosts.map((post) => (
-                            <TableRow key={post.id} className="hover:bg-white/5 border-gray-600/30">
-                              <TableCell className="font-mono text-seguranca-yellow text-xs">{post.postCode}</TableCell>
-                              <TableCell className="font-medium text-white">{post.name}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-[10px] uppercase border-gray-600">
-                                  {post.type?.replace('POSTO_', '')}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge className={`text-[10px] ${post.status === 'ATIVO' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                                  {post.status?.replace('_', ' ')}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-gray-400 hover:text-white"
-                                    onClick={() => {
-                                      setEditingPost(post);
-                                      setIsPostFormOpen(true);
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-gray-400 hover:text-seguranca-red"
-                                    onClick={() => {
-                                      setSelectedPost(post);
-                                      setIsPostDeleteDialogOpen(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
+                    <div className="space-y-3">
+                      {/* Barra de Ações em Massa */}
+                      {selectedPostIds.length > 0 && (
+                        <div className="flex items-center justify-between bg-red-950/40 border border-red-500/40 rounded-lg p-3 animate-in fade-in-0 duration-150">
+                          <span className="text-xs font-medium text-red-200 flex items-center gap-2">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                              {selectedPostIds.length}
+                            </span>
+                            setor(es) de trabalho selecionado(s)
+                          </span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setIsBulkDeleteDialogOpen(true);
+                            }}
+                            className="bg-red-600 hover:bg-red-700 text-white text-xs h-8 px-3 gap-1.5 shadow-md"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Excluir Selecionados ({selectedPostIds.length})
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="rounded-xl border border-gray-600/30 overflow-hidden">
+                        <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader className="bg-seguranca-black/80">
+                            <TableRow className="hover:bg-transparent border-gray-600/30">
+                              <TableHead className="w-10 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedPostIds.length === workPosts.length && workPosts.length > 0}
+                                  onChange={(e) => handleToggleSelectAllPosts(e.target.checked)}
+                                  className="rounded border-gray-500 text-red-600 focus:ring-red-600 h-4 w-4 accent-red-600 cursor-pointer"
+                                  title="Selecionar Todos os Setores"
+                                />
+                              </TableHead>
+                              <TableHead className="text-gray-300 font-bold">Código</TableHead>
+                              <TableHead className="text-gray-300 font-bold">Setor de Trabalho</TableHead>
+                              <TableHead className="text-gray-300 font-bold">Posto / Tipo</TableHead>
+                              <TableHead className="text-gray-300 font-bold">Status</TableHead>
+                              <TableHead className="text-right text-gray-300 font-bold">Ações</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {workPosts.map((post) => {
+                              const isSelected = selectedPostIds.includes(post.id);
+                              return (
+                                <TableRow key={post.id} className={`hover:bg-white/5 border-gray-600/30 ${isSelected ? 'bg-red-950/20' : ''}`}>
+                                  <TableCell className="text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => handleToggleSelectPost(post.id, e.target.checked)}
+                                      className="rounded border-gray-500 text-red-600 focus:ring-red-600 h-4 w-4 accent-red-600 cursor-pointer"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-mono text-seguranca-yellow text-xs">{post.postCode}</TableCell>
+                                  <TableCell className="font-medium text-white">{post.name}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-[10px] uppercase border-gray-600">
+                                      {post.type?.replace('POSTO_', '')}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge className={`text-[10px] ${post.status === 'ATIVO' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                      {post.status?.replace('_', ' ')}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex justify-end gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-gray-400 hover:text-white"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setEditingPost(post);
+                                          setIsPostFormOpen(true);
+                                        }}
+                                        title="Editar Setor de Trabalho"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-gray-400 hover:text-seguranca-red"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setSelectedPost(post);
+                                          setIsPostDeleteDialogOpen(true);
+                                        }}
+                                        title="Excluir Setor de Trabalho"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -902,28 +1078,28 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="border-t border-gray-600/30 bg-seguranca-black/90 px-3 py-4 backdrop-blur supports-[backdrop-filter]:bg-seguranca-black/70 sm:px-6">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <p className="text-center text-sm text-gray-400 xl:text-left">
+          <div className="shrink-0 border-t border-gray-600/30 bg-seguranca-black/95 px-3 py-3 backdrop-blur sm:px-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-center text-xs text-gray-400 sm:text-left">
                 <span className="text-seguranca-red">*</span> Campos obrigatórios
               </p>
-              <div className="flex w-full flex-col gap-3 sm:flex-row xl:w-auto xl:justify-end">
+              <div className="flex w-full flex-row items-center justify-end gap-2 sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={onClose}
-                  className="w-full border-gray-600 px-6 text-white hover:bg-seguranca-black hover:text-white xl:w-auto"
+                  className="border-gray-600 px-4 h-9 text-xs text-white hover:bg-seguranca-black hover:text-white"
                   disabled={isLoading}
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-3.5 w-3.5 mr-1.5" />
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-seguranca-red px-6 shadow-lg shadow-seguranca-red/20 hover:bg-seguranca-darkred xl:w-auto"
+                  className="bg-seguranca-red px-5 h-9 text-xs shadow-lg shadow-seguranca-red/20 hover:bg-seguranca-darkred"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
                   {isLoading ? 'Salvando...' : (activeClient ? 'Atualizar Cliente' : 'Criar Cliente')}
                 </Button>
               </div>
@@ -961,19 +1137,76 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                   loadWorkPosts();
                   setIsPostDeleteDialogOpen(false);
                   toast({
-                    title: "✅ Posto removido",
-                    description: "O posto de trabalho foi excluído com sucesso.",
+                    title: "✅ Setor de trabalho removido",
+                    description: `O setor "${selectedPost.name}" foi excluído com sucesso.`,
                   });
                 } catch (error) {
                   toast({
                     title: "❌ Erro",
-                    description: "Erro ao excluir posto de trabalho.",
+                    description: "Erro ao excluir setor de trabalho.",
                     variant: "destructive",
                   });
                 }
               }}
             />
           </>
+        )}
+
+        {/* Modal de Confirmação de Exclusão em Massa */}
+        {isBulkDeleteDialogOpen && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in-0 duration-200">
+            <div 
+              className="w-full max-w-md rounded-xl border border-gray-600/60 bg-seguranca-black p-6 shadow-2xl space-y-4 text-white animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 border-b border-gray-600/30 pb-3">
+                <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/30">
+                  <Trash2 className="h-5 w-5 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Exclusão em Massa</h3>
+                  <p className="text-xs text-gray-400">Excluir múltiplos setores selecionados</p>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-sm text-gray-300 py-1">
+                <p>
+                  Tem certeza que deseja excluir permanentemente os <strong className="text-white">{selectedPostIds.length}</strong> setores de trabalho selecionados deste cliente?
+                </p>
+                <p className="text-xs text-gray-400 bg-red-950/40 p-2.5 rounded-lg border border-red-500/20 mt-2">
+                  ⚠️ Esta ação não pode ser desfeita e todos os setores selecionados serão removidos do cliente.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-600/30">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isBulkDeleting}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsBulkDeleteDialogOpen(false);
+                  }}
+                  className="border-gray-600 px-4 text-xs text-white hover:bg-seguranca-graphite"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  disabled={isBulkDeleting}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void handleExecuteBulkDeletePosts();
+                  }}
+                  className="bg-red-600 hover:bg-red-700 px-5 text-xs text-white shadow-lg shadow-red-600/20"
+                >
+                  {isBulkDeleting ? 'Excluindo...' : `Excluir ${selectedPostIds.length} Setores`}
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </DialogContent>
     </Dialog>

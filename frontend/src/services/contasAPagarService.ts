@@ -16,6 +16,8 @@ export interface CreateContaAPagarRequest {
   paymentDate?: string;
   barcode?: string;
   category?: string;
+  subcategoriaId?: string | null;
+  employeeId?: string | null;
   notes?: string;
   centroCusto?: string;
   companySigla?: string;
@@ -193,6 +195,32 @@ export interface AnaliseFluxoPagamento {
   };
 }
 
+// === Interfaces do Plano de Contas ===
+export interface CategoriaPai {
+  id: string;
+  nome: string;
+  codigo: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Subcategoria {
+  id: string;
+  categoriaPaiId: string;
+  categoriaPaiNome?: string;
+  categoriaPaiCodigo?: string;
+  nome: string;
+  codigo: string;
+  requerVinculoFuncionario: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EmployeeSelect {
+  id: string;
+  name: string;
+}
+
 export const contasAPagarService = {
   // ===== CONTAS A PAGAR =====
 
@@ -249,6 +277,8 @@ export const contasAPagarService = {
         dataPagamento: parseDateFromBackend(invoice.paymentDate),
         observacoes: invoice.notes,
         categoria: invoice.category,
+        subcategoriaId: invoice.subcategoriaId,
+        employeeId: invoice.employeeId,
         centroCusto: invoice.centroCusto
       };
     });
@@ -302,6 +332,8 @@ export const contasAPagarService = {
       dataPagamento: parseDateFromBackend(invoice.paymentDate),
       observacoes: invoice.notes,
       categoria: invoice.category,
+      subcategoriaId: invoice.subcategoriaId,
+      employeeId: invoice.employeeId,
       centroCusto: invoice.centroCusto
     };
   },
@@ -332,6 +364,8 @@ export const contasAPagarService = {
       paymentDate: formatDateForBackend(conta.dataPagamento),
       barcode: conta.codigoBarras,
       category: conta.categoria === 'NENHUMA' ? undefined : conta.categoria,
+      subcategoriaId: conta.subcategoriaId || null,
+      employeeId: conta.employeeId || null,
       notes: conta.observacoes,
       centroCusto: conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto,
       companySigla: conta.companySigla
@@ -365,6 +399,8 @@ export const contasAPagarService = {
     if (conta.dataPagamento) requestData.paymentDate = formatDateForBackend(conta.dataPagamento);
     if (conta.codigoBarras) requestData.barcode = conta.codigoBarras;
     if (conta.categoria !== undefined) requestData.category = conta.categoria === 'NENHUMA' ? undefined : conta.categoria;
+    if (conta.subcategoriaId !== undefined) requestData.subcategoriaId = conta.subcategoriaId || null;
+    if (conta.employeeId !== undefined) requestData.employeeId = conta.employeeId || null;
     if (conta.observacoes) requestData.notes = conta.observacoes;
     if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto;
     if (conta.companySigla !== undefined) requestData.companySigla = conta.companySigla;
@@ -484,29 +520,25 @@ export const contasAPagarService = {
   // Buscar todos os fornecedores
   async getFornecedores(): Promise<Supplier[]> {
     try {
-      console.log('📦 contasAPagarService.getFornecedores: Iniciando chamada para /api/suppliers/all');
       const response = await api.get('/api/suppliers/all');
-      console.log('📦 contasAPagarService.getFornecedores: Resposta recebida:', {
-        status: response.status,
-        data: response.data,
-        dataType: typeof response.data,
-        isArray: Array.isArray(response.data),
-        length: Array.isArray(response.data) ? response.data.length : 'N/A'
-      });
       const data = response.data;
-      const result = Array.isArray(data) ? data : [];
-      console.log('📦 contasAPagarService.getFornecedores: Retornando', result.length, 'fornecedores');
-      return result;
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.content)) return data.content;
+      return [];
     } catch (error: any) {
-      console.error('❌ contasAPagarService.getFornecedores: Erro ao buscar fornecedores:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        statusText: error?.response?.statusText,
-        error
-      });
+      // Fallback: lista só ativos
+      try {
+        const active = await api.get('/api/suppliers/active');
+        const data = active.data;
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.content)) return data.content;
+      } catch {
+        /* ignore */
+      }
       if (isConnectionError(error)) {
         console.warn('⚠️ Backend não está disponível. Retornando array vazio para fornecedores.');
+      } else {
+        console.error('❌ Erro ao buscar fornecedores:', error?.response?.status || error?.message);
       }
       return [];
     }
@@ -821,6 +853,67 @@ export const contasAPagarService = {
     }
   },
 
+  // ===== PLANO DE CONTAS =====
+
+  async getCategoriasPai(): Promise<CategoriaPai[]> {
+    const response = await api.get('/api/plano-contas/categorias');
+    return Array.isArray(response.data) ? response.data : [];
+  },
+
+  async createCategoriaPai(data: Partial<CategoriaPai>): Promise<CategoriaPai> {
+    const response = await api.post('/api/plano-contas/categorias', data);
+    return response.data;
+  },
+
+  async updateCategoriaPai(id: string, data: Partial<CategoriaPai>): Promise<CategoriaPai> {
+    const response = await api.put(`/api/plano-contas/categorias/${id}`, data);
+    return response.data;
+  },
+
+  async deleteCategoriaPai(id: string): Promise<void> {
+    await api.delete(`/api/plano-contas/categorias/${id}`);
+  },
+
+  async getSubcategorias(categoriaPaiId?: string): Promise<Subcategoria[]> {
+    const url = categoriaPaiId
+      ? `/api/plano-contas/subcategorias/por-categoria/${categoriaPaiId}`
+      : '/api/plano-contas/subcategorias';
+    const response = await api.get(url);
+    return Array.isArray(response.data) ? response.data : [];
+  },
+
+  async createSubcategoria(data: Partial<Subcategoria>): Promise<Subcategoria> {
+    const response = await api.post('/api/plano-contas/subcategorias', data);
+    return response.data;
+  },
+
+  async updateSubcategoria(id: string, data: Partial<Subcategoria>): Promise<Subcategoria> {
+    const response = await api.put(`/api/plano-contas/subcategorias/${id}`, data);
+    return response.data;
+  },
+
+  async deleteSubcategoria(id: string): Promise<void> {
+    await api.delete(`/api/plano-contas/subcategorias/${id}`);
+  },
+
+  // Buscar funcionários para o campo condicional
+  async getEmployeeList(): Promise<EmployeeSelect[]> {
+    try {
+      const response = await api.get('/api/employees?size=200');
+      const data = response.data?.content || response.data || [];
+      return Array.isArray(data) ? data.map((e: any) => ({ id: e.id, name: e.name })) : [];
+    } catch {
+      // Fallback: buscar pelo endpoint de autocomplete
+      try {
+        const response = await api.get('/api/employees/search?q=');
+        const data = Array.isArray(response.data) ? response.data : [];
+        return data.map((e: any) => ({ id: e.id, name: e.name }));
+      } catch {
+        return [];
+      }
+    }
+  },
+
   // Método auxiliar para mapear invoice para ContaAPagar
   mapInvoiceToContaAPagar(invoice: any): ContaAPagar {
     return {
@@ -838,6 +931,8 @@ export const contasAPagarService = {
       dataPagamento: parseDateFromBackend(invoice.paymentDate),
       observacoes: invoice.notes,
       categoria: invoice.category,
+      subcategoriaId: invoice.subcategoriaId,
+      employeeId: invoice.employeeId,
       centroCusto: invoice.centroCusto,
       companySigla: invoice.companySigla,
       createdAt: parseDateFromBackend(invoice.createdAt)

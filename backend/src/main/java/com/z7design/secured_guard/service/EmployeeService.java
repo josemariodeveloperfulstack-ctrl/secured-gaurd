@@ -869,6 +869,71 @@ public class EmployeeService {
         return toDTO(saved);
     }
 
+    /**
+     * Cancela demissão registrada indevidamente: reativa o colaborador sem gerar Readmissão.
+     * Reabre o vínculo mais recente, limpa datas/motivo de demissão e registra auditoria com justificativa.
+     */
+    @Transactional
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
+    public EmployeeDTO cancelDismissal(UUID id, String justification, UUID periodId, UUID changedByUserId) {
+        if (justification == null || justification.isBlank()) {
+            throw new IllegalArgumentException("Informe a justificativa do cancelamento da demissão.");
+        }
+        String trimmedJustification = justification.trim();
+        if (trimmedJustification.length() < 5) {
+            throw new IllegalArgumentException("A justificativa deve ter pelo menos 5 caracteres.");
+        }
+
+        Employee employee = findById(id);
+        if (employee.getStatus() != EmploymentStatus.TERMINATED) {
+            throw new IllegalArgumentException(
+                    "Somente funcionários com status Demitido podem ter a demissão cancelada. "
+                            + "Se o colaborador já foi readmitido, o vínculo anterior permanece no histórico.");
+        }
+
+        LocalDate prevTermination = employee.getTerminationDate() != null
+                ? employee.getTerminationDate()
+                : employee.getDataRescisao();
+        String prevReason = employee.getTerminationReason();
+
+        employmentPeriodService.reopenAfterMistakenDismissal(employee, periodId);
+
+        employee.setStatus(EmploymentStatus.ACTIVE);
+        employee.setTerminationDate(null);
+        employee.setDataRescisao(null);
+        employee.setTerminationReason(null);
+        employee.setUpdatedAt(LocalDateTime.now());
+        Employee saved = employeeRepository.save(employee);
+
+        employmentPeriodService.reactivateLinkedUser(saved);
+
+        if (changedByUserId != null) {
+            String oldDesc = "Demitido em "
+                    + (prevTermination != null ? prevTermination : "-")
+                    + (prevReason != null && !prevReason.isBlank() ? " — " + prevReason : "");
+            employeeChangeHistoryService.recordChange(
+                    saved.getId(),
+                    EmployeeChangeCategory.VINCULO_EMPREGATICIO,
+                    "dismissalCancel",
+                    "Cancelamento de demissão",
+                    oldDesc,
+                    "Revertido para Ativo (sem readmissão). Justificativa: " + trimmedJustification,
+                    changedByUserId);
+            employeeChangeHistoryService.recordChange(
+                    saved.getId(),
+                    EmployeeChangeCategory.STATUS,
+                    "status",
+                    "Status",
+                    EmploymentStatus.TERMINATED.name(),
+                    EmploymentStatus.ACTIVE.name(),
+                    changedByUserId);
+        }
+
+        log.info("Demissão cancelada para funcionário {} por usuário {}. Justificativa: {}",
+                saved.getId(), changedByUserId, trimmedJustification);
+        return toDTO(saved);
+    }
+
     @Transactional(readOnly = true)
     public Optional<EmployeeDTO> findEligibleForRehireByCpf(String cpf) {
         return employmentPeriodService.findEligibleForRehireByCpf(cpf).map(this::toDTO);
@@ -1017,6 +1082,9 @@ public class EmployeeService {
             }
             if (employee.getWorkPost() != null) {
                 org.hibernate.Hibernate.initialize(employee.getWorkPost());
+                if (employee.getWorkPost().getPrimaryPosition() != null) {
+                    org.hibernate.Hibernate.initialize(employee.getWorkPost().getPrimaryPosition());
+                }
             }
             if (employee.getDepartment() != null) {
                 org.hibernate.Hibernate.initialize(employee.getDepartment());
@@ -2137,6 +2205,19 @@ public class EmployeeService {
                     EmployeeDTO.IdOnlyDTO workPostDTO = new EmployeeDTO.IdOnlyDTO();
                     workPostDTO.setId(e.getWorkPost().getId());
                     workPostDTO.setName(e.getWorkPost().getName());
+                    workPostDTO.setDescription(e.getWorkPost().getDescription());
+                    workPostDTO.setWorkSchedule(e.getWorkPost().getWorkSchedule());
+                    if (e.getWorkPost().getType() != null) {
+                        workPostDTO.setType(e.getWorkPost().getType().name());
+                    }
+                    try {
+                        if (e.getWorkPost().getPrimaryPosition() != null) {
+                            org.hibernate.Hibernate.initialize(e.getWorkPost().getPrimaryPosition());
+                            workPostDTO.setPrimaryPositionName(e.getWorkPost().getPrimaryPosition().getName());
+                        }
+                    } catch (Exception posEx) {
+                        System.err.println("[WARNING] Erro ao mapear workPost.primaryPosition: " + posEx.getMessage());
+                    }
                     try {
                         if (e.getWorkPost().getClient() != null) {
                             workPostDTO.setClientId(e.getWorkPost().getClient().getId());
@@ -2415,58 +2496,64 @@ public class EmployeeService {
         String normalizedCpf = cpf.replaceAll("[^0-9]", "");
         log.debug("Buscando funcionário por CPF exato (normalizado): {}", normalizedCpf);
 
-        // PRIORIDADE 1: Buscar User pelo username (que contém o CPF)
-        Optional<com.z7design.secured_guard.model.User> userOpt = userRepository.findByUsername(normalizedCpf);
-        if (userOpt.isEmpty()) {
-            // Tentar também com CPF formatado (com pontos e traço)
-            String formattedCpf = normalizedCpf.length() == 11
-                    ? String.format("%s.%s.%s-%s",
-                            normalizedCpf.substring(0, 3),
-                            normalizedCpf.substring(3, 6),
-                            normalizedCpf.substring(6, 9),
-                            normalizedCpf.substring(9))
-                    : normalizedCpf;
-            userOpt = userRepository.findByUsername(formattedCpf);
-        }
-
-        if (userOpt.isPresent()) {
-            com.z7design.secured_guard.model.User user = userOpt.get();
-            log.debug("✅ User encontrado pelo username (CPF): {} - ID: {}", user.getUsername(), user.getId());
-
-            // Buscar Employee relacionado ao User
-            Optional<Employee> employeeOpt = employeeRepository.findByUserId(user.getId());
-            if (employeeOpt.isPresent()) {
-                log.debug("✅ Funcionário encontrado através do User: {}", employeeOpt.get().getName());
-                return employeeOpt;
-            } else {
-                log.warn("⚠️ User encontrado mas não há Employee relacionado para userId: {}", user.getId());
+        try {
+            // PRIORIDADE 1: Buscar User pelo username (que contém o CPF)
+            Optional<com.z7design.secured_guard.model.User> userOpt = userRepository.findByUsername(normalizedCpf);
+            if (userOpt.isEmpty()) {
+                // Tentar também com CPF formatado (com pontos e traço)
+                String formattedCpf = normalizedCpf.length() == 11
+                        ? String.format("%s.%s.%s-%s",
+                                normalizedCpf.substring(0, 3),
+                                normalizedCpf.substring(3, 6),
+                                normalizedCpf.substring(6, 9),
+                                normalizedCpf.substring(9))
+                        : normalizedCpf;
+                userOpt = userRepository.findByUsername(formattedCpf);
             }
-        }
 
-        // PRIORIDADE 2: Buscar usando findByCpf (busca na coluna cpf com normalização)
-        Optional<Employee> employeeOpt = employeeRepository.findByCpf(normalizedCpf);
-        if (employeeOpt.isPresent()) {
-            log.debug("✅ Funcionário encontrado usando findByCpf: {}", employeeOpt.get().getName());
-            return employeeOpt;
-        }
+            if (userOpt.isPresent()) {
+                com.z7design.secured_guard.model.User user = userOpt.get();
+                log.debug("✅ User encontrado pelo username (CPF): {} - ID: {}", user.getUsername(), user.getId());
 
-        // PRIORIDADE 3: Buscar usando findByDocument (campo document)
-        employeeOpt = employeeRepository.findByDocument(normalizedCpf);
-        if (employeeOpt.isPresent()) {
-            log.debug("✅ Funcionário encontrado usando findByDocument: {}", employeeOpt.get().getName());
-            return employeeOpt;
-        }
+                // Buscar Employee relacionado ao User
+                Optional<Employee> employeeOpt = employeeRepository.findByUserId(user.getId());
+                if (employeeOpt.isPresent()) {
+                    log.debug("✅ Funcionário encontrado através do User: {}", employeeOpt.get().getName());
+                    return employeeOpt;
+                } else {
+                    log.warn("⚠️ User encontrado mas não há Employee relacionado para userId: {}", user.getId());
+                }
+            }
 
-        // PRIORIDADE 4: Buscar todos e normalizar manualmente (fallback)
-        List<Employee> allEmployees = employeeRepository.findAll();
-        employeeOpt = allEmployees.stream()
-                .filter(e -> e.getDocument() != null)
-                .filter(e -> e.getDocument().replaceAll("[^0-9]", "").equals(normalizedCpf))
-                .findFirst();
+            // PRIORIDADE 2: Buscar usando findByCpf (busca na coluna cpf com normalização)
+            Optional<Employee> employeeOpt = employeeRepository.findByCpf(normalizedCpf);
+            if (employeeOpt.isPresent()) {
+                log.debug("✅ Funcionário encontrado usando findByCpf: {}", employeeOpt.get().getName());
+                return employeeOpt;
+            }
 
-        if (employeeOpt.isPresent()) {
-            log.debug("✅ Funcionário encontrado usando busca manual: {}", employeeOpt.get().getName());
-            return employeeOpt;
+            // PRIORIDADE 3: Buscar usando findByDocument (campo document)
+            employeeOpt = employeeRepository.findByDocument(normalizedCpf);
+            if (employeeOpt.isPresent()) {
+                log.debug("✅ Funcionário encontrado usando findByDocument: {}", employeeOpt.get().getName());
+                return employeeOpt;
+            }
+
+            // PRIORIDADE 4: Buscar todos e normalizar manualmente (fallback)
+            List<Employee> allEmployees = employeeRepository.findAll();
+            employeeOpt = allEmployees.stream()
+                    .filter(e -> e.getDocument() != null)
+                    .filter(e -> e.getDocument().replaceAll("[^0-9]", "").equals(normalizedCpf))
+                    .findFirst();
+
+            if (employeeOpt.isPresent()) {
+                log.debug("✅ Funcionário encontrado usando busca manual: {}", employeeOpt.get().getName());
+                return employeeOpt;
+            }
+        } catch (jakarta.persistence.NonUniqueResultException | org.springframework.dao.IncorrectResultSizeDataAccessException e) {
+            log.warn("⚠️ Múltiplos registros encontrados para CPF: {}. Retornando o primeiro.", normalizedCpf);
+            List<Employee> employees = employeeRepository.findAllByDocument(normalizedCpf);
+            return employees.stream().findFirst();
         }
 
         log.warn(

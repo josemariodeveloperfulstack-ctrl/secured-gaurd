@@ -2,11 +2,13 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DatePicker } from '@/components/ui/date-picker';
-import { parseDateFromBackend, formatDateForBackend } from '@/utils/dateUtils';
+import { parseDateFromBackend, formatDateForBackend, calcAsoExpiryDate } from '@/utils/dateUtils';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
 import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import { DependentFormModal } from '@/components/dependentes/DependentFormModal';
+import SpouseFormModal, { SpouseFormValues } from '@/components/funcionarios/SpouseFormModal';
 import FichaEntregaEPIForm from './FichaEntregaEPIForm';
+import CancelDismissalDialog from './CancelDismissalDialog';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import dependentService from '@/services/dependentService';
@@ -21,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { employeeService } from '@/services/employeeService';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys, fetchEmployeeDetailForEdit } from '@/hooks/queries';
@@ -111,6 +114,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     spouseBirthDate: '',
     spousePhone: '',
     spouseEmail: '',
+    spouseProfession: '',
     
     // Campos da ficha de registro
     empresaNome: '',
@@ -236,14 +240,20 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [cpfError, setCpfError] = useState<string | null>(null);
   const [eligibleRehireEmployee, setEligibleRehireEmployee] = useState<EligibleRehireEmployee | null>(null);
   const [rehireAdmissionType, setRehireAdmissionType] = useState<EmploymentAdmissionType | ''>('');
+  /** Opt-in: só exibe Readmissão/Promoção quando o usuário habilitar. */
+  const [rehireEnabled, setRehireEnabled] = useState(false);
   const [employmentPeriods, setEmploymentPeriods] = useState<EmployeeEmploymentPeriod[]>([]);
   const [employmentPeriodsLoading, setEmploymentPeriodsLoading] = useState(false);
+  const [cancelDismissalOpen, setCancelDismissalOpen] = useState(false);
+  const [cancelDismissalPeriodId, setCancelDismissalPeriodId] = useState<string | undefined>();
+  const [cancelDismissalLoading, setCancelDismissalLoading] = useState(false);
   const [historyPdfLoading, setHistoryPdfLoading] = useState(false);
   const [canCreateDefaultUser, setCanCreateDefaultUser] = useState(false);
   const [criarUsuarioModalOpen, setCriarUsuarioModalOpen] = useState(false);
   const [novoMedicoModalOpen, setNovoMedicoModalOpen] = useState(false);
   const [dependentModalOpen, setDependentModalOpen] = useState(false);
   const [dependentToEdit, setDependentToEdit] = useState<Dependent | null>(null);
+  const [spouseModalOpen, setSpouseModalOpen] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loadingDependents, setLoadingDependents] = useState(false);
   const [positionSearchTerm, setPositionSearchTerm] = useState('');
@@ -819,12 +829,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         console.log('✅ Initialized lastSavedFormRef:', lastSavedFormRef.current);
         initialWorkPostIdRef.current = String(formToSet.workPostId || '').toLowerCase();
         workPostSelectReadyRef.current = false;
-        if ((formToSet.status || '').toUpperCase() === 'TERMINATED') {
-          setEligibleRehireEmployee(employeeData as EligibleRehireEmployee);
-        } else {
-          setEligibleRehireEmployee(null);
-          setRehireAdmissionType('');
-        }
+        // Recontratação é opt-in: não forçar painel ao editar demitido (permite corrigir datas/salário/ASO)
+        setEligibleRehireEmployee(null);
+        setRehireAdmissionType('');
+        setRehireEnabled(false);
         setTemIntervaloRefeicao(employeeData.horarioTrabalhoIntervalo ? 'sim' : 'nao');
 
         const docRef = (employeeData as any).exameMedicoDoctor;
@@ -1370,7 +1378,55 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     }));
   };
 
-  const isRehireFormMode = Boolean(eligibleRehireEmployee && rehireAdmissionType);
+  /** Só oferece recontratação se já houve demissão (status ou data de rescisão / período encerrado). */
+  const wasDismissedAtLeastOnce =
+    (form.status || '').toUpperCase() === 'TERMINATED' ||
+    Boolean(form.dataRescisao) ||
+    employmentPeriods.some(
+      (p) =>
+        (p.status || '').toUpperCase() === 'TERMINATED' ||
+        Boolean(p.terminationDate),
+    );
+
+  const buildEligibleRehireSnapshot = (): EligibleRehireEmployee | null => {
+    if (!funcionario?.id || !wasDismissedAtLeastOnce) return null;
+    return {
+      id: String(funcionario.id),
+      name: form.name || funcionario.name || '',
+      cpf: form.cpf || funcionario.cpf,
+      status: form.status || funcionario.status,
+      company: (form.company as { id: string; name?: string } | undefined) ||
+        (funcionario.company as { id: string; name?: string } | undefined),
+      hireDate: form.hireDate || funcionario.hireDate,
+      dataRescisao: form.dataRescisao || (funcionario as { dataRescisao?: string }).dataRescisao,
+      terminationDate:
+        form.dataRescisao ||
+        (funcionario as { terminationDate?: string }).terminationDate ||
+        (funcionario as { dataRescisao?: string }).dataRescisao,
+      terminationReason: form.terminationReason || funcionario.terminationReason,
+      position: form.position || funcionario.position,
+    };
+  };
+
+  const handleRehireEnabledChange = (enabled: boolean) => {
+    setRehireEnabled(enabled);
+    if (enabled) {
+      const snapshot = buildEligibleRehireSnapshot();
+      setEligibleRehireEmployee(snapshot);
+      setRehireAdmissionType('');
+    } else {
+      const prevHire = eligibleRehireEmployee?.hireDate;
+      setEligibleRehireEmployee(null);
+      setRehireAdmissionType('');
+      setForm((prev) => ({
+        ...prev,
+        status: 'TERMINATED',
+        hireDate: prevHire || prev.hireDate,
+      }));
+    }
+  };
+
+  const isRehireFormMode = Boolean(rehireEnabled && eligibleRehireEmployee && rehireAdmissionType);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1415,12 +1471,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       return;
     }
 
-    if (eligibleRehireEmployee?.id && !rehireAdmissionType) {
+    if (rehireEnabled && eligibleRehireEmployee?.id && !rehireAdmissionType) {
       setError('Selecione Readmissão ou Promoção para recontratar o funcionário.');
       return;
     }
 
-    const isRehireFlow = Boolean(eligibleRehireEmployee?.id && rehireAdmissionType);
+    const isRehireFlow = Boolean(rehireEnabled && eligibleRehireEmployee?.id && rehireAdmissionType);
 
     if (isRehireFlow) {
       if (!form.hireDate) {
@@ -1475,6 +1531,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       if (isRehireFlow) {
         setEligibleRehireEmployee(null);
         setRehireAdmissionType('');
+        setRehireEnabled(false);
       }
       syncInitialWorkPostRef(
         updatedEmployee?.workPostId || updatedEmployee?.workPost?.id || employeeData.workPostId,
@@ -1686,9 +1743,19 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setForm(prev => ({ ...prev, user: { id: user.id } }));
   };
 
-  const handleUsuarioPadraoCriado = (userId: string) => {
+  const handleUsuarioPadraoCriado = (usuario: User) => {
+    setUsers((prev) => {
+      if (prev.some((u) => u.id === usuario.id)) return prev;
+      return [...prev, usuario];
+    });
+    setSelectedUser(usuario);
+    setUserSearchTerm(usuario.name || usuario.username || '');
+    setForm((prev) => ({ ...prev, user: { id: usuario.id } }));
     setCriarUsuarioModalOpen(false);
-    // Update user select
+    toast({
+      title: 'Usuário criado',
+      description: `Login: CPF do funcionário · Senha padrão: CPF@Promover${new Date().getFullYear()}`,
+    });
   };
 
   const handleMedicoCreated = (medico: Doctor) => {
@@ -1715,6 +1782,45 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const handleEditDependent = (dependent: Dependent) => {
     setDependentToEdit(dependent);
     setDependentModalOpen(true);
+  };
+
+  const isSpouseRelationship = (rel?: string) => {
+    const u = (rel || '').trim().toUpperCase();
+    return u === 'CONJUGE' || u === 'SPOUSE' || u.includes('CÔNJUGE') || u.includes('CONJUGE');
+  };
+
+  const findSpouseDependent = () =>
+    employeeDependents.find((d) => isSpouseRelationship(d.relationship)) || null;
+
+  const handleMaritalStatusChange = (value: string) => {
+    setForm((prev) => ({ ...prev, maritalStatus: value }));
+    if (value === 'MARRIED') {
+      setSpouseModalOpen(true);
+    }
+  };
+
+  const handleSpouseSaved = async (spouse: SpouseFormValues, dependent?: Dependent | null) => {
+    setForm((prev) => ({
+      ...prev,
+      maritalStatus: 'MARRIED',
+      spouseName: spouse.spouseName,
+      spouseCpf: spouse.spouseCpf,
+      spouseRg: spouse.spouseRg,
+      spouseBirthDate: spouse.spouseBirthDate,
+      spouseProfession: spouse.spouseProfession,
+      spousePhone: spouse.spousePhone,
+    }));
+    if (dependent) {
+      setEmployeeDependents((prev) => {
+        const exists = prev.some((d) => d.id === dependent.id);
+        if (exists) return prev.map((d) => (d.id === dependent.id ? dependent : d));
+        const withoutOtherSpouse = prev.filter((d) => !isSpouseRelationship(d.relationship) || d.id === dependent.id);
+        return [...withoutOtherSpouse.filter((d) => d.id !== dependent.id), dependent];
+      });
+    }
+    if (funcionario?.id) {
+      await loadEmployeeDependents(String(funcionario.id).trim(), true);
+    }
   };
 
   const handleDeleteDependent = async (dependent: Dependent) => { };
@@ -1755,6 +1861,57 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       });
     } finally {
       setHistoryPdfLoading(false);
+    }
+  };
+
+  const openCancelDismissal = (periodId?: string) => {
+    setCancelDismissalPeriodId(periodId);
+    setCancelDismissalOpen(true);
+  };
+
+  const handleConfirmCancelDismissal = async (justification: string) => {
+    if (!funcionario?.id) return;
+    setCancelDismissalLoading(true);
+    try {
+      const updated = await employeeService.cancelDismissal(
+        funcionario.id,
+        justification,
+        cancelDismissalPeriodId,
+      );
+      setForm((prev) => ({
+        ...prev,
+        status: 'ACTIVE',
+        dataRescisao: '',
+        terminationDate: undefined as any,
+        terminationReason: undefined,
+      }));
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      queryClient.setQueryData(queryKeys.employees.byId(funcionario.id), updated);
+      const periods = await employeeEmploymentPeriodService.getEmploymentPeriods(funcionario.id);
+      setEmploymentPeriods(periods);
+      if (canSeeHistory) {
+        try {
+          const history = await employeeChangeHistoryService.getByEmployeeId(funcionario.id, 0, 20);
+          setHistoryData(history);
+          setHistoryPageIndex(0);
+        } catch {
+          /* ignore */
+        }
+      }
+      setCancelDismissalOpen(false);
+      toast({
+        title: 'Demissão cancelada',
+        description: 'Funcionário reativado sem readmissão. Ação registrada na auditoria.',
+      });
+      onSuccess();
+    } catch (err: any) {
+      toast({
+        title: 'Erro',
+        description: err?.message || 'Não foi possível cancelar a demissão.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCancelDismissalLoading(false);
     }
   };
 
@@ -2060,7 +2217,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                  </div>
                             </div>
                           )}
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                  <p className="text-xs text-gray-300">
                               O usuário selecionado será associado ao funcionário para acesso ao sistema. (Opcional)
                               {canCreateDefaultUser && (
@@ -2069,19 +2226,26 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                 </span>
                               )}
                             </p>
-                            {canCreateDefaultUser && (
                               <Button
                                 type="button"
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => setCriarUsuarioModalOpen(true)}
-                                className="text-seguranca-yellow hover:text-yellow-400 text-xs px-2 py-1 h-auto"
+                                onClick={() => {
+                                  if (!form.name?.trim() || !form.cpf?.replace(/\D/g, '') || form.cpf.replace(/\D/g, '').length !== 11) {
+                                    toast({
+                                      title: 'Atenção',
+                                      description: 'Preencha nome e CPF válidos do funcionário antes de gerar o usuário.',
+                                      variant: 'destructive',
+                                    });
+                                    return;
+                                  }
+                                  setCriarUsuarioModalOpen(true);
+                                }}
+                                className="border-seguranca-yellow/50 text-seguranca-yellow hover:bg-seguranca-yellow/10 text-xs shrink-0"
                               >
-                                <UserPlus className="h-3 w-3 mr-1" />
-                                Criar Usuário Padrão
-                                <Link className="h-3 w-3 ml-1" />
+                                <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                                Gerar Usuário do Sistema
                               </Button>
-                            )}
                </div>
             </div>
 
@@ -2360,7 +2524,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                           </Label>
                 <Select 
                   value={form.maritalStatus} 
-                  onValueChange={(value) => setForm(prev => ({ ...prev, maritalStatus: value }))}
+                  onValueChange={handleMaritalStatusChange}
                 >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
                               <SelectValue placeholder="Selecione" />
@@ -2494,29 +2658,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
               </div>
             </div>
             
-                      {/* Nome do Conselho Regional */}
-            <div className="mt-4 pt-4 border-t border-gray-600">
-                        <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
-                          <FileText className="mr-2" size={16} />
-                          Nome do Conselho Regional
-                        </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Sigla</span>
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                            </Label>
-                  <Input 
-                              name="nomeConselhoRegional"
-                              value={form.nomeConselhoRegional || ''}
-                    onChange={handleChange} 
-                              placeholder="Ex: CRM, CRO, etc."
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                  />
-                </div>
-                        </div>
-                      </div>
-
                       {/* Seção de Documentos Pessoais */}
                       <div className="mt-4 pt-4 border-t border-gray-600">
                         <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
@@ -2655,94 +2796,52 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Seção de dados do cônjuge - aparece apenas se estado civil for "Casado" */}
+                      {/* Cônjuge: modal ao selecionar Casado; resumo + edição aqui */}
           {form.maritalStatus === 'MARRIED' && (
                         <div className="mt-4 pt-4 border-t border-gray-600">
-                          <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
-                            <UserIcon className="mr-2" size={16} />
-                            Dados do Cônjuge
-                          </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">Nome do Cônjuge</span>
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
-                              </Label>
-                  <Input 
-                    name="spouseName" 
-                                value={form.spouseName || ''}
-                    onChange={handleChange} 
-                    required 
-                                placeholder="Nome completo do cônjuge"
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                  />
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                            <h4 className="text-md font-semibold text-seguranca-yellow flex items-center">
+                              <UserIcon className="mr-2" size={16} />
+                              Dados do Cônjuge
+                            </h4>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="border-seguranca-yellow/40 text-seguranca-yellow hover:bg-seguranca-yellow/10"
+                              onClick={() => setSpouseModalOpen(true)}
+                            >
+                              {form.spouseName ? 'Editar cônjuge' : 'Cadastrar cônjuge'}
+                            </Button>
+                          </div>
+                          {form.spouseName ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="p-3 rounded-md bg-black/20 border border-gray-700">
+                  <p className="text-xs text-gray-500 uppercase">Nome</p>
+                  <p className="text-white font-medium">{form.spouseName}</p>
                 </div>
-                <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">CPF do Cônjuge</span>
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
-                              </Label>
-                  <Input 
-                    name="spouseCpf" 
-                                value={form.spouseCpf || ''}
-                    onChange={handleChange} 
-                    required 
-                                placeholder="000.000.000-00"
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                  />
+                <div className="p-3 rounded-md bg-black/20 border border-gray-700">
+                  <p className="text-xs text-gray-500 uppercase">CPF</p>
+                  <p className="text-white font-medium">{form.spouseCpf || '—'}</p>
                 </div>
-                <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">RG do Cônjuge</span>
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
-                              </Label>
-                  <Input 
-                    name="spouseRg" 
-                                value={form.spouseRg || ''}
-                    onChange={handleChange} 
-                                required
-                                placeholder="Número do RG"
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                  />
+                <div className="p-3 rounded-md bg-black/20 border border-gray-700">
+                  <p className="text-xs text-gray-500 uppercase">RG</p>
+                  <p className="text-white font-medium">{form.spouseRg || '—'}</p>
                 </div>
-                <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">Data de Nascimento do Cônjuge</span>
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
-                              </Label>
-                              <DatePicker
-                                date={parseDateFromBackend(form.spouseBirthDate) || undefined}
-                                onDateChange={(date) => setForm(prev => ({ ...prev, spouseBirthDate: formatDateForBackend(date) || '' }))}
-                                className="h-10 sm:h-11"
-                              />
-                            </div>
-                <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">Profissão do Cônjuge</span>
-                                <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                              </Label>
-                  <Input 
-                                name="spouseProfession"
-                                value={form.spouseProfession || ''}
-                    onChange={handleChange} 
-                                placeholder="Profissão do cônjuge"
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                  />
-                </div>
-                <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">Telefone do Cônjuge</span>
-                                <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                              </Label>
-                  <Input 
-                                name="spousePhone"
-                                value={form.spousePhone || ''}
-                    onChange={handleChange} 
-                                placeholder="(00) 00000-0000"
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                  />
+                <div className="p-3 rounded-md bg-black/20 border border-gray-700">
+                  <p className="text-xs text-gray-500 uppercase">Nascimento</p>
+                  <p className="text-white font-medium">
+                    {form.spouseBirthDate
+                      ? new Date(form.spouseBirthDate + 'T12:00:00').toLocaleDateString('pt-BR')
+                      : '—'}
+                  </p>
                 </div>
               </div>
+                          ) : (
+                            <p className="text-sm text-amber-200/90 bg-amber-500/10 border border-amber-500/30 rounded-md p-3">
+                              Funcionário marcado como Casado. Cadastre o cônjuge — ele também será incluído na aba Dependentes.
+                            </p>
+                          )}
             </div>
           )}
 
@@ -3048,7 +3147,17 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 <Label className="text-sm font-medium text-gray-200">Data Realizada</Label>
                 <DatePicker
                   date={parseDateFromBackend(form.exameMedicoData) || undefined}
-                  onDateChange={(date) => setForm(prev => ({ ...prev, exameMedicoData: formatDateForBackend(date) || '' }))}
+                  onDateChange={(date) => {
+                    const realization = formatDateForBackend(date) || '';
+                    const expiry = calcAsoExpiryDate(date || null);
+                    setForm(prev => ({
+                      ...prev,
+                      exameMedicoData: realization,
+                      exameMedicoVencimento: realization
+                        ? (formatDateForBackend(expiry) || '')
+                        : '',
+                    }));
+                  }}
                   className="h-9 sm:h-10"
                 />
               </div>
@@ -3059,6 +3168,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   onDateChange={(date) => setForm(prev => ({ ...prev, exameMedicoVencimento: formatDateForBackend(date) || '' }))}
                   className="h-9 sm:h-10"
                 />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Preenchida automaticamente (realização + 1 ano − 1 dia). Pode editar se necessário.
+                </p>
               </div>
               <div>
                           <Label className="text-sm font-medium text-gray-200">Tipo de Exame Realizado</Label>
@@ -3078,7 +3190,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   </SelectContent>
                 </Select>
               </div>
-                        <div className="md:col-span-2">
+                        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
                           <div className="flex items-center justify-between mb-1.5">
                             <Label className="text-sm font-medium text-gray-200">Nome do Médico</Label>
                             <button
@@ -3158,6 +3271,20 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                 )}
                               </div>
                             )}
+                          </div>
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Nome do Conselho Regional (Sigla)</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="nomeConselhoRegional"
+                              value={form.nomeConselhoRegional || ''}
+                              onChange={handleChange}
+                              placeholder="Ex: CRM, CRO, etc."
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-xs sm:text-sm h-9 sm:h-10"
+                            />
                           </div>
                         </div>
 
@@ -3362,13 +3489,41 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Dados do Cadastro / Admissão</h3>
                       </div>
-                      {eligibleRehireEmployee && (
-                        <RehireAdmissionPanel
-                          eligibleEmployee={eligibleRehireEmployee}
-                          admissionType={rehireAdmissionType}
-                          onAdmissionTypeChange={handleRehireAdmissionTypeChange}
-                          showTerminatedEditHint
-                        />
+                      {wasDismissedAtLeastOnce && (
+                        <div className="rounded-lg border border-gray-600 bg-gray-900/50 p-4 space-y-3">
+                          <div className="flex items-start sm:items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <Label htmlFor="rehire-enabled" className="text-sm font-medium text-white cursor-pointer">
+                                Habilitar recontratação (Readmissão / Promoção)
+                              </Label>
+                              <p className="text-xs text-gray-400 mt-1">
+                                Desligado: corrija data de demissão, admissão, salário, ASO e demais dados do vínculo atual.
+                                Ligado: inicia novo vínculo com Readmissão ou Promoção.
+                              </p>
+                            </div>
+                            <Switch
+                              id="rehire-enabled"
+                              checked={rehireEnabled}
+                              onCheckedChange={handleRehireEnabledChange}
+                              className="shrink-0"
+                            />
+                          </div>
+
+                          {!rehireEnabled && (
+                            <p className="text-xs text-amber-200/90 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                              Modo correção ativo — a mensagem de recontratação não é exibida. Ajuste as informações abaixo e salve normalmente.
+                            </p>
+                          )}
+
+                          {rehireEnabled && eligibleRehireEmployee && (
+                            <RehireAdmissionPanel
+                              eligibleEmployee={eligibleRehireEmployee}
+                              admissionType={rehireAdmissionType}
+                              onAdmissionTypeChange={handleRehireAdmissionTypeChange}
+                              showTerminatedEditHint
+                            />
+                          )}
+                        </div>
                       )}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -3432,6 +3587,22 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               onValueChange={(val) => setForm((prev) => ({ ...prev, terminationReason: val }))}
                             />
             </div>
+                        )}
+                        {!isRehireFormMode && (form.status || '').toUpperCase() === 'TERMINATED' && (
+                          <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                            <p className="text-xs text-amber-100/90 flex-1">
+                              Demissão indevida? Cancele o registro para reativar o colaborador sem gerar Readmissão.
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="border-amber-500/50 text-amber-200 hover:bg-amber-500/20 shrink-0"
+                              onClick={() => openCancelDismissal(employmentPeriods[0]?.id)}
+                            >
+                              Cancelar Demissão
+                            </Button>
+                          </div>
                         )}
                         {/* Cargo */}
                         <div className="space-y-2 md:col-span-2">
@@ -4389,10 +4560,16 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                     <th className="text-left p-3">Admissão</th>
                                     <th className="text-left p-3">Demissão</th>
                                     <th className="text-left p-3">Status</th>
+                                    <th className="text-left p-3">Ações</th>
                                   </tr>
                                 </thead>
                                 <tbody className="text-gray-400 divide-y divide-gray-600">
-                                  {employmentPeriods.map((period) => (
+                                  {employmentPeriods.map((period, index) => {
+                                    const canCancelDismissal =
+                                      (form.status || '').toUpperCase() === 'TERMINATED'
+                                      && period.status === 'TERMINATED'
+                                      && index === 0;
+                                    return (
                                     <tr key={period.id} className="hover:bg-gray-800/50">
                                       <td className="p-3">{period.admissionTypeLabel || period.admissionType}</td>
                                       <td className="p-3">{period.companyName || '-'}</td>
@@ -4408,8 +4585,24 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                       <td className="p-3">
                                         {period.status === 'TERMINATED' ? 'Demitido' : 'Ativo'}
                                       </td>
+                                      <td className="p-3">
+                                        {canCancelDismissal ? (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
+                                            onClick={() => openCancelDismissal(period.id)}
+                                          >
+                                            Cancelar Demissão
+                                          </Button>
+                                        ) : (
+                                          <span className="text-gray-600 text-xs">—</span>
+                                        )}
+                                      </td>
                                     </tr>
-                                  ))}
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>
@@ -4600,11 +4793,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         {/* Modal de Criar Usuário Padrão */}
         <CriarUsuarioPadraoModal
           open={criarUsuarioModalOpen}
-          onClose={() => {
-            setCriarUsuarioModalOpen(false);
-            // Se fechar sem criar usuário, fechar o modal principal também
-            onClose();
-          }}
+          onClose={() => setCriarUsuarioModalOpen(false)}
           onUsuarioCreated={handleUsuarioPadraoCriado}
           positionName={selectedPosition?.name || ''}
           employeeName={form.name}
@@ -4636,6 +4825,27 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           onSuccess={async () => {
             await handleDependentSaved();
           }}
+        />
+
+        <SpouseFormModal
+          open={spouseModalOpen}
+          onOpenChange={setSpouseModalOpen}
+          employeeId={funcionario?.id}
+          employeeCpf={form.cpf}
+          existingSpouseDependent={findSpouseDependent()}
+          existingDependentCpfs={employeeDependents
+            .filter((d) => !isSpouseRelationship(d.relationship))
+            .map((d) => d.cpf)
+            .filter(Boolean)}
+          initialValues={{
+            spouseName: form.spouseName,
+            spouseCpf: form.spouseCpf,
+            spouseRg: form.spouseRg,
+            spouseBirthDate: form.spouseBirthDate,
+            spouseProfession: form.spouseProfession,
+            spousePhone: form.spousePhone,
+          }}
+          onSaved={handleSpouseSaved}
         />
 
         {/* Modal de Remanejamento - ao alterar Setor/Posto de Trabalho */}
@@ -4765,6 +4975,19 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             </div>
           </DialogContent>
      </Dialog>
+
+        <CancelDismissalDialog
+          open={cancelDismissalOpen}
+          onOpenChange={setCancelDismissalOpen}
+          employeeName={form.name || funcionario?.name}
+          terminationDateLabel={
+            form.dataRescisao
+              ? new Date(form.dataRescisao + 'T12:00:00').toLocaleDateString('pt-BR')
+              : undefined
+          }
+          loading={cancelDismissalLoading}
+          onConfirm={handleConfirmCancelDismissal}
+        />
       </Dialog>
     </TooltipProvider >
    );

@@ -95,6 +95,32 @@ public class EPIDeliveryForm {
     @Column(name = "stock_requisition_id")
     private UUID stockRequisitionId;
 
+    /** Token do link público /epi-confirm/{token} */
+    @Column(name = "confirmation_token")
+    private UUID confirmationToken;
+
+    /** Código de 6 dígitos enviado no WhatsApp */
+    @Column(name = "confirmation_code", length = 6)
+    private String confirmationCode;
+
+    @Column(name = "confirmation_expires_at")
+    private LocalDateTime confirmationExpiresAt;
+
+    @Column(name = "confirmation_sent_at")
+    private LocalDateTime confirmationSentAt;
+
+    @Column(name = "signed_at")
+    private LocalDateTime signedAt;
+
+    @Column(name = "signature_origin", length = 40)
+    private String signatureOrigin;
+
+    @Column(name = "audit_ip", length = 80)
+    private String auditIp;
+
+    @Column(name = "audit_user_agent", length = 500)
+    private String auditUserAgent;
+
     @OneToMany(mappedBy = "deliveryForm", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference
     @Builder.Default

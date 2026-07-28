@@ -100,6 +100,15 @@ public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm
      * Ficha de EPI vinculada a uma requisição de almoxarifado (campo {@code stock_requisition_id}).
      */
     Optional<EPIDeliveryForm> findFirstByStockRequisitionIdOrderByCreatedAtDesc(UUID stockRequisitionId);
+
+    @Query("""
+        SELECT f FROM EPIDeliveryForm f
+        LEFT JOIN FETCH f.employee
+        LEFT JOIN FETCH f.company
+        LEFT JOIN FETCH f.items
+        WHERE f.confirmationToken = :token
+        """)
+    Optional<EPIDeliveryForm> findByConfirmationTokenWithDetails(@Param("token") UUID token);
 }
 
 

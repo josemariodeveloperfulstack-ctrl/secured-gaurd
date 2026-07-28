@@ -60,7 +60,7 @@ const REPORT_COLUMNS: { key: string; label: string }[] = [
     { key: 'name', label: 'Nome' },
     { key: 'registrationNumber', label: 'Matrícula' },
     { key: 'position', label: 'Cargo' },
-    { key: 'workPost', label: 'Posto de Trabalho' },
+    { key: 'workPost', label: 'Setor de Trabalho' },
     { key: 'company', label: 'Empresa' },
     { key: 'status', label: 'Status' },
     { key: 'cpf', label: 'CPF' },
@@ -270,7 +270,7 @@ export function RelatoriosModal({
         const parts: string[] = [];
         if (statusFilter !== 'all') parts.push(`Status: ${getStatusLabel(statusFilter)}`);
         if (companyFilters.length > 0) parts.push(`Empresa: ${companyFilters.join(', ')}`);
-        if (workPostFilters.length > 0) parts.push(`Posto: ${workPostFilters.join(', ')}`);
+        if (workPostFilters.length > 0) parts.push(`Setor: ${workPostFilters.join(', ')}`);
         if (positionFilters.length > 0) parts.push(`Cargo: ${positionFilters.join(', ')}`);
         if (genderFilter !== 'all') {
             const genderLabels: Record<string, string> = { M: 'Masculino', F: 'Feminino', OUTRO: 'Outro' };
@@ -494,7 +494,7 @@ export function RelatoriosModal({
                 if (columnsToUse.includes('position')) row['Cargo'] = typeof emp.position === 'string' ? emp.position : emp.position?.name || '';
                 if (columnsToUse.includes('workPost')) {
                     const wp = typeof emp.workPost === 'string' ? emp.workPost : (emp.workPost?.name || emp.department?.name || '');
-                    row['Posto de Trabalho'] = wp && String(wp).trim() ? wp : 'Não alocado';
+                    row['Setor de Trabalho'] = wp && String(wp).trim() ? wp : 'Não alocado';
                 }
                 if (columnsToUse.includes('company')) row['Empresa'] = emp.company?.sigla || emp.company?.name || emp.empresaNome || '';
                 if (columnsToUse.includes('status')) row['Status'] = getStatusLabel(emp.status);
@@ -508,7 +508,16 @@ export function RelatoriosModal({
                 if (columnsToUse.includes('phone')) row['Telefone'] = emp.phone || emp.telefoneContato || '';
                 if (columnsToUse.includes('sexo')) row['Gênero'] = emp.sexo || emp.gender || '';
                 if (columnsToUse.includes('maritalStatus')) row['Estado Civil'] = emp.maritalStatus || '';
-                if (columnsToUse.includes('salario')) row['Salário'] = emp.salario ? `R$ ${emp.salario}` : '';
+                if (columnsToUse.includes('salario')) {
+                    if (emp.salario !== null && emp.salario !== undefined && emp.salario !== '') {
+                        const parsed = typeof emp.salario === 'number' ? emp.salario : parseFloat(String(emp.salario).replace(/\./g, '').replace(',', '.'));
+                        row['Salário'] = !isNaN(parsed)
+                            ? `R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parsed)}`
+                            : String(emp.salario);
+                    } else {
+                        row['Salário'] = '';
+                    }
+                }
                 if (columnsToUse.includes('ctps')) row['CTPS'] = emp.ctps || '';
                 if (columnsToUse.includes('pis')) row['PIS'] = emp.pis || '';
                 if (columnsToUse.includes('cbo')) row['CBO'] = emp.cbo || '';
@@ -556,7 +565,7 @@ export function RelatoriosModal({
                         if (groupedData.length > 0) groupedData.push({});
                         // Inserir header da seção no Excel (usando a primeira chave do objeto row para aparecer na primeira coluna)
                         const firstKey = Object.keys(row)[0] || 'Agrupamento';
-                        groupedData.push({ [firstKey]: `== POSTO DE TRABALHO: ${wpLabel} ==` });
+                        groupedData.push({ [firstKey]: `== SETOR DE TRABALHO: ${wpLabel} ==` });
                     }
                     groupedData.push(row);
                 });
@@ -896,19 +905,19 @@ export function RelatoriosModal({
                                 {/* Work Post */}
                                 <div className="space-y-2">
                                     <Label className="text-xs font-medium text-gray-400 flex items-center gap-2 uppercase tracking-wider">
-                                        <Briefcase className="h-3 w-3" /> Posto de Trabalho
+                                        <Briefcase className="h-3 w-3" /> Setor de Trabalho
                                     </Label>
                                     <Popover modal={false}>
                                         <PopoverTrigger asChild>
                                             <Button variant="outline" className="w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-gray-200">
-                                                <span className="truncate">{multiSelectButtonLabel(workPostFilters, 'Todos os Postos')}</span>
+                                                <span className="truncate">{multiSelectButtonLabel(workPostFilters, 'Todos os Setores')}</span>
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0 bg-seguranca-graphite border-gray-600" align="start">
                                             <Command>
-                                                <CommandInput placeholder="Buscar posto..." className="border-gray-600 text-gray-200" />
+                                                <CommandInput placeholder="Buscar setor..." className="border-gray-600 text-gray-200" />
                                                 <CommandList className="max-h-64 scrollbar-thin scrollbar-thumb-gray-600">
-                                                    <CommandEmpty className="text-gray-400 py-3 text-center text-sm">Nenhum posto encontrado.</CommandEmpty>
+                                                    <CommandEmpty className="text-gray-400 py-3 text-center text-sm">Nenhum setor encontrado.</CommandEmpty>
                                                     <CommandGroup>
                                                         <CommandItem
                                                             onSelect={() => setWorkPostFilters([])}
@@ -916,7 +925,7 @@ export function RelatoriosModal({
                                                             className="text-gray-200 aria-selected:bg-white/10 cursor-pointer"
                                                         >
                                                             <Check className={cn("mr-2 h-4 w-4 shrink-0 text-seguranca-yellow", workPostFilters.length === 0 ? "opacity-100" : "opacity-0")} />
-                                                            Todos os Postos
+                                                            Todos os Setores
                                                         </CommandItem>
                                                         {workPosts.map(p => (
                                                             <CommandItem
@@ -1115,8 +1124,8 @@ export function RelatoriosModal({
                                             <SelectValue placeholder="Organizar por" />
                                         </SelectTrigger>
                                         <SelectContent className="bg-seguranca-graphite border-gray-600 text-gray-200">
-                                            <SelectItem value="FUNCIONARIO">Funcionário (todos os postos que já passou)</SelectItem>
-                                            <SelectItem value="POSTO_TRABALHO">Posto de Trabalho</SelectItem>
+                                            <SelectItem value="FUNCIONARIO">Funcionário (todos os setores que já passou)</SelectItem>
+                                            <SelectItem value="POSTO_TRABALHO">Setor de Trabalho</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -1130,7 +1139,7 @@ export function RelatoriosModal({
                                         </SelectTrigger>
                                         <SelectContent className="bg-seguranca-graphite border-gray-600 text-gray-200">
                                             <SelectItem value="FUNCIONARIO">Funcionário</SelectItem>
-                                            <SelectItem value="POSTO_TRABALHO">Posto de Trabalho</SelectItem>
+                                            <SelectItem value="POSTO_TRABALHO">Setor de Trabalho</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>

@@ -4,6 +4,8 @@ import com.z7design.secured_guard.dto.CreateEPIDeliveryFormDTO;
 import com.z7design.secured_guard.dto.DeliverStockRequisitionRequest;
 import com.z7design.secured_guard.dto.EPIDeliveryFormDTO;
 import com.z7design.secured_guard.dto.EPIDeliveryFormItemDTO;
+import com.z7design.secured_guard.dto.EpiConfirmationSendResponseDTO;
+import com.z7design.secured_guard.dto.PublicEpiConfirmationDTO;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Employee;
@@ -45,12 +47,19 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import com.z7design.secured_guard.service.StockService;
+import com.z7design.secured_guard.service.whatsapp.WhatsAppAgentService;
+import com.z7design.secured_guard.service.whatsapp.WhatsAppPhoneUtil;
+import com.z7design.secured_guard.exception.BusinessException;
 
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 
 import java.util.HashMap;
@@ -65,6 +74,10 @@ import java.util.stream.Collectors;
 @Slf4j
 public class EPIDeliveryFormService {
 
+    private static final String SIGNATURE_WHATSAPP = "WHATSAPP_CONFIRM";
+    private static final int CONFIRMATION_TTL_HOURS = 48;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final EPIDeliveryFormRepository epiDeliveryFormRepository;
     private final EmployeeRepository employeeRepository;
     private final CompanyRepository companyRepository;
@@ -74,6 +87,7 @@ public class EPIDeliveryFormService {
     private final StockItemRepository stockItemRepository;
     private final StockRequisitionRepository stockRequisitionRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final WhatsAppAgentService whatsAppAgentService;
 
     @Autowired
     @Lazy
@@ -115,6 +129,8 @@ public class EPIDeliveryFormService {
         EPIDeliveryFormStatus status = dto.getStatus() != null 
                 ? dto.getStatus() 
                 : EPIDeliveryFormStatus.DRAFT;
+        String signatureType = dto.getSignatureType() != null ? dto.getSignatureType() : "ON_SCREEN";
+        assertWhatsAppNotCompletedWithoutConfirm(status, signatureType, null);
 
         EPIDeliveryForm form = EPIDeliveryForm.builder()
 
@@ -128,7 +144,7 @@ public class EPIDeliveryFormService {
                 .pdfUrl(dto.getPdfUrl())
                 .createdBy(createdBy)
                 .signatureBase64(dto.getSignatureBase64())
-                .signatureType(dto.getSignatureType() != null ? dto.getSignatureType() : "ON_SCREEN")
+                .signatureType(signatureType)
                 .status(status)
                 .stockRequisitionId(dto.getStockRequisitionId())
                 .build();
@@ -146,6 +162,8 @@ public class EPIDeliveryFormService {
                         .uniformPiece(itemDto.getUniformPiece())
                         .observations(itemDto.getObservations())
                         .stockItemId(itemDto.getStockItemId())
+                        .substitutedDate(itemDto.getSubstitutedDate())
+                        .replacementReason(itemDto.getReplacementReason())
                         .build();
                 form.getItems().add(item);
             }
@@ -153,9 +171,9 @@ public class EPIDeliveryFormService {
 
         EPIDeliveryForm savedForm = epiDeliveryFormRepository.save(form);
         
-        // Concluir ficha sem vínculo a requisição de almoxarifado: gera REQ-EPI e baixa estoque
-        if (savedForm.getStatus() == EPIDeliveryFormStatus.COMPLETED && savedForm.getStockRequisitionId() == null) {
-            syncWithStockRequisition(savedForm, createdByUserId);
+        // Concluir ficha: gera REQ-EPI e baixa estoque de todos os itens (exceto se já veio do almoxarifado)
+        if (savedForm.getStatus() == EPIDeliveryFormStatus.COMPLETED) {
+            applyStockDeductionIfNeeded(savedForm, createdByUserId);
         }
 
         log.info("✅ Ficha de entrega de EPI criada com sucesso: {}", savedForm.getId());
@@ -185,9 +203,12 @@ public class EPIDeliveryFormService {
         form.setObservations(dto.getObservations());
         form.setDeliveryType(dto.getDeliveryType() != null ? dto.getDeliveryType() : form.getDeliveryType());
         form.setSignatureBase64(dto.getSignatureBase64());
-        form.setSignatureType(dto.getSignatureType() != null ? dto.getSignatureType() : form.getSignatureType());
+        String nextSignatureType = dto.getSignatureType() != null ? dto.getSignatureType() : form.getSignatureType();
+        form.setSignatureType(nextSignatureType);
         form.setEmployeeWorkSector(dto.getEmployeeWorkSector() != null ? dto.getEmployeeWorkSector() : form.getEmployeeWorkSector());
-        form.setStatus(dto.getStatus() != null ? dto.getStatus() : form.getStatus());
+        EPIDeliveryFormStatus nextStatus = dto.getStatus() != null ? dto.getStatus() : form.getStatus();
+        assertWhatsAppNotCompletedWithoutConfirm(nextStatus, nextSignatureType, form);
+        form.setStatus(nextStatus);
 
         // Atualizar itens (remover antigos e adicionar novos para simplificar)
         form.getItems().clear();
@@ -204,6 +225,8 @@ public class EPIDeliveryFormService {
                         .uniformPiece(itemDto.getUniformPiece())
                         .observations(itemDto.getObservations())
                         .stockItemId(itemDto.getStockItemId())
+                        .substitutedDate(itemDto.getSubstitutedDate())
+                        .replacementReason(itemDto.getReplacementReason())
                         .build();
                 form.getItems().add(item);
             }
@@ -212,16 +235,11 @@ public class EPIDeliveryFormService {
         EPIDeliveryForm savedForm = epiDeliveryFormRepository.save(form);
         
         if (savedForm.getStatus() == EPIDeliveryFormStatus.COMPLETED) {
-            if (savedForm.getStockRequisitionId() == null) {
-                syncWithStockRequisition(savedForm, updatedByUserId);
-            } else {
-                log.debug("Ficha EPI {} concluída com vínculo a requisição de estoque {}; baixa já tratada fora da ficha.",
-                        savedForm.getId(), savedForm.getStockRequisitionId());
-            }
+            applyStockDeductionIfNeeded(savedForm, updatedByUserId);
         } else if (wasCompleted) {
-            if (savedForm.getStockRequisitionId() == null) {
+            if (isEpiGeneratedRequisition(savedForm.getStockRequisitionId())) {
                 cancelStockRequisition(savedForm, updatedByUserId);
-            } else {
+            } else if (savedForm.getStockRequisitionId() != null) {
                 log.warn("Ficha EPI {} deixou de estar concluída mas está vinculada à requisição {}; estorno automático de estoque não aplicado.",
                         savedForm.getId(), savedForm.getStockRequisitionId());
             }
@@ -234,63 +252,123 @@ public class EPIDeliveryFormService {
         return EPIDeliveryFormDTO.fromEntity(savedForm);
     }
 
+    /**
+     * Aplica baixa de estoque para ficha concluída.
+     * Fichas geradas pelo almoxarifado (requisição que não é REQ-EPI-*) já tiveram baixa na aprovação.
+     * Fichas criadas/alteradas pela própria tela de EPI sempre sincronizam (cancela REQ-EPI antiga e recria).
+     */
+    private void applyStockDeductionIfNeeded(EPIDeliveryForm form, UUID userId) {
+        UUID reqId = form.getStockRequisitionId();
+        if (reqId != null && !isEpiGeneratedRequisition(reqId)) {
+            log.debug("Ficha EPI {} concluída com vínculo a requisição de almoxarifado {}; baixa já tratada fora da ficha.",
+                    form.getId(), reqId);
+            return;
+        }
+        syncWithStockRequisition(form, userId);
+    }
+
+    private boolean isEpiGeneratedRequisition(UUID stockRequisitionId) {
+        if (stockRequisitionId == null) {
+            return false;
+        }
+        StockRequisition req = stockRequisitionRepository.findById(stockRequisitionId).orElse(null);
+        return req != null
+                && req.getRequisitionNumber() != null
+                && req.getRequisitionNumber().startsWith("REQ-EPI-");
+    }
+
+    private void validateAllItemsLinkedToStock(EPIDeliveryForm form) {
+        if (form.getItems() == null || form.getItems().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Ficha concluída deve ter ao menos um item vinculado ao estoque para gerar a baixa.");
+        }
+        List<String> missing = new ArrayList<>();
+        for (EPIDeliveryFormItem item : form.getItems()) {
+            String label = item.getEpiName() != null && !item.getEpiName().isBlank()
+                    ? item.getEpiName()
+                    : "Item sem nome";
+            if (item.getStockItemId() == null) {
+                missing.add(label);
+                continue;
+            }
+            if (!stockItemRepository.existsById(item.getStockItemId())) {
+                missing.add(label + " (item de estoque inexistente)");
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Todos os itens da ficha concluída devem estar vinculados ao estoque para dar baixa. "
+                            + "Sem vínculo: " + String.join(", ", missing));
+        }
+    }
+
     private void syncWithStockRequisition(EPIDeliveryForm form, UUID userId) {
-        log.info("📦 Sincronizando ficha EPI {} com requisição de estoque", form.getId());
-        
-        // Se já existe uma requisição, vamos cancelar ela e as movimentações para gerar uma nova
-        // (Isso garante que alterações na lista de itens sejam refletidas corretamente no estoque)
+        log.info("📦 Sincronizando ficha EPI {} com requisição de estoque (baixa de todos os itens)", form.getId());
+
+        validateAllItemsLinkedToStock(form);
+
+        // Se já existe uma REQ-EPI, cancelar movimentações e gerar nova (reflete alterações na lista)
         if (form.getStockRequisitionId() != null) {
             cancelStockRequisition(form, userId);
         }
 
-        // Criar nova requisição de estoque
+        User actingUser = null;
+        if (userId != null) {
+            actingUser = userRepository.findById(userId).orElse(null);
+        }
+        if (actingUser == null) {
+            throw new IllegalArgumentException(
+                    "Usuário responsável pela baixa de estoque não identificado. Faça login novamente e tente gerar a ficha.");
+        }
+
         StockRequisition requisition = StockRequisition.builder()
                 .requisitionNumber("REQ-EPI-" + form.getId().toString().substring(0, 8).toUpperCase())
                 .employee(form.getEmployee())
-                .requestedByUser(userRepository.findById(userId).orElse(null))
-                .movementReason(form.getDeliveryType() == EPIDeliveryType.PRIMEIRA_ENTREGA ? 
-                        MovementReason.ENTREGA_INICIAL : 
+                .requestedByUser(actingUser)
+                .movementReason(form.getDeliveryType() == EPIDeliveryType.PRIMEIRA_ENTREGA ?
+                        MovementReason.ENTREGA_INICIAL :
                         MovementReason.REPOSICAO)
                 .notes("Gerado automaticamente pela Ficha de EPI: " + form.getId())
                 .employeeWorkSector(form.getEmployeeWorkSector())
                 .status(StockRequisitionStatus.DELIVERED)
                 .deliveredAt(LocalDateTime.now())
-                .deliveredByUser(userRepository.findById(userId).orElse(null))
+                .deliveredByUser(actingUser)
                 .signatureType(StockMovement.SignatureType.DIGITAL)
                 .digitalSignature(form.getSignatureBase64())
                 .signatureAt(LocalDateTime.now())
                 .build();
 
         for (EPIDeliveryFormItem item : form.getItems()) {
-            // Regra: Vincular ao estoque apenas se houver ID do item de estoque
-            // O frontend garante que Uniforme de Trabalho - Individual SEJA obrigatório ter stockItemId
-            if (item.getStockItemId() != null) {
-                StockItem stockItem = stockItemRepository.findById(item.getStockItemId())
-                        .orElse(null);
-                
-                if (stockItem != null) {
-                    StockRequisitionLine line = StockRequisitionLine.builder()
-                            .stockItem(stockItem)
-                            .quantity(item.getQuantity())
-                            .build();
-                    requisition.addLine(line);
-                    
-                    // Gerar movimentação de saída imediata
-                    com.z7design.secured_guard.dto.StockMovementDTO movDto = new com.z7design.secured_guard.dto.StockMovementDTO();
-                    movDto.setStockItemId(stockItem.getId());
-                    movDto.setMovementType(MovementType.SAIDA);
-                    movDto.setReason(requisition.getMovementReason());
-                    movDto.setQuantity(item.getQuantity());
-                    movDto.setEmployeeId(form.getEmployee().getId());
-                    movDto.setRequisitionNumber(requisition.getRequisitionNumber());
-                    movDto.setNotes("Baixa automática via Ficha de EPI");
-                    movDto.setDigitalSignature(form.getSignatureBase64());
-                    movDto.setSignatureType(StockMovement.SignatureType.DIGITAL);
-                    movDto.setSignatureDate(LocalDateTime.now());
-                    
-                    stockService.createMovement(movDto, userId);
-                }
+            if (item.getStockItemId() == null) {
+                throw new IllegalArgumentException(
+                        "Item sem vínculo de estoque: " + (item.getEpiName() != null ? item.getEpiName() : "sem nome"));
             }
+            StockItem stockItem = stockItemRepository.findById(item.getStockItemId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Item de estoque não encontrado para: " + item.getEpiName()));
+
+            int qty = item.getQuantity() != null && item.getQuantity() > 0 ? item.getQuantity() : 1;
+
+            StockRequisitionLine line = StockRequisitionLine.builder()
+                    .stockItem(stockItem)
+                    .quantity(qty)
+                    .build();
+            requisition.addLine(line);
+
+            com.z7design.secured_guard.dto.StockMovementDTO movDto = new com.z7design.secured_guard.dto.StockMovementDTO();
+            movDto.setStockItemId(stockItem.getId());
+            movDto.setMovementType(MovementType.SAIDA);
+            movDto.setReason(requisition.getMovementReason());
+            movDto.setQuantity(qty);
+            movDto.setEmployeeId(form.getEmployee().getId());
+            movDto.setRequisitionNumber(requisition.getRequisitionNumber());
+            movDto.setNotes("Baixa automática via Ficha de EPI");
+            movDto.setDigitalSignature(form.getSignatureBase64());
+            movDto.setSignatureType(StockMovement.SignatureType.DIGITAL);
+            movDto.setSignatureDate(LocalDateTime.now());
+
+            stockService.createMovement(movDto, userId);
+            log.info("📉 Baixa de estoque: {} x {} (ficha EPI {})", qty, stockItem.getFullName(), form.getId());
         }
 
         StockRequisition savedReq = stockRequisitionRepository.save(requisition);
@@ -635,6 +713,264 @@ public class EPIDeliveryFormService {
             parts.add("Unidade: " + employee.getUnit().getName());
         }
         return parts.isEmpty() ? null : String.join(" | ", parts);
+    }
+
+    /**
+     * Gera token + código e envia (AUTO) ou monta link wa.me (MANUAL) para confirmação de recebimento.
+     */
+    @Transactional
+    public EpiConfirmationSendResponseDTO sendWhatsAppConfirmation(UUID formId, String mode, String frontendBaseUrl) {
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByIdWithDetails(formId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + formId));
+
+        if (form.getStatus() == EPIDeliveryFormStatus.COMPLETED) {
+            throw new BusinessException("Esta ficha já está concluída.");
+        }
+        if (form.getItems() == null || form.getItems().isEmpty()) {
+            throw new BusinessException("Adicione pelo menos um EPI antes de enviar a confirmação.");
+        }
+
+        Employee employee = form.getEmployee();
+        if (employee == null) {
+            throw new BusinessException("Funcionário não encontrado na ficha.");
+        }
+        String phone = employee.getPhone();
+        if (phone == null || phone.isBlank()) {
+            throw new BusinessException("Funcionário sem telefone cadastrado. Atualize o cadastro para enviar pelo WhatsApp.");
+        }
+
+        String normalizedPhone = WhatsAppPhoneUtil.normalize(phone);
+        if (normalizedPhone.length() < 12) {
+            throw new BusinessException("Telefone do funcionário inválido para WhatsApp: " + phone);
+        }
+
+        String resolvedMode = mode != null && mode.equalsIgnoreCase("MANUAL") ? "MANUAL" : "AUTO";
+        String baseUrl = sanitizeFrontendBaseUrl(frontendBaseUrl);
+
+        UUID token = UUID.randomUUID();
+        String code = generateSixDigitCode();
+        LocalDateTime expiresAt = LocalDateTime.now().plusHours(CONFIRMATION_TTL_HOURS);
+
+        form.setConfirmationToken(token);
+        form.setConfirmationCode(code);
+        form.setConfirmationExpiresAt(expiresAt);
+        form.setConfirmationSentAt(LocalDateTime.now());
+        form.setSignatureType(SIGNATURE_WHATSAPP);
+        form.setStatus(EPIDeliveryFormStatus.DRAFT);
+        form.setSignedAt(null);
+        form.setSignatureOrigin(null);
+        epiDeliveryFormRepository.save(form);
+
+        String confirmUrl = baseUrl + "/epi-confirm/" + token;
+        String messageBody = buildWhatsAppMessage(employee.getName(), form.getDeliveryDate(), code, confirmUrl);
+        String whatsappUrl = "https://wa.me/" + normalizedPhone + "?text="
+                + URLEncoder.encode(messageBody, StandardCharsets.UTF_8);
+
+        boolean sent = false;
+        if ("AUTO".equals(resolvedMode)) {
+            sent = whatsAppAgentService.sendTextMessage(normalizedPhone, messageBody);
+            if (!sent) {
+                log.warn("Falha no envio automático WhatsApp da ficha EPI {}. Link wa.me disponível para envio manual.", formId);
+            }
+        }
+
+        String msg = "AUTO".equals(resolvedMode)
+                ? (sent ? "Mensagem enviada pelo WhatsApp." : "Não foi possível enviar automaticamente. Use o link manual.")
+                : "Link WhatsApp gerado. Abra e envie manualmente.";
+
+        return EpiConfirmationSendResponseDTO.builder()
+                .formId(form.getId())
+                .confirmationToken(token)
+                .confirmationCode(code)
+                .confirmUrl(confirmUrl)
+                .whatsappUrl(whatsappUrl)
+                .phoneMasked(maskPhone(normalizedPhone))
+                .sent(sent)
+                .mode(resolvedMode)
+                .expiresAt(expiresAt)
+                .message(msg)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PublicEpiConfirmationDTO getPublicConfirmation(UUID token) {
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByConfirmationTokenWithDetails(token)
+                .orElseThrow(() -> new ResourceNotFoundException("Link de confirmação inválido ou expirado."));
+
+        boolean alreadyConfirmed = form.getStatus() == EPIDeliveryFormStatus.COMPLETED || form.getSignedAt() != null;
+        boolean expired = !alreadyConfirmed
+                && form.getConfirmationExpiresAt() != null
+                && form.getConfirmationExpiresAt().isBefore(LocalDateTime.now());
+
+        List<PublicEpiConfirmationDTO.Item> items = form.getItems() == null ? List.of()
+                : form.getItems().stream()
+                .map(i -> PublicEpiConfirmationDTO.Item.builder()
+                        .epiName(i.getEpiName())
+                        .quantity(i.getQuantity())
+                        .ca(i.getCa())
+                        .caName(i.getCaName())
+                        .build())
+                .collect(Collectors.toList());
+
+        return PublicEpiConfirmationDTO.builder()
+                .employeeName(form.getEmployee() != null ? form.getEmployee().getName() : null)
+                .companyName(form.getCompany() != null ? form.getCompany().getName() : null)
+                .deliveryDate(form.getDeliveryDate())
+                .deliveryType(form.getDeliveryType() != null ? form.getDeliveryType().name() : null)
+                .items(items)
+                .alreadyConfirmed(alreadyConfirmed)
+                .expired(expired)
+                .awaitingConfirmation(!alreadyConfirmed && !expired)
+                .build();
+    }
+
+    @Transactional
+    public PublicEpiConfirmationDTO confirmPublicReceipt(UUID token, String code, String signatureBase64,
+                                                         String ip, String userAgent) {
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByConfirmationTokenWithDetails(token)
+                .orElseThrow(() -> new ResourceNotFoundException("Link de confirmação inválido ou expirado."));
+        applyConfirmation(form, code, signatureBase64, "WHATSAPP_LINK", ip, userAgent, null);
+        return getPublicConfirmation(token);
+    }
+
+    /**
+     * Confirmação pelo operador digitando o código informado pelo funcionário.
+     */
+    @Transactional
+    public EPIDeliveryFormDTO confirmWithCode(UUID formId, String code, UUID actingUserId) {
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByIdWithDetails(formId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + formId));
+        applyConfirmation(form, code, null, "ADMIN_CODE", null, null, actingUserId);
+        return EPIDeliveryFormDTO.fromEntity(form);
+    }
+
+    /**
+     * Confirmação pelo próprio funcionário logado no portal.
+     * Se a ficha tiver código WhatsApp pendente e o código for informado, valida o código.
+     * Caso contrário (sem WhatsApp), confirma direto como recebimento no portal.
+     */
+    @Transactional
+    public EPIDeliveryFormDTO confirmOwnReceipt(UUID formId, UUID authenticatedEmployeeId, String code, UUID actingUserId) {
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByIdWithDetails(formId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + formId));
+
+        if (form.getEmployee() == null || !form.getEmployee().getId().equals(authenticatedEmployeeId)) {
+            throw new BusinessException("Você só pode confirmar o recebimento das suas próprias fichas de EPI.");
+        }
+        if (form.getStatus() == EPIDeliveryFormStatus.COMPLETED || form.getSignedAt() != null) {
+            throw new BusinessException("Recebimento já confirmado.");
+        }
+
+        boolean hasWhatsAppCode = form.getConfirmationCode() != null && form.getConfirmationExpiresAt() != null;
+        if (hasWhatsAppCode) {
+            applyConfirmation(form, code, null, "PORTAL_CODE", null, null, actingUserId);
+        } else {
+            form.setStatus(EPIDeliveryFormStatus.COMPLETED);
+            form.setSignedAt(LocalDateTime.now());
+            form.setSignatureOrigin("PORTAL_SELF");
+            form.setSignatureType("ON_SCREEN");
+            EPIDeliveryForm saved = epiDeliveryFormRepository.save(form);
+            applyStockDeductionIfNeeded(saved, actingUserId);
+            User actingUser = actingUserId != null ? userRepository.findById(actingUserId).orElse(null) : null;
+            recordHistoryForForm(saved, actingUser, "CONFIRMAÇÃO PORTAL FUNCIONÁRIO");
+            log.info("✅ Recebimento EPI confirmado no portal pelo funcionário na ficha {}", form.getId());
+            return EPIDeliveryFormDTO.fromEntity(saved);
+        }
+        return EPIDeliveryFormDTO.fromEntity(form);
+    }
+
+    private void applyConfirmation(EPIDeliveryForm form, String code, String signatureBase64,
+                                   String origin, String ip, String userAgent, UUID actingUserId) {
+        if (form.getStatus() == EPIDeliveryFormStatus.COMPLETED || form.getSignedAt() != null) {
+            throw new BusinessException("Recebimento já confirmado.");
+        }
+        if (form.getConfirmationCode() == null || form.getConfirmationExpiresAt() == null) {
+            throw new BusinessException("Nenhuma confirmação WhatsApp foi gerada para esta ficha.");
+        }
+        if (form.getConfirmationExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new BusinessException("O código de confirmação expirou. Gere um novo envio.");
+        }
+        String normalizedCode = code == null ? "" : code.trim().replaceAll("\\s+", "");
+        if (!form.getConfirmationCode().equals(normalizedCode)) {
+            throw new BusinessException("Código de confirmação inválido.");
+        }
+
+        form.setStatus(EPIDeliveryFormStatus.COMPLETED);
+        form.setSignedAt(LocalDateTime.now());
+        form.setSignatureOrigin(origin);
+        form.setSignatureType(SIGNATURE_WHATSAPP);
+        if (signatureBase64 != null && !signatureBase64.isBlank()) {
+            form.setSignatureBase64(signatureBase64);
+        }
+        if (ip != null) {
+            form.setAuditIp(ip.length() > 80 ? ip.substring(0, 80) : ip);
+        }
+        if (userAgent != null) {
+            form.setAuditUserAgent(userAgent.length() > 500 ? userAgent.substring(0, 500) : userAgent);
+        }
+
+        EPIDeliveryForm saved = epiDeliveryFormRepository.save(form);
+        applyStockDeductionIfNeeded(saved, actingUserId);
+
+        User actingUser = actingUserId != null ? userRepository.findById(actingUserId).orElse(null) : null;
+        recordHistoryForForm(saved, actingUser, "CONFIRMAÇÃO WHATSAPP");
+        log.info("✅ Recebimento EPI confirmado via {} na ficha {}", origin, form.getId());
+    }
+
+    private void assertWhatsAppNotCompletedWithoutConfirm(EPIDeliveryFormStatus status, String signatureType,
+                                                          EPIDeliveryForm existing) {
+        if (status != EPIDeliveryFormStatus.COMPLETED) {
+            return;
+        }
+        if (!SIGNATURE_WHATSAPP.equals(signatureType)) {
+            return;
+        }
+        if (existing != null && existing.getSignedAt() != null) {
+            return;
+        }
+        throw new BusinessException(
+                "Para concluir com confirmação WhatsApp, envie o link ao funcionário ou confirme com o código recebido.");
+    }
+
+    private static String generateSixDigitCode() {
+        int n = SECURE_RANDOM.nextInt(1_000_000);
+        return String.format("%06d", n);
+    }
+
+    private static String sanitizeFrontendBaseUrl(String frontendBaseUrl) {
+        if (frontendBaseUrl == null || frontendBaseUrl.isBlank()) {
+            throw new BusinessException("URL do frontend é obrigatória para gerar o link de confirmação.");
+        }
+        String base = frontendBaseUrl.trim();
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if (!base.startsWith("http://") && !base.startsWith("https://")) {
+            throw new BusinessException("URL do frontend inválida.");
+        }
+        return base;
+    }
+
+    private static String buildWhatsAppMessage(String employeeName, LocalDate deliveryDate, String code, String confirmUrl) {
+        String dateStr = deliveryDate != null
+                ? deliveryDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                : "-";
+        String firstName = employeeName != null && !employeeName.isBlank()
+                ? employeeName.trim().split("\\s+")[0]
+                : "colaborador";
+        return "Olá " + firstName + "!\n\n"
+                + "Confirme o recebimento dos EPIs entregues em " + dateStr + ".\n\n"
+                + "Seu código: *" + code + "*\n\n"
+                + "Acesse o link e digite o código:\n"
+                + confirmUrl + "\n\n"
+                + "Validade: " + CONFIRMATION_TTL_HOURS + "h.";
+    }
+
+    private static String maskPhone(String normalized) {
+        if (normalized == null || normalized.length() < 4) {
+            return "****";
+        }
+        return "***" + normalized.substring(normalized.length() - 4);
     }
 
     /**

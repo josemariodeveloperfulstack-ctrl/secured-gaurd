@@ -19,6 +19,7 @@ public class StockItemDTO {
     private Integer currentQuantity;
     private Integer minimumQuantity;
     private BigDecimal unitCost;
+    private BigDecimal previousUnitCost;
     private String supplier;
     private String barcode;
     private String qrCode;
@@ -45,6 +46,7 @@ public class StockItemDTO {
         dto.setCurrentQuantity(entity.getCurrentQuantity());
         dto.setMinimumQuantity(entity.getMinimumQuantity());
         dto.setUnitCost(entity.getUnitCost());
+        dto.setPreviousUnitCost(entity.getPreviousUnitCost());
         dto.setSupplier(entity.getSupplier());
         dto.setBarcode(entity.getBarcode());
         dto.setQrCode(entity.getQrCode());
@@ -78,6 +80,7 @@ public class StockItemDTO {
         entity.setCurrentQuantity(dto.getCurrentQuantity() != null ? dto.getCurrentQuantity() : 0);
         entity.setMinimumQuantity(dto.getMinimumQuantity() != null ? dto.getMinimumQuantity() : 0);
         entity.setUnitCost(dto.getUnitCost());
+        entity.setPreviousUnitCost(dto.getPreviousUnitCost());
         entity.setSupplier(dto.getSupplier());
         entity.setBarcode(dto.getBarcode());
         entity.setQrCode(dto.getQrCode());

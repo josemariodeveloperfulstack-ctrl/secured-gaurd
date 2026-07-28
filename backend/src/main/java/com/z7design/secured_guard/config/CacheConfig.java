@@ -47,6 +47,7 @@ public class CacheConfig {
         cacheManager.setCacheNames(java.util.List.of(
             // Dashboard / Estatísticas
             "dashboard", "dashboard-summary", "dashboard-stats", "dashboard-quick-stats", "statistics",
+            "commercial-dashboard",
             // Entidades principais
             "employees", "employees-by-company",
             "vehicles", "vehicles-by-status",

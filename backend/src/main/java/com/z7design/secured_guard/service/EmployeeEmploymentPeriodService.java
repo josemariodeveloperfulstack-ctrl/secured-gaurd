@@ -239,6 +239,47 @@ public class EmployeeEmploymentPeriodService {
     }
 
     @Transactional
+    public void reopenAfterMistakenDismissal(Employee employee, UUID periodId) {
+        if (employee == null || employee.getId() == null) {
+            return;
+        }
+
+        List<EmployeeEmploymentPeriod> periods =
+                periodRepository.findByEmployeeIdOrderByHireDateDesc(employee.getId());
+        if (periods.isEmpty()) {
+            log.info("Cancelamento de demissão do funcionário {} sem vínculos registrados — apenas cadastro será reativado.",
+                    employee.getId());
+            return;
+        }
+
+        EmployeeEmploymentPeriod latest = periods.get(0);
+        EmployeeEmploymentPeriod target = latest;
+
+        if (periodId != null) {
+            target = periods.stream()
+                    .filter(p -> periodId.equals(p.getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Vínculo empregatício não encontrado para este funcionário."));
+            if (!latest.getId().equals(target.getId())) {
+                throw new IllegalArgumentException(
+                        "Só é possível cancelar a demissão do vínculo mais recente. "
+                                + "Vínculos anteriores já fazem parte do histórico e não devem ser revertidos por este fluxo.");
+            }
+        }
+
+        if (!STATUS_TERMINATED.equals(target.getStatus()) && target.getTerminationDate() == null) {
+            throw new IllegalArgumentException("O vínculo selecionado não possui demissão para cancelar.");
+        }
+
+        target.setStatus(STATUS_ACTIVE);
+        target.setTerminationDate(null);
+        target.setTerminationReason(null);
+        periodRepository.save(target);
+        log.info("Vínculo {} reaberto (demissão cancelada) para funcionário {}", target.getId(), employee.getId());
+    }
+
+    @Transactional
     public void reactivateLinkedUser(Employee employee) {
         if (employee == null) {
             return;

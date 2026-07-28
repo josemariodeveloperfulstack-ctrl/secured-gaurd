@@ -29,4 +29,12 @@ public class InteractionHistoryService {
     public void delete(UUID id) {
         interactionHistoryRepository.deleteById(id);
     }
-} 
+
+    public List<InteractionHistory> findByLeadId(UUID leadId) {
+        return interactionHistoryRepository.findByLeadIdOrderByCreatedAtDesc(leadId);
+    }
+
+    public List<InteractionHistory> findByOpportunityId(UUID opportunityId) {
+        return interactionHistoryRepository.findByOpportunityIdOrderByCreatedAtDesc(opportunityId);
+    }
+}

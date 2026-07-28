@@ -1,10 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit, Trash2, Eye, Building2, Mail, Phone, MapPin, User, Sparkles, TrendingUp, Users } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, Eye, Building2, Mail, Phone, MapPin, User, Sparkles, TrendingUp, Users, Shield } from 'lucide-react';
 import { Client, ClientStatus } from '@/types/client';
 
 interface ClientsTableProps {
@@ -22,6 +23,7 @@ export const ClientsTable: React.FC<ClientsTableProps> = ({
   onView,
   isLoading = false
 }) => {
+  const navigate = useNavigate();
   const getStatusBadge = (status: ClientStatus) => {
     const statusConfig = {
       [ClientStatus.ACTIVE]: { 
@@ -231,6 +233,13 @@ export const ClientsTable: React.FC<ClientsTableProps> = ({
                       >
                         <Eye className="mr-3 h-4 w-4" />
                         Visualizar Detalhes
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => navigate(`/postos?clientSearch=${encodeURIComponent(client.name)}`)}
+                        className="text-seguranca-lightgray hover:bg-gradient-to-r hover:from-seguranca-graphite hover:to-seguranca-black hover:text-white cursor-pointer transition-all duration-200"
+                      >
+                        <Shield className="mr-3 h-4 w-4 text-primary" />
+                        Ver Setores e Postos
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => onEdit(client)}

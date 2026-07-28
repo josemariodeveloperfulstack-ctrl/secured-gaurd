@@ -132,7 +132,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, java.util.UUID
            "(:category IS NULL OR i.category = :category) AND " +
            "(:description IS NULL OR i.description LIKE %:description%) AND " +
            "(:startDate IS NULL OR i.dueDate >= :startDate) AND " +
-           "(:endDate IS NULL OR i.dueDate <= :endDate)")
+           "(:endDate IS NULL OR i.dueDate <= :endDate) AND " +
+           "(:subcategoriaId IS NULL OR i.subcategoria.id = :subcategoriaId) AND " +
+           "(:employeeId IS NULL OR i.employee.id = :employeeId)")
     Page<Invoice> findByAdvancedFilters(
         @Param("status") ExpenseStatus status,
         @Param("type") ExpenseType type,
@@ -143,6 +145,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, java.util.UUID
         @Param("description") String description,
         @Param("startDate") LocalDate startDate,
         @Param("endDate") LocalDate endDate,
+        @Param("subcategoriaId") UUID subcategoriaId,
+        @Param("employeeId") UUID employeeId,
         Pageable pageable
     );
     
@@ -220,11 +224,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, java.util.UUID
 
     // Nota: manter assinaturas herdadas; o EntityGraph não altera nullability
     @Override
-    @EntityGraph(attributePaths = {"supplier", "client", "contract", "unit"})
+    @EntityGraph(attributePaths = {"supplier", "client", "contract", "unit", "subcategoria", "employee"})
     List<Invoice> findAll();
 
     @Override
-    @EntityGraph(attributePaths = {"supplier", "client", "contract", "unit"})
+    @EntityGraph(attributePaths = {"supplier", "client", "contract", "unit", "subcategoria", "employee"})
     Page<Invoice> findAll(@org.springframework.lang.NonNull Pageable pageable);
 
     // ---- Centros de Custo ----
@@ -257,7 +261,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, java.util.UUID
     List<String> findAllCostCenterNames();
     
     // Buscar invoice por ID com todos os relacionamentos carregados (evita LazyInitializationException)
-    @EntityGraph(attributePaths = {"supplier", "client", "contract", "unit"})
+    @EntityGraph(attributePaths = {"supplier", "client", "contract", "unit", "subcategoria", "employee"})
     @Query("SELECT i FROM Invoice i WHERE i.id = :id")
     Optional<Invoice> findByIdWithRelations(@Param("id") UUID id);
 } 

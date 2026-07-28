@@ -47,7 +47,7 @@ const PoliticasPrivacidade: React.FC = () => {
               </div>
               
               <p className="text-gray-300 text-lg">
-                Última atualização: 01/01/2025
+                Última atualização: 24/07/2026
               </p>
             </div>
 
@@ -113,6 +113,20 @@ const PoliticasPrivacidade: React.FC = () => {
                       <li>Cargo/função</li>
                       <li>Área de atuação</li>
                     </ul>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="text-white font-semibold">Aplicativo mobile (Secured Guard):</h4>
+                    <ul className="list-disc list-inside space-y-1 ml-4">
+                      <li>Credenciais de login e identificadores de conta</li>
+                      <li>Localização aproximada e precisa (check-in / registro de ponto)</li>
+                      <li>Imagens da câmera quando o usuário utiliza o scanner de QR Code</li>
+                      <li>Dados de dispositivo necessários à autenticação e notificações</li>
+                    </ul>
+                    <p className="text-sm text-gray-400">
+                      Esses dados são usados apenas para operação do serviço (ponto, ronda,
+                      autenticação e comunicação operacional) e não são vendidos a terceiros.
+                    </p>
                   </div>
                 </CardContent>
               </Card>

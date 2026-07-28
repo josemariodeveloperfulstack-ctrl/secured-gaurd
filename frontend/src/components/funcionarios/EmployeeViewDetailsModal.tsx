@@ -35,7 +35,8 @@ import {
     Building,
     Mail,
     Phone,
-    Briefcase
+    Briefcase,
+    GraduationCap
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
 import type { Dependent } from '@/types/dependent';
@@ -43,12 +44,81 @@ import { EmployeeDocuments } from './EmployeeDocuments';
 import employeeService from '@/services/employeeService';
 import dependentService from '@/services/dependentService';
 import { sstService, MedicalExam } from '@/services/sstService';
+import { trainingService, EmployeeCertification } from '@/services/trainingService';
 import { feriasService } from '@/services/feriasService';
 import { occurrenceService, Occurrence } from '@/services/occurrenceService';
 import { remanejamentoService, Remanejamento } from '@/services/remanejamentoService';
 import timeRecordService, { TimeRecord } from '@/services/timeRecordService';
 import { format } from 'date-fns';
 import { formatCPF, formatRG, formatPhone, formatDate as formatSystemDate } from '@/utils/formatters';
+
+const EXAM_TYPE_LABELS: Record<string, string> = {
+    ADMISSIONAL: 'Admissional',
+    DEMISSIONAL: 'Demissional',
+    PERIODICO: 'Periódico',
+    MUDANCA_FUNCAO: 'Mudança de Função',
+    RETORNO_TRABALHO: 'Retorno ao Trabalho',
+};
+
+type UnifiedExamItem = {
+    id: string;
+    examType: string;
+    examCategory: string;
+    scheduledDate?: string;
+    nextExamDate?: string;
+    status?: string;
+    result?: string;
+    doctorName?: string;
+    source: 'SST' | 'FICHA';
+};
+
+const WORK_POST_TYPE_LABELS: Record<string, string> = {
+    POSTO_24H: 'Posto 24h',
+    POSTO_SDF: 'Posto SDF',
+    POSTO_12H_NOTURNO: '12h Noturno',
+    POSTO_12H_DIURNO: '12h Diurno',
+    POSTO_6H: 'Posto 6h',
+    POSTO_8H: 'Posto 8h',
+    POSTO_8H_DIURNO: '8h Diurno',
+    POSTO_8H_NOTURNO: '8h Noturno',
+    POSTO_ESPECIAL: 'Posto Especial',
+    OUTROS: '',
+};
+
+function formatPostoTrabalhoLabel(employee: Employee | null): string {
+    if (!employee) return '-';
+    const wp = employee.workPost as {
+        name?: string;
+        description?: string;
+        type?: string;
+        workSchedule?: string;
+        primaryPositionName?: string;
+    } | undefined;
+    const setor = wp?.name?.trim();
+    const posto =
+        wp?.description?.trim() ||
+        (wp?.type ? WORK_POST_TYPE_LABELS[wp.type] || (wp.type !== 'OUTROS' ? wp.type : '') : '') ||
+        wp?.primaryPositionName?.trim() ||
+        '';
+    const escala =
+        (employee as { escalaTrabalho?: string }).escalaTrabalho?.trim() ||
+        wp?.workSchedule?.trim() ||
+        '';
+    const parts = [setor, posto, escala].filter(Boolean);
+    return parts.length > 0 ? parts.join(' — ') : '-';
+}
+
+const VIEW_TABS = [
+    { value: 'dados', label: 'Dados', icon: User },
+    { value: 'documentos', label: 'Documentos', icon: FileText },
+    { value: 'ponto', label: 'Ponto', icon: Clock },
+    { value: 'dependentes', label: 'Dependentes', icon: Users },
+    { value: 'exames-treinamentos', label: 'Exames e Treinamentos', icon: HeartPulse },
+    { value: 'ferias', label: 'Férias', icon: Palmtree },
+    { value: 'atestados', label: 'Atestados', icon: Stethoscope },
+    { value: 'disciplinar', label: 'Disciplinar', icon: AlertTriangle },
+    { value: 'remanejamentos', label: 'Remanejamentos', icon: MoveHorizontal },
+] as const;
 
 interface EmployeeViewDetailsModalProps {
     open: boolean;
@@ -71,7 +141,8 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
 
     // Data states
     const [dependents, setDependents] = useState<Dependent[]>([]);
-    const [exams, setExams] = useState<MedicalExam[]>([]);
+    const [exams, setExams] = useState<UnifiedExamItem[]>([]);
+    const [trainings, setTrainings] = useState<EmployeeCertification[]>([]);
     const [vacations, setVacations] = useState<any[]>([]);
     const [absences, setAbsences] = useState<any[]>([]);
     const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
@@ -138,10 +209,71 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
         setLoading(true);
         try {
             switch (activeTab) {
-                case 'aso':
-                    const medExams = await sstService.getMedicalExamsByEmployee(employee.id);
-                    setExams(medExams);
+                case 'exames-treinamentos': {
+                    const empDetail =
+                        fullEmployee?.id === employee.id
+                            ? fullEmployee
+                            : (await employeeService.getEmployeeById(employee.id)) || fullEmployee || employee;
+
+                    const [sstExams, certs] = await Promise.all([
+                        sstService.getMedicalExamsByEmployee(employee.id).catch(() => [] as MedicalExam[]),
+                        trainingService.getEmployeeCertifications({ employeeId: employee.id }).catch(() => [] as EmployeeCertification[]),
+                    ]);
+
+                    const fromSst: UnifiedExamItem[] = (Array.isArray(sstExams) ? sstExams : []).map((exam) => ({
+                        id: exam.id,
+                        examType: EXAM_TYPE_LABELS[String(exam.examCategory || exam.examType || '').toUpperCase()]
+                            || exam.examType
+                            || exam.examCategory
+                            || 'Exame Médico',
+                        examCategory: exam.examCategory || 'SST',
+                        scheduledDate: exam.performedDate || exam.scheduledDate,
+                        nextExamDate: (exam as any).nextExamDate,
+                        status: exam.status,
+                        result: exam.result,
+                        doctorName: exam.doctorName,
+                        source: 'SST',
+                    }));
+
+                    const fichaHasAso = Boolean(
+                        empDetail?.exameMedicoData ||
+                        empDetail?.exameMedicoVencimento ||
+                        empDetail?.exameMedicoTipo
+                    );
+
+                    const alreadyCoveredBySst = fichaHasAso && fromSst.some((e) => {
+                        const tipoFicha = String(empDetail?.exameMedicoTipo || '').toUpperCase();
+                        const tipoExam = String(e.examType || '').toUpperCase();
+                        const sameType =
+                            !tipoFicha ||
+                            tipoExam.includes(tipoFicha) ||
+                            tipoExam.includes(EXAM_TYPE_LABELS[tipoFicha]?.toUpperCase() || '___');
+                        const sameDate =
+                            !empDetail?.exameMedicoData ||
+                            (e.scheduledDate || '').slice(0, 10) === String(empDetail.exameMedicoData).slice(0, 10);
+                        return sameType && sameDate;
+                    });
+
+                    const fromFicha: UnifiedExamItem[] = fichaHasAso && !alreadyCoveredBySst
+                        ? [{
+                            id: `ficha-aso-${empDetail.id}`,
+                            examType: EXAM_TYPE_LABELS[String(empDetail.exameMedicoTipo || '').toUpperCase()]
+                                || empDetail.exameMedicoTipo
+                                || 'Exame Médico (ASO)',
+                            examCategory: 'Cadastro do funcionário',
+                            scheduledDate: empDetail.exameMedicoData,
+                            nextExamDate: empDetail.exameMedicoVencimento,
+                            status: empDetail.exameMedicoData ? 'REALIZADO' : 'PENDENTE',
+                            result: undefined,
+                            doctorName: (empDetail as any).exameMedicoDoctor?.name,
+                            source: 'FICHA',
+                        }]
+                        : [];
+
+                    setExams([...fromFicha, ...fromSst]);
+                    setTrainings(Array.isArray(certs) ? certs : []);
                     break;
+                }
                 case 'ferias':
                     const vacs = await feriasService.getFeriasByEmployee(employee.id);
                     setVacations(vacs);
@@ -302,100 +434,42 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                 <Tabs
                     value={activeTab}
                     onValueChange={setActiveTab}
-                    className="flex-1 h-full flex flex-col md:flex-row xl:flex-col overflow-hidden min-h-0"
+                    className="flex-1 h-full flex flex-col md:flex-row overflow-hidden min-h-0"
                 >
-                    {/* MOBILE NAVIGATION: Select (Visible only on < md) */}
+                    {/* MOBILE: Select */}
                     <div className="md:hidden px-6 py-4 border-b border-gray-700 bg-seguranca-graphite/50">
                         <Select value={activeTab} onValueChange={setActiveTab}>
                             <SelectTrigger className="w-full bg-seguranca-black border-gray-600">
                                 <SelectValue placeholder="Selecionar categoria" />
                             </SelectTrigger>
                             <SelectContent className="bg-seguranca-black border-gray-600">
-                                <SelectItem value="dados"><div className="flex items-center"><User size={16} className="mr-2" /> Dados</div></SelectItem>
-                                <SelectItem value="documentos"><div className="flex items-center"><FileText size={16} className="mr-2" /> Documentos</div></SelectItem>
-                                <SelectItem value="ponto"><div className="flex items-center"><Clock size={16} className="mr-2" /> Ponto</div></SelectItem>
-                                <SelectItem value="dependentes"><div className="flex items-center"><Users size={16} className="mr-2" /> Dependentes</div></SelectItem>
-                                <SelectItem value="aso"><div className="flex items-center"><HeartPulse size={16} className="mr-2" /> ASO</div></SelectItem>
-                                <SelectItem value="ferias"><div className="flex items-center"><Palmtree size={16} className="mr-2" /> Férias</div></SelectItem>
-                                <SelectItem value="atestados"><div className="flex items-center"><Stethoscope size={16} className="mr-2" /> Atestados</div></SelectItem>
-                                <SelectItem value="disciplinar"><div className="flex items-center"><AlertTriangle size={16} className="mr-2" /> Disciplinar</div></SelectItem>
-                                <SelectItem value="remanejamentos"><div className="flex items-center"><MoveHorizontal size={16} className="mr-2" /> Remanejamentos</div></SelectItem>
+                                {VIEW_TABS.map(({ value, label, icon: Icon }) => (
+                                    <SelectItem key={value} value={value}>
+                                        <div className="flex items-center">
+                                            <Icon size={16} className="mr-2" /> {label}
+                                        </div>
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
 
-                    {/* TABLET NAVIGATION: Vertical Tabs (Visible only on md to xl) */}
-                    <div className="hidden md:flex xl:hidden w-64 border-r border-gray-700 bg-seguranca-graphite/30 shrink-0 overflow-hidden">
-                        <ScrollArea className="w-full">
-                            <TabsList className="flex flex-col h-auto bg-transparent gap-1 p-4 justify-start items-stretch">
-                                <TabsTrigger value="dados" className="justify-start data-[state=active]:bg-seguranca-red data-[state=active]:text-white rounded-md px-4 py-3 transition-all">
-                                    <User size={16} className="mr-3" /> Dados
-                                </TabsTrigger>
-                                <TabsTrigger value="documentos" className="justify-start data-[state=active]:bg-seguranca-red data-[state=active]:text-white rounded-md px-4 py-3 transition-all">
-                                    <FileText size={16} className="mr-3" /> Documentos
-                                </TabsTrigger>
-                                <TabsTrigger value="ponto" className="justify-start data-[state=active]:bg-seguranca-red data-[state=active]:text-white rounded-md px-4 py-3 transition-all">
-                                    <Clock size={16} className="mr-3" /> Ponto
-                                </TabsTrigger>
-                                <TabsTrigger value="dependentes" className="justify-start data-[state=active]:bg-seguranca-red data-[state=active]:text-white rounded-md px-4 py-3 transition-all">
-                                    <Users size={16} className="mr-3" /> Dependentes
-                                </TabsTrigger>
-                                <TabsTrigger value="aso" className="justify-start data-[state=active]:bg-seguranca-red data-[state=active]:text-white rounded-md px-4 py-3 transition-all">
-                                    <HeartPulse size={16} className="mr-3" /> ASO
-                                </TabsTrigger>
-                                <TabsTrigger value="ferias" className="justify-start data-[state=active]:bg-seguranca-red data-[state=active]:text-white rounded-md px-4 py-3 transition-all">
-                                    <Palmtree size={16} className="mr-3" /> Férias
-                                </TabsTrigger>
-                                <TabsTrigger value="atestados" className="justify-start data-[state=active]:bg-seguranca-red data-[state=active]:text-white rounded-md px-4 py-3 transition-all">
-                                    <Stethoscope size={16} className="mr-3" /> Atestados
-                                </TabsTrigger>
-                                <TabsTrigger value="disciplinar" className="justify-start data-[state=active]:bg-seguranca-red data-[state=active]:text-white rounded-md px-4 py-3 transition-all">
-                                    <AlertTriangle size={16} className="mr-3" /> Disciplinar
-                                </TabsTrigger>
-                                <TabsTrigger value="remanejamentos" className="justify-start data-[state=active]:bg-seguranca-red data-[state=active]:text-white rounded-md px-4 py-3 transition-all">
-                                    <MoveHorizontal size={16} className="mr-3" /> Remanejamentos
-                                </TabsTrigger>
+                    {/* DESKTOP/TABLET: menu lateral — todas as abas sempre visíveis */}
+                    <div className="hidden md:flex w-56 lg:w-64 border-r border-gray-700 bg-seguranca-graphite/30 shrink-0 overflow-hidden self-stretch">
+                        <ScrollArea className="h-full w-full">
+                            <TabsList className="flex flex-col h-auto bg-transparent gap-1 p-3 lg:p-4 justify-start items-stretch">
+                                {VIEW_TABS.map(({ value, label, icon: Icon }) => (
+                                    <TabsTrigger
+                                        key={value}
+                                        value={value}
+                                        className="justify-start data-[state=active]:bg-seguranca-red data-[state=active]:text-white rounded-md px-3 lg:px-4 py-2.5 lg:py-3 transition-all text-left"
+                                    >
+                                        <Icon size={16} className="mr-2 lg:mr-3 shrink-0" />
+                                        <span className="truncate">{label}</span>
+                                    </TabsTrigger>
+                                ))}
                             </TabsList>
                         </ScrollArea>
-                    </div>
-
-                    {/* DESKTOP NAVIGATION: Horizontal Scroll Tabs (Visible only on xl+) */}
-                    <div className="hidden xl:block border-b border-gray-700 relative shrink-0">
-                        {/* Indicadores de Scroll Sombreados */}
-                        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-seguranca-graphite to-transparent z-10 pointer-events-none" />
-                        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-seguranca-graphite to-transparent z-10 pointer-events-none" />
-
-                        <div className="overflow-x-auto scrollbar-hide">
-                            <TabsList className="bg-transparent h-12 gap-1 px-10 justify-start w-max min-w-full">
-                                <TabsTrigger value="dados" className="data-[state=active]:bg-seguranca-red/20 data-[state=active]:text-seguranca-red rounded-none border-b-2 border-transparent data-[state=active]:border-seguranca-red h-full px-4 transition-all whitespace-nowrap">
-                                    <User size={16} className="mr-2" /> Dados
-                                </TabsTrigger>
-                                <TabsTrigger value="documentos" className="data-[state=active]:bg-seguranca-red/20 data-[state=active]:text-seguranca-red rounded-none border-b-2 border-transparent data-[state=active]:border-seguranca-red h-full px-4 transition-all whitespace-nowrap">
-                                    <FileText size={16} className="mr-2" /> Documentos
-                                </TabsTrigger>
-                                <TabsTrigger value="ponto" className="data-[state=active]:bg-seguranca-red/20 data-[state=active]:text-seguranca-red rounded-none border-b-2 border-transparent data-[state=active]:border-seguranca-red h-full px-4 transition-all whitespace-nowrap">
-                                    <Clock size={16} className="mr-2" /> Ponto
-                                </TabsTrigger>
-                                <TabsTrigger value="dependentes" className="data-[state=active]:bg-seguranca-red/20 data-[state=active]:text-seguranca-red rounded-none border-b-2 border-transparent data-[state=active]:border-seguranca-red h-full px-4 transition-all whitespace-nowrap">
-                                    <Users size={16} className="mr-2" /> Dependentes
-                                </TabsTrigger>
-                                <TabsTrigger value="aso" className="data-[state=active]:bg-seguranca-red/20 data-[state=active]:text-seguranca-red rounded-none border-b-2 border-transparent data-[state=active]:border-seguranca-red h-full px-4 transition-all whitespace-nowrap">
-                                    <HeartPulse size={16} className="mr-2" /> ASO
-                                </TabsTrigger>
-                                <TabsTrigger value="ferias" className="data-[state=active]:bg-seguranca-red/20 data-[state=active]:text-seguranca-red rounded-none border-b-2 border-transparent data-[state=active]:border-seguranca-red h-full px-4 transition-all whitespace-nowrap">
-                                    <Palmtree size={16} className="mr-2" /> Férias
-                                </TabsTrigger>
-                                <TabsTrigger value="atestados" className="data-[state=active]:bg-seguranca-red/20 data-[state=active]:text-seguranca-red rounded-none border-b-2 border-transparent data-[state=active]:border-seguranca-red h-full px-4 transition-all whitespace-nowrap">
-                                    <Stethoscope size={16} className="mr-2" /> Atestados
-                                </TabsTrigger>
-                                <TabsTrigger value="disciplinar" className="data-[state=active]:bg-seguranca-red/20 data-[state=active]:text-seguranca-red rounded-none border-b-2 border-transparent data-[state=active]:border-seguranca-red h-full px-4 transition-all whitespace-nowrap">
-                                    <AlertTriangle size={16} className="mr-2" /> Disciplinar
-                                </TabsTrigger>
-                                <TabsTrigger value="remanejamentos" className="data-[state=active]:bg-seguranca-red/20 data-[state=active]:text-seguranca-red rounded-none border-b-2 border-transparent data-[state=active]:border-seguranca-red h-full px-4 transition-all whitespace-nowrap">
-                                    <MoveHorizontal size={16} className="mr-2" /> Remanejamentos
-                                </TabsTrigger>
-                            </TabsList>
-                        </div>
                     </div>
 
                     <ScrollArea className="flex-1 p-4 md:p-6">
@@ -455,8 +529,14 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                             <span className="text-sm text-white font-semibold">{displayEmployee.position?.name || '-'}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-[10px] text-gray-500 uppercase font-bold">Posto / Unidade</span>
-                                            <span className="text-sm text-white">{displayEmployee.workPost?.name || displayEmployee.unit?.name || (displayEmployee as any).department?.name || '-'}</span>
+                                            <span className="text-[10px] text-gray-500 uppercase font-bold">Setor de Trabalho</span>
+                                            <span className="text-sm text-white">
+                                                {displayEmployee.workPost?.name || displayEmployee.unit?.name || (displayEmployee as any).department?.name || '-'}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-gray-500 uppercase font-bold">Posto de Trabalho</span>
+                                            <span className="text-sm text-white">{formatPostoTrabalhoLabel(displayEmployee)}</span>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
                                             <div className="flex flex-col">
@@ -667,42 +747,115 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                             )}
                         </TabsContent>
 
-                        {/* Aba ASO */}
-                        <TabsContent value="aso" className="mt-0">
+                        {/* Aba Exames e Treinamentos */}
+                        <TabsContent value="exames-treinamentos" className="mt-0">
                             {loading ? renderLoading() : (
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold text-white mb-2">Histórico de Exames Médicos (ASO)</h3>
+                                <div className="space-y-6">
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-white mb-2">Exames Médicos (ASO)</h3>
+                                        <p className="text-xs text-gray-500 mb-3">
+                                            Inclui ASO da ficha (admissional, periódico, demissional etc.) e exames do módulo SST.
+                                        </p>
+                                        {exams.length === 0 ? renderEmpty('Nenhum exame médico encontrado na ficha nem no SST.') : (
+                                            <div className="space-y-3">
+                                                {[...exams]
+                                                    .sort((a, b) => {
+                                                        const da = a.scheduledDate ? new Date(a.scheduledDate).getTime() : 0;
+                                                        const db = b.scheduledDate ? new Date(b.scheduledDate).getTime() : 0;
+                                                        return db - da;
+                                                    })
+                                                    .map((exam) => (
+                                                    <Card key={exam.id} className="bg-seguranca-black/40 border-gray-700/50 p-4">
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className={`p-2 rounded-lg shrink-0 ${exam.status === 'REALIZADO' || exam.status === 'COMPLETED' ? 'bg-green-500/10 text-green-400' : 'bg-seguranca-yellow/10 text-seguranca-yellow'
+                                                                    }`}>
+                                                                    <Stethoscope size={18} />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="font-bold text-white text-sm truncate">{exam.examType}</p>
+                                                                    <p className="text-xs text-seguranca-lightgray uppercase tracking-tighter mt-0.5">
+                                                                        {exam.examCategory}
+                                                                        {exam.scheduledDate ? ` • Realizado: ${formatDate(exam.scheduledDate)}` : ''}
+                                                                        {exam.nextExamDate ? ` • Vence: ${formatDate(exam.nextExamDate)}` : ''}
+                                                                    </p>
+                                                                    <Badge variant="outline" className="mt-1 text-[10px] border-gray-600 text-gray-400">
+                                                                        {exam.source === 'FICHA' ? 'Ficha do funcionário' : 'Módulo SST'}
+                                                                    </Badge>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right shrink-0">
+                                                                <Badge className={`${exam.result === 'APTO' ? 'bg-green-500/20 text-green-400' :
+                                                                    exam.result === 'INAPTO' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'
+                                                                    }`}>
+                                                                    {exam.result || exam.status || 'Registrado'}
+                                                                </Badge>
+                                                                {exam.doctorName && <p className="text-[10px] text-gray-500 mt-1">Dr(a). {exam.doctorName}</p>}
+                                                            </div>
+                                                        </div>
+                                                    </Card>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
 
-                                    {exams.length === 0 ? renderEmpty('Nenhum registro de exame médico encontrado.') : (
-                                        <div className="space-y-3">
-                                            {exams.sort((a, b) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime()).map((exam) => (
-                                                <Card key={exam.id} className="bg-seguranca-black/40 border-gray-700/50 p-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`p-2 rounded-lg ${exam.status === 'REALIZADO' ? 'bg-green-500/10 text-green-400' : 'bg-seguranca-yellow/10 text-seguranca-yellow'
-                                                                }`}>
-                                                                <Stethoscope size={18} />
-                                                            </div>
-                                                            <div>
-                                                                <p className="font-bold text-white text-sm">{exam.examType}</p>
-                                                                <p className="text-xs text-seguranca-lightgray uppercase tracking-tighter mt-0.5">
-                                                                    {exam.examCategory} • {formatDate(exam.scheduledDate)}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <Badge className={`${exam.result === 'APTO' ? 'bg-green-500/20 text-green-400' :
-                                                                exam.result === 'INAPTO' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'
-                                                                }`}>
-                                                                {exam.result || 'Pendente'}
-                                                            </Badge>
-                                                            {exam.doctorName && <p className="text-[10px] text-gray-500 mt-1">Dr(a). {exam.doctorName}</p>}
-                                                        </div>
-                                                    </div>
-                                                </Card>
-                                            ))}
-                                        </div>
-                                    )}
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                                            <GraduationCap size={18} className="text-seguranca-yellow" />
+                                            Treinamentos e Certificações
+                                        </h3>
+                                        <p className="text-xs text-gray-500 mb-3">
+                                            Treinamentos obrigatórios (vigilante, vigia e demais) e demais certificações vinculadas ao colaborador.
+                                        </p>
+                                        {trainings.length === 0 ? renderEmpty('Nenhum treinamento/certificação vinculado a este funcionário.') : (
+                                            <div className="space-y-3">
+                                                {[...trainings]
+                                                    .sort((a, b) => {
+                                                        const da = a.issueDate ? new Date(a.issueDate).getTime() : 0;
+                                                        const db = b.issueDate ? new Date(b.issueDate).getTime() : 0;
+                                                        return db - da;
+                                                    })
+                                                    .map((cert) => {
+                                                        const expired = cert.expirationDate
+                                                            ? new Date(cert.expirationDate) < new Date()
+                                                            : false;
+                                                        return (
+                                                            <Card key={cert.id} className="bg-seguranca-black/40 border-gray-700/50 p-4">
+                                                                <div className="flex items-center justify-between gap-3">
+                                                                    <div className="flex items-center gap-3 min-w-0">
+                                                                        <div className={`p-2 rounded-lg shrink-0 ${expired ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                                                                            <GraduationCap size={18} />
+                                                                        </div>
+                                                                        <div className="min-w-0">
+                                                                            <p className="font-bold text-white text-sm truncate">
+                                                                                {cert.trainingName || 'Treinamento'}
+                                                                            </p>
+                                                                            <p className="text-xs text-seguranca-lightgray mt-0.5">
+                                                                                {cert.certificationNumber ? `Cert. ${cert.certificationNumber} • ` : ''}
+                                                                                Emissão: {formatDate(cert.issueDate)}
+                                                                                {cert.expirationDate ? ` • Validade: ${formatDate(cert.expirationDate)}` : ''}
+                                                                            </p>
+                                                                            {cert.workPostName && (
+                                                                                <p className="text-[10px] text-gray-500 mt-1">Posto: {cert.workPostName}</p>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                    <Badge className={
+                                                                        expired || cert.status === 'CANCELLED'
+                                                                            ? 'bg-red-500/20 text-red-400'
+                                                                            : cert.status === 'RENEWED'
+                                                                                ? 'bg-yellow-500/20 text-yellow-400'
+                                                                                : 'bg-green-500/20 text-green-400'
+                                                                    }>
+                                                                        {expired ? 'Vencido' : cert.status === 'ACTIVE' ? 'Ativo' : cert.status === 'RENEWED' ? 'Renovado' : cert.status === 'CANCELLED' ? 'Cancelado' : cert.status}
+                                                                    </Badge>
+                                                                </div>
+                                                            </Card>
+                                                        );
+                                                    })}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </TabsContent>

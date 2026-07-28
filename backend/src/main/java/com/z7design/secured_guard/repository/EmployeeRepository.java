@@ -57,9 +57,15 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         nativeQuery = true)
         boolean existsByNormalizedDocumentAndNotTerminated(@Param("normalizedDocument") String normalizedDocument);
 
-        Optional<Employee> findByNameIgnoreCase(String name);
+        @Query(value = "SELECT * FROM employees WHERE UPPER(TRIM(name)) = UPPER(TRIM(:name)) LIMIT 1", nativeQuery = true)
+        Optional<Employee> findByNameIgnoreCase(@Param("name") String name);
 
-        Optional<Employee> findByDocument(String document);
+        @Query(value = "SELECT * FROM employees WHERE REGEXP_REPLACE(COALESCE(document, ''), '[^0-9]', '', 'g') = :document LIMIT 1", nativeQuery = true)
+        Optional<Employee> findByDocument(@Param("document") String document);
+
+        // Retorna TODOS os registros com este document (para diagnóstico de duplicatas)
+        @Query(value = "SELECT * FROM employees WHERE REGEXP_REPLACE(COALESCE(document, ''), '[^0-9]', '', 'g') = :document", nativeQuery = true)
+        List<Employee> findAllByDocument(@Param("document") String document);
 
         // Métodos para envio de holerites
         List<Employee> findByEmailIsNotNullAndEmailNot(String empty);

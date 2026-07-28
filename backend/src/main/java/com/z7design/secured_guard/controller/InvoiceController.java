@@ -205,8 +205,10 @@ public class InvoiceController {
             @RequestParam(required = false) String description,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) UUID subcategoriaId,
+            @RequestParam(required = false) UUID employeeId,
             Pageable pageable) {
-        Page<Invoice> invoices = invoiceService.findByAdvancedFilters(status, type, supplierId, clientId, unitId, category, description, startDate, endDate, pageable);
+        Page<Invoice> invoices = invoiceService.findByAdvancedFilters(status, type, supplierId, clientId, unitId, category, description, startDate, endDate, subcategoriaId, employeeId, pageable);
         Page<InvoiceDTO> dtos = invoices.map(InvoiceDTO::fromEntity);
         return ResponseEntity.ok(dtos);
     }

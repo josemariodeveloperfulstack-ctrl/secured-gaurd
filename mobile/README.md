@@ -1,76 +1,82 @@
 # Secured Guard - Aplicativo Mobile (Flutter)
 
-Aplicativo mobile do sistema Secured Guard / Promover Vigilância, desenvolvido em Flutter.
+Aplicativo mobile do sistema Secured Guard / Promover Vigilância.
 
 ## Pré-requisitos
 
-- [Flutter SDK](https://flutter.dev/docs/get-started/install) 3.2.0 ou superior
-- Android Studio / Xcode (para emuladores)
-- Dispositivo físico ou emulador configurado
+- [Flutter SDK](https://flutter.dev/docs/get-started/install) 3.2.0+
+- Android Studio (SDK 24+)
+- Keystore de release (ver seção Assinatura)
 
 ## Instalação
 
 ```bash
-# Na raiz do projeto
 cd mobile
-
-# Gerar pastas android/ios (se não existirem)
-flutter create . --project-name secured_guard_app
-
-# Instalar dependências
 flutter pub get
-
-# Verificar ambiente
 flutter doctor
-```
-
-## Executar
-
-```bash
-# Modo debug (hot reload)
-flutter run
-
-# Android
-flutter run -d android
-
-# iOS (apenas macOS)
-flutter run -d ios
-
-# Web (preview)
-flutter run -d chrome
-```
-
-## Estrutura do Projeto
-
-```
-mobile/
-├── lib/
-│   └── main.dart       # Entry point
-├── pubspec.yaml        # Dependências
-├── README.md
-└── analysis_options.yaml
 ```
 
 ## Configuração da API
 
-Edite `lib/config/api_config.dart` (a criar) para apontar para a URL do backend:
+Default de produção em `lib/config/api_config.dart`:
 
-- Local: `http://10.0.2.2:8083` (Android emulador)
 - Produção: `https://app.z7botsolutions.com.br`
+- Emulador local: `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8083`
 
-## Build para Produção
+Política de privacidade (Play Console):  
+`https://app.z7botsolutions.com.br/politicas-privacidade`
+
+## Assinatura (release)
+
+Arquivos locais (não versionados):
+
+- `android/key.properties`
+- `android/app/upload-keystore.jks`
+
+O `build.gradle.kts` usa a config `release` quando `key.properties` existe; caso contrário cai no debug (só para dev).
+
+**Backup:** guarde o `.jks` e as senhas fora do repositório. Perder o keystore impede atualizações no Play com o mesmo `applicationId`.
+
+## Ícones
 
 ```bash
-# Android APK
-flutter build apk --release
-
-# Android App Bundle (Google Play)
-flutter build appbundle --release
-
-# iOS (apenas macOS)
-flutter build ios --release
+dart run flutter_launcher_icons
 ```
 
-## Integração com o Backend
+Fonte: `assets/icon/app_icon.png`
 
-O app consumirá as mesmas APIs REST do frontend web em `/api/*`. Configure autenticação JWT e endpoints conforme a documentação do backend.
+## Executar
+
+```bash
+# Debug (API local no emulador)
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8083
+
+# Release apontando para produção
+flutter run --release
+```
+
+## Build Google Play (AAB)
+
+```bash
+flutter build appbundle --release
+```
+
+Artefato: `build/app/outputs/bundle/release/app-release.aab`
+
+### Checklist Play Console
+
+1. Conta Google Play Developer ativa
+2. App criado com `applicationId` = `com.z7design.secured_guard_app`
+3. Upload do AAB assinado (não usar debug)
+4. Store listing: nome **Secured Guard**, ícone 512×512, screenshots
+5. Política de privacidade: URL acima
+6. **Data safety** — declarar coleta de:
+   - Localização (aproximada/precisa) — check-in / ponto
+   - Fotos/imagens da câmera — scanner QR
+   - Identificadores de conta (login)
+7. Conteúdo do app / público-alvo (18+)
+8. Target API / políticas de permissões (câmera e localização justificadas)
+
+## Versão
+
+Definida em `pubspec.yaml` (`version: X.Y.Z+build`). Incrementar o `+build` a cada upload no Play.

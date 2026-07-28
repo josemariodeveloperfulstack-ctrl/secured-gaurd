@@ -11,6 +11,9 @@ build/
 android/.gradle/
 android/local.properties
 android/**/GeneratedPluginRegistrant.java
+android/key.properties
+**/*.jks
+**/*.keystore
 *.apk
 *.aab
 

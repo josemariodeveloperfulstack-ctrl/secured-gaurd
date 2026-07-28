@@ -13,6 +13,10 @@ import com.z7design.secured_guard.model.Client;
 import com.z7design.secured_guard.model.Supplier;
 import com.z7design.secured_guard.model.Contract;
 import com.z7design.secured_guard.model.Unit;
+import com.z7design.secured_guard.model.Subcategoria;
+import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.repository.SubcategoriaRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -37,6 +41,8 @@ public class InvoiceService {
     private final ClientRepository clientRepository;
     private final ContractRepository contractRepository;
     private final UnitRepository unitRepository;
+    private final SubcategoriaRepository subcategoriaRepository;
+    private final EmployeeRepository employeeRepository;
     
     @Transactional(readOnly = true)
     public List<Invoice> findAll() {
@@ -145,8 +151,9 @@ public class InvoiceService {
     
     public Page<Invoice> findByAdvancedFilters(ExpenseStatus status, ExpenseType type, UUID supplierId, 
                                              UUID clientId, UUID unitId, String category, String description, 
-                                             LocalDate startDate, LocalDate endDate, Pageable pageable) {
-        return invoiceRepository.findByAdvancedFilters(status, type, supplierId, clientId, unitId, category, description, startDate, endDate, pageable);
+                                             LocalDate startDate, LocalDate endDate, 
+                                             UUID subcategoriaId, UUID employeeId, Pageable pageable) {
+        return invoiceRepository.findByAdvancedFilters(status, type, supplierId, clientId, unitId, category, description, startDate, endDate, subcategoriaId, employeeId, pageable);
     }
     
     public Invoice save(Invoice invoice) {
@@ -244,6 +251,24 @@ public class InvoiceService {
             } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
                 // Unit foi deletado ou não pode ser inicializado, definir como null
                 invoice.setUnit(null);
+            }
+        }
+
+        // Inicializar Subcategoria
+        if (invoice.getSubcategoria() != null) {
+            try {
+                invoice.getSubcategoria().getNome(); // Força inicialização
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                invoice.setSubcategoria(null);
+            }
+        }
+
+        // Inicializar Employee
+        if (invoice.getEmployee() != null) {
+            try {
+                invoice.getEmployee().getName(); // Força inicialização
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                invoice.setEmployee(null);
             }
         }
     }
@@ -496,6 +521,24 @@ public class InvoiceService {
                     log.error("Erro ao buscar unidade {}: {}", dto.getUnitId(), e.getMessage());
                     throw new RuntimeException("Erro ao processar unidade: " + e.getMessage(), e);
                 }
+            }
+
+            if (dto.getSubcategoriaId() != null) {
+                log.debug("Processando subcategoria: {}", dto.getSubcategoriaId());
+                Subcategoria subcategoria = subcategoriaRepository.findById(dto.getSubcategoriaId())
+                        .orElseThrow(() -> new RuntimeException("Subcategoria não encontrada: " + dto.getSubcategoriaId()));
+                invoice.setSubcategoria(subcategoria);
+            } else {
+                invoice.setSubcategoria(null);
+            }
+
+            if (dto.getEmployeeId() != null) {
+                log.debug("Processando employee: {}", dto.getEmployeeId());
+                Employee employee = employeeRepository.findById(dto.getEmployeeId())
+                        .orElseThrow(() -> new RuntimeException("Funcionário não encontrado: " + dto.getEmployeeId()));
+                invoice.setEmployee(employee);
+            } else {
+                invoice.setEmployee(null);
             }
             
             log.info("Atualização de invoice concluída com sucesso");

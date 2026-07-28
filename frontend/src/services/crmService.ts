@@ -80,6 +80,16 @@ export async function fetchInteractionHistory() {
   return data;
 }
 
+export async function fetchInteractionHistoryByLead(leadId: string) {
+  const { data } = await api.get(`/interaction-history/by-lead/${leadId}`);
+  return data;
+}
+
+export async function fetchInteractionHistoryByOpportunity(opportunityId: string) {
+  const { data } = await api.get(`/interaction-history/by-opportunity/${opportunityId}`);
+  return data;
+}
+
 export async function createInteractionHistory(history) {
   const { data } = await api.post('/interaction-history', history);
   return data;

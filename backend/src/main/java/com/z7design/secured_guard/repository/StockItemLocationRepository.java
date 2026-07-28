@@ -6,8 +6,10 @@ import com.z7design.secured_guard.model.StorageShelf;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +24,14 @@ public interface StockItemLocationRepository extends JpaRepository<StockItemLoca
     List<StockItemLocation> findByShelf(StorageShelf shelf);
     
     Optional<StockItemLocation> findByStockItemIdAndShelfIdAndFloor(UUID stockItemId, UUID shelfId, String floor);
+
+    @Query("""
+            SELECT l FROM StockItemLocation l
+            LEFT JOIN FETCH l.shelf
+            LEFT JOIN FETCH l.stockItem
+            WHERE l.stockItem.id IN :ids
+            """)
+    List<StockItemLocation> findByStockItemIdInWithShelf(@Param("ids") Collection<UUID> ids);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE StockItemLocation l SET l.quantity = 0 WHERE l.stockItem.id IN (SELECT s.id FROM StockItem s WHERE s.active = true)")

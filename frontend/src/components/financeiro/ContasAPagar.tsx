@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, isAfter, isBefore, addDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { DateRange } from 'react-day-picker';
+import { contasAPagarService, Subcategoria, EmployeeSelect } from '@/services/contasAPagarService';
 
 export const ContasAPagar: React.FC = () => {
   const [contas, setContas] = useState<ContaAPagar[]>([]);
@@ -32,6 +33,10 @@ export const ContasAPagar: React.FC = () => {
   const [tipoFilter, setTipoFilter] = useState<string>('all');
   const [fornecedorFilter, setFornecedorFilter] = useState<string>('all');
   const [centroCustoFilter, setCentroCustoFilter] = useState<string>('all');
+  const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>('all');
+  const [employeeFilter, setEmployeeFilter] = useState<string>('all');
+  const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
+  const [employees, setEmployees] = useState<EmployeeSelect[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
@@ -43,6 +48,13 @@ export const ContasAPagar: React.FC = () => {
 
   useEffect(() => {
     loadContas();
+    // Carregar listas para filtros de subcategoria e funcionário
+    contasAPagarService.getSubcategorias()
+      .then(data => setSubcategorias(Array.isArray(data) ? data : []))
+      .catch(() => setSubcategorias([]));
+    contasAPagarService.getEmployeeList()
+      .then(data => setEmployees(Array.isArray(data) ? data : []))
+      .catch(() => setEmployees([]));
   }, []);
 
   const loadContas = async () => {
@@ -225,6 +237,8 @@ export const ContasAPagar: React.FC = () => {
     setTipoFilter('all');
     setFornecedorFilter('all');
     setCentroCustoFilter('all');
+    setSubcategoriaFilter('all');
+    setEmployeeFilter('all');
     setDateRange({
       from: startOfMonth(new Date()),
       to: endOfMonth(new Date())
@@ -238,6 +252,8 @@ export const ContasAPagar: React.FC = () => {
     const matchesTipo = tipoFilter === 'all' || conta.tipo === tipoFilter;
     const matchesFornecedor = fornecedorFilter === 'all' || conta.fornecedor.nome === fornecedorFilter;
     const matchesCentroCusto = centroCustoFilter === 'all' || conta.centroCusto === centroCustoFilter;
+    const matchesSubcategoria = subcategoriaFilter === 'all' || conta.subcategoriaId === subcategoriaFilter;
+    const matchesEmployee = employeeFilter === 'all' || conta.employeeId === employeeFilter;
 
     // Filtro por data
     let matchesDate = true;
@@ -246,7 +262,7 @@ export const ContasAPagar: React.FC = () => {
       matchesDate = contaDate >= dateRange.from && contaDate <= dateRange.to;
     }
 
-    return matchesSearch && matchesStatus && matchesTipo && matchesFornecedor && matchesCentroCusto && matchesDate;
+    return matchesSearch && matchesStatus && matchesTipo && matchesFornecedor && matchesCentroCusto && matchesSubcategoria && matchesEmployee && matchesDate;
   });
 
   // Estatísticas rápidas
@@ -396,6 +412,40 @@ export const ContasAPagar: React.FC = () => {
                         <SelectContent>
                           <SelectItem value="all">Todos os Centros</SelectItem>
                           {/* Adicionar centros de custo únicos */}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                    <div className="flex-1">
+                      <label className="text-sm font-medium mb-2 block">Subcategoria (Plano de Contas)</label>
+                      <Select value={subcategoriaFilter} onValueChange={setSubcategoriaFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todas as Subcategorias" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas as Subcategorias</SelectItem>
+                          {subcategorias.map(sub => (
+                            <SelectItem key={sub.id} value={sub.id}>
+                              {sub.codigo} - {sub.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-sm font-medium mb-2 block">Funcionário</label>
+                      <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos os Funcionários" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos os Funcionários</SelectItem>
+                          {employees.map(emp => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

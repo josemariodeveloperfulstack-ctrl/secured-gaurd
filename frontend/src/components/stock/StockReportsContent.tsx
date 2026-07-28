@@ -48,6 +48,8 @@ import {
   Cell 
 } from 'recharts';
 import { normalizeStockItem } from '@/services/stockService';
+import StockReportModal from '@/components/stock/StockReportModal';
+import { isConnectionError, isServerUnavailableError } from '@/utils/connectionError';
 
 type ReportTypeOption =
   | 'low-stock'
@@ -111,26 +113,36 @@ function categoryLabel(category: unknown): string {
 }
 
 function mapStockItemToReport(item: StockItem): StockReport {
-  const current = item.currentQuantity ?? 0;
+  const locSum = Array.isArray(item.locations)
+    ? item.locations.reduce((sum, loc) => sum + (Number(loc.quantity) || 0), 0)
+    : 0;
+  const fromField = item.currentQuantity ?? 0;
+  const current = locSum > 0 ? locSum : fromField;
   const minimum = item.minimumQuantity ?? 0;
   const unit =
     typeof item.unitCost === 'number' && !Number.isNaN(item.unitCost)
       ? item.unitCost
       : Number(item.unitCost) || 0;
   const displayName = (item.fullName && item.fullName.trim()) || item.name || '—';
+  // Sem máximo cadastrado: "alto" = bem acima do mínimo (ou qtd elevada se mínimo = 0)
+  const highThreshold = minimum > 0 ? Math.max(minimum * 2, minimum + 5) : 20;
+  let status: StockReport['status'] = 'NORMAL';
+  if (current <= 0) status = 'OUT';
+  else if (current <= minimum) status = 'LOW';
+  else if (current >= highThreshold) status = 'OVER';
+
   return {
     id: item.id,
     productName: displayName,
     category: categoryLabel(item.category),
     currentStock: current,
     minimumStock: minimum,
-    maximumStock: 0,
+    maximumStock: highThreshold,
     averageConsumption: 0,
     turnoverRate: 0,
     lastMovementDate: item.updatedAt || item.createdAt || new Date().toISOString(),
     totalValue: current * unit,
-    status:
-      current <= 0 ? 'OUT' : current <= minimum ? 'LOW' : 'NORMAL'
+    status
   };
 }
 
@@ -157,11 +169,12 @@ function requisitionStatusLabel(s: StockRequisitionListItem['status']): string {
 const StockReportsContent: React.FC = () => {
   const { toast } = useToast();
   const [reports, setReports] = useState<StockReport[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [reportType, setReportType] = useState<ReportTypeOption>('low-stock');
   const [dateRange, setDateRange] = useState('30');
   const [empresa, setEmpresa] = useState<Company | undefined>(undefined);
   const [reportFiltersOpen, setReportFiltersOpen] = useState(false);
+  const [stockReportModalOpen, setStockReportModalOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string>(FILTER_NONE);
   const [selectedShelfId, setSelectedShelfId] = useState<string>(FILTER_NONE);
   const [movementDirection, setMovementDirection] = useState<MovementDirectionFilter>('ALL');
@@ -169,6 +182,7 @@ const StockReportsContent: React.FC = () => {
   const [qtyFilterMax, setQtyFilterMax] = useState<string>('');
   const [itemOptions, setItemOptions] = useState<StockItem[]>([]);
   const [shelfOptions, setShelfOptions] = useState<{ id: string; identification: string }[]>([]);
+  const metaLoadedRef = React.useRef(false);
   
   // Estatísticas
   const [stats, setStats] = useState({
@@ -185,50 +199,85 @@ const StockReportsContent: React.FC = () => {
 
   const [dashboardData, setDashboardData] = useState<any>(null);
 
+  // Só cards de resumo no mount (1 request). Tabela/itens/prateleiras sob demanda.
   useEffect(() => {
-    void fetchCompany();
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadStats({ cancelled });
+      } catch {
+        /* silencioso — evita tempestade de toasts se o backend estiver reiniciando */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Metadados (itens/prateleiras) só quando o painel de filtros abre
   useEffect(() => {
-    void loadReports();
-    void loadStats();
-  }, [reportType, dateRange, movementDirection]);
-
-  useEffect(() => {
-    const loadMeta = async () => {
+    if (!reportFiltersOpen || metaLoadedRef.current) return;
+    let cancelled = false;
+    (async () => {
       try {
         const { stockService } = await import('@/services/stockService');
         const [items, shelves] = await Promise.all([
           stockService.getAllItems(),
-          stockService.getAllShelves()
+          stockService.getAllShelves(),
         ]);
+        if (cancelled) return;
         setItemOptions(items);
         setShelfOptions(
           (shelves || []).map((s) => ({
             id: s.id,
-            identification: s.identification || s.id
+            identification: s.identification || s.id,
           }))
         );
+        metaLoadedRef.current = true;
       } catch {
-        setItemOptions([]);
-        setShelfOptions([]);
+        if (!cancelled) {
+          setItemOptions([]);
+          setShelfOptions([]);
+        }
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    void loadMeta();
-  }, []);
+  }, [reportFiltersOpen]);
 
-  const fetchCompany = async () => {
+  const stockReportCacheRef = React.useRef<{ at: number; data: Awaited<ReturnType<typeof import('@/services/stockService').stockService.getStockReport>> | null }>({
+    at: 0,
+    data: null,
+  });
+
+  const getStockReportCached = async () => {
+    const { stockService } = await import('@/services/stockService');
+    const now = Date.now();
+    if (stockReportCacheRef.current.data && now - stockReportCacheRef.current.at < 4000) {
+      return stockReportCacheRef.current.data;
+    }
+    const data = await stockService.getStockReport();
+    stockReportCacheRef.current = { at: now, data };
+    return data;
+  };
+
+  const ensureCompany = async (): Promise<Company | undefined> => {
+    if (empresa?.id) return empresa;
     try {
       const companies = await companyService.getAllCompanies();
       if (companies && companies.length > 0) {
         setEmpresa(companies[0]);
+        return companies[0];
       }
     } catch (error) {
-      console.error('Erro ao carregar dados da empresa para relatórios de estoque:', error);
+      console.error('Erro ao carregar empresa para relatórios de estoque:', error);
     }
+    return undefined;
   };
 
-  const loadReports = async () => {
+  const loadReports = async (opts?: { cancelled?: boolean; skipToastOnNetwork?: boolean }) => {
+    const cancelled = opts?.cancelled ?? false;
     try {
       setLoading(true);
 
@@ -239,11 +288,11 @@ const StockReportsContent: React.FC = () => {
 
       switch (reportType) {
         case 'consolidated': {
-          setReports([]);
+          filteredReports = [];
           break;
         }
         case 'low-stock': {
-          const reportData = await stockService.getStockReport();
+          const reportData = await getStockReportCached();
           const items = (reportData.lowStockItems || []).map((row) =>
             normalizeStockItem(row as unknown as Record<string, unknown>)
           );
@@ -251,7 +300,7 @@ const StockReportsContent: React.FC = () => {
           break;
         }
         case 'out-of-stock': {
-          const reportData = await stockService.getStockReport();
+          const reportData = await getStockReportCached();
           const items = (reportData.outOfStockItems || []).map((row) =>
             normalizeStockItem(row as unknown as Record<string, unknown>)
           );
@@ -403,7 +452,7 @@ const StockReportsContent: React.FC = () => {
           break;
         }
         default: {
-          const reportData = await stockService.getStockReport();
+          const reportData = await getStockReportCached();
           const items = (reportData.lowStockItems || []).map((row) =>
             normalizeStockItem(row as unknown as Record<string, unknown>)
           );
@@ -412,24 +461,33 @@ const StockReportsContent: React.FC = () => {
         }
       }
 
-      setReports(filteredReports);
+      if (!cancelled) setReports(filteredReports);
     } catch (error) {
       console.error('Erro ao carregar relatórios:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar relatórios do banco de dados.",
-        variant: "destructive",
-      });
+      if (!cancelled && !opts?.skipToastOnNetwork) {
+        const isNetwork =
+          isConnectionError(error) ||
+          isServerUnavailableError(error) ||
+          (error instanceof Error && /não está disponível|Backend/i.test(error.message));
+        toast({
+          title: isNetwork ? 'Servidor indisponível' : 'Erro',
+          description: isNetwork
+            ? 'O backend reiniciou ou ficou offline por um instante. Aguarde e clique em Gerar Relatório novamente.'
+            : 'Erro ao carregar relatórios do banco de dados.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const loadStats = async () => {
+  const loadStats = async (opts?: { cancelled?: boolean; withDashboard?: boolean }) => {
+    const cancelled = opts?.cancelled ?? false;
     try {
-      const { stockService } = await import('@/services/stockService');
-      const reportData = await stockService.getStockReport();
-      
+      const reportData = await getStockReportCached();
+      if (cancelled) return;
+
       setStats({
         totalProducts: reportData.totalItems || 0,
         lowStockProducts: reportData.lowStockCount || 0,
@@ -438,29 +496,39 @@ const StockReportsContent: React.FC = () => {
         totalValue: reportData.totalValue || 0,
         totalQuantity: reportData.totalQuantity ?? 0,
         averageTurnover: 0,
+        generatedRequisitions: 0,
+        consolidatedRequisitions: 0,
       });
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
+      throw error;
     }
 
-    // Carregar dados do dashboard analítico
-    if (empresa?.id) {
-      try {
-        const { stockService } = await import('@/services/stockService');
-        const { start, end } = getPeriodBounds(dateRange);
-        const data = await stockService.getStockDashboard(empresa.id, start.toISOString(), end.toISOString());
-        setDashboardData(data);
-        
-        if (data) {
-          setStats(prev => ({
-            ...prev,
-            generatedRequisitions: data.generatedRequisitionsCount || 0,
-            consolidatedRequisitions: data.consolidatedRequisitionsCount || 0
-          }));
-        }
-      } catch (error) {
-        console.error('Erro ao carregar dashboard analítico:', error);
+    if (!opts?.withDashboard) return;
+
+    const currentEmpresa = await ensureCompany();
+    if (!currentEmpresa?.id || cancelled) return;
+
+    try {
+      const { stockService } = await import('@/services/stockService');
+      const { start, end } = getPeriodBounds(dateRange);
+      const data = await stockService.getStockDashboard(
+        currentEmpresa.id,
+        start.toISOString(),
+        end.toISOString()
+      );
+      if (cancelled) return;
+      setDashboardData(data);
+
+      if (data) {
+        setStats((prev) => ({
+          ...prev,
+          generatedRequisitions: data.generatedRequisitionsCount || 0,
+          consolidatedRequisitions: data.consolidatedRequisitionsCount || 0,
+        }));
       }
+    } catch (error) {
+      console.error('Erro ao carregar dashboard analítico:', error);
     }
   };
 
@@ -530,18 +598,7 @@ const StockReportsContent: React.FC = () => {
         return;
       }
 
-      let currentEmpresa = empresa;
-      if (!currentEmpresa) {
-        try {
-          const companies = await companyService.getAllCompanies();
-          if (companies && companies.length > 0) {
-            currentEmpresa = companies[0];
-            setEmpresa(currentEmpresa);
-          }
-        } catch (e) {
-          console.error('Erro ao carregar empresa para o relatório de estoque (componente interno):', e);
-        }
-      }
+      let currentEmpresa = await ensureCompany();
 
       if (!currentEmpresa?.id) {
         toast({
@@ -573,7 +630,7 @@ const StockReportsContent: React.FC = () => {
 
       toast({
         title: "Sucesso",
-        description: "Relatório exportado com layout profissional.",
+        description: "Relatório exportado em A4 retrato com layout padrão do sistema.",
       });
     } catch (error) {
       console.error('Erro ao exportar relatório:', error);
@@ -594,15 +651,30 @@ const StockReportsContent: React.FC = () => {
             Análise e relatórios detalhados do estoque
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={() => setReportFiltersOpen(true)}
-          className="bg-seguranca-red hover:bg-seguranca-darkred"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Gerar Relatório
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setReportFiltersOpen((open) => !open)}
+            className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+          >
+            Filtros rápidos
+          </Button>
+          <Button
+            type="button"
+            onClick={() => setStockReportModalOpen(true)}
+            className="bg-seguranca-red hover:bg-seguranca-darkred"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Gerar Relatório
+          </Button>
+        </div>
       </div>
+
+      <StockReportModal
+        isOpen={stockReportModalOpen}
+        onClose={() => setStockReportModalOpen(false)}
+      />
 
       {/* Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -899,9 +971,14 @@ const StockReportsContent: React.FC = () => {
                   variant="outline"
                   className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-black"
                   onClick={() => {
-                    void loadReports();
-                    void loadStats();
-                    toast({ title: 'Filtros aplicados', description: 'A tabela foi atualizada com os critérios escolhidos.' });
+                    void (async () => {
+                      await loadStats({ withDashboard: true }).catch(() => undefined);
+                      await loadReports();
+                      toast({
+                        title: 'Filtros aplicados',
+                        description: 'A tabela foi atualizada com os critérios escolhidos.',
+                      });
+                    })();
                   }}
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
@@ -920,20 +997,23 @@ const StockReportsContent: React.FC = () => {
       {!reportFiltersOpen && (
         <div className="flex flex-wrap items-center justify-between gap-2 -mt-2">
           <p className="text-sm text-gray-500">
-            Clique em <span className="font-medium text-seguranca-lightgray">Gerar Relatório</span> para abrir período,
-            tipo, prateleira, item, movimentações e faixas de quantidade.
+            Use <span className="font-medium text-seguranca-lightgray">Gerar Relatório</span> para PDF/Excel avançado.
+            A tabela abaixo só carrega sob demanda — clique em Atualizar ou abra Filtros rápidos → Aplicar.
           </p>
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="border-gray-600 text-seguranca-lightgray"
+            disabled={loading}
             onClick={() => {
-              void loadReports();
-              void loadStats();
+              void (async () => {
+                await loadStats({ withDashboard: true }).catch(() => undefined);
+                await loadReports();
+              })();
             }}
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Atualizar tabela
           </Button>
         </div>
@@ -1144,7 +1224,7 @@ const StockReportsContent: React.FC = () => {
                   {reports.length === 0 ? (
                     <TableRow className="border-gray-600">
                       <TableCell colSpan={10} className="text-center text-gray-400 py-8">
-                        Nenhum dado disponível para o filtro selecionado
+                        Nenhum dado na tabela ainda. Clique em &quot;Atualizar tabela&quot; ou aplique os filtros.
                       </TableCell>
                     </TableRow>
                   ) : (

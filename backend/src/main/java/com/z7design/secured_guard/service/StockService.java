@@ -76,12 +76,70 @@ public class StockService {
 
     // ===== GESTÃO DE ITENS =====
 
+    /**
+     * Converte itens enriquecendo com localizações e reconciliando currentQuantity
+     * com a soma das prateleiras (evita estoque "0" quando há quantidade só na localização).
+     */
+    private List<StockItemDTO> mapItemsWithLocations(List<StockItem> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = items.stream().map(StockItem::getId).filter(Objects::nonNull).toList();
+        Map<UUID, List<StockItemLocation>> locsByItem = Map.of();
+        if (!ids.isEmpty()) {
+            locsByItem = stockItemLocationRepository.findByStockItemIdInWithShelf(ids).stream()
+                    .filter(l -> l.getStockItem() != null && l.getStockItem().getId() != null)
+                    .collect(Collectors.groupingBy(l -> l.getStockItem().getId()));
+        }
+        List<StockItemDTO> result = new ArrayList<>(items.size());
+        List<StockItem> toRepair = new ArrayList<>();
+        for (StockItem item : items) {
+            List<StockItemLocation> locs = locsByItem.getOrDefault(item.getId(), List.of());
+            result.add(toDtoWithLocations(item, locs, toRepair));
+        }
+        if (!toRepair.isEmpty()) {
+            stockItemRepository.saveAll(toRepair);
+            log.info("Reconciliadas quantidades de {} item(ns) de estoque com soma das localizações", toRepair.size());
+        }
+        return result;
+    }
+
+    private StockItemDTO toDtoWithLocations(StockItem item, List<StockItemLocation> locations, List<StockItem> toRepair) {
+        StockItemDTO dto = StockItemDTO.fromEntity(item);
+        List<StockItemLocation> safeLocs = locations != null ? locations : List.of();
+        dto.setLocations(safeLocs.stream()
+                .map(com.z7design.secured_guard.dto.StockItemLocationDTO::fromEntity)
+                .collect(Collectors.toList()));
+
+        int itemQty = item.getCurrentQuantity() != null ? item.getCurrentQuantity() : 0;
+        int locSum = safeLocs.stream()
+                .mapToInt(l -> l.getQuantity() != null ? l.getQuantity() : 0)
+                .sum();
+
+        int effective;
+        if (!safeLocs.isEmpty() && locSum > 0) {
+            // Localizações com quantidade = verdade física do almoxarifado
+            effective = locSum;
+            if (locSum != itemQty) {
+                item.setCurrentQuantity(locSum);
+                if (toRepair != null) {
+                    toRepair.add(item);
+                }
+            }
+        } else {
+            // Sem localização com saldo: usar quantidade do item
+            effective = itemQty;
+        }
+
+        dto.setCurrentQuantity(effective);
+        int min = item.getMinimumQuantity() != null ? item.getMinimumQuantity() : 0;
+        dto.setIsLowStock(effective <= min);
+        return dto;
+    }
 
     public List<StockItemDTO> getAllItems() {
         log.info("Buscando todos os itens de estoque");
-        return stockItemRepository.findByActiveTrue().stream()
-                .map(StockItemDTO::fromEntity)
-                .collect(Collectors.toList());
+        return mapItemsWithLocations(stockItemRepository.findByActiveTrue());
     }
 
     public Page<StockItemDTO> getItemsWithFilters(
@@ -95,22 +153,28 @@ public class StockService {
         log.info("Buscando itens com filtros - Categoria: {}, Ativo: {}, Baixo estoque: {}",
                 category, active, lowStock);
 
-        return stockItemRepository.findByFilters(category, active, unitId, lowStock, searchTerm, pageable)
-                .map(StockItemDTO::fromEntity);
+        Page<StockItem> page = stockItemRepository.findByFilters(category, active, unitId, lowStock, searchTerm, pageable);
+        List<StockItemDTO> content = mapItemsWithLocations(page.getContent());
+        // Reaplica filtro de baixo estoque após reconciliar quantidades
+        if (Boolean.TRUE.equals(lowStock)) {
+            content = content.stream()
+                    .filter(d -> Boolean.TRUE.equals(d.getIsLowStock()))
+                    .collect(Collectors.toList());
+            return new PageImpl<>(content, pageable, content.size());
+        }
+        return new PageImpl<>(content, pageable, page.getTotalElements());
     }
 
     public StockItemDTO getItemById(UUID id) {
         log.info("Buscando item por ID: {}", id);
         StockItem item = stockItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Item de estoque não encontrado: " + id));
-        StockItemDTO dto = StockItemDTO.fromEntity(item);
-        
-        // Buscar localizações
+        List<StockItem> repair = new ArrayList<>();
         List<StockItemLocation> locations = stockItemLocationRepository.findByStockItem(item);
-        dto.setLocations(locations.stream()
-                .map(com.z7design.secured_guard.dto.StockItemLocationDTO::fromEntity)
-                .collect(Collectors.toList()));
-        
+        StockItemDTO dto = toDtoWithLocations(item, locations, repair);
+        if (!repair.isEmpty()) {
+            stockItemRepository.saveAll(repair);
+        }
         return dto;
     }
 
@@ -125,14 +189,12 @@ public class StockService {
         log.info("Buscando item por QR Code: {}", qrCode);
         StockItem item = stockItemRepository.findByQrCode(qrCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado com QR Code: " + qrCode));
-        StockItemDTO dto = StockItemDTO.fromEntity(item);
-        
-        // Buscar localizações para exibir no scanner
+        List<StockItem> repair = new ArrayList<>();
         List<StockItemLocation> locations = stockItemLocationRepository.findByStockItem(item);
-        dto.setLocations(locations.stream()
-                .map(com.z7design.secured_guard.dto.StockItemLocationDTO::fromEntity)
-                .collect(Collectors.toList()));
-                
+        StockItemDTO dto = toDtoWithLocations(item, locations, repair);
+        if (!repair.isEmpty()) {
+            stockItemRepository.saveAll(repair);
+        }
         return dto;
     }
 
@@ -199,7 +261,25 @@ public class StockService {
         if (dto.getMinimumQuantity() != null) {
             existingItem.setMinimumQuantity(dto.getMinimumQuantity());
         }
-        existingItem.setUnitCost(dto.getUnitCost());
+        // Ao mudar o valor unitário, guarda o anterior para histórico/variação
+        // Ex.: estava 145,45 e salvou 158,45 → previous=145,45 e unitCost=158,45
+        java.math.BigDecimal oldCost = existingItem.getUnitCost();
+        java.math.BigDecimal newCost = dto.getUnitCost();
+        if (newCost != null) {
+            java.math.BigDecimal normalizedNew = newCost.setScale(2, java.math.RoundingMode.HALF_UP);
+            java.math.BigDecimal normalizedOld = oldCost != null
+                    ? oldCost.setScale(2, java.math.RoundingMode.HALF_UP)
+                    : null;
+            if (normalizedOld != null
+                    && normalizedOld.compareTo(java.math.BigDecimal.ZERO) > 0
+                    && normalizedNew.compareTo(normalizedOld) != 0) {
+                existingItem.setPreviousUnitCost(normalizedOld);
+                log.info("Valor unitário do item {} alterado: {} → {} (anterior gravado)",
+                        id, normalizedOld, normalizedNew);
+            }
+            existingItem.setUnitCost(normalizedNew);
+        }
+        // Não zerar unitCost quando o frontend omite o campo
         existingItem.setSupplier(dto.getSupplier());
         existingItem.setBarcode(dto.getBarcode());
         if (dto.getActive() != null) {
@@ -628,14 +708,17 @@ public class StockService {
     public Map<String, Object> getStockReport() {
         log.info("Gerando relatório de estoque");
 
-        List<StockItem> allItems = stockItemRepository.findByActiveTrue();
-        List<StockItem> lowStockItems = stockItemRepository.findLowStockItems();
-        List<StockItem> outOfStockItems = stockItemRepository.findOutOfStockItems();
+        List<StockItemDTO> allItems = mapItemsWithLocations(stockItemRepository.findByActiveTrue());
+        List<StockItemDTO> lowStockItems = allItems.stream()
+                .filter(i -> Boolean.TRUE.equals(i.getIsLowStock()))
+                .collect(Collectors.toList());
+        List<StockItemDTO> outOfStockItems = allItems.stream()
+                .filter(i -> i.getCurrentQuantity() == null || i.getCurrentQuantity() <= 0)
+                .collect(Collectors.toList());
 
         Long totalItems = (long) allItems.size();
         Long lowStockCount = (long) lowStockItems.size();
         Long outOfStockCount = (long) outOfStockItems.size();
-        Double totalValueFromQuery = stockItemRepository.getTotalStockValue();
         java.math.BigDecimal totalValueComputed = allItems.stream()
                 .map(i -> {
                     int q = i.getCurrentQuantity() != null ? i.getCurrentQuantity() : 0;
@@ -643,16 +726,15 @@ public class StockService {
                     return u != null ? u.multiply(java.math.BigDecimal.valueOf(q)) : java.math.BigDecimal.ZERO;
                 })
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
-        double totalValue = totalValueFromQuery != null && totalValueFromQuery > 0
-                ? totalValueFromQuery
-                : totalValueComputed.doubleValue();
+        double totalValue = totalValueComputed.doubleValue();
 
         long totalQuantity = allItems.stream()
                 .mapToInt(i -> i.getCurrentQuantity() != null ? i.getCurrentQuantity() : 0)
                 .sum();
 
         Map<StockCategory, Long> itemsByCategory = allItems.stream()
-                .collect(Collectors.groupingBy(StockItem::getCategory, Collectors.counting()));
+                .filter(i -> i.getCategory() != null)
+                .collect(Collectors.groupingBy(StockItemDTO::getCategory, Collectors.counting()));
 
         Long activeAlerts = stockAlertRepository.countByIsResolvedFalse();
         Long criticalAlerts = stockAlertRepository.countCriticalUnresolvedAlerts();
@@ -666,8 +748,8 @@ public class StockService {
                 "itemsByCategory", itemsByCategory,
                 "activeAlerts", activeAlerts,
                 "criticalAlerts", criticalAlerts,
-                "lowStockItems", lowStockItems.stream().map(StockItemDTO::fromEntity).collect(Collectors.toList()),
-                "outOfStockItems", outOfStockItems.stream().map(StockItemDTO::fromEntity).collect(Collectors.toList()));
+                "lowStockItems", lowStockItems,
+                "outOfStockItems", outOfStockItems);
     }
 
     // ===== RELATÓRIOS DETALHADOS =====
@@ -1250,15 +1332,13 @@ public class StockService {
     // ===== MÉTODOS ESPECÍFICOS =====
 
     public List<StockItemDTO> getLowStockItems() {
-        return stockItemRepository.findLowStockItems().stream()
-                .map(StockItemDTO::fromEntity)
+        return mapItemsWithLocations(stockItemRepository.findByActiveTrue()).stream()
+                .filter(i -> Boolean.TRUE.equals(i.getIsLowStock()))
                 .collect(Collectors.toList());
     }
 
     public List<StockItemDTO> getItemsByCategory(StockCategory category) {
-        return stockItemRepository.findByCategoryAndActiveTrue(category).stream()
-                .map(StockItemDTO::fromEntity)
-                .collect(Collectors.toList());
+        return mapItemsWithLocations(stockItemRepository.findByCategoryAndActiveTrue(category));
     }
 
     public List<StockMovementDTO> getRecentMovements(int limit) {

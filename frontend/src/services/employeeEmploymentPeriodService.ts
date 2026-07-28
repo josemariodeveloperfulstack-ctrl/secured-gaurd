@@ -58,6 +58,18 @@ export const employeeEmploymentPeriodService = {
     const response = await api.get(`/api/employees/${employeeId}/employment-periods`);
     return response.data ?? [];
   },
+
+  async cancelDismissal(
+    employeeId: string,
+    justification: string,
+    periodId?: string,
+  ): Promise<unknown> {
+    const response = await api.post(`/api/employees/${employeeId}/cancel-dismissal`, {
+      justification,
+      periodId: periodId || undefined,
+    });
+    return response.data;
+  },
 };
 
 export const ADMISSION_TYPE_LABELS: Record<EmploymentAdmissionType, string> = {

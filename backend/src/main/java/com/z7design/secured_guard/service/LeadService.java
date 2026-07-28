@@ -8,8 +8,12 @@ import com.z7design.secured_guard.model.enums.LeadStatus;
 import com.z7design.secured_guard.model.enums.LeadSource;
 import com.z7design.secured_guard.repository.LeadRepository;
 import com.z7design.secured_guard.repository.UserRepository;
+import com.z7design.secured_guard.repository.KanbanStatusRepository;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.Opportunity;
+import com.z7design.secured_guard.model.KanbanStatus;
+import com.z7design.secured_guard.model.InteractionHistory;
 import jakarta.persistence.EntityNotFoundException;
 import org.hibernate.Hibernate;
 import org.hibernate.proxy.HibernateProxy;
@@ -36,6 +40,15 @@ public class LeadService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private KanbanStatusRepository kanbanStatusRepository;
+
+    @Autowired
+    private OpportunityService opportunityService;
+
+    @Autowired
+    private InteractionHistoryService interactionHistoryService;
 
     /**
      * Inicializa relacionamentos lazy de um Lead, tratando casos onde o User foi deletado
@@ -330,35 +343,86 @@ public class LeadService {
             throw new ResourceNotFoundException("Usuário não encontrado com username/email: " + currentUserIdentifier);
         }
         
-        lead.setCreatedBy(userOptional.get());
-        
-        // Atualizar assignedTo apenas se assignedToId for fornecido e válido
+        User currentUser = userOptional.get();
+        lead.setCreatedBy(currentUser);
+
+        // Se nenhum responsável for informado, atribuir automaticamente ao usuário logado
         if (leadDTO.getAssignedToId() != null) {
             try {
                 String assignedToIdStr = leadDTO.getAssignedToId().toString().trim();
-                // Verificar se não é uma string vazia ou "null"
                 if (!assignedToIdStr.isEmpty() && !assignedToIdStr.equalsIgnoreCase("null") && !assignedToIdStr.equalsIgnoreCase("undefined")) {
                     UUID assignedToUUID = UUID.fromString(assignedToIdStr);
                     var assignedUserOptional = userRepository.findById(assignedToUUID);
                     if (assignedUserOptional.isPresent()) {
                         lead.setAssignedTo(assignedUserOptional.get());
                     } else {
-                        // Se o usuário não existir, definir como null em vez de lançar exceção
-                        log.warn("Usuário responsável não encontrado com ID: {}. Criando lead sem responsável.", assignedToIdStr);
-                        lead.setAssignedTo(null);
+                        log.warn("Usuário responsável não encontrado com ID: {}. Atribuindo ao usuário logado.", assignedToIdStr);
+                        lead.setAssignedTo(currentUser);
                     }
                 } else {
-                    lead.setAssignedTo(null);
+                    lead.setAssignedTo(currentUser);
                 }
             } catch (IllegalArgumentException e) {
-                log.warn("ID do usuário responsável inválido: {}. Criando lead sem responsável.", leadDTO.getAssignedToId());
-                lead.setAssignedTo(null);
+                log.warn("ID do usuário responsável inválido: {}. Atribuindo ao usuário logado.", leadDTO.getAssignedToId());
+                lead.setAssignedTo(currentUser);
             }
         } else {
-            lead.setAssignedTo(null);
+            lead.setAssignedTo(currentUser);
         }
 
-        return leadRepository.save(lead);
+        Lead savedLead = leadRepository.save(lead);
+
+        // Registrar histórico de criação
+        try {
+            InteractionHistory history = new InteractionHistory();
+            history.setLead(savedLead);
+            history.setUser(currentUser);
+            history.setAction("CREATED");
+            history.setNote("Lead criado por " + currentUser.getName() + " com status " + savedLead.getStatus());
+            interactionHistoryService.save(history);
+        } catch (Exception e) {
+            log.warn("Erro ao salvar histórico de criação do lead {}: {}", savedLead.getId(), e.getMessage());
+        }
+
+        // Criar automaticamente uma Oportunidade no Kanban vinculada a este Lead
+        try {
+            List<KanbanStatus> statuses = kanbanStatusRepository.findAll();
+            if (!statuses.isEmpty()) {
+                KanbanStatus defaultStatus = statuses.stream()
+                    .min(java.util.Comparator.comparingInt(KanbanStatus::getOrderIndex))
+                    .orElse(statuses.get(0));
+
+                Opportunity opportunity = new Opportunity();
+                opportunity.setTitle(savedLead.getName());
+                opportunity.setDescription(savedLead.getNotes());
+                opportunity.setLead(savedLead);
+                opportunity.setEstimatedValue(savedLead.getEstimatedValue());
+
+                opportunityService.create(opportunity, defaultStatus.getId(),
+                    savedLead.getId(), null,
+                    savedLead.getAssignedTo() != null ? savedLead.getAssignedTo().getId() : null);
+
+                log.info("✅ Oportunidade criada automaticamente para o lead {}", savedLead.getId());
+
+                // Registrar histórico da oportunidade criada
+                try {
+                    InteractionHistory oppHistory = new InteractionHistory();
+                    oppHistory.setLead(savedLead);
+                    oppHistory.setUser(currentUser);
+                    oppHistory.setAction("OPPORTUNITY_CREATED");
+                    oppHistory.setNote("Oportunidade criada automaticamente no Kanban");
+                    interactionHistoryService.save(oppHistory);
+                } catch (Exception e) {
+                    log.warn("Erro ao salvar histórico de oportunidade para lead {}: {}", savedLead.getId(), e.getMessage());
+                }
+            } else {
+                log.warn("⚠️ Nenhum status Kanban encontrado - oportunidade não criada para o lead {}", savedLead.getId());
+            }
+        } catch (Exception e) {
+            log.error("❌ Erro ao criar oportunidade para lead {}: {}", savedLead.getId(), e.getMessage(), e);
+        }
+
+        return savedLead;
     }
 
     @Transactional
@@ -442,7 +506,32 @@ public class LeadService {
         }
 
         Lead savedLead = leadRepository.save(lead);
-        
+
+        // Registrar histórico de atualização
+        try {
+            User historyUser = savedLead.getAssignedTo() != null ? savedLead.getAssignedTo() : null;
+            if (historyUser == null) {
+                try {
+                    var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                    if (auth != null) {
+                        historyUser = userRepository.findByUsername(auth.getName()).orElse(null);
+                    }
+                } catch (Exception ignored) {}
+            }
+            if (historyUser == null) {
+                historyUser = lead.getCreatedBy();
+            }
+
+            InteractionHistory history = new InteractionHistory();
+            history.setLead(savedLead);
+            history.setUser(historyUser);
+            history.setAction("UPDATED");
+            history.setNote("Lead atualizado: " + buildUpdateDescription(leadDTO));
+            interactionHistoryService.save(history);
+        } catch (Exception e) {
+            log.warn("Erro ao salvar histórico de atualização do lead {}: {}", savedLead.getId(), e.getMessage());
+        }
+
         // Log para debug - verificar se o assignedTo foi salvo
         if (savedLead.getAssignedTo() != null) {
             log.info("✅ Lead {} atualizado - AssignedTo: ID={}, Name={}", 
@@ -477,8 +566,34 @@ public class LeadService {
 
     public Lead updateStatus(UUID id, String status) {
         Lead lead = findById(id);
+        LeadStatus oldStatus = lead.getStatus();
         lead.setStatus(LeadStatus.valueOf(status));
-        return leadRepository.save(lead);
+        Lead savedLead = leadRepository.save(lead);
+
+        // Registrar histórico de mudança de status
+        try {
+            User historyUser = null;
+            try {
+                var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null) {
+                    historyUser = userRepository.findByUsername(auth.getName()).orElse(null);
+                }
+            } catch (Exception ignored) {}
+            if (historyUser == null) {
+                historyUser = lead.getCreatedBy();
+            }
+
+            InteractionHistory history = new InteractionHistory();
+            history.setLead(savedLead);
+            history.setUser(historyUser);
+            history.setAction("STATUS_CHANGED");
+            history.setNote("Status alterado de " + oldStatus + " para " + status);
+            interactionHistoryService.save(history);
+        } catch (Exception e) {
+            log.warn("Erro ao salvar histórico de status do lead {}: {}", savedLead.getId(), e.getMessage());
+        }
+
+        return savedLead;
     }
 
     public void delete(UUID id, String reason, User user) {
@@ -769,5 +884,17 @@ public class LeadService {
             sb.append("Tipo empresa: ").append(companyType);
         }
         return sb.length() > 0 ? sb.toString() : null;
+    }
+
+    private static String buildUpdateDescription(LeadDTO dto) {
+        StringBuilder sb = new StringBuilder();
+        if (dto.getName() != null) sb.append("Nome: ").append(dto.getName()).append(" | ");
+        if (dto.getStatus() != null) sb.append("Status: ").append(dto.getStatus()).append(" | ");
+        if (dto.getAssignedToId() != null) sb.append("Responsável ID: ").append(dto.getAssignedToId()).append(" | ");
+        if (dto.getEstimatedValue() != null) sb.append("Valor: ").append(dto.getEstimatedValue()).append(" | ");
+        if (dto.getPhone() != null) sb.append("Telefone: ").append(dto.getPhone()).append(" | ");
+        if (dto.getEmail() != null) sb.append("E-mail: ").append(dto.getEmail()).append(" | ");
+        String result = sb.toString();
+        return result.endsWith(" | ") ? result.substring(0, result.length() - 3) : (result.isEmpty() ? "Sem detalhes" : result);
     }
 } 

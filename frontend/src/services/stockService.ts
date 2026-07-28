@@ -40,6 +40,7 @@ export function normalizeStockItem(raw: Record<string, unknown>): StockItem {
   const low = raw.isLowStock ?? raw.is_low_stock;
   const fn = raw.fullName ?? raw.full_name;
   const uc = raw.unitCost ?? raw.unit_cost;
+  const puc = raw.previousUnitCost ?? raw.previous_unit_cost;
   const base = raw as unknown as StockItem;
   const nameStr = typeof raw.name === 'string' ? raw.name : '';
   const fullNameStr =
@@ -64,11 +65,25 @@ export function normalizeStockItem(raw: Record<string, unknown>): StockItem {
   }
   return {
     ...base,
-    currentQuantity: typeof cur === 'number' && !Number.isNaN(cur) ? cur : Number(cur) || 0,
+    currentQuantity: (() => {
+      const fromField = parseNumberField(
+        cur ?? raw.currentStock ?? raw.current_stock ?? raw.quantity,
+      );
+      const locSum = Array.isArray(locations)
+        ? locations.reduce((sum, loc) => sum + (Number(loc.quantity) || 0), 0)
+        : 0;
+      // Preferir soma das localizações quando houver (verdade física do almoxarifado)
+      if (locSum > 0) return locSum;
+      return fromField;
+    })(),
     minimumQuantity: typeof min === 'number' && !Number.isNaN(min) ? min : Number(min) || 0,
     isLowStock: Boolean(low),
     fullName: fullNameStr,
     unitCost: parseNumberField(uc),
+    previousUnitCost: (() => {
+      const n = parseNumberField(puc);
+      return n > 0 ? n : undefined;
+    })(),
     locations
   };
 }
@@ -137,7 +152,7 @@ export const stockService = {
   async getItemById(id: string): Promise<StockItem> {
     try {
       const response = await api.get(`/api/stock/items/${id}`);
-      return response.data;
+      return normalizeStockItem(response.data as unknown as Record<string, unknown>);
     } catch (error) {
       console.error('Erro ao buscar item por ID:', error);
       throw new Error('Falha ao buscar item');
@@ -189,7 +204,7 @@ export const stockService = {
   async updateItem(id: string, itemData: Partial<CreateStockItemDTO>): Promise<StockItem> {
     try {
       const response = await api.put(`/api/stock/items/${id}`, itemData);
-      return response.data;
+      return normalizeStockItem(response.data as unknown as Record<string, unknown>);
     } catch (error) {
       console.error('Erro ao atualizar item:', error);
       throw new Error('Falha ao atualizar item');

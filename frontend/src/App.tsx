@@ -220,6 +220,7 @@ const FeriasPage = lazy(() => import('@/pages/Ferias'));
 const Beneficios = lazy(() => import('@/pages/Beneficios'));
 const AdmissaoDemissao = lazy(() => import('@/pages/AdmissaoDemissao'));
 const CentrosDeCusto = lazy(() => import('@/pages/CentrosDeCusto'));
+const PlanoDeContas = lazy(() => import('@/pages/PlanoDeContas'));
 const ImportarDadosBancarios = lazy(() => import('@/pages/ImportarDadosBancarios'));
 const ImportarWhatsappPDF = lazy(() => import('@/pages/ImportarWhatsappPDF'));
 
@@ -248,6 +249,7 @@ const GuiaTransporte = lazy(() => import('@/pages/GuiaTransporte'));
 const RotaSemanalSupervisao = lazy(() => import('@/pages/RotaSemanalSupervisao'));
 const Supervisao = lazy(() => import('@/pages/Supervisao'));
 const RemoteSignaturePage = lazy(() => import('@/pages/RemoteSignaturePage'));
+const EpiConfirmReceiptPage = lazy(() => import('@/pages/EpiConfirmReceiptPage'));
 const DeliveryManagement = lazy(() => import('@/components/estoque/DeliveryManagement'));
 const WebmailApp = lazy(() => import('@/pages/Webmail/WebmailApp'));
 const EmployeePortal = lazy(() => import('@/pages/EmployeePortal'));
@@ -325,6 +327,11 @@ function App() {
                     <Route path="/remote-sign/:token" element={
                       <Suspense fallback={<LoadingSpinner />}>
                         <RemoteSignaturePage />
+                      </Suspense>
+                    } />
+                    <Route path="/epi-confirm/:token" element={
+                      <Suspense fallback={<LoadingSpinner />}>
+                        <EpiConfirmReceiptPage />
                       </Suspense>
                     } />
 
@@ -672,6 +679,15 @@ function App() {
                     <Route path="/gestao-financeira/contas-pagar" element={
                       <ProtectedRoute requiredPermissions={['FINANCIAL_READ']}>
                         <ContasAPagar />
+                      </ProtectedRoute>
+                    } />
+
+                    {/* Plano de Contas */}
+                    <Route path="/plano-contas" element={
+                      <ProtectedRoute requiredPermissions={['FINANCIAL_READ']}>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <PlanoDeContas />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
 

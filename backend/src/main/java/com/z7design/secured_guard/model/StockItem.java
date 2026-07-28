@@ -47,6 +47,10 @@ public class StockItem {
     @Column(name = "unit_cost", precision = 10, scale = 2)
     private java.math.BigDecimal unitCost;
 
+    /** Valor unitário do cadastro anterior (antes da última atualização de preço). */
+    @Column(name = "previous_unit_cost", precision = 10, scale = 2)
+    private java.math.BigDecimal previousUnitCost;
+
     @Column(name = "supplier")
     private String supplier;
 

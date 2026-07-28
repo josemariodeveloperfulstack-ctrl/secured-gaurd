@@ -146,6 +146,7 @@ import {
 const financeiroMenuItems = [
   { icon: DollarSign, text: 'Financeiro Geral', to: '/financeiro', id: 'financeiro' },
   { icon: Calculator, text: 'Contas a Pagar', to: '/contas-a-pagar', id: 'contas-a-pagar' },
+  { icon: FolderTree, text: 'Plano de Contas', to: '/plano-contas', id: 'plano-contas' },
 ];
 
 // Novo grupo de mensagens

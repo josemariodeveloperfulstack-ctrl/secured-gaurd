@@ -86,6 +86,14 @@ public class InvoiceDTO {
     private String supplierName;
     private String clientName;
     private String contractNumber;
+
+    private java.util.UUID subcategoriaId;
+    private String subcategoriaNome;
+    private String subcategoriaCodigo;
+    private Boolean requerVinculoFuncionario;
+
+    private java.util.UUID employeeId;
+    private String employeeName;
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -179,7 +187,31 @@ public class InvoiceDTO {
                 System.err.println("⚠️ Erro ao acessar unit da invoice " + invoice.getId() + ": " + e.getMessage());
                 dto.setUnitId(null);
             }
-            
+
+            try {
+                if (invoice.getSubcategoria() != null) {
+                    dto.setSubcategoriaId(invoice.getSubcategoria().getId());
+                    dto.setSubcategoriaNome(invoice.getSubcategoria().getNome());
+                    dto.setSubcategoriaCodigo(invoice.getSubcategoria().getCodigo());
+                    dto.setRequerVinculoFuncionario(invoice.getSubcategoria().getRequerVinculoFuncionario());
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ Erro ao acessar subcategoria da invoice " + invoice.getId() + ": " + e.getMessage());
+                dto.setSubcategoriaId(null);
+                dto.setSubcategoriaNome(null);
+                dto.setSubcategoriaCodigo(null);
+                dto.setRequerVinculoFuncionario(null);
+            }
+
+            try {
+                dto.setEmployeeId(invoice.getEmployee() != null ? invoice.getEmployee().getId() : null);
+                dto.setEmployeeName(invoice.getEmployee() != null ? invoice.getEmployee().getName() : null);
+            } catch (Exception e) {
+                System.err.println("⚠️ Erro ao acessar employee da invoice " + invoice.getId() + ": " + e.getMessage());
+                dto.setEmployeeId(null);
+                dto.setEmployeeName(null);
+            }
+
             dto.setCreatedAt(invoice.getCreatedAt());
             dto.setUpdatedAt(invoice.getUpdatedAt());
             return dto;

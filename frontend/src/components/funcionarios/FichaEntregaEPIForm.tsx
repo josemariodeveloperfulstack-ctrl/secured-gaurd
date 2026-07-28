@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { FileText, Download, Eye, User, Building, Calendar, Shield, Plus, X, HardHat, Loader2, CheckCircle2, ChevronsUpDown, Check, AlertCircle } from 'lucide-react';
+import { FileText, Download, Eye, User, Building, Calendar, Shield, Plus, X, HardHat, Loader2, CheckCircle2, ChevronsUpDown, Check, AlertCircle, MessageCircle, Copy, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { employeeService, SimpleEmployee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
@@ -26,6 +26,7 @@ import SignaturePad from '@/components/SignaturePad';
 import { stockService } from '@/services/stockService';
 import { StockItem } from '@/types/stock';
 import { Switch } from '@/components/ui/switch';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 const epiOptions = [
   'Capacete de Segurança',
@@ -101,11 +102,13 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
             responsavelEntregaId: ficha.responsibleEmployeeId || '',
             observacoes: ficha.observations || '',
             status: ficha.status || 'DRAFT',
-            signatureType: ficha.signatureType || 'ON_SCREEN',
+            signatureType: (ficha.signatureType as any) || 'ON_SCREEN',
             signatureBase64: '', // Signature is not returned for security/storage reasons in edit mode usually, or we can't edit it easily
             employeeWorkSector: ficha.employeeWorkSector || '',
             tipoEntrega: ficha.deliveryType || 'PRIMEIRA_ENTREGA',
           });
+          setCurrentFichaId(ficha.id);
+          setConfirmationPending(!!ficha.confirmationPending);
           setEpis(ficha.items.map(item => ({
             nome: item.epiName,
             quantidade: String(item.quantity),
@@ -116,6 +119,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
             uniformeTipo: item.uniformType || '',
             uniformePeca: item.uniformPiece || '',
             stockItemId: item.stockItemId || '',
+            dataSubstituicao: (item as any).substitutedDate || '',
+            motivoSubstituicao: (item as any).replacementReason || '',
           })));
           
           // Trigger data resolution for employee and company
@@ -189,11 +194,24 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     responsavelEntregaId: '',
     observacoes: '',
     status: 'DRAFT' as 'DRAFT' | 'COMPLETED',
-    signatureType: 'ON_SCREEN' as 'ON_SCREEN' | 'PHYSICAL_ACKNOWLEDGEMENT',
+    signatureType: 'ON_SCREEN' as 'ON_SCREEN' | 'PHYSICAL_ACKNOWLEDGEMENT' | 'WHATSAPP_CONFIRM',
     signatureBase64: '',
     employeeWorkSector: '',
     tipoEntrega: 'PRIMEIRA_ENTREGA'
   });
+
+  const [currentFichaId, setCurrentFichaId] = useState<string | undefined>(fichaId);
+  const [confirmationPending, setConfirmationPending] = useState(false);
+  const [whatsappResult, setWhatsappResult] = useState<{
+    confirmationCode: string;
+    confirmUrl: string;
+    whatsappUrl: string;
+    phoneMasked: string;
+    sent: boolean;
+    message: string;
+  } | null>(null);
+  const [adminConfirmCode, setAdminConfirmCode] = useState('');
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
 
   const [epis, setEpis] = useState([
     {
@@ -205,7 +223,9 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       observacoes: '',
       uniformeTipo: '',
       uniformePeca: '',
-      stockItemId: ''
+      stockItemId: '',
+      dataSubstituicao: '',
+      motivoSubstituicao: '',
     }
   ]);
 
@@ -220,6 +240,32 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
   const [selectedResponsibleData, setSelectedResponsibleData] = useState<SimpleEmployee | null>(null);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
+
+  const stockItemOptions = useMemo(
+    () =>
+      stockItems.map((item) => {
+        const code = item.code || item.barcode || '';
+        const name = item.fullName || item.name || 'Item sem nome';
+        const qty = Number(item.currentQuantity) || 0;
+        const minQty = Number(item.minimumQuantity) || 0;
+        return {
+          value: item.id,
+          label: code ? `${code} — ${name}` : name,
+          description:
+            qty <= 0
+              ? `Saldo: 0 · SEM ESTOQUE — cadastre entrada e informe quantidade mínima${minQty > 0 ? ` (mín: ${minQty})` : ''}`
+              : `Saldo: ${qty}${minQty > 0 ? ` · Mín: ${minQty}` : ''}${item.barcode && item.barcode !== code ? ` · Cód. barras: ${item.barcode}` : ''}`,
+        };
+      }),
+    [stockItems],
+  );
+
+  const getStockQty = (stockItemId?: string) => {
+    if (!stockItemId) return null;
+    const item = stockItems.find((i) => i.id === stockItemId);
+    if (!item) return null;
+    return Number(item.currentQuantity) || 0;
+  };
 
   useEffect(() => {
     const fetchStockItems = async () => {
@@ -326,7 +372,10 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
               validade: epi.validity || '',
               observacoes: epi.observations || '',
               uniformeTipo: '',
-              uniformePeca: ''
+              uniformePeca: '',
+              stockItemId: '',
+              dataSubstituicao: '',
+              motivoSubstituicao: '',
             }));
             setEpis(loadedEpis);
             toast({
@@ -345,7 +394,10 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
               validade: '', 
               observacoes: '', 
               uniformeTipo: '', 
-              uniformePeca: '' 
+              uniformePeca: '',
+              stockItemId: '',
+              dataSubstituicao: '',
+              motivoSubstituicao: '',
             }]);
           }
         }
@@ -376,10 +428,10 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       const updatedEpis = [...prevEpis];
       const updatedItem = { ...updatedEpis[idx], [field]: value };
       
-      if (field === 'stockItemId' && value && value !== 'none') {
+      if (field === 'stockItemId' && value && value !== 'none' && value !== 'all') {
         const selectedItem = stockItems.find(item => item.id === value);
-        if (selectedItem && !updatedItem.nome) {
-          updatedItem.nome = selectedItem.name || selectedItem.fullName || '';
+        if (selectedItem) {
+          updatedItem.nome = selectedItem.name || selectedItem.fullName || updatedItem.nome || '';
         }
       }
       
@@ -458,7 +510,10 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       validade: '',
       observacoes: '',
       uniformeTipo: '',
-      uniformePeca: ''
+      uniformePeca: '',
+      stockItemId: '',
+      dataSubstituicao: '',
+      motivoSubstituicao: '',
     }]);
   };
 
@@ -479,7 +534,39 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       uniformPiece: epi.uniformePeca || undefined,
       observations: epi.observacoes || undefined,
       stockItemId: epi.stockItemId || undefined,
+      substitutedDate: epi.dataSubstituicao || undefined,
+      replacementReason: epi.motivoSubstituicao || undefined,
     }));
+
+  /** Na conclusão, todo item deve gerar baixa no estoque. */
+  const validateEpisForCompletion = (): string | null => {
+    if (epis.length === 0) {
+      return 'Adicione ao menos um item na ficha.';
+    }
+    if (epis.some(epi => !epi.nome?.trim())) {
+      return 'Preencha o nome de todos os EPIs!';
+    }
+    if (epis.some(epi => epi.nome === 'Uniforme de Trabalho' && !epi.uniformeTipo)) {
+      return 'Para Uniforme de Trabalho, selecione se é Completo ou Individual!';
+    }
+    if (epis.some(epi => epi.nome === 'Uniforme de Trabalho' && epi.uniformeTipo === 'INDIVIDUAL' && !epi.uniformePeca)) {
+      return 'Para Uniforme de Trabalho Individual, selecione a peça específica!';
+    }
+    const withoutStock = epis.filter(epi => !epi.stockItemId || epi.stockItemId === 'none');
+    if (withoutStock.length > 0) {
+      const names = withoutStock.map(e => e.nome || 'Item sem nome').join(', ');
+      return `Todos os itens devem estar vinculados ao estoque para dar baixa. Sem vínculo: ${names}`;
+    }
+    const zeroStock = epis.filter((epi) => {
+      const item = stockItems.find((s) => s.id === epi.stockItemId);
+      return item && (Number(item.currentQuantity) || 0) <= 0;
+    });
+    if (zeroStock.length > 0) {
+      const names = zeroStock.map((e) => e.nome || 'Item sem nome').join(', ');
+      return `Itens sem saldo no estoque: ${names}. Cadastre entrada no estoque e informe a quantidade mínima antes de concluir.`;
+    }
+    return null;
+  };
 
   const handlePreview = async () => {
     if (!form.funcionarioId || !form.empresaId || !form.dataEntrega) {
@@ -587,7 +674,13 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       return;
     }
 
-    if (epis.some(epi => !epi.nome)) {
+    if (form.status === 'COMPLETED') {
+      const completionError = validateEpisForCompletion();
+      if (completionError) {
+        toast({ title: 'Atenção', description: completionError, variant: 'destructive' });
+        return;
+      }
+    } else if (epis.some(epi => !epi.nome)) {
       toast({
         title: 'Atenção',
         description: 'Preencha o nome de todos os EPIs!',
@@ -664,10 +757,25 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       return;
     }
 
-    if (epis.some(epi => !epi.nome)) {
+    if (form.status === 'COMPLETED') {
+      const completionError = validateEpisForCompletion();
+      if (completionError) {
+        toast({ title: 'Atenção', description: completionError, variant: 'destructive' });
+        return;
+      }
+    } else if (epis.some(epi => !epi.nome)) {
       toast({
         title: 'Atenção',
         description: 'Preencha o nome de todos os EPIs!',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (form.status === 'COMPLETED' && form.signatureType === 'WHATSAPP_CONFIRM') {
+      toast({
+        title: 'Confirmação WhatsApp',
+        description: 'Com WhatsApp, mantenha a ficha em rascunho, envie o link e aguarde a confirmação do funcionário (ou digite o código).',
         variant: 'destructive'
       });
       return;
@@ -698,11 +806,11 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
         items: mapEpisToFormItems(),
       };
 
-      if (fichaId) {
-        await epiDeliveryFormService.update(fichaId, formData);
-      } else {
-        await epiDeliveryFormService.create(formData);
-      }
+      const saved = currentFichaId
+        ? await epiDeliveryFormService.update(currentFichaId, formData)
+        : await epiDeliveryFormService.create(formData);
+
+      setCurrentFichaId(saved.id);
 
       toast({
         title: '✅ Sucesso',
@@ -713,6 +821,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       
       if (form.status === 'COMPLETED') {
         setForm(prev => ({ ...prev, signatureBase64: '' }));
+        setConfirmationPending(false);
       }
 
       if (onSuccess) {
@@ -727,6 +836,115 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const ensureFichaSavedAsDraft = async (): Promise<string | null> => {
+    if (!form.funcionarioId || !form.empresaId || !form.dataEntrega) {
+      toast({
+        title: 'Atenção',
+        description: 'Preencha funcionário, empresa e data antes de enviar o WhatsApp.',
+        variant: 'destructive'
+      });
+      return null;
+    }
+    const completionError = validateEpisForCompletion();
+    if (completionError) {
+      toast({ title: 'Atenção', description: completionError, variant: 'destructive' });
+      return null;
+    }
+
+    const formData = {
+      employeeId: form.funcionarioId,
+      companyId: form.empresaId,
+      deliveryDate: form.dataEntrega,
+      responsibleEmployeeId: form.responsavelEntregaId || undefined,
+      observations: form.observacoes || undefined,
+      status: 'DRAFT' as const,
+      signatureType: 'WHATSAPP_CONFIRM' as const,
+      employeeWorkSector: form.employeeWorkSector || undefined,
+      deliveryType: form.tipoEntrega || 'PRIMEIRA_ENTREGA',
+      items: mapEpisToFormItems(),
+    };
+
+    const saved = currentFichaId
+      ? await epiDeliveryFormService.update(currentFichaId, formData)
+      : await epiDeliveryFormService.create(formData);
+
+    setCurrentFichaId(saved.id);
+    setForm(prev => ({ ...prev, status: 'DRAFT', signatureType: 'WHATSAPP_CONFIRM' }));
+    return saved.id;
+  };
+
+  const handleSendWhatsApp = async (mode: 'AUTO' | 'MANUAL') => {
+    try {
+      setSendingWhatsApp(true);
+      const id = await ensureFichaSavedAsDraft();
+      if (!id) return;
+
+      const result = await epiDeliveryFormService.sendWhatsAppConfirmation(
+        id,
+        mode,
+        window.location.origin
+      );
+      setWhatsappResult(result);
+      setConfirmationPending(true);
+
+      toast({
+        title: result.sent ? 'WhatsApp enviado' : 'Link gerado',
+        description: result.message,
+      });
+
+      if (mode === 'MANUAL' && result.whatsappUrl) {
+        window.open(result.whatsappUrl, '_blank');
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro',
+        description: err.response?.data?.message || 'Não foi possível enviar a confirmação.',
+        variant: 'destructive'
+      });
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  };
+
+  const handleAdminConfirmCode = async () => {
+    if (!currentFichaId) {
+      toast({
+        title: 'Atenção',
+        description: 'Salve a ficha e envie a confirmação antes de validar o código.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (!adminConfirmCode.trim() || adminConfirmCode.trim().length !== 6) {
+      toast({
+        title: 'Atenção',
+        description: 'Informe o código de 6 dígitos.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    try {
+      setSendingWhatsApp(true);
+      await epiDeliveryFormService.confirmWithCode(currentFichaId, adminConfirmCode.trim());
+      setForm(prev => ({ ...prev, status: 'COMPLETED' }));
+      setConfirmationPending(false);
+      setWhatsappResult(null);
+      toast({
+        title: 'Recebimento confirmado',
+        description: 'Ficha concluída e estoque atualizado.',
+      });
+      if (onSuccess) onSuccess();
+    } catch (err: any) {
+      toast({
+        title: 'Erro',
+        description: err.response?.data?.message || 'Código inválido.',
+        variant: 'destructive'
+      });
+    } finally {
+      setSendingWhatsApp(false);
     }
   };
 
@@ -1004,8 +1222,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                   </Label>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     {form.status === 'COMPLETED' 
-                      ? 'CONCLUÍDA: Gera baixa automática no estoque.' 
-                      : 'RASCUNHO: Apenas salva as informações.'}
+                      ? 'CONCLUÍDA: todos os itens dão baixa automática no estoque (vínculo obrigatório).' 
+                      : 'RASCUNHO: apenas salva as informações (sem baixa no estoque).'}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1014,6 +1232,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                   </Badge>
                   <Switch
                     checked={form.status === 'COMPLETED'}
+                    disabled={form.signatureType === 'WHATSAPP_CONFIRM'}
                     onCheckedChange={(checked) => setForm(prev => ({ 
                       ...prev, 
                       status: checked ? 'COMPLETED' : 'DRAFT' 
@@ -1029,7 +1248,12 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                 </Label>
                 <Select
                   value={form.signatureType}
-                  onValueChange={(value: any) => setForm(prev => ({ ...prev, signatureType: value }))}
+                  onValueChange={(value: any) => setForm(prev => ({
+                    ...prev,
+                    signatureType: value,
+                    status: value === 'WHATSAPP_CONFIRM' ? 'DRAFT' : prev.status,
+                    signatureBase64: value === 'WHATSAPP_CONFIRM' ? '' : prev.signatureBase64,
+                  }))}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue />
@@ -1037,8 +1261,14 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                   <SelectContent>
                     <SelectItem value="ON_SCREEN">Assinar na Tela Digital</SelectItem>
                     <SelectItem value="PHYSICAL_ACKNOWLEDGEMENT">Assinatura em Papel (Anexo)</SelectItem>
+                    <SelectItem value="WHATSAPP_CONFIRM">Confirmação via WhatsApp</SelectItem>
                   </SelectContent>
                 </Select>
+                {form.signatureType === 'WHATSAPP_CONFIRM' && (
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    A ficha permanece em rascunho até o funcionário confirmar com o código enviado no WhatsApp.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1112,27 +1342,65 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                         <div className="space-y-2 lg:col-span-2">
                           <Label className="text-sm font-medium flex items-center gap-2">
                             Vincular ao Estoque
-                            <Badge variant="outline" className="text-[10px] h-4">Recomendado</Badge>
+                            <Badge
+                              variant={form.status === 'COMPLETED' ? 'default' : 'outline'}
+                              className="text-[10px] h-4"
+                            >
+                              {form.status === 'COMPLETED' ? 'Obrigatório' : 'Recomendado'}
+                            </Badge>
                           </Label>
-                          <Select
-                            value={epi.stockItemId || 'none'}
-                            onValueChange={(value) => handleEpiChange(idx, 'stockItemId', value === 'none' ? '' : value)}
-                          >
-                            <SelectTrigger className="h-10 bg-background border-primary/20">
-                              <SelectValue placeholder="Selecione um item do estoque" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Nenhum vínculo (Entrada Manual)</SelectItem>
-                              {stockItems.map(item => (
-                                <SelectItem key={item.id} value={item.id}>
-                                  {item.fullName || item.name} {item.code ? `(${item.code})` : ''} - Saldo: {item.currentStock || 0}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <p className="text-[10px] text-muted-foreground">
-                            O nome do EPI será preenchido automaticamente ao selecionar um item.
-                          </p>
+                          <SearchableSelect
+                            options={stockItemOptions}
+                            value={epi.stockItemId || ''}
+                            onChange={(value) => {
+                              if (!value || value === 'all' || value === 'none') {
+                                handleEpiChange(idx, 'stockItemId', '');
+                                return;
+                              }
+                              handleEpiChange(idx, 'stockItemId', value);
+                              const selected = stockItems.find((i) => i.id === value);
+                              const qty = Number(selected?.currentQuantity) || 0;
+                              if (selected && qty <= 0) {
+                                toast({
+                                  title: 'Item sem estoque',
+                                  description:
+                                    'Este item está com saldo 0. Cadastre entrada no estoque e informe a quantidade mínima antes de concluir a entrega.',
+                                  variant: 'destructive',
+                                });
+                              }
+                            }}
+                            placeholder="Digite o código ou nome do item..."
+                            searchPlaceholder="Código, nome ou código de barras..."
+                            emptyPlaceholder="Nenhum item encontrado."
+                            minSearchChars={3}
+                            minCharsMessage="Digite ao menos 3 caracteres (código ou nome) para buscar..."
+                            className={cn(
+                              "h-10 bg-background border-primary/20 text-foreground hover:bg-background",
+                              form.status === 'COMPLETED' && (!epi.stockItemId || epi.stockItemId === 'none')
+                                && "border-destructive"
+                            )}
+                          />
+                          {(() => {
+                            const qty = getStockQty(epi.stockItemId);
+                            if (epi.stockItemId && qty !== null && qty <= 0) {
+                              return (
+                                <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
+                                  <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-400" />
+                                  <span>
+                                    Saldo zerado neste item. Cadastre itens/entrada no sistema de estoque e informe a{' '}
+                                    <strong className="text-amber-50">quantidade mínima</strong> antes de concluir a ficha.
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return (
+                              <p className="text-[10px] text-muted-foreground">
+                                {form.status === 'COMPLETED'
+                                  ? 'Digite o código do item (mín. 3 caracteres). Cada item concluído gera saída no estoque.'
+                                  : 'Digite o código ou nome (mín. 3 caracteres). O nome do EPI é preenchido ao selecionar.'}
+                              </p>
+                            );
+                          })()}
                         </div>
 
                         {/* Nome do EPI */}
@@ -1143,9 +1411,11 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                               <Button
                                 variant="outline"
                                 role="combobox"
-                                className="w-full h-10 justify-between font-normal bg-background"
+                                className="w-full h-10 justify-between font-normal bg-background text-foreground hover:bg-muted hover:text-foreground focus:text-foreground"
                               >
-                                {epi.nome || "Selecione ou digite o nome..."}
+                                <span className="truncate text-left flex-1">
+                                  {epi.nome || "Selecione ou digite o nome..."}
+                                </span>
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
@@ -1381,6 +1651,40 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                         </div>
                       )}
 
+                      {/* Substituição — preenche colunas SUBSTITUÍDO / MOTIVO DA SUBST. no PDF */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            Substituído em
+                            <Badge variant="outline" className="text-[10px] h-4">PDF</Badge>
+                          </Label>
+                          <Input
+                            type="date"
+                            value={epi.dataSubstituicao || ''}
+                            onChange={(e) => handleEpiChange(idx, 'dataSubstituicao', e.target.value)}
+                            className="bg-background"
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Data exibida na coluna SUBSTITUÍDO da ficha.
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            Motivo da substituição
+                            <Badge variant="outline" className="text-[10px] h-4">PDF</Badge>
+                          </Label>
+                          <Input
+                            value={epi.motivoSubstituicao || ''}
+                            onChange={(e) => handleEpiChange(idx, 'motivoSubstituicao', e.target.value)}
+                            placeholder="Ex.: desgaste, troca de tamanho, extravio..."
+                            className="bg-background"
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Texto da coluna MOTIVO DA SUBST. no PDF.
+                          </p>
+                        </div>
+                      </div>
+
                       {/* Observações do Item (sempre visível) */}
                       <div className="space-y-2">
                         <Label>Observações do Item</Label>
@@ -1457,6 +1761,121 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Confirmação WhatsApp */}
+          {form.signatureType === 'WHATSAPP_CONFIRM' && (
+            <div className="space-y-4 p-6 bg-muted/30 rounded-xl border border-emerald-500/30 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <MessageCircle className="h-4 w-4 text-emerald-600" />
+                  <span>Confirmação de recebimento via WhatsApp</span>
+                </div>
+                {confirmationPending ? (
+                  <Badge variant="outline" className="text-amber-600 border-amber-500 gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Aguardando confirmação
+                  </Badge>
+                ) : form.status === 'COMPLETED' ? (
+                  <Badge className="bg-green-500 text-white border-none gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Confirmado
+                  </Badge>
+                ) : null}
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                O funcionário recebe um link e um código de 6 dígitos. Ao confirmar, a ficha é concluída e o estoque é baixado.
+                {funcionario?.phone ? (
+                  <> Telefone cadastrado: <strong>{funcionario.phone}</strong>.</>
+                ) : (
+                  <span className="text-amber-600"> Cadastre o telefone do funcionário antes de enviar.</span>
+                )}
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  type="button"
+                  className="gap-2"
+                  disabled={sendingWhatsApp || !funcionario || !empresa}
+                  onClick={() => handleSendWhatsApp('AUTO')}
+                >
+                  {sendingWhatsApp ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                  Enviar automaticamente
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2"
+                  disabled={sendingWhatsApp || !funcionario || !empresa}
+                  onClick={() => handleSendWhatsApp('MANUAL')}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Abrir WhatsApp (manual)
+                </Button>
+              </div>
+
+              {whatsappResult && (
+                <div className="rounded-lg border bg-background p-4 space-y-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted-foreground">Código:</span>
+                    <code className="font-mono text-lg tracking-widest font-bold">{whatsappResult.confirmationCode}</code>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={() => {
+                        navigator.clipboard.writeText(whatsappResult.confirmationCode);
+                        toast({ title: 'Código copiado' });
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="text-muted-foreground ml-auto">Tel. {whatsappResult.phoneMasked}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted-foreground shrink-0">Link:</span>
+                    <a
+                      href={whatsappResult.confirmUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline break-all text-xs"
+                    >
+                      {whatsappResult.confirmUrl}
+                    </a>
+                  </div>
+                  {!whatsappResult.sent && whatsappResult.whatsappUrl && (
+                    <Button type="button" variant="secondary" size="sm" className="gap-2" onClick={() => window.open(whatsappResult.whatsappUrl, '_blank')}>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Reabrir WhatsApp
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              <div className="border-t pt-4 space-y-2">
+                <Label className="text-sm">Confirmar com código informado pelo funcionário</Label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="000000"
+                    value={adminConfirmCode}
+                    onChange={(e) => setAdminConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="font-mono tracking-widest sm:max-w-[160px]"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={sendingWhatsApp || adminConfirmCode.length !== 6}
+                    onClick={handleAdminConfirmCode}
+                  >
+                    Validar código e concluir
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 

@@ -11,6 +11,10 @@ export interface EPIDeliveryFormItem {
   uniformPiece?: string;
   observations?: string;
   stockItemId?: string; // ID do item no estoque para baixa automática
+  /** Data da substituição — coluna SUBSTITUÍDO no PDF */
+  substitutedDate?: string;
+  /** Motivo da substituição — coluna MOTIVO DA SUBST. no PDF */
+  replacementReason?: string;
 }
 
 export type EPIDeliveryType = 'PRIMEIRA_ENTREGA' | 'SUBSTITUICAO' | 'DEVOLUCAO' | 'TROCA';
@@ -26,7 +30,7 @@ export interface CreateEPIDeliveryForm {
   deliveryType?: EPIDeliveryType;
   items: EPIDeliveryFormItem[];
   signatureBase64?: string;
-  signatureType?: 'ON_SCREEN' | 'PHYSICAL_ACKNOWLEDGEMENT';
+  signatureType?: 'ON_SCREEN' | 'PHYSICAL_ACKNOWLEDGEMENT' | 'WHATSAPP_CONFIRM';
   status?: EPIDeliveryFormStatus;
 }
 
@@ -51,7 +55,34 @@ export interface EPIDeliveryForm {
   updatedAt: string;
   items: EPIDeliveryFormItem[];
   status?: EPIDeliveryFormStatus;
-  signatureType?: 'ON_SCREEN' | 'PHYSICAL_ACKNOWLEDGEMENT';
+  signatureType?: 'ON_SCREEN' | 'PHYSICAL_ACKNOWLEDGEMENT' | 'WHATSAPP_CONFIRM';
+  confirmationSentAt?: string;
+  confirmationExpiresAt?: string;
+  confirmationPending?: boolean;
+}
+
+export interface EpiConfirmationSendResponse {
+  formId: string;
+  confirmationToken: string;
+  confirmationCode: string;
+  confirmUrl: string;
+  whatsappUrl: string;
+  phoneMasked: string;
+  sent: boolean;
+  mode: 'AUTO' | 'MANUAL';
+  expiresAt: string;
+  message: string;
+}
+
+export interface PublicEpiConfirmation {
+  employeeName: string;
+  companyName?: string;
+  deliveryDate: string;
+  deliveryType?: string;
+  items: Array<{ epiName: string; quantity: number; ca?: string; caName?: string }>;
+  alreadyConfirmed: boolean;
+  expired: boolean;
+  awaitingConfirmation: boolean;
 }
 
 export interface EPIDeliveryFormFilters {
@@ -164,6 +195,19 @@ export const epiDeliveryFormService = {
   },
 
   /**
+   * Buscar fichas do funcionário autenticado (resolve Employee no servidor).
+   */
+  async getMine(): Promise<EPIDeliveryForm[]> {
+    try {
+      const response = await api.get('/epi-delivery-forms/me');
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar minhas fichas de EPI:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Buscar fichas por funcionário
    */
   async getByEmployeeId(employeeId: string): Promise<EPIDeliveryForm[]> {
@@ -174,6 +218,13 @@ export const epiDeliveryFormService = {
       console.error('Erro ao buscar fichas por funcionário:', error);
       throw error;
     }
+  },
+
+  async confirmOwnReceipt(id: string, code?: string): Promise<EPIDeliveryForm> {
+    const response = await api.post(`/epi-delivery-forms/${id}/confirm-own-receipt`, {
+      code: code || undefined,
+    });
+    return response.data;
   },
 
   /**
@@ -199,6 +250,40 @@ export const epiDeliveryFormService = {
       console.error('Erro ao deletar ficha de entrega de EPI:', error);
       throw error;
     }
+  },
+
+  async sendWhatsAppConfirmation(
+    id: string,
+    mode: 'AUTO' | 'MANUAL',
+    frontendBaseUrl: string
+  ): Promise<EpiConfirmationSendResponse> {
+    const response = await api.post(`/epi-delivery-forms/${id}/send-whatsapp-confirmation`, {
+      mode,
+      frontendBaseUrl,
+    });
+    return response.data;
+  },
+
+  async confirmWithCode(id: string, code: string): Promise<EPIDeliveryForm> {
+    const response = await api.post(`/epi-delivery-forms/${id}/confirm-with-code`, { code });
+    return response.data;
+  },
+
+  async getPublicConfirmation(token: string): Promise<PublicEpiConfirmation> {
+    const response = await api.get(`/public/epi-delivery-forms/token/${token}`);
+    return response.data;
+  },
+
+  async confirmPublicReceipt(
+    token: string,
+    code: string,
+    signatureBase64?: string
+  ): Promise<PublicEpiConfirmation> {
+    const response = await api.post(`/public/epi-delivery-forms/token/${token}/confirm`, {
+      code,
+      signatureBase64,
+    });
+    return response.data;
   },
 
   /**

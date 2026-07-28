@@ -334,6 +334,13 @@ public class EmployeeDTO {
         private java.util.UUID clientId;
         private String clientName;
         private List<String> epis;
+        /** Descrição do posto (ex.: Portaria 24h dia) — usado quando type=OUTROS */
+        private String description;
+        /** Tipo do posto (enum name, ex.: POSTO_24H) */
+        private String type;
+        /** Escala do posto (ex.: 12x36) */
+        private String workSchedule;
+        private String primaryPositionName;
     }
 
     @Data

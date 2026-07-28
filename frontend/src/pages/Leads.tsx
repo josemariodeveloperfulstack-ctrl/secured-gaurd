@@ -34,6 +34,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
 import leadService, { Lead, CreateLeadRequest, UpdateLeadRequest } from '@/services/leadService';
+import LeadHistory from '@/components/comercial/LeadHistory';
 import {
   Users,
   Plus,
@@ -51,7 +52,8 @@ import {
   User,
   FileText,
   Briefcase,
-  Tag
+  Tag,
+  Clock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO } from 'date-fns';
@@ -822,6 +824,15 @@ const Leads = () => {
                   <p className="text-seguranca-lightgray mt-1">{selectedLead.notes}</p>
                 </div>
 
+                {/* Histórico de Interações */}
+                <div>
+                  <h3 className="text-lg font-semibold text-seguranca-lightgray mb-3 flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Histórico de Interações
+                  </h3>
+                  <LeadHistory leadId={selectedLead.id} />
+                </div>
+
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="outline"
@@ -1066,6 +1077,23 @@ const Leads = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Histórico de Interações */}
+              {selectedLead?.id && (
+                <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                      <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                        <Clock className="h-5 w-5 text-seguranca-red" />
+                      </div>
+                      Histórico de Interações
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <LeadHistory leadId={selectedLead.id} />
+                  </CardContent>
+                </Card>
+              )}
 
               <DialogFooter className="gap-2 pt-4">
                 <Button

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { employeeService } from '@/services/employeeService';
@@ -21,6 +22,7 @@ import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
 import { DependentFormModal } from '@/components/dependentes/DependentFormModal';
+import SpouseFormModal, { type SpouseFormValues } from '@/components/funcionarios/SpouseFormModal';
 import dependentService from '@/services/dependentService';
 import { Dependent, DependentCreateRequest, RELATIONSHIP_OPTIONS } from '@/types/dependent';
 import { useToast } from '@/hooks/use-toast';
@@ -53,7 +55,8 @@ import RehireAdmissionPanel from '@/components/funcionarios/RehireAdmissionPanel
 import { DismissalReasonSelect } from '@/components/funcionarios/DismissalReasonSelect';
 import { DatePicker } from '@/components/ui/date-picker';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { parseDateFromBackend, formatDateForBackend } from '@/utils/dateUtils';
+import { parseDateFromBackend, formatDateForBackend, calcAsoExpiryDate } from '@/utils/dateUtils';
+import CancelDismissalDialog from './CancelDismissalDialog';
 import {
   clearEmployeeFormDraft,
   getEmployeeFormDraftKey,
@@ -160,8 +163,13 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [cpfError, setCpfError] = useState<string | null>(null);
   const [eligibleRehireEmployee, setEligibleRehireEmployee] = useState<EligibleRehireEmployee | null>(null);
   const [rehireAdmissionType, setRehireAdmissionType] = useState<EmploymentAdmissionType | ''>('');
+  /** Opt-in na edição: só exibe Readmissão/Promoção quando habilitado. No cadastro novo via CPF, liga automaticamente. */
+  const [rehireEnabled, setRehireEnabled] = useState(false);
   const [employmentPeriods, setEmploymentPeriods] = useState<EmployeeEmploymentPeriod[]>([]);
   const [employmentPeriodsLoading, setEmploymentPeriodsLoading] = useState(false);
+  const [cancelDismissalOpen, setCancelDismissalOpen] = useState(false);
+  const [cancelDismissalPeriodId, setCancelDismissalPeriodId] = useState<string | undefined>();
+  const [cancelDismissalLoading, setCancelDismissalLoading] = useState(false);
   const [historyPdfLoading, setHistoryPdfLoading] = useState(false);
   const cpfRehireCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modalWasOpenRef = useRef(false);
@@ -181,149 +189,173 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const lastSavedFormRef = useRef<string | null>(null);
 
   // Monitora a inicialização/carregamento do form
+  // Atualiza lastSavedFormRef quando o formulário é hidratado com dados do funcionário
+  const formHydratedRef = useRef(false);
   useEffect(() => {
-    if (open) {
-      if (employeeToEdit?.id && form.name) {
-        if (lastSavedFormRef.current === null) {
-          lastSavedFormRef.current = JSON.stringify(form);
-        }
-      } else if (!employeeToEdit && lastSavedFormRef.current === null) {
-        lastSavedFormRef.current = JSON.stringify(form);
-      }
+    if (open && employeeToEdit?.id && form.name && !formHydratedRef.current && lastSavedFormRef.current === null) {
+      formHydratedRef.current = true;
+      lastSavedFormRef.current = JSON.stringify(form);
+    } else if (open && !employeeToEdit && lastSavedFormRef.current === null) {
+      lastSavedFormRef.current = JSON.stringify(form);
     }
-  }, [open, employeeToEdit, form]);
+  }, [open, employeeToEdit, form.name]);
 
   // Monitor form changes for autosave in FuncionarioNovoModal
+  const isAutosavingRef = useRef(false);
+  const lastConnectionErrorRef = useRef(0);
+  const formChangedRef = useRef(false);
+
   useEffect(() => {
     if (!open) {
       isInitialMount.current = true;
       lastSavedFormRef.current = null;
-      console.log('📝 [Autosave Novo] Modal fechado, limpando referências.');
+      isAutosavingRef.current = false;
+      formChangedRef.current = false;
+      formHydratedRef.current = false;
       return;
     }
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      console.log('📝 [Autosave Novo] Mount inicial, pulando salvamento automático.');
       return;
     }
 
+    if (isAutosavingRef.current) return;
+
     const currentFormStr = JSON.stringify(form);
     if (lastSavedFormRef.current === null) {
-      console.log('📝 [Autosave Novo] Abortando: formulário não hidratado/inicializado ainda.');
       return;
     }
     if (currentFormStr === lastSavedFormRef.current) {
-      console.log('📝 [Autosave Novo] Nenhuma alteração detectada no formulário.');
+      formChangedRef.current = false;
       return;
     }
 
     // 1. Se já está no modo de edição (funcionário já existe)
     if (isEditMode && currentEmployeeId) {
       if (!form.cpf?.trim() || !form.hireDate || !form.name?.trim()) {
-        console.log('📝 [Autosave Novo - Update] Abortando: campos obrigatórios vazios.');
         return;
       }
       const cpfDigits = form.cpf.replace(/\D/g, '');
       if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
-        console.log('📝 [Autosave Novo - Update] Abortando: CPF inválido:', form.cpf);
         return;
       }
 
       const targetPost = normalizeWorkPostId((form as any).workPostId);
       if (isWorkPostTransfer(initialWorkPostIdRef.current, targetPost) && !(form as any).remanejamentoDataInicio) {
-        console.log('📝 [Autosave Novo - Update] Abortando: transferência de posto sem data de início.');
         return;
       }
 
-      console.log('📝 [Autosave Novo - Update] Alteração detectada! Iniciando timer de 1.5s...');
+      formChangedRef.current = true;
       setSaveStatus('saving');
 
       const delayDebounceFn = setTimeout(async () => {
-        console.log('🚀 [Autosave Novo - Update] Executando chamada de atualização no backend para ID:', currentEmployeeId);
-        try {
-          const { remanejamentoDataInicio, ...formRest } = form as any;
-          const employeeData: any = { ...formRest };
-          if (remanejamentoDataInicio && remanejamentoDataInicio.trim()) {
-            employeeData.remanejamentoDataInicio = remanejamentoDataInicio;
+        if (!isAutosavingRef.current && currentFormStr === JSON.stringify(form)) {
+          isAutosavingRef.current = true;
+          try {
+            const { remanejamentoDataInicio, ...formRest } = form as any;
+            const employeeData: any = { ...formRest };
+            if (remanejamentoDataInicio && remanejamentoDataInicio.trim()) {
+              employeeData.remanejamentoDataInicio = remanejamentoDataInicio;
+            }
+
+            const updatedEmployee = await employeeService.updateEmployee(currentEmployeeId, employeeData);
+            
+            syncInitialWorkPostRef(
+              updatedEmployee?.workPostId || updatedEmployee?.workPost?.id || employeeData.workPostId,
+            );
+
+            queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+            queryClient.setQueryData(queryKeys.employees.byId(currentEmployeeId), updatedEmployee);
+
+            lastSavedFormRef.current = JSON.stringify(form);
+            formChangedRef.current = false;
+            isAutosavingRef.current = false;
+            setSaveStatus('saved');
+            setTimeout(() => {
+              if (!formChangedRef.current) {
+                setSaveStatus('idle');
+              }
+            }, 3000);
+          } catch (err) {
+            isAutosavingRef.current = false;
+            if ((err as any)?.isConnectionError) {
+              lastConnectionErrorRef.current = Date.now();
+              setSaveStatus('error');
+            } else {
+              setSaveStatus('error');
+            }
           }
-
-          const updatedEmployee = await employeeService.updateEmployee(currentEmployeeId, employeeData);
-          console.log('✅ [Autosave Novo - Update] Atualizado com sucesso no backend:', updatedEmployee);
-          
-          syncInitialWorkPostRef(
-            updatedEmployee?.workPostId || updatedEmployee?.workPost?.id || employeeData.workPostId,
-          );
-
-          queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
-          queryClient.setQueryData(queryKeys.employees.byId(currentEmployeeId), updatedEmployee);
-
-          lastSavedFormRef.current = currentFormStr;
-          setSaveStatus('saved');
-          const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
-          return () => clearTimeout(resetStatusTimeout);
-        } catch (err) {
-          console.error('❌ [Autosave Novo - Update] Erro no salvamento automático:', err);
-          setSaveStatus('error');
         }
       }, 1500);
 
-      return () => clearTimeout(delayDebounceFn);
+      return () => {
+        clearTimeout(delayDebounceFn);
+        formChangedRef.current = false;
+      };
     } 
     
     // 2. Se NÃO está no modo de edição (funcionário novo, tentar a criação automática se os campos obrigatórios estiverem válidos)
     else if (!isEditMode && !currentEmployeeId && !employeeToEdit) {
       if (!form.name?.trim() || !form.cpf?.trim()) {
-        console.log('📝 [Autosave Novo - Create] Abortando: Name ou CPF ausentes.');
         return;
       }
 
       const cpfDigits = form.cpf.replace(/\D/g, '');
       if (cpfDigits.length !== 11 || !validateCPF(form.cpf)) {
-        console.log('📝 [Autosave Novo - Create] Abortando: CPF inválido para criação:', form.cpf);
         return;
       }
 
-      console.log('📝 [Autosave Novo - Create] Campos mínimos válidos para criação! Iniciando timer de 2s...');
+      formChangedRef.current = true;
       setSaveStatus('saving');
 
       const delayDebounceFn = setTimeout(async () => {
-        console.log('🚀 [Autosave Novo - Create] Executando chamada de criação no backend...');
-        try {
-          const employeeData = { ...form } as Record<string, unknown>;
-          delete employeeData.remanejamentoDataInicio;
+        if (!isAutosavingRef.current && currentFormStr === JSON.stringify(form)) {
+          isAutosavingRef.current = true;
+          try {
+            const employeeData = { ...form } as Record<string, unknown>;
+            delete employeeData.remanejamentoDataInicio;
 
-          // Fornece uma data de admissão padrão (hoje) caso ainda não selecionada
-          if (!employeeData.hireDate) {
-            employeeData.hireDate = new Date().toISOString().split('T')[0];
-            console.log('📝 [Autosave Novo - Create] hireDate padrão aplicada:', employeeData.hireDate);
+            if (!employeeData.hireDate) {
+              employeeData.hireDate = new Date().toISOString().split('T')[0];
+            }
+
+            const createdEmployee = await employeeService.createEmployee(employeeData);
+
+            setCurrentEmployeeId(createdEmployee.id);
+            setIsEditMode(true);
+            syncInitialWorkPostRef(
+              createdEmployee?.workPostId || createdEmployee?.workPost?.id || (employeeData.workPostId as string),
+            );
+
+            queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+            queryClient.setQueryData(queryKeys.employees.byId(createdEmployee.id), createdEmployee);
+            void clearEmployeeFormDraft(draftStorageKey);
+
+            lastSavedFormRef.current = JSON.stringify(form);
+            isAutosavingRef.current = false;
+            formChangedRef.current = false;
+            setSaveStatus('saved');
+            setTimeout(() => {
+              if (!formChangedRef.current) {
+                setSaveStatus('idle');
+              }
+            }, 3000);
+          } catch (err) {
+            isAutosavingRef.current = false;
+            if ((err as any)?.isConnectionError) {
+              lastConnectionErrorRef.current = Date.now();
+            }
+            setSaveStatus('error');
           }
-
-          const createdEmployee = await employeeService.createEmployee(employeeData);
-          console.log('✅ [Autosave Novo - Create] Funcionário criado automaticamente no backend - ID:', createdEmployee.id);
-          
-          setCurrentEmployeeId(createdEmployee.id);
-          setIsEditMode(true);
-          syncInitialWorkPostRef(
-            createdEmployee?.workPostId || createdEmployee?.workPost?.id || (employeeData.workPostId as string),
-          );
-          
-          queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
-          queryClient.setQueryData(queryKeys.employees.byId(createdEmployee.id), createdEmployee);
-          void clearEmployeeFormDraft(draftStorageKey);
-
-          lastSavedFormRef.current = currentFormStr;
-          setSaveStatus('saved');
-          const resetStatusTimeout = setTimeout(() => setSaveStatus('idle'), 3000);
-          return () => clearTimeout(resetStatusTimeout);
-        } catch (err) {
-          console.error('❌ [Autosave Novo - Create] Erro ao criar funcionário automaticamente:', err);
-          setSaveStatus('error');
         }
       }, 2000);
 
-      return () => clearTimeout(delayDebounceFn);
+      return () => {
+        clearTimeout(delayDebounceFn);
+        formChangedRef.current = false;
+      };
     }
-  }, [form, isEditMode, currentEmployeeId, open, queryClient, employeeToEdit]);
+  }, [form, isEditMode, currentEmployeeId, open, employeeToEdit]);
 
   const handleOfflineItemSynced = useCallback(
     ({ item, employee }: { item: { id: string; operation: string }; employee?: { id?: string } }) => {
@@ -501,6 +533,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [employeeDependents, setEmployeeDependents] = useState<Dependent[]>([]);
   const [pendingDependents, setPendingDependents] = useState<DependentCreateRequest[]>([]); // Dependentes pendentes para salvar após criar funcionário
   const [dependentModalOpen, setDependentModalOpen] = useState(false);
+  const [spouseModalOpen, setSpouseModalOpen] = useState(false);
   const [dependentToEdit, setDependentToEdit] = useState<Dependent | null>(null);
   const [loadingDependents, setLoadingDependents] = useState(false);
 
@@ -568,6 +601,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [temIntervaloAlmoco, setTemIntervaloAlmoco] = useState<'sim' | 'nao'>('nao');
 
   const resetNewEmployeeFormState = useCallback(async () => {
+    formHydratedRef.current = false;
     setIsEditMode(false);
     setCurrentEmployeeId(null);
     setForm(initialState);
@@ -663,6 +697,58 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     return () => { cancelled = true; };
   }, [showHistoryTab, activeTab, currentEmployeeId, historyPageIndex]);
 
+  const openCancelDismissal = (periodId?: string) => {
+    setCancelDismissalPeriodId(periodId);
+    setCancelDismissalOpen(true);
+  };
+
+  const handleConfirmCancelDismissal = async (justification: string) => {
+    const employeeId = currentEmployeeId || employeeToEdit?.id;
+    if (!employeeId) return;
+    setCancelDismissalLoading(true);
+    try {
+      const updated = await employeeService.cancelDismissal(
+        employeeId,
+        justification,
+        cancelDismissalPeriodId,
+      );
+      setForm((prev) => ({
+        ...prev,
+        status: 'ACTIVE',
+        dataRescisao: '',
+        terminationDate: undefined as any,
+        terminationReason: undefined,
+      }));
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      queryClient.setQueryData(queryKeys.employees.byId(employeeId), updated);
+      const periods = await employeeEmploymentPeriodService.getEmploymentPeriods(employeeId);
+      setEmploymentPeriods(periods);
+      if (showHistoryTab) {
+        try {
+          const history = await employeeChangeHistoryService.getByEmployeeId(employeeId, 0, 20);
+          setHistoryData(history);
+          setHistoryPageIndex(0);
+        } catch {
+          /* ignore */
+        }
+      }
+      setCancelDismissalOpen(false);
+      toast({
+        title: 'Demissão cancelada',
+        description: 'Funcionário reativado sem readmissão. Ação registrada na auditoria.',
+      });
+      onCreated();
+    } catch (err: any) {
+      toast({
+        title: 'Erro',
+        description: err?.message || 'Não foi possível cancelar a demissão.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCancelDismissalLoading(false);
+    }
+  };
+
   // useEffect para carregar dados do funcionário em modo de edição
   useEffect(() => {
     const justOpened = open && !modalWasOpenRef.current;
@@ -725,6 +811,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         spouseBirthDate: employeeToEdit.spouseBirthDate || '',
         spousePhone: employeeToEdit.spousePhone || '',
         spouseEmail: employeeToEdit.spouseEmail || '',
+        spouseProfession: (employeeToEdit as any).spouseProfession || '',
 
         // Campos da ficha de registro
         empresaNome: employeeToEdit.empresaNome || '',
@@ -839,12 +926,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       ).toLowerCase();
       workPostSelectReadyRef.current = false;
 
-      if ((employeeToEdit.status || '').toUpperCase() === 'TERMINATED') {
-        setEligibleRehireEmployee(employeeToEdit as EligibleRehireEmployee);
-      } else {
-        setEligibleRehireEmployee(null);
-        setRehireAdmissionType('');
-      }
+      // Em edição, recontratação é opt-in (permite corrigir datas/salário/ASO sem forçar Readmissão)
+      setEligibleRehireEmployee(null);
+      setRehireAdmissionType('');
+      setRehireEnabled(false);
 
       setTemIntervaloAlmoco(employeeToEdit.horarioTrabalhoIntervalo ? 'sim' : 'nao');
 
@@ -1267,20 +1352,41 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const loadSelectData = async () => {
     setLoadingData(true);
     try {
-      const [positionsData, unitsData, companiesData] = await Promise.all([
-        positionService.searchPositions(), // Usar searchPositions para carregar todos
+      const results = await Promise.allSettled([
+        positionService.searchPositions(),
         unitService.getAllUnits(),
         companyService.getAllCompanies()
       ]);
-      setPositions(positionsData);
-      setFilteredPositions(positionsData);
-      setUnits(unitsData);
-      setCompanies(companiesData);
+
+      const [positionsResult, unitsResult, companiesResult] = results;
+
+      if (positionsResult.status === 'fulfilled') {
+        setPositions(positionsResult.value);
+        setFilteredPositions(positionsResult.value);
+      } else {
+        console.warn('Erro ao carregar cargos:', positionsResult.reason);
+      }
+
+      if (unitsResult.status === 'fulfilled') {
+        setUnits(unitsResult.value);
+      } else {
+        console.warn('Erro ao carregar unidades:', unitsResult.reason);
+      }
+
+      if (companiesResult.status === 'fulfilled') {
+        setCompanies(companiesResult.value);
+      } else {
+        console.warn('Erro ao carregar empresas:', companiesResult.reason);
+      }
 
       // Carregar usuários iniciais (sem filtro)
-      const usersData = await userService.searchUsers();
-      setUsers(usersData);
-      setFilteredUsers(usersData);
+      try {
+        const usersData = await userService.searchUsers();
+        setUsers(usersData);
+        setFilteredUsers(usersData);
+      } catch (err) {
+        console.warn('Erro ao carregar usuários:', err);
+      }
     } catch (err) {
       console.error('Erro ao carregar dados dos selects:', err);
     } finally {
@@ -1344,6 +1450,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         setCpfError('CPF não válido');
         setEligibleRehireEmployee(null);
         setRehireAdmissionType('');
+        setRehireEnabled(false);
       } else if (!isEditMode) {
         if (cpfRehireCheckRef.current) clearTimeout(cpfRehireCheckRef.current);
         cpfRehireCheckRef.current = setTimeout(async () => {
@@ -1351,6 +1458,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             const eligible = await employeeService.findEligibleForRehire(formatted);
             if (eligible) {
               setEligibleRehireEmployee(eligible as EligibleRehireEmployee);
+              setRehireEnabled(true);
               setForm((prev) => ({
                 ...prev,
                 name: eligible.name || prev.name,
@@ -1367,16 +1475,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             } else {
               setEligibleRehireEmployee(null);
               setRehireAdmissionType('');
+              setRehireEnabled(false);
             }
           } catch {
             setEligibleRehireEmployee(null);
             setRehireAdmissionType('');
+            setRehireEnabled(false);
           }
         }, 400);
       }
     } else {
       setEligibleRehireEmployee(null);
       setRehireAdmissionType('');
+      setRehireEnabled(false);
     }
     setForm((prev) => ({ ...prev, ...updates }));
   };
@@ -1470,7 +1581,58 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     }));
   };
 
-  const isRehireFormMode = Boolean(eligibleRehireEmployee && rehireAdmissionType);
+  const wasDismissedAtLeastOnce =
+    isEditMode &&
+    ((form.status || '').toUpperCase() === 'TERMINATED' ||
+      Boolean(form.dataRescisao) ||
+      employmentPeriods.some(
+        (p) =>
+          (p.status || '').toUpperCase() === 'TERMINATED' ||
+          Boolean(p.terminationDate),
+      ));
+
+  const buildEligibleRehireSnapshot = (): EligibleRehireEmployee | null => {
+    const source = employeeToEdit;
+    if (!source?.id || !wasDismissedAtLeastOnce) return null;
+    return {
+      id: String(source.id),
+      name: form.name || source.name || '',
+      cpf: form.cpf || source.cpf,
+      status: form.status || source.status,
+      company: (form.company as { id: string; name?: string } | undefined) ||
+        (source.company as { id: string; name?: string } | undefined),
+      hireDate: form.hireDate || source.hireDate,
+      dataRescisao: form.dataRescisao || (source as { dataRescisao?: string }).dataRescisao,
+      terminationDate:
+        form.dataRescisao ||
+        (source as { terminationDate?: string }).terminationDate ||
+        (source as { dataRescisao?: string }).dataRescisao,
+      terminationReason: form.terminationReason || source.terminationReason,
+      position: form.position || source.position,
+    };
+  };
+
+  const handleRehireEnabledChange = (enabled: boolean) => {
+    setRehireEnabled(enabled);
+    if (enabled) {
+      const snapshot = buildEligibleRehireSnapshot();
+      if (snapshot) setEligibleRehireEmployee(snapshot);
+      setRehireAdmissionType('');
+    } else {
+      const prevHire = eligibleRehireEmployee?.hireDate;
+      setEligibleRehireEmployee(null);
+      setRehireAdmissionType('');
+      if (isEditMode) {
+        setForm((prev) => ({
+          ...prev,
+          status: 'TERMINATED',
+          hireDate: prevHire || prev.hireDate,
+        }));
+      }
+    }
+  };
+
+  const isRehireFormMode = Boolean(rehireEnabled && eligibleRehireEmployee && rehireAdmissionType);
 
   const downloadHistoryPdfBlob = (blob: Blob, filename: string) => {
     const url = window.URL.createObjectURL(blob);
@@ -1581,12 +1743,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       }
     }
 
-    if (eligibleRehireEmployee?.id && !rehireAdmissionType) {
+    if (rehireEnabled && eligibleRehireEmployee?.id && !rehireAdmissionType) {
       setError('Selecione Readmissão ou Promoção para recontratar o funcionário.');
       return;
     }
 
-    const isRehireFlowCheck = Boolean(eligibleRehireEmployee?.id && rehireAdmissionType);
+    const isRehireFlowCheck = Boolean(rehireEnabled && eligibleRehireEmployee?.id && rehireAdmissionType);
     if (isRehireFlowCheck) {
       if (!form.hireDate) {
         setError('Informe a nova data de admissão para a recontratação.');
@@ -1606,7 +1768,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     const targetEmployeeId = employeeToEdit?.id || currentEmployeeId;
     const isUpdate = Boolean(isEditMode && targetEmployeeId);
 
-    const isRehireFlow = Boolean(eligibleRehireEmployee?.id && rehireAdmissionType);
+    const isRehireFlow = Boolean(rehireEnabled && eligibleRehireEmployee?.id && rehireAdmissionType);
 
     if (isRehireFlow) {
       if (!form.hireDate) {
@@ -1659,6 +1821,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         setIsEditMode(true);
         setEligibleRehireEmployee(null);
         setRehireAdmissionType('');
+        setRehireEnabled(false);
         setForm((prev) => ({
           ...prev,
           status: 'ACTIVE',
@@ -1851,11 +2014,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     // Selecionar automaticamente o novo usuário
     setForm(prev => ({ ...prev, user: { id: usuario.id } }));
     setSelectedUser(usuario);
-    setUserSearchTerm(usuario.name);
+    setUserSearchTerm(usuario.name || usuario.username || '');
     setCriarUsuarioModalOpen(false);
-
-    // Fechar o modal principal após criar o usuário
-    onClose();
+    toast({
+      title: 'Usuário criado',
+      description: `Login: CPF do funcionário · Senha padrão: CPF@Promover${new Date().getFullYear()}`,
+    });
   };
 
   const handleUserSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1997,9 +2161,52 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   };
 
   const handlePendingDependentCreate = (data: DependentCreateRequest) => {
-    setPendingDependents((prev) => [...prev, data]);
+    setPendingDependents((prev) => {
+      if (data.relationship === 'CONJUGE') {
+        return [...prev.filter((d) => d.relationship !== 'CONJUGE'), data];
+      }
+      return [...prev, data];
+    });
     setDependentModalOpen(false);
     setDependentToEdit(null);
+  };
+
+  const isSpouseRelationship = (rel?: string) => {
+    const u = (rel || '').trim().toUpperCase();
+    return u === 'CONJUGE' || u === 'SPOUSE' || u.includes('CÔNJUGE') || u.includes('CONJUGE');
+  };
+
+  const findSpouseDependent = () =>
+    employeeDependents.find((d) => isSpouseRelationship(d.relationship)) || null;
+
+  const handleMaritalStatusChange = (value: string) => {
+    setForm((prev) => ({ ...prev, maritalStatus: value }));
+    if (value === 'MARRIED') {
+      setSpouseModalOpen(true);
+    }
+  };
+
+  const handleSpouseSaved = async (spouse: SpouseFormValues, dependent?: Dependent | null) => {
+    setForm((prev) => ({
+      ...prev,
+      maritalStatus: 'MARRIED',
+      spouseName: spouse.spouseName,
+      spouseCpf: spouse.spouseCpf,
+      spouseRg: spouse.spouseRg,
+      spouseBirthDate: spouse.spouseBirthDate,
+      spouseProfession: spouse.spouseProfession,
+      spousePhone: spouse.spousePhone,
+    }));
+    if (dependent) {
+      setEmployeeDependents((prev) => {
+        const exists = prev.some((d) => d.id === dependent.id);
+        if (exists) return prev.map((d) => (d.id === dependent.id ? dependent : d));
+        return [...prev.filter((d) => !isSpouseRelationship(d.relationship)), dependent];
+      });
+      if (employeeIdValue) {
+        await loadEmployeeDependents(employeeIdValue, true);
+      }
+    }
   };
 
   const handleRemovePendingDependent = (index: number) => {
@@ -2479,7 +2686,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               </div>
                             </div>
                           )}
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                             <p className="text-xs text-gray-300">
                               O usuário selecionado será associado ao funcionário para acesso ao sistema. (Opcional)
                               {canCreateDefaultUser && (
@@ -2488,19 +2695,26 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                                 </span>
                               )}
                             </p>
-                            {canCreateDefaultUser && (
                               <Button
                                 type="button"
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => setCriarUsuarioModalOpen(true)}
-                                className="text-seguranca-yellow hover:text-yellow-400 text-xs px-2 py-1 h-auto"
+                                onClick={() => {
+                                  if (!form.name?.trim() || !form.cpf?.replace(/\D/g, '') || form.cpf.replace(/\D/g, '').length !== 11) {
+                                    toast({
+                                      title: 'Atenção',
+                                      description: 'Preencha nome e CPF válidos do funcionário antes de gerar o usuário.',
+                                      variant: 'destructive',
+                                    });
+                                    return;
+                                  }
+                                  setCriarUsuarioModalOpen(true);
+                                }}
+                                className="border-seguranca-yellow/50 text-seguranca-yellow hover:bg-seguranca-yellow/10 text-xs shrink-0"
                               >
-                                <UserPlus className="h-3 w-3 mr-1" />
-                                Criar Usuário Padrão
-                                <Link className="h-3 w-3 ml-1" />
+                                <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                                Gerar Usuário do Sistema
                               </Button>
-                            )}
                           </div>
                         </div>
 
@@ -2790,7 +3004,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                           </Label>
                           <Select
                             value={form.maritalStatus}
-                            onValueChange={(value) => setForm(prev => ({ ...prev, maritalStatus: value }))}
+                            onValueChange={handleMaritalStatusChange}
                           >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
                               <SelectValue placeholder="Selecione" />
@@ -2919,29 +3133,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               date={parseDateFromBackend(form.tituloEleitorValidade) || undefined}
                               onDateChange={(date) => setForm(prev => ({ ...prev, tituloEleitorValidade: formatDateForBackend(date) || '' }))}
                               className="w-full"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Nome do Conselho Regional */}
-                      <div className="mt-4 pt-4 border-t border-gray-600">
-                        <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
-                          <FileText className="mr-2" size={16} />
-                          Nome do Conselho Regional
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Sigla</span>
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                            </Label>
-                            <Input
-                              name="nomeConselhoRegional"
-                              value={form.nomeConselhoRegional || ''}
-                              onChange={handleChange}
-                              placeholder="Ex: CRM, CRO, etc."
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                             />
                           </div>
                         </div>
@@ -3085,94 +3276,52 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                         </div>
                       </div>
 
-                      {/* Seção de dados do cônjuge - aparece apenas se estado civil for "Casado" */}
+                      {/* Cônjuge: modal ao selecionar Casado; resumo + edição */}
                       {form.maritalStatus === 'MARRIED' && (
                         <div className="mt-4 pt-4 border-t border-gray-600">
-                          <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
-                            <UserIcon className="mr-2" size={16} />
-                            Dados do Cônjuge
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">Nome do Cônjuge</span>
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
-                              </Label>
-                              <Input
-                                name="spouseName"
-                                value={form.spouseName || ''}
-                                onChange={handleChange}
-                                required
-                                placeholder="Nome completo do cônjuge"
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">CPF do Cônjuge</span>
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
-                              </Label>
-                              <Input
-                                name="spouseCpf"
-                                value={form.spouseCpf || ''}
-                                onChange={handleChange}
-                                required
-                                placeholder="000.000.000-00"
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">RG do Cônjuge</span>
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
-                              </Label>
-                              <Input
-                                name="spouseRg"
-                                value={form.spouseRg || ''}
-                                onChange={handleChange}
-                                required
-                                placeholder="Número do RG"
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">Data de Nascimento do Cônjuge</span>
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
-                              </Label>
-                              <DatePicker
-                                date={parseDateFromBackend(form.spouseBirthDate) || undefined}
-                                onDateChange={(date) => setForm(prev => ({ ...prev, spouseBirthDate: formatDateForBackend(date) || '' }))}
-                                className="w-full"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">Profissão do Cônjuge</span>
-                                <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                              </Label>
-                              <Input
-                                name="spouseProfession"
-                                value={form.spouseProfession || ''}
-                                onChange={handleChange}
-                                placeholder="Profissão do cônjuge"
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                                <span className="truncate">Telefone do Cônjuge</span>
-                                <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                              </Label>
-                              <Input
-                                name="spousePhone"
-                                value={form.spousePhone || ''}
-                                onChange={handleChange}
-                                placeholder="(00) 00000-0000"
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                            </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                            <h4 className="text-md font-semibold text-seguranca-yellow flex items-center">
+                              <UserIcon className="mr-2" size={16} />
+                              Dados do Cônjuge
+                            </h4>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="border-seguranca-yellow/40 text-seguranca-yellow hover:bg-seguranca-yellow/10"
+                              onClick={() => setSpouseModalOpen(true)}
+                            >
+                              {form.spouseName ? 'Editar cônjuge' : 'Cadastrar cônjuge'}
+                            </Button>
                           </div>
+                          {form.spouseName ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                              <div className="p-3 rounded-md bg-black/20 border border-gray-700">
+                                <p className="text-xs text-gray-500 uppercase">Nome</p>
+                                <p className="text-white font-medium">{form.spouseName}</p>
+                              </div>
+                              <div className="p-3 rounded-md bg-black/20 border border-gray-700">
+                                <p className="text-xs text-gray-500 uppercase">CPF</p>
+                                <p className="text-white font-medium">{form.spouseCpf || '—'}</p>
+                              </div>
+                              <div className="p-3 rounded-md bg-black/20 border border-gray-700">
+                                <p className="text-xs text-gray-500 uppercase">RG</p>
+                                <p className="text-white font-medium">{form.spouseRg || '—'}</p>
+                              </div>
+                              <div className="p-3 rounded-md bg-black/20 border border-gray-700">
+                                <p className="text-xs text-gray-500 uppercase">Nascimento</p>
+                                <p className="text-white font-medium">
+                                  {form.spouseBirthDate
+                                    ? new Date(form.spouseBirthDate + 'T12:00:00').toLocaleDateString('pt-BR')
+                                    : '—'}
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-amber-200/90 bg-amber-500/10 border border-amber-500/30 rounded-md p-3">
+                              Funcionário marcado como Casado. Cadastre o cônjuge — ele também será incluído na aba Dependentes.
+                            </p>
+                          )}
                         </div>
                       )}
 
@@ -3478,7 +3627,17 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                           <Label className="text-sm font-medium text-gray-200">Data Realizada</Label>
                           <DatePicker
                             date={parseDateFromBackend(form.exameMedicoData) || undefined}
-                            onDateChange={(date) => setForm(prev => ({ ...prev, exameMedicoData: formatDateForBackend(date) || '' }))}
+                            onDateChange={(date) => {
+                              const realization = formatDateForBackend(date) || '';
+                              const expiry = calcAsoExpiryDate(date || null);
+                              setForm(prev => ({
+                                ...prev,
+                                exameMedicoData: realization,
+                                exameMedicoVencimento: realization
+                                  ? (formatDateForBackend(expiry) || '')
+                                  : '',
+                              }));
+                            }}
                             className="w-full"
                           />
                         </div>
@@ -3489,6 +3648,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             onDateChange={(date) => setForm(prev => ({ ...prev, exameMedicoVencimento: formatDateForBackend(date) || '' }))}
                             className="w-full"
                           />
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Preenchida automaticamente (realização + 1 ano − 1 dia). Pode editar se necessário.
+                          </p>
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-200">Tipo de Exame Realizado</Label>
@@ -3508,7 +3670,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="md:col-span-2">
+                        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <Label className="text-sm font-medium text-gray-200">Nome do Médico</Label>
                             <button
@@ -3586,6 +3749,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                                 )}
                               </div>
                             )}
+                          </div>
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Nome do Conselho Regional (Sigla)</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="nomeConselhoRegional"
+                              value={form.nomeConselhoRegional || ''}
+                              onChange={handleChange}
+                              placeholder="Ex: CRM, CRO, etc."
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-xs sm:text-sm h-9 sm:h-10"
+                            />
                           </div>
                         </div>
 
@@ -3790,12 +3967,47 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Dados do Cadastro / Admissão</h3>
                       </div>
-                      {eligibleRehireEmployee && (
+                      {isEditMode && wasDismissedAtLeastOnce && (
+                        <div className="rounded-lg border border-gray-600 bg-gray-900/50 p-4 space-y-3">
+                          <div className="flex items-start sm:items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <Label htmlFor="rehire-enabled-novo" className="text-sm font-medium text-white cursor-pointer">
+                                Habilitar recontratação (Readmissão / Promoção)
+                              </Label>
+                              <p className="text-xs text-gray-400 mt-1">
+                                Desligado: corrija data de demissão, admissão, salário, ASO e demais dados do vínculo atual.
+                                Ligado: inicia novo vínculo com Readmissão ou Promoção.
+                              </p>
+                            </div>
+                            <Switch
+                              id="rehire-enabled-novo"
+                              checked={rehireEnabled}
+                              onCheckedChange={handleRehireEnabledChange}
+                              className="shrink-0"
+                            />
+                          </div>
+
+                          {!rehireEnabled && (
+                            <p className="text-xs text-amber-200/90 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                              Modo correção ativo — a mensagem de recontratação não é exibida. Ajuste as informações abaixo e salve normalmente.
+                            </p>
+                          )}
+
+                          {rehireEnabled && eligibleRehireEmployee && (
+                            <RehireAdmissionPanel
+                              eligibleEmployee={eligibleRehireEmployee}
+                              admissionType={rehireAdmissionType}
+                              onAdmissionTypeChange={handleRehireAdmissionTypeChange}
+                              showTerminatedEditHint
+                            />
+                          )}
+                        </div>
+                      )}
+                      {!isEditMode && rehireEnabled && eligibleRehireEmployee && (
                         <RehireAdmissionPanel
                           eligibleEmployee={eligibleRehireEmployee}
                           admissionType={rehireAdmissionType}
                           onAdmissionTypeChange={handleRehireAdmissionTypeChange}
-                          showTerminatedEditHint={isEditMode}
                         />
                       )}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3859,6 +4071,22 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               value={form.terminationReason || ''}
                               onValueChange={(val) => setForm((prev) => ({ ...prev, terminationReason: val }))}
                             />
+                          </div>
+                        )}
+                        {!isRehireFormMode && (form.status || '').toUpperCase() === 'TERMINATED' && (
+                          <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                            <p className="text-xs text-amber-100/90 flex-1">
+                              Demissão indevida? Cancele o registro para reativar o colaborador sem gerar Readmissão.
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="border-amber-500/50 text-amber-200 hover:bg-amber-500/20 shrink-0"
+                              onClick={() => openCancelDismissal(employmentPeriods[0]?.id)}
+                            >
+                              Cancelar Demissão
+                            </Button>
                           </div>
                         )}
                         {/* Cargo */}
@@ -4739,10 +4967,16 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                                     <th className="text-left p-3">Admissão</th>
                                     <th className="text-left p-3">Demissão</th>
                                     <th className="text-left p-3">Status</th>
+                                    <th className="text-left p-3">Ações</th>
                                   </tr>
                                 </thead>
                                 <tbody className="text-gray-400 divide-y divide-gray-600">
-                                  {employmentPeriods.map((period) => (
+                                  {employmentPeriods.map((period, index) => {
+                                    const canCancelDismissal =
+                                      (form.status || '').toUpperCase() === 'TERMINATED'
+                                      && period.status === 'TERMINATED'
+                                      && index === 0;
+                                    return (
                                     <tr key={period.id} className="hover:bg-gray-800/50">
                                       <td className="p-3">{period.admissionTypeLabel || period.admissionType}</td>
                                       <td className="p-3">{period.companyName || '-'}</td>
@@ -4758,8 +4992,24 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                                       <td className="p-3">
                                         {period.status === 'TERMINATED' ? 'Demitido' : 'Ativo'}
                                       </td>
+                                      <td className="p-3">
+                                        {canCancelDismissal ? (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
+                                            onClick={() => openCancelDismissal(period.id)}
+                                          >
+                                            Cancelar Demissão
+                                          </Button>
+                                        ) : (
+                                          <span className="text-gray-600 text-xs">—</span>
+                                        )}
+                                      </td>
                                     </tr>
-                                  ))}
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>
@@ -4892,11 +5142,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         {/* Modal de Criar Usuário Padrão */}
         <CriarUsuarioPadraoModal
           open={criarUsuarioModalOpen}
-          onClose={() => {
-            setCriarUsuarioModalOpen(false);
-            // Se fechar sem criar usuário, fechar o modal principal também
-            onClose();
-          }}
+          onClose={() => setCriarUsuarioModalOpen(false)}
           onUsuarioCreated={handleUsuarioPadraoCriado}
           positionName={selectedPosition?.name || ''}
           employeeName={form.name}
@@ -4936,6 +5182,28 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
               variant: "default"
             });
           }}
+        />
+
+        <SpouseFormModal
+          open={spouseModalOpen}
+          onOpenChange={setSpouseModalOpen}
+          employeeId={employeeIdValue || undefined}
+          employeeCpf={form.cpf}
+          existingSpouseDependent={findSpouseDependent()}
+          existingDependentCpfs={[
+            ...employeeDependents.filter((d) => !isSpouseRelationship(d.relationship)).map((d) => d.cpf),
+            ...pendingDependents.filter((d) => d.relationship !== 'CONJUGE').map((d) => d.cpf),
+          ].filter(Boolean) as string[]}
+          initialValues={{
+            spouseName: form.spouseName,
+            spouseCpf: form.spouseCpf,
+            spouseRg: form.spouseRg,
+            spouseBirthDate: form.spouseBirthDate,
+            spouseProfession: (form as any).spouseProfession,
+            spousePhone: form.spousePhone,
+          }}
+          onPendingDependent={handlePendingDependentCreate}
+          onSaved={handleSpouseSaved}
         />
 
         {/* Modal de Ficha de Entrega de EPI */}
@@ -5065,6 +5333,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <CancelDismissalDialog
+          open={cancelDismissalOpen}
+          onOpenChange={setCancelDismissalOpen}
+          employeeName={form.name || employeeToEdit?.name}
+          terminationDateLabel={
+            form.dataRescisao
+              ? new Date(form.dataRescisao + 'T12:00:00').toLocaleDateString('pt-BR')
+              : undefined
+          }
+          loading={cancelDismissalLoading}
+          onConfirm={handleConfirmCancelDismissal}
+        />
       </Dialog>
     </TooltipProvider >
   );

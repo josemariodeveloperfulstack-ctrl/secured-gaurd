@@ -22,11 +22,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/opportunities")
 @Validated
 public class OpportunityController {
+    private static final Logger log = LoggerFactory.getLogger(OpportunityController.class);
+
     @Autowired
     private OpportunityService opportunityService;
 
@@ -107,40 +111,59 @@ public class OpportunityController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
-    public ResponseEntity<Void> delete(@PathVariable String id, @RequestParam String reason) {
-        if (!opportunityService.findById(UUID.fromString(id)).isPresent()) {
-            return ResponseEntity.notFound().build();
+    public ResponseEntity<?> delete(@PathVariable String id, @RequestParam String reason) {
+        try {
+            if (!opportunityService.findById(UUID.fromString(id)).isPresent()) {
+                return ResponseEntity.notFound().build();
+            }
+            User user = resolveCurrentUserManaged();
+            opportunityService.delete(UUID.fromString(id), reason, user);
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
+            log.error("Erro ao excluir oportunidade {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(java.util.Map.of("error", "Erro interno: " + e.getMessage()));
         }
-        
-        User user = resolveCurrentUserManaged();
-        opportunityService.delete(UUID.fromString(id), reason, user);
-        return ResponseEntity.noContent().build();
     }
+
     @DeleteMapping("/all")
     @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
-    public ResponseEntity<Void> deleteAll(@RequestParam String reason) {
-        User user = resolveCurrentUserManaged();
-        opportunityService.deleteAll(reason, user);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteAll(@RequestParam String reason) {
+        try {
+            User user = resolveCurrentUserManaged();
+            opportunityService.deleteAll(reason, user);
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
+            log.error("Erro ao excluir todas as oportunidades: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(java.util.Map.of("error", "Erro interno: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/bulk-delete")
     @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
-    public ResponseEntity<Void> deleteBulk(@RequestBody java.util.Map<String, Object> payload) {
-        List<UUID> ids = parseOpportunityIds(payload.get("ids"));
-        if (ids.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        }
+    public ResponseEntity<?> deleteBulk(@RequestBody java.util.Map<String, Object> payload) {
+        try {
+            List<UUID> ids = parseOpportunityIds(payload.get("ids"));
+            if (ids.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(java.util.Map.of("error", "Nenhum ID válido fornecido"));
+            }
 
-        Object reasonObj = payload.get("reason");
-        String reason = reasonObj != null ? String.valueOf(reasonObj).trim() : "";
-        if (reason.isEmpty() || "null".equalsIgnoreCase(reason)) {
-            reason = "Exclusão em massa via sistema";
-        }
+            Object reasonObj = payload.get("reason");
+            String reason = reasonObj != null ? String.valueOf(reasonObj).trim() : "";
+            if (reason.isEmpty() || "null".equalsIgnoreCase(reason)) {
+                reason = "Exclusão em massa via sistema";
+            }
 
-        User user = resolveCurrentUserManaged();
-        opportunityService.deleteBulk(ids, reason, user);
-        return ResponseEntity.noContent().build();
+            User user = resolveCurrentUserManaged();
+            opportunityService.deleteBulk(ids, reason, user);
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
+            log.error("Erro ao excluir oportunidades em massa (ids={}): {}", payload.get("ids"), e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(java.util.Map.of("error", "Erro interno: " + e.getMessage()));
+        }
     }
 
     /**

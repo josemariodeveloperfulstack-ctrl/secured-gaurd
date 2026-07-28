@@ -1,12 +1,18 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.ConfirmEpiReceiptRequestDTO;
 import com.z7design.secured_guard.dto.CreateEPIDeliveryFormDTO;
 import com.z7design.secured_guard.dto.EPIDeliveryFormDTO;
+import com.z7design.secured_guard.dto.EpiConfirmationSendResponseDTO;
+import com.z7design.secured_guard.dto.SendEpiConfirmationRequestDTO;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
 import com.z7design.secured_guard.service.EPIDeliveryFormService;
 import com.z7design.secured_guard.service.EPIDeliveryStandardPdfService;
+import com.z7design.secured_guard.util.AuthenticatedCpfResolver;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,11 +27,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -39,6 +48,8 @@ public class EPIDeliveryFormController {
     private final EPIDeliveryFormService epiDeliveryFormService;
     private final EPIDeliveryStandardPdfService epiDeliveryPdfService;
     private final com.z7design.secured_guard.repository.UserRepository userRepository;
+    private final EmployeeRepository employeeRepository;
+    private final AuthenticatedCpfResolver authenticatedCpfResolver;
     private final com.z7design.secured_guard.service.EPIDeliveryReportService epiDeliveryReportService;
     private final DocumentoGeradoPersistenceService persistenceService;
 
@@ -150,6 +161,32 @@ public class EPIDeliveryFormController {
         return ResponseEntity.ok(form);
     }
 
+    @Operation(summary = "Enviar confirmação de recebimento de EPI via WhatsApp (AUTO ou MANUAL)")
+    @PostMapping("/{id}/send-whatsapp-confirmation")
+    public ResponseEntity<EpiConfirmationSendResponseDTO> sendWhatsAppConfirmation(
+            @PathVariable UUID id,
+            @RequestBody SendEpiConfirmationRequestDTO request) {
+        EpiConfirmationSendResponseDTO response = epiDeliveryFormService.sendWhatsAppConfirmation(
+                id,
+                request != null ? request.getMode() : "AUTO",
+                request != null ? request.getFrontendBaseUrl() : null);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Confirmar recebimento com o código informado pelo funcionário")
+    @PostMapping("/{id}/confirm-with-code")
+    public ResponseEntity<EPIDeliveryFormDTO> confirmWithCode(
+            @PathVariable UUID id,
+            @RequestBody ConfirmEpiReceiptRequestDTO request,
+            Authentication authentication) {
+        UUID actingUserId = resolveUserId(authentication);
+        EPIDeliveryFormDTO updated = epiDeliveryFormService.confirmWithCode(
+                id,
+                request != null ? request.getCode() : null,
+                actingUserId);
+        return ResponseEntity.ok(updated);
+    }
+
     @Operation(summary = "Lista todas as fichas de entrega de EPI com paginação")
     @GetMapping
     public ResponseEntity<Page<EPIDeliveryFormDTO>> findAll(
@@ -185,11 +222,74 @@ public class EPIDeliveryFormController {
         return ResponseEntity.ok(forms);
     }
 
+    @Operation(summary = "Lista fichas de EPI do funcionário autenticado",
+            description = "Resolve o Employee vinculado ao JWT (userId/CPF) e retorna as fichas dele.")
+    @GetMapping("/me")
+    public ResponseEntity<List<EPIDeliveryFormDTO>> findMine() {
+        Optional<UUID> employeeId = resolveAuthenticatedEmployeeId();
+        if (employeeId.isEmpty()) {
+            log.warn("⚠️ /epi-delivery-forms/me sem Employee associado ao usuário autenticado");
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        return ResponseEntity.ok(epiDeliveryFormService.findByEmployeeId(employeeId.get()));
+    }
+
+    @Operation(summary = "Funcionário autentica confirma o recebimento da própria ficha de EPI")
+    @PostMapping("/{id}/confirm-own-receipt")
+    public ResponseEntity<EPIDeliveryFormDTO> confirmOwnReceipt(
+            @PathVariable UUID id,
+            @RequestBody(required = false) ConfirmEpiReceiptRequestDTO request,
+            Authentication authentication) {
+        UUID employeeId = resolveAuthenticatedEmployeeId()
+                .orElseThrow(() -> new com.z7design.secured_guard.exception.BusinessException(
+                        "Funcionário não vinculado ao usuário autenticado. Peça ao RH para vincular seu usuário."));
+        UUID actingUserId = resolveUserId(authentication);
+        EPIDeliveryFormDTO updated = epiDeliveryFormService.confirmOwnReceipt(
+                id,
+                employeeId,
+                request != null ? request.getCode() : null,
+                actingUserId);
+        return ResponseEntity.ok(updated);
+    }
+
     @Operation(summary = "Busca fichas de entrega de EPI por funcionário")
     @GetMapping("/employee/{employeeId}")
     public ResponseEntity<List<EPIDeliveryFormDTO>> findByEmployeeId(@PathVariable UUID employeeId) {
-        List<EPIDeliveryFormDTO> forms = epiDeliveryFormService.findByEmployeeId(employeeId);
+        // Compatibilidade: portal legado às vezes envia User.id; resolve para Employee.id
+        UUID resolved = employeeRepository.findById(employeeId)
+                .map(Employee::getId)
+                .or(() -> employeeRepository.findByUserId(employeeId).map(Employee::getId))
+                .orElse(employeeId);
+        List<EPIDeliveryFormDTO> forms = epiDeliveryFormService.findByEmployeeId(resolved);
         return ResponseEntity.ok(forms);
+    }
+
+    private Optional<UUID> resolveAuthenticatedEmployeeId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return Optional.empty();
+        }
+        if (auth.getPrincipal() instanceof User principalUser && principalUser.getId() != null) {
+            Optional<UUID> byUser = employeeRepository.findByUserId(principalUser.getId()).map(Employee::getId);
+            if (byUser.isPresent()) {
+                return byUser;
+            }
+        }
+        Optional<UUID> byCpf = authenticatedCpfResolver.resolve(auth)
+                .flatMap(employeeRepository::findByDocument)
+                .map(Employee::getId);
+        if (byCpf.isPresent()) {
+            return byCpf;
+        }
+        String name = auth.getName();
+        if (name == null || name.isBlank()) {
+            return Optional.empty();
+        }
+        return userRepository.findByUsername(name)
+                .or(() -> userRepository.findByEmail(name))
+                .map(User::getId)
+                .flatMap(employeeRepository::findByUserId)
+                .map(Employee::getId);
     }
 
     @Operation(summary = "Busca fichas de entrega de EPI por empresa")
@@ -246,10 +346,9 @@ public class EPIDeliveryFormController {
         try {
             log.info("📄 Gerando PDF de ficha de entrega de EPI para funcionário: {}", dto.getEmployeeId());
 
-            UUID createdByUserId = null;
-            if (authentication != null && authentication.getPrincipal() instanceof UserDetails) {
-                UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-                // Buscar UUID do usuário pelo username se necessário
+            UUID createdByUserId = resolveUserId(authentication);
+            if (createdByUserId == null) {
+                log.warn("Usuário autenticado não resolvido ao gerar ficha EPI — baixa de estoque pode falhar.");
             }
 
             // Primeiro, salvar a ficha no banco
@@ -294,11 +393,7 @@ public class EPIDeliveryFormController {
         try {
             log.info("📊 Gerando Excel de ficha de entrega de EPI para funcionário: {}", dto.getEmployeeId());
 
-            UUID createdByUserId = null;
-            if (authentication != null && authentication.getPrincipal() instanceof UserDetails) {
-                UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-                // Buscar UUID do usuário pelo username se necessário
-            }
+            UUID createdByUserId = resolveUserId(authentication);
 
             EPIDeliveryFormDTO savedForm = epiDeliveryFormService.create(dto, createdByUserId);
             log.info("✅ Ficha de entrega de EPI salva no banco com ID: {}", savedForm.getId());

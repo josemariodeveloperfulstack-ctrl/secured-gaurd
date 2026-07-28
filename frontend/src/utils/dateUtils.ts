@@ -1,4 +1,4 @@
-import { format, parse, isValid } from 'date-fns';
+import { format, parse, isValid, addYears, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 /**
@@ -163,3 +163,13 @@ export const DEFAULT_DATE_PICKER_PROPS = {
   placeholderText: 'dd/mm/aaaa',
   className: 'w-full p-2 border rounded-md'
 } as const;
+
+/**
+ * Vencimento de exame médico anual (ASO):
+ * Data de Vencimento = Data da Realização + 1 ano - 1 dia.
+ * Ex.: 27/07/2026 → 26/07/2027 (respeita anos bissextos via date-fns).
+ */
+export const calcAsoExpiryDate = (realizationDate: Date | null | undefined): Date | null => {
+  if (!realizationDate || !isValid(realizationDate)) return null;
+  return subDays(addYears(realizationDate, 1), 1);
+};

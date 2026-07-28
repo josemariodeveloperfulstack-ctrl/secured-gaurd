@@ -27,8 +27,8 @@ public class CreateUserRequest {
     @NotBlank(message = "Senha é obrigatória")
     @Size(min = 6, message = "Senha deve ter pelo menos 6 caracteres")
     @Pattern(
-        regexp = "^(?:(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*|\\d{11}@2025)$",
-        message = "Senha deve ser forte (maiúscula, minúscula, número, especial) ou CPF@2025"
+        regexp = "^(?:(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^a-zA-Z0-9\\s]).*|\\d{11}@Promover\\d{4}|\\d{11}@2025|1234556)$",
+        message = "Senha deve ser forte, CPF@PromoverAAAA, CPF@2025 ou padrão de funcionário"
     )
     private String password;
     
