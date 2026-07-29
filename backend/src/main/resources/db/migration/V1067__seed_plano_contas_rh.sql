@@ -1,5 +1,56 @@
--- V1067: seed inicial do Plano de Contas (contas a pagar)
--- Inclui contas de RH que exigem vínculo com funcionário
+-- V1067: garante Plano de Contas + seed inicial (contas a pagar / RH)
+-- Em ambientes que já passaram de V99 sem aplicar V99 (out-of-order), as tabelas
+-- podem não existir. Por isso criamos com IF NOT EXISTS antes do seed.
+
+CREATE TABLE IF NOT EXISTS categoria_pai (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome VARCHAR(100) NOT NULL,
+    codigo VARCHAR(10) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS subcategoria (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    categoria_pai_id UUID NOT NULL REFERENCES categoria_pai(id) ON DELETE CASCADE,
+    nome VARCHAR(100) NOT NULL,
+    codigo VARCHAR(20) NOT NULL UNIQUE,
+    requer_vinculo_funcionario BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- Colunas em invoices (idempotente; V99/V1062 podem já ter criado)
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS subcategoria_id UUID;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS employee_id UUID;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'subcategoria') THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.table_constraints
+            WHERE constraint_name = 'fk_invoices_subcategoria' AND table_name = 'invoices'
+        ) THEN
+            ALTER TABLE invoices
+                ADD CONSTRAINT fk_invoices_subcategoria
+                FOREIGN KEY (subcategoria_id) REFERENCES subcategoria(id) ON DELETE SET NULL;
+        END IF;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'employees') THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.table_constraints
+            WHERE constraint_name = 'fk_invoices_employee' AND table_name = 'invoices'
+        ) THEN
+            ALTER TABLE invoices
+                ADD CONSTRAINT fk_invoices_employee
+                FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL;
+        END IF;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_invoices_subcategoria_id ON invoices(subcategoria_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_employee_id ON invoices(employee_id);
 
 INSERT INTO categoria_pai (id, nome, codigo, created_at, updated_at)
 VALUES
