@@ -38,7 +38,7 @@ class Holerite {
       month: json['month'] as int? ?? 1,
       year: json['year'] as int? ?? DateTime.now().year,
       fileName: json['fileName'] as String? ?? '',
-      filePath: json['filePath'] as String?,
+      filePath: json['filePath'] as String? ?? json['arquivoCaminho'] as String?,
       fileSize: json['fileSize'] as int?,
       status: json['status'] as String? ?? 'PROCESSED',
       processedAt: json['processedAt'] as String?,

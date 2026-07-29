@@ -117,23 +117,27 @@ public class WhatsAppController {
             }
 
             if (qrcode) {
+                // Baileys gera o QR de forma assíncrona após /instance/init.
+                // Não reinicializar entre tentativas — isso resetava a instância (estado "closed")
+                // e apagava o QR antes de ficar pronto.
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(2500);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
 
                 String qrCodeData = null;
-                int maxAttempts = 5;
+                int maxAttempts = 12;
                 for (int attempt = 1; attempt <= maxAttempts; attempt++) {
                     qrCodeData = whatsAppAgent.getQRCode();
                     if (qrCodeData != null && !qrCodeData.isEmpty()) {
                         log.info("✅ QR Code obtido na tentativa {}/{}", attempt, maxAttempts);
                         break;
                     }
+                    log.info("⏳ Aguardando QR Code ({}/{})...", attempt, maxAttempts);
                     if (attempt < maxAttempts) {
                         try {
-                            Thread.sleep(500L * attempt);
+                            Thread.sleep(800L);
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                             break;

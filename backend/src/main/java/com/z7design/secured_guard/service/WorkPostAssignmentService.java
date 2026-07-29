@@ -65,47 +65,53 @@ public class WorkPostAssignmentService {
     @Transactional(readOnly = true)
     public List<WorkPostAssignmentResponse> getAllWorkPostAssignments() {
         return workPostAssignmentRepository.findAll().stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public Optional<WorkPostAssignmentResponse> getWorkPostAssignmentById(UUID id) {
-        return workPostAssignmentRepository.findById(id).map(this::mapToResponse);
+        return workPostAssignmentRepository.findById(id).map(this::mapToResponseSafe);
     }
 
     @Transactional(readOnly = true)
     public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByEmployee(UUID employeeId) {
         return workPostAssignmentRepository.findByEmployeeId(employeeId).stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByWorkPost(UUID workPostId) {
         return workPostAssignmentRepository.findByWorkPostId(workPostId).stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByDate(LocalDate date) {
         return workPostAssignmentRepository.findByAssignmentDate(date).stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByStatus(WorkPostAssignment.AssignmentStatus status) {
         return workPostAssignmentRepository.findByStatus(status).stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByDateRange(LocalDate startDate, LocalDate endDate) {
         return workPostAssignmentRepository.findByDateRange(startDate, endDate).stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -113,7 +119,8 @@ public class WorkPostAssignmentService {
     public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByEmployeeAndDateRange(UUID employeeId,
             LocalDate startDate, LocalDate endDate) {
         return workPostAssignmentRepository.findByEmployeeAndDateRange(employeeId, startDate, endDate).stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -121,7 +128,8 @@ public class WorkPostAssignmentService {
     public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByWorkPostAndDateRange(UUID workPostId,
             LocalDate startDate, LocalDate endDate) {
         return workPostAssignmentRepository.findByWorkPostAndDateRange(workPostId, startDate, endDate).stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -425,19 +433,42 @@ public class WorkPostAssignmentService {
                 .setPadding(5);
     }
 
+    private WorkPostAssignmentResponse mapToResponseSafe(WorkPostAssignment assignment) {
+        try {
+            return mapToResponse(assignment);
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            log.warn("Ignorando alocação {} com referência órfã: {}", assignment.getId(), e.getMessage());
+            return null;
+        } catch (Exception e) {
+            log.warn("Ignorando alocação {} por erro ao mapear: {}", assignment.getId(), e.getMessage());
+            return null;
+        }
+    }
+
     private WorkPostAssignmentResponse mapToResponse(WorkPostAssignment assignment) {
         WorkPostAssignmentResponse.SimpleEmployee employeeData = null;
-        if (assignment.getEmployee() != null) {
-            employeeData = new WorkPostAssignmentResponse.SimpleEmployee(
-                    assignment.getEmployee().getId(),
-                    assignment.getEmployee().getName());
+        try {
+            if (assignment.getEmployee() != null) {
+                employeeData = new WorkPostAssignmentResponse.SimpleEmployee(
+                        assignment.getEmployee().getId(),
+                        assignment.getEmployee().getName());
+            }
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            log.warn("Alocação {} referencia funcionário inexistente", assignment.getId());
         }
 
         WorkPostAssignmentResponse.SimpleWorkPost workPostData = null;
-        if (assignment.getWorkPost() != null) {
+        try {
+            if (assignment.getWorkPost() != null) {
+                workPostData = new WorkPostAssignmentResponse.SimpleWorkPost(
+                        assignment.getWorkPost().getId(),
+                        assignment.getWorkPost().getName());
+            }
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            log.warn("Alocação {} referencia posto inexistente", assignment.getId());
             workPostData = new WorkPostAssignmentResponse.SimpleWorkPost(
-                    assignment.getWorkPost().getId(),
-                    assignment.getWorkPost().getName());
+                    null,
+                    "Posto removido");
         }
 
         String shift = assignment.getShiftType() != null ? assignment.getShiftType().name() : null;
@@ -454,6 +485,13 @@ public class WorkPostAssignmentService {
             }
         }
 
+        UUID assignedById = null;
+        try {
+            assignedById = assignment.getAssignedBy() != null ? assignment.getAssignedBy().getId() : null;
+        } catch (jakarta.persistence.EntityNotFoundException ignored) {
+            // usuário removido
+        }
+
         return WorkPostAssignmentResponse.builder()
                 .id(assignment.getId())
                 .employee(employeeData)
@@ -467,7 +505,7 @@ public class WorkPostAssignmentService {
                 .backupAssignment(assignment.getIsBackupAssignment())
                 .observations(assignment.getObservations())
                 .specialInstructions(assignment.getSpecialInstructions())
-                .assignedById(assignment.getAssignedBy() != null ? assignment.getAssignedBy().getId() : null)
+                .assignedById(assignedById)
                 .assignmentDateTime(assignment.getAssignmentDateTime())
                 .createdAt(assignment.getCreatedAt())
                 .updatedAt(assignment.getUpdatedAt())

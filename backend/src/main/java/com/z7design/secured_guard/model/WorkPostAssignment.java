@@ -36,6 +36,7 @@ public class WorkPostAssignment {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "work_post_id", nullable = false)
+    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
     private WorkPost workPost;
 
     @Column(name = "assignment_date", nullable = false)

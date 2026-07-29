@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Agente WhatsApp com fallback: tenta UAZAPI → Z-API → Evolution → Baileys
+ * Agente WhatsApp com fallback: Evolution → UAZAPI → Z-API → Baileys
  * (ordem configurável). Se um provedor falhar, o próximo é usado automaticamente.
  */
 @Service
@@ -126,8 +126,16 @@ public class WhatsAppAgentService {
             if (!provider.isServiceAvailable()) {
                 continue;
             }
-            provider.initializeInstance();
-            String qr = provider.getQRCode();
+            // Não chamar initializeInstance() aqui: no Baileys o estado "closed"
+            // (ainda sem pareamento) dispara reset e apaga o QR que está a ser gerado.
+            String qr;
+            try {
+                qr = provider.getQRCode();
+            } catch (Exception e) {
+                log.debug("QR ainda indisponível via {}: {}", provider.getType(), e.getMessage());
+                setError(provider, "QR Code indisponível");
+                continue;
+            }
             if (qr != null && !qr.isBlank()) {
                 lastSuccessfulProvider = provider.getType();
                 lastErrorMessage = null;

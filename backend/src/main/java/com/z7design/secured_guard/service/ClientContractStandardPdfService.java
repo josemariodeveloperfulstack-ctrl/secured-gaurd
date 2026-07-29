@@ -430,7 +430,7 @@ public class ClientContractStandardPdfService {
                 document.add(new Paragraph(contratadaText).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(12f));
 
                 // CLÁUSULA SEGUNDA - Do Objeto
-                document.add(new Paragraph("CLÁUSULA SEGUNDA - DO OBJETO E DOS POSTOS DE TRABALHO").setBold().setFontSize(10f).setMarginBottom(4f));
+                document.add(new Paragraph("CLÁUSULA SEGUNDA - DO OBJETO E DOS SETORES DE TRABALHO").setBold().setFontSize(10f).setMarginBottom(4f));
                 
                 String objetoBase = isVigilancia 
                                 ? "Constitui objeto do presente Contrato a prestação, pela CONTRATADA ao CONTRATANTE, de serviços especializados de vigilância e segurança patrimonial ativa, através de mão de obra qualificada."
@@ -442,9 +442,9 @@ public class ClientContractStandardPdfService {
 
                 document.add(new Paragraph(objetoBase).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(6f));
 
-                // Listar Postos de Trabalho vinculados se existirem
+                // Listar Setores de Trabalho vinculados se existirem
                 if (request.getWorkPostIds() != null && !request.getWorkPostIds().isEmpty()) {
-                        document.add(new Paragraph("Relação de Postos de Trabalho Contratados:").setBold().setFontSize(9f).setMarginBottom(4f));
+                        document.add(new Paragraph("Relação de Setores de Trabalho Contratados:").setBold().setFontSize(9f).setMarginBottom(4f));
                         
                         try {
                                 List<WorkPost> posts = workPostRepository.findAllById(request.getWorkPostIds());
@@ -452,9 +452,9 @@ public class ClientContractStandardPdfService {
                                         Table postsTable = new Table(UnitValue.createPercentArray(new float[] { 25, 20, 20, 20, 15 }))
                                                         .useAllAvailableWidth().setMarginBottom(10f);
                                         
-                                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Posto / Código").setBold().setFontSize(8f)));
+                                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Setor / Código").setBold().setFontSize(8f)));
                                         postsTable.addHeaderCell(new Cell().add(new Paragraph("Escala / Turno").setBold().setFontSize(8f)));
-                                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Tipo").setBold().setFontSize(8f)));
+                                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Posto").setBold().setFontSize(8f)));
                                         postsTable.addHeaderCell(new Cell().add(new Paragraph("Cidade/UF").setBold().setFontSize(8f)));
                                         postsTable.addHeaderCell(new Cell().add(new Paragraph("Efetivo").setBold().setFontSize(8f)));
 
@@ -467,14 +467,14 @@ public class ClientContractStandardPdfService {
                                         }
                                         document.add(postsTable);
                                 } else {
-                                        document.add(new Paragraph("Efetivos e postos de trabalho conforme proposta comercial em anexo.").setFontSize(9f).setItalic().setMarginBottom(6f));
+                                        document.add(new Paragraph("Efetivos e setores de trabalho conforme proposta comercial em anexo.").setFontSize(9f).setItalic().setMarginBottom(6f));
                                 }
                         } catch (Exception e) {
-                                log.error("Erro ao buscar postos de trabalho para o PDF", e);
-                                document.add(new Paragraph("Efetivos e postos de trabalho conforme proposta comercial em anexo.").setFontSize(9f).setItalic().setMarginBottom(6f));
+                                log.error("Erro ao buscar setores de trabalho para o PDF", e);
+                                document.add(new Paragraph("Efetivos e setores de trabalho conforme proposta comercial em anexo.").setFontSize(9f).setItalic().setMarginBottom(6f));
                         }
                 } else {
-                        document.add(new Paragraph("Efetivos e postos de trabalho conforme proposta comercial em anexo.").setFontSize(9f).setItalic().setMarginBottom(6f));
+                        document.add(new Paragraph("Efetivos e setores de trabalho conforme proposta comercial em anexo.").setFontSize(9f).setItalic().setMarginBottom(6f));
                 }
 
                 // CLÁUSULA TERCEIRA - Obrigações da Contratada

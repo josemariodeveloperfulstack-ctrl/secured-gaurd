@@ -30,6 +30,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -202,11 +204,75 @@ public class ContractService {
         contract.setClient(client);
         resolveAndSetRelatedEntities(contract, contractDTO);
         Contract savedContract = contractRepository.save(contract);
-        
-        // Enviar notificação para os departamentos
-        notifyDepartmentsNewContract(savedContract);
-        
+
+        // Notificação é best-effort e nunca deve afetar a resposta de criação.
+        // Snapshot dos dados antes do afterCommit (sessão Hibernate já fecha no commit).
+        final String contractNumber = savedContract.getContractNumber();
+        final String clientName = client.getName() != null ? client.getName() : "-";
+        final String clientCnpj = client.getCnpj() != null ? client.getCnpj() : "-";
+        final String description = savedContract.getDescription() != null ? savedContract.getDescription() : "-";
+        final BigDecimal value = savedContract.getValue() != null ? savedContract.getValue() : BigDecimal.ZERO;
+        final String startDate = savedContract.getStartDate() != null ? savedContract.getStartDate().toString() : "-";
+        final String endDate = savedContract.getEndDate() != null ? savedContract.getEndDate().toString() : "-";
+        final String senderUsername = resolveAuthenticatedUsername();
+
+        scheduleNewContractNotification(
+                contractNumber, clientName, clientCnpj, description, value, startDate, endDate, senderUsername);
+
         return savedContract;
+    }
+
+    private String resolveAuthenticatedUsername() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null) {
+                return null;
+            }
+            Object principal = authentication.getPrincipal();
+            if (principal instanceof User user) {
+                return user.getUsername();
+            }
+            if (principal instanceof org.springframework.security.core.userdetails.UserDetails details) {
+                return details.getUsername();
+            }
+            if (principal instanceof String username && !"anonymousUser".equals(username)) {
+                return username;
+            }
+        } catch (Exception e) {
+            log.warn("Não foi possível obter username autenticado para notificação: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    private void scheduleNewContractNotification(
+            String contractNumber,
+            String clientName,
+            String clientCnpj,
+            String description,
+            BigDecimal value,
+            String startDate,
+            String endDate,
+            String senderUsername) {
+        Runnable notifyTask = () -> {
+            try {
+                notifyDepartmentsNewContract(
+                        contractNumber, clientName, clientCnpj, description, value, startDate, endDate, senderUsername);
+            } catch (Throwable e) {
+                log.error("Contrato {} criado, mas falhou ao notificar departamentos: {}",
+                        contractNumber, e.getMessage(), e);
+            }
+        };
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    notifyTask.run();
+                }
+            });
+        } else {
+            notifyTask.run();
+        }
     }
     
     public ContractDTO updateContract(UUID id, ContractDTO contractDTO) {
@@ -510,8 +576,15 @@ public class ContractService {
         }
     }
     
-    private void notifyDepartmentsNewContract(Contract contract) {
-        // Grupos a serem notificados
+    private void notifyDepartmentsNewContract(
+            String contractNumber,
+            String clientName,
+            String clientCnpj,
+            String description,
+            BigDecimal value,
+            String startDate,
+            String endDate,
+            String senderUsername) {
         UserGroup[] groups = new UserGroup[] {
             UserGroup.GRUPO_FINANCEIRO,
             UserGroup.GRUPO_RH,
@@ -520,67 +593,58 @@ public class ContractService {
             UserGroup.GRUPO_ESTOQUE
         };
 
-        // Obter usuário autenticado
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         User sender = null;
-        
-        if (authentication != null && authentication.getPrincipal() instanceof User) {
-            sender = (User) authentication.getPrincipal();
+        if (senderUsername != null && !senderUsername.isBlank()) {
+            sender = userRepository.findByUsername(senderUsername).orElse(null);
         }
-        
-        // Se não conseguir obter o usuário autenticado, buscar um usuário padrão
         if (sender == null) {
             try {
-                // Buscar um usuário admin ou o primeiro usuário ativo
-                User defaultSender = userRepository.findByActiveTrue().stream()
-                    .filter(user -> user.getRoles().stream()
-                        .anyMatch(role -> role.getName().contains("ADMIN") || role.getName().contains("SUPER_ADMIN")))
-                    .findFirst()
-                    .orElse(userRepository.findByActiveTrue().stream().findFirst().orElse(null));
-                    
-                if (defaultSender == null) {
-                    log.warn("Não foi possível encontrar um usuário válido para enviar notificações");
-                    return; // Não enviar notificações se não houver usuário válido
-                }
-                sender = defaultSender;
+                sender = userRepository.findByActiveTrue().stream().findFirst().orElse(null);
             } catch (Exception e) {
                 log.error("Erro ao buscar usuário padrão para notificações", e);
-                return; // Não enviar notificações se houver erro
             }
         }
+        if (sender == null) {
+            log.warn("Não foi possível encontrar um usuário válido para enviar notificações do contrato {}", contractNumber);
+            return;
+        }
 
-        // Criar uma variável final para usar no lambda
         final User finalSender = sender;
-
-        final String title = "Novo Contrato Criado: " + contract.getContractNumber();
+        final String title = "Novo Contrato Criado: " + contractNumber;
         final String content = String.format(
             "Um novo contrato foi criado para o cliente %s (CNPJ: %s).\n" +
             "Descrição: %s\nValor: R$ %.2f\nInício: %s\nTérmino: %s\n\nProvidencie os recursos necessários para a execução dos serviços.",
-            contract.getClient().getName(),
-            contract.getClient().getCnpj(),
-            contract.getDescription(),
-            contract.getValue(),
-            contract.getStartDate(),
-            contract.getEndDate() != null ? contract.getEndDate().toString() : "-"
+            clientName,
+            clientCnpj,
+            description,
+            value,
+            startDate,
+            endDate
         );
 
         for (UserGroup groupEnum : groups) {
-            userGroupRepository.findByGroupName(groupEnum)
-                .ifPresent(groupEntity -> sendContractNotificationMessage(title, content, groupEntity.getId(), finalSender));
+            try {
+                userGroupRepository.findByGroupName(groupEnum)
+                    .ifPresent(groupEntity -> sendContractNotificationMessage(title, content, groupEntity.getId(), finalSender));
+            } catch (Throwable e) {
+                log.error("Falha ao notificar grupo {} sobre contrato {}: {}", groupEnum, contractNumber, e.getMessage(), e);
+            }
         }
     }
 
     private void sendContractNotificationMessage(String title, String content, UUID groupId, User sender) {
-        MessageRequestDTO req = new MessageRequestDTO();
-        req.setTitle(title);
-        req.setContent(content);
-        req.setType(MessageType.GROUP);
-        req.setPriority(MessagePriority.HIGH);
-        req.setSendNotification(true);
-        req.setSendEmail(false);
-        req.setGroupIds(Set.of(groupId));
-        
-        // Converter CreateMessageRequest para MessageRequestDTO
-        messageService.createMessage(req, sender);
+        try {
+            MessageRequestDTO req = new MessageRequestDTO();
+            req.setTitle(title);
+            req.setContent(content);
+            req.setType(MessageType.GROUP);
+            req.setPriority(MessagePriority.HIGH);
+            req.setSendNotification(true);
+            req.setSendEmail(false);
+            req.setGroupIds(Set.of(groupId));
+            messageService.createMessage(req, sender);
+        } catch (Throwable e) {
+            log.error("Falha ao enviar notificação de contrato para o grupo {}: {}", groupId, e.getMessage(), e);
+        }
     }
 } 

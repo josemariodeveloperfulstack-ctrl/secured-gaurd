@@ -369,52 +369,49 @@ public class MessageService {
     }
 
     /**
-     * Define destinatários baseado no tipo de mensagem
+     * Define destinatários baseado no tipo de mensagem.
+     * Usa if/else (em vez de switch em enum) para evitar classe sintética MessageService$1,
+     * que falha com NoClassDefFoundError após hot-reload do DevTools.
      */
     private Set<User> getRecipients(MessageRequestDTO request) {
-        Set<User> recipients = Set.of();
-
-        switch (request.getType()) {
-            case INDIVIDUAL:
-                if (request.getRecipientIds() == null || request.getRecipientIds().isEmpty()) {
-                    throw new BusinessException("Destinatários são obrigatórios para mensagens individuais");
-                }
-                recipients = userRepository.findAllById(request.getRecipientIds())
-                        .stream().collect(Collectors.toSet());
-                break;
-
-            case GROUP:
-                if (request.getGroupIds() == null || request.getGroupIds().isEmpty()) {
-                    throw new BusinessException("Grupos são obrigatórios para mensagens de grupo");
-                }
-                // Buscar usuários dos grupos especificados
-                recipients = userGroupRepository.findAllById(request.getGroupIds())
-                        .stream()
-                        .flatMap(group -> group.getUsers().stream())
-                        .collect(Collectors.toSet());
-                break;
-
-            case DEPARTMENT:
-                // Por enquanto, buscar todos os usuários ativos, mesmo que nenhum departamento
-                // seja informado
-                if (request.getDepartmentIds() == null || request.getDepartmentIds().isEmpty()) {
-                    log.warn(
-                            "Nenhum departamento informado para mensagem de departamento; enviando para todos usuários ativos");
-                }
-                recipients = userRepository.findByActiveTrue()
-                        .stream().collect(Collectors.toSet());
-                break;
-
-            case GLOBAL:
-                recipients = userRepository.findByActiveTrue()
-                        .stream().collect(Collectors.toSet());
-                break;
-
-            default:
-                throw new BusinessException("Tipo de mensagem não suportado");
+        MessageType type = request.getType();
+        if (type == null) {
+            throw new BusinessException("Tipo de mensagem não suportado");
         }
 
-        return recipients;
+        if (type == MessageType.INDIVIDUAL) {
+            if (request.getRecipientIds() == null || request.getRecipientIds().isEmpty()) {
+                throw new BusinessException("Destinatários são obrigatórios para mensagens individuais");
+            }
+            return userRepository.findAllById(request.getRecipientIds())
+                    .stream().collect(Collectors.toSet());
+        }
+
+        if (type == MessageType.GROUP) {
+            if (request.getGroupIds() == null || request.getGroupIds().isEmpty()) {
+                throw new BusinessException("Grupos são obrigatórios para mensagens de grupo");
+            }
+            return userGroupRepository.findAllById(request.getGroupIds())
+                    .stream()
+                    .flatMap(group -> group.getUsers().stream())
+                    .collect(Collectors.toSet());
+        }
+
+        if (type == MessageType.DEPARTMENT) {
+            if (request.getDepartmentIds() == null || request.getDepartmentIds().isEmpty()) {
+                log.warn(
+                        "Nenhum departamento informado para mensagem de departamento; enviando para todos usuários ativos");
+            }
+            return userRepository.findByActiveTrue()
+                    .stream().collect(Collectors.toSet());
+        }
+
+        if (type == MessageType.GLOBAL) {
+            return userRepository.findByActiveTrue()
+                    .stream().collect(Collectors.toSet());
+        }
+
+        throw new BusinessException("Tipo de mensagem não suportado");
     }
 
     /**

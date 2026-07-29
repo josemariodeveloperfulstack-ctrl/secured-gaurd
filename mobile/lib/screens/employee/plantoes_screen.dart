@@ -28,7 +28,7 @@ class _PlantoesScreenState extends State<PlantoesScreen> {
     setState(() { _isLoading = true; _error = null; });
     try {
       final user = context.read<AuthProvider>().user;
-      final employeeId = user?.id;
+      final employeeId = user?.employeeId ?? user?.id;
       if (employeeId == null) {
         setState(() { _plantoes = []; _isLoading = false; });
         return;

@@ -65,7 +65,7 @@ services:
       SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: "30000"
       JWT_SECRET: ${JWT_SECRET_PROD}
       # WhatsApp — Agente multi-provedor
-      WHATSAPP_PROVIDER_ORDER: ${WHATSAPP_PROVIDER_ORDER:-uazapi,zapi,evolution,baileys}
+      WHATSAPP_PROVIDER_ORDER: ${WHATSAPP_PROVIDER_ORDER:-evolution,uazapi,zapi,baileys}
       EVOLUTION_API_ENABLED: ${EVOLUTION_API_ENABLED:-true}
       EVOLUTION_API_URL: ${EVOLUTION_API_URL:-https://evolution.z7botsolutions.com.br}
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}

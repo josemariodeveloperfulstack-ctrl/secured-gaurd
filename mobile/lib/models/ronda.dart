@@ -59,6 +59,8 @@ class Plantao {
       case 'CANCELADA':
       case 'CANCELLED':
         return 'Cancelada';
+      case 'ATRASADA':
+        return 'Atrasada';
       default:
         return status;
     }
@@ -98,12 +100,16 @@ class Plantao {
     switch (tipo?.toUpperCase()) {
       case 'PREVENTIVA':
         return 'Preventiva';
-      case 'CORRETIVA':
-        return 'Corretiva';
+      case 'VIGILANCIA':
+        return 'Vigilância';
       case 'PATRULHAMENTO':
         return 'Patrulhamento';
-      case 'MONITORAMENTO':
-        return 'Monitoramento';
+      case 'EMERGENCIA':
+        return 'Emergência';
+      case 'ESPECIAL':
+        return 'Especial';
+      case 'CORRETIVA':
+        return 'Corretiva';
       default:
         return tipo ?? '--';
     }
@@ -120,6 +126,8 @@ class Plantao {
       case 'BAIXA':
       case 'LOW':
         return 'Baixa';
+      case 'CRITICA':
+        return 'Crítica';
       default:
         return prioridade ?? '--';
     }

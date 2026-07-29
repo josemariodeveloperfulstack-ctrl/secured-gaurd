@@ -528,6 +528,11 @@ public class InvoiceService {
                 Subcategoria subcategoria = subcategoriaRepository.findById(dto.getSubcategoriaId())
                         .orElseThrow(() -> new RuntimeException("Subcategoria não encontrada: " + dto.getSubcategoriaId()));
                 invoice.setSubcategoria(subcategoria);
+                if (Boolean.TRUE.equals(subcategoria.getRequerVinculoFuncionario()) && dto.getEmployeeId() == null) {
+                    throw new IllegalArgumentException(
+                            "A conta \"" + subcategoria.getNome()
+                                    + "\" exige informar o funcionário beneficiário do pagamento.");
+                }
             } else {
                 invoice.setSubcategoria(null);
             }
@@ -537,6 +542,10 @@ public class InvoiceService {
                 Employee employee = employeeRepository.findById(dto.getEmployeeId())
                         .orElseThrow(() -> new RuntimeException("Funcionário não encontrado: " + dto.getEmployeeId()));
                 invoice.setEmployee(employee);
+                if (dto.getCompanySigla() == null || dto.getCompanySigla().isBlank()) {
+                    throw new IllegalArgumentException(
+                            "Informe a empresa (SIGLA) quando o pagamento estiver vinculado a um funcionário.");
+                }
             } else {
                 invoice.setEmployee(null);
             }

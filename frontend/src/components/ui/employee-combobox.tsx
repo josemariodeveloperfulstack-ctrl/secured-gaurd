@@ -46,6 +46,8 @@ interface EmployeeComboboxProps {
   positionFilter?: string | string[];
   /** Exibe apenas o nome no botão (sem cargo/posto). A lista de busca mantém detalhes. */
   displayNameOnly?: boolean;
+  /** Filtra localmente por empresa do funcionário (companyId). */
+  companyId?: string;
 }
 
 export function EmployeeCombobox({ 
@@ -59,7 +61,8 @@ export function EmployeeCombobox({
   initialDisplayName,
   onEmployeeSelect,
   positionFilter,
-  displayNameOnly = false
+  displayNameOnly = false,
+  companyId,
 }: EmployeeComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [employees, setEmployees] = React.useState<SimpleEmployee[]>([])
@@ -85,13 +88,18 @@ export function EmployeeCombobox({
     return positionTokens.some(t => pos.includes(t));
   }, [positionTokens])
 
+  const matchesCompanyFilter = React.useCallback((emp: SimpleEmployee): boolean => {
+    if (!companyId) return true;
+    return String(emp.companyId || '') === String(companyId);
+  }, [companyId])
+
   // Buscar funcionários quando o usuário digitar (a partir de minChars caracteres)
   React.useEffect(() => {
     if (debouncedSearchTerm.trim().length >= minChars) {
       setLoading(true)
       employeeService.searchSimpleEmployees(debouncedSearchTerm.trim())
         .then(result => {
-          setEmployees(result.filter(matchesPositionFilter))
+          setEmployees(result.filter(matchesPositionFilter).filter(matchesCompanyFilter))
         })
         .catch(error => {
           console.error('Erro ao buscar funcionários:', error)
@@ -101,7 +109,7 @@ export function EmployeeCombobox({
     } else {
       setEmployees([])
     }
-  }, [debouncedSearchTerm, minChars, matchesPositionFilter])
+  }, [debouncedSearchTerm, minChars, matchesPositionFilter, matchesCompanyFilter])
 
   // Garantir que o funcionário selecionado apareça na lista mesmo se não estiver carregado
   React.useEffect(() => {

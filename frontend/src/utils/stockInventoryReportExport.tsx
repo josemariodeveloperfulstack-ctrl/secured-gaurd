@@ -138,8 +138,7 @@ export const StockInventoryReportPrintable: React.FC<StockInventoryReportPrintab
 
       {isPhysical && (
         <p className="text-[10px] text-gray-600 italic m-0">
-          Preencha a coluna &quot;Físico&quot; na conferência. Diferença = Físico − Sistema. Percorra o almoxarifado pela
-          localização.
+          Preencha a coluna &quot;Físico&quot; na conferência. Diferença = Físico − Sistema.
         </p>
       )}
 
@@ -148,34 +147,28 @@ export const StockInventoryReportPrintable: React.FC<StockInventoryReportPrintab
           <tr className="bg-gray-100">
             {isPhysical ? (
               <>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-left font-bold text-[10px] uppercase w-[14%]">
+                <th className="border border-gray-300 px-1.5 py-1.5 text-left font-bold text-[10px] uppercase w-[16%]">
                   Código
                 </th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-left font-bold text-[10px] uppercase w-[36%]">
+                <th className="border border-gray-300 px-1.5 py-1.5 text-left font-bold text-[10px] uppercase w-[48%]">
                   Item
                 </th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-left font-bold text-[10px] uppercase w-[28%]">
-                  Localização
-                </th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-center font-bold text-[10px] uppercase w-[11%]">
+                <th className="border border-gray-300 px-1.5 py-1.5 text-center font-bold text-[10px] uppercase w-[18%]">
                   Sist.
                 </th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-center font-bold text-[10px] uppercase w-[11%]">
+                <th className="border border-gray-300 px-1.5 py-1.5 text-center font-bold text-[10px] uppercase w-[18%]">
                   Físico
                 </th>
               </>
             ) : (
               <>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-left font-bold text-[10px] uppercase w-[14%]">
+                <th className="border border-gray-300 px-1.5 py-1.5 text-left font-bold text-[10px] uppercase w-[18%]">
                   Código
                 </th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-left font-bold text-[10px] uppercase w-[40%]">
+                <th className="border border-gray-300 px-1.5 py-1.5 text-left font-bold text-[10px] uppercase w-[58%]">
                   Item
                 </th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-left font-bold text-[10px] uppercase w-[28%]">
-                  Localização
-                </th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-center font-bold text-[10px] uppercase w-[18%]">
+                <th className="border border-gray-300 px-1.5 py-1.5 text-center font-bold text-[10px] uppercase w-[24%]">
                   Qtd / Mín
                 </th>
               </>
@@ -188,7 +181,7 @@ export const StockInventoryReportPrintable: React.FC<StockInventoryReportPrintab
               return (
                 <tr key={`g-${idx}`}>
                   <td
-                    colSpan={isPhysical ? 5 : 4}
+                    colSpan={isPhysical ? 4 : 3}
                     className="border border-gray-300 px-2 py-1.5 bg-gray-800 text-white font-bold text-[10px] uppercase"
                   >
                     {row.groupLabel || row.itemName}
@@ -212,9 +205,6 @@ export const StockInventoryReportPrintable: React.FC<StockInventoryReportPrintab
                   {row.category && row.category !== '—' && (
                     <div className="text-[9px] text-gray-500 mt-0.5">{row.category}</div>
                   )}
-                </td>
-                <td className="border border-gray-300 px-1.5 py-1 align-top text-[10px] break-words leading-snug">
-                  {row.location || '—'}
                 </td>
                 {isPhysical ? (
                   <>

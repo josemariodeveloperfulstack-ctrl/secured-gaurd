@@ -8,17 +8,25 @@ import {
   User,
   Building2,
   Calendar,
-  Mail,
   Phone,
+  Mail,
+  MessageSquare,
   Target,
   Clock,
   XCircle,
   Edit,
   Eye,
-  MessageSquare,
-  Send,
   GripVertical,
+  History,
+  AlertTriangle,
 } from 'lucide-react';
+import {
+  CardInteraction,
+  daysSince,
+  interactionActionLabel,
+  sortInteractionsDesc,
+} from './kanbanInteractionTypes';
+import { fetchInteractionHistoryByOpportunity } from '@/services/crmService';
 
 interface Lead {
   id: string | number | null;
@@ -58,7 +66,8 @@ interface KanbanCardProps {
   onDelete?: (id: string | number) => void;
   onSendEmail?: (opp: Opportunity) => void;
   onSendWhatsApp?: (opp: Opportunity) => void;
-  onSendMessage?: (opp: Opportunity) => void;
+  onAddNegotiationNote?: (opp: Opportunity) => void;
+  interactions?: CardInteraction[];
   formatCurrency: (value: number) => string;
   formatDate: (dateString: string) => string;
   /** Preview flutuante do dnd-kit — card completo, sem listeners de drag. */
@@ -81,12 +90,16 @@ export default function KanbanCard({
   onDelete,
   onSendEmail,
   onSendWhatsApp,
-  onSendMessage,
+  onAddNegotiationNote,
+  interactions = [],
   formatCurrency,
   formatDate,
   isDragOverlay = false,
 }: KanbanCardProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const [showNegotiation, setShowNegotiation] = useState(false);
+  const [localInteractions, setLocalInteractions] = useState<CardInteraction[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const didDragRef = useRef(false);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: isDragOverlay ? `overlay-${opportunity.id}` : String(opportunity.id),
@@ -99,6 +112,50 @@ export default function KanbanCard({
       didDragRef.current = true;
     }
   }, [isDragging]);
+
+  useEffect(() => {
+    setLocalInteractions(sortInteractionsDesc(interactions || []));
+  }, [interactions, opportunity.id]);
+
+  useEffect(() => {
+    if (!showNegotiation || isDragOverlay) return;
+    if (localInteractions.length > 0) return;
+    let cancelled = false;
+    setLoadingHistory(true);
+    fetchInteractionHistoryByOpportunity(String(opportunity.id))
+      .then((data) => {
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : [];
+        setLocalInteractions(sortInteractionsDesc(list as CardInteraction[]));
+      })
+      .catch(() => {
+        if (!cancelled) setLocalInteractions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingHistory(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showNegotiation, opportunity.id, isDragOverlay, localInteractions.length]);
+
+  const sortedHistory = localInteractions;
+  const lastInteraction = sortedHistory[0];
+  const idleDays = daysSince(lastInteraction?.createdAt || opportunity.lastContact);
+  const formatDateTime = (dateStr?: string | null) => {
+    if (!dateStr) return '';
+    try {
+      return new Date(dateStr).toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateStr;
+    }
+  };
 
   // Com DragOverlay: o card original fica no lugar (invisível).
   // Não aplicar transform — evita corte pelo overflow da coluna.
@@ -290,6 +347,110 @@ export default function KanbanCard({
           </div>
         </div>
 
+        {/* Negociação — contexto para o time comercial continuar o atendimento */}
+        <div
+          className="rounded-md border border-gray-700/70 bg-black/30 p-2.5 space-y-2"
+          onClick={stopDragStart}
+          onPointerDown={stopDragStart}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-medium text-seguranca-yellow flex items-center gap-1">
+              <History className="h-3 w-3" />
+              Negociação
+              {sortedHistory.length > 0 && (
+                <span className="text-gray-400 font-normal">({sortedHistory.length})</span>
+              )}
+            </span>
+            {idleDays !== null && idleDays >= 7 && (
+              <span className="text-[10px] text-amber-400 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {idleDays}d sem contato
+              </span>
+            )}
+          </div>
+
+          {lastInteraction?.note ? (
+            <div className="space-y-1">
+              <p className="text-[11px] text-gray-300 line-clamp-3 whitespace-pre-wrap break-words">
+                <span className="text-seguranca-yellow/90">
+                  {interactionActionLabel(lastInteraction.action)}:
+                </span>{' '}
+                {lastInteraction.note}
+              </p>
+              <p className="text-[10px] text-gray-500">
+                {lastInteraction.userName || 'Comercial'}
+                {lastInteraction.createdAt ? ` · ${formatDateTime(lastInteraction.createdAt)}` : ''}
+              </p>
+            </div>
+          ) : (
+            <p className="text-[11px] text-gray-500">
+              Sem histórico de negociação. Registre e-mail, WhatsApp ou uma nota para o próximo atendente.
+            </p>
+          )}
+
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowNegotiation((v) => !v);
+              }}
+              className="h-7 px-2 text-[10px] text-gray-300 hover:text-seguranca-yellow hover:bg-seguranca-yellow/10"
+            >
+              {showNegotiation ? 'Ocultar histórico' : 'Ver histórico'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddNegotiationNote?.(opportunity);
+              }}
+              className="h-7 px-2 text-[10px] text-gray-300 hover:text-seguranca-yellow hover:bg-seguranca-yellow/10"
+            >
+              + Nota
+            </Button>
+          </div>
+
+          {showNegotiation && (
+            <div className="max-h-40 overflow-y-auto space-y-2 border-t border-gray-700/60 pt-2">
+              {loadingHistory && (
+                <p className="text-[11px] text-gray-500">Carregando histórico...</p>
+              )}
+              {!loadingHistory && sortedHistory.length === 0 && (
+                <p className="text-[11px] text-gray-500">Nenhum registro ainda.</p>
+              )}
+              {sortedHistory.slice(0, 8).map((entry) => (
+                <div
+                  key={entry.id}
+                  className="rounded border border-gray-700/50 bg-seguranca-black/50 p-2 space-y-1"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] border-gray-600 text-gray-300 px-1.5 py-0"
+                    >
+                      {interactionActionLabel(entry.action)}
+                    </Badge>
+                    <span className="text-[10px] text-gray-500 truncate">
+                      {entry.userName || 'Comercial'}
+                    </span>
+                  </div>
+                  {entry.note && (
+                    <p className="text-[11px] text-gray-300 whitespace-pre-wrap break-words">
+                      {entry.note}
+                    </p>
+                  )}
+                  {entry.createdAt && (
+                    <p className="text-[10px] text-gray-500">{formatDateTime(entry.createdAt)}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Ações principais */}
         <div
           className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-700"
@@ -322,9 +483,9 @@ export default function KanbanCard({
           </Button>
         </div>
 
-        {/* Contato — grid 3 colunas, texto completo sem corte */}
+        {/* Contato — permanece no Kanban (sem abrir app externo) */}
         <div
-          className="grid grid-cols-3 gap-1 pt-2 border-t border-gray-700/50"
+          className="grid grid-cols-2 gap-1 pt-2 border-t border-gray-700/50"
           onClick={stopDragStart}
           onPointerDown={stopDragStart}
         >
@@ -335,9 +496,8 @@ export default function KanbanCard({
               e.stopPropagation();
               onSendEmail?.(opportunity);
             }}
-            disabled={!opportunity.lead?.email}
-            title={opportunity.lead?.email ? `E-mail: ${opportunity.lead.email}` : 'Lead sem e-mail'}
-            className="h-auto min-h-[2.75rem] px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-[10px] leading-tight text-gray-300 hover:text-seguranca-yellow hover:bg-seguranca-yellow/10 disabled:opacity-30"
+            title={opportunity.lead?.email ? `E-mail: ${opportunity.lead.email}` : 'Enviar e-mail (informe o destinatário)'}
+            className="h-auto min-h-[2.75rem] px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-[10px] leading-tight text-seguranca-yellow hover:text-seguranca-yellow hover:bg-seguranca-yellow/10"
           >
             <Mail className="h-3.5 w-3.5 shrink-0" />
             <span className="whitespace-normal text-center">E-mail</span>
@@ -349,26 +509,11 @@ export default function KanbanCard({
               e.stopPropagation();
               onSendWhatsApp?.(opportunity);
             }}
-            disabled={!opportunity.lead?.phone}
-            title={opportunity.lead?.phone ? `WhatsApp: ${opportunity.lead.phone}` : 'Lead sem telefone'}
-            className="h-auto min-h-[2.75rem] px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-[10px] leading-tight text-gray-300 hover:text-green-400 hover:bg-green-400/10 disabled:opacity-30"
+            title={opportunity.lead?.phone ? `WhatsApp: ${opportunity.lead.phone}` : 'Enviar WhatsApp (informe o telefone)'}
+            className="h-auto min-h-[2.75rem] px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-[10px] leading-tight text-green-400 hover:text-green-300 hover:bg-green-400/10"
           >
             <MessageSquare className="h-3.5 w-3.5 shrink-0" />
             <span className="whitespace-normal text-center">WhatsApp</span>
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSendMessage?.(opportunity);
-            }}
-            disabled={!opportunity.lead}
-            title="Registrar mensagem no histórico"
-            className="h-auto min-h-[2.75rem] px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-[10px] leading-tight text-gray-300 hover:text-blue-400 hover:bg-blue-400/10 disabled:opacity-30"
-          >
-            <Send className="h-3.5 w-3.5 shrink-0" />
-            <span className="whitespace-normal text-center">Mensagem</span>
           </Button>
         </div>
 

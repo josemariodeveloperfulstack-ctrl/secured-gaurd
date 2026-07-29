@@ -630,35 +630,27 @@ public class BaileysRestService {
             
             return null;
             
-        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
-            // QR Code ainda não está disponível - isso é esperado após inicialização
-            // Não logar como ERROR, apenas como DEBUG/WARNING
-            String errorBody = e.getResponseBodyAsString();
-            if (errorBody != null && errorBody.contains("QR not available")) {
-                logger.debug("⏳ QR Code ainda não disponível (esperado após inicialização) - URL: {}", baileysRestUrl);
-            } else {
-                logger.warn("⚠️ QR Code não encontrado: {} - URL: {}", e.getMessage(), baileysRestUrl);
-            }
-            // Re-lançar a exceção para que o controller possa tratar adequadamente
-            throw e;
         } catch (org.springframework.web.client.HttpClientErrorException e) {
-            // Outros erros HTTP 4xx
+            // 404 "QR not available" é esperado enquanto o Baileys gera o QR — retornar null
+            // para o controller/agente poder fazer retry sem abortar a conexão.
             String errorBody = e.getResponseBodyAsString();
-            if (errorBody != null && errorBody.contains("QR not available")) {
-                logger.debug("⏳ QR Code ainda não disponível (esperado após inicialização) - URL: {}", baileysRestUrl);
-            } else {
-                logger.warn("⚠️ Erro HTTP ao obter QR Code: {} - URL: {}", e.getMessage(), baileysRestUrl);
+            boolean qrPending = (errorBody != null && errorBody.contains("QR not available"))
+                    || (e.getMessage() != null && e.getMessage().contains("QR not available"));
+            if (qrPending || e.getStatusCode().value() == 404) {
+                logger.info("⏳ QR Code ainda não disponível (aguardando Baileys) - HTTP {}", e.getStatusCode().value());
+                return null;
             }
-            throw e;
+            logger.warn("⚠️ Erro HTTP ao obter QR Code: {} - URL: {}", e.getMessage(), baileysRestUrl);
+            lastErrorMessage = "Erro ao obter QR Code: " + e.getMessage();
+            return null;
         } catch (Exception e) {
-            // Apenas logar como ERROR se não for um erro esperado de QR não disponível
             String errorMessage = e.getMessage();
             if (errorMessage != null && errorMessage.contains("QR not available")) {
-                logger.debug("⏳ QR Code ainda não disponível (esperado após inicialização) - URL: {}", baileysRestUrl);
-            } else {
-                logger.error("❌ Erro ao obter QR Code de {}", baileysRestUrl, e);
-                logger.error("💥 Detalhes do erro: {}", e.getMessage());
+                logger.info("⏳ QR Code ainda não disponível (aguardando Baileys)");
+                return null;
             }
+            logger.error("❌ Erro ao obter QR Code de {}", baileysRestUrl, e);
+            lastErrorMessage = "Erro ao obter QR Code: " + errorMessage;
             return null;
         }
     }

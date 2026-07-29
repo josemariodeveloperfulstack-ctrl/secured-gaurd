@@ -27,7 +27,7 @@ class _EpisScreenState extends State<EpisScreen> {
     setState(() { _isLoading = true; _error = null; });
     try {
       final user = context.read<AuthProvider>().user;
-      final employeeId = user?.id;
+      final employeeId = user?.employeeId ?? user?.id;
       if (employeeId == null) {
         setState(() { _epis = []; _isLoading = false; });
         return;

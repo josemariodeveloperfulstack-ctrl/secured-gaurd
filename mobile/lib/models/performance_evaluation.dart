@@ -35,7 +35,7 @@ class PerformanceEvaluation {
       evaluatorName: json['evaluator'] is Map ? json['evaluator']['name'] as String? : null,
       evaluationDate: json['evaluationDate'] as String?,
       evaluationType: json['evaluationType'] as String? ?? 'MONTHLY',
-      score: json['score'] as int? ?? 0,
+      score: (json['score'] as num?)?.toInt() ?? 0,
       comments: json['comments'] as String?,
       status: json['status'] as String? ?? 'PENDING',
       createdAt: json['createdAt'] as String?,
@@ -81,6 +81,10 @@ class PerformanceEvaluation {
         return 'Concluída';
       case 'CANCELLED':
         return 'Cancelada';
+      case 'UNDER_REVIEW':
+        return 'Em Revisão';
+      case 'APPROVED':
+        return 'Aprovada';
       default:
         return status;
     }

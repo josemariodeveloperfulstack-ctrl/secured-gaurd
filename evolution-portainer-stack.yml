@@ -3,7 +3,7 @@ version: '3.8'
 # ========================================
 # EVOLUTION API - STACK PORTAINER
 # Integrado ao SecuredGuard via agente WhatsApp (EVOLUTION_API_URL + EVOLUTION_API_KEY).
-# Ordem de fallback padrão em produção: uazapi,zapi,evolution,baileys — ver env.whatsapp-agent.template
+# Ordem de fallback padrão: evolution,uazapi,zapi,baileys — ver env.whatsapp-agent.template
 # ========================================
 # COMO USAR:
 # 1. Copie este arquivo completo

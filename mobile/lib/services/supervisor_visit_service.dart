@@ -1,10 +1,69 @@
 import '../config/api_config.dart';
 import '../models/supervisor_visit.dart';
+import '../models/supervisor_visit_preview.dart';
 import 'api_service.dart';
 
 /// Serviço de Controle de Visitas do Supervisor.
+///
+/// Mantém compatibilidade com o sistema legado [VisitControlController]
+/// e adiciona o novo fluxo [SupervisorVisitController] (preview + checkin).
 class SupervisorVisitService {
   final ApiService _api = ApiService();
+
+  // ═══════════════════════════════════════════════
+  // NOVO FLUXO: SupervisorVisit (preview + checkin)
+  // ═══════════════════════════════════════════════
+
+  /// Preview: confirma posto + funcionário + vínculo SEM gravar.
+  ///
+  /// Retorna [SupervisorVisitCheckinResponse] com os dados do posto,
+  /// funcionário identificado e tipo de alocação (efetivo/remanejado/cobertura).
+  Future<SupervisorVisitCheckinResponse?> previewCheckin(
+      SupervisorVisitCheckinRequest request) async {
+    final response = await _api.post(
+      ApiConfig.supervisorVisitPreview,
+      body: request.toJson(),
+    );
+
+    if (!response.success || response.data == null) return null;
+
+    // O backend retorna { success: true, data: { ... } }
+    final raw = response.data;
+    if (raw is Map<String, dynamic>) {
+      final nested = raw['data'];
+      if (nested is Map<String, dynamic>) {
+        return SupervisorVisitCheckinResponse.fromJson(nested);
+      }
+    }
+    return null;
+  }
+
+  /// Check-in: grava a visita com geolocalização e endereço.
+  ///
+  /// Retorna [SupervisorVisitCheckinResponse] com visitId preenchido.
+  Future<SupervisorVisitCheckinResponse?> doCheckin(
+      SupervisorVisitCheckinRequest request) async {
+    final response = await _api.post(
+      ApiConfig.supervisorVisitCheckin,
+      body: request.toJson(),
+    );
+
+    if (!response.success || response.data == null) return null;
+
+    // O backend retorna { success: true, message: "...", data: { ... } }
+    final raw = response.data;
+    if (raw is Map<String, dynamic>) {
+      final nested = raw['data'];
+      if (nested is Map<String, dynamic>) {
+        return SupervisorVisitCheckinResponse.fromJson(nested);
+      }
+    }
+    return null;
+  }
+
+  // ═══════════════════════════════════════════════
+  // FLUXO LEGADO: VisitControl (listar/gerenciar visitas)
+  // ═══════════════════════════════════════════════
 
   /// Busca visitas do dia de hoje.
   Future<List<SupervisorVisit>> getTodayVisits() async {
@@ -100,7 +159,7 @@ class SupervisorVisitService {
     return [];
   }
 
-  /// Cria uma nova visita.
+  /// Cria uma nova visita (legado).
   Future<SupervisorVisit?> createVisit(
       Map<String, dynamic> visitData) async {
     final response = await _api.post(
@@ -114,7 +173,7 @@ class SupervisorVisitService {
     return null;
   }
 
-  /// Inicia uma visita (check-in no posto).
+  /// Inicia uma visita (check-in no posto) — legado.
   Future<SupervisorVisit?> startVisit(String visitId) async {
     final uri = '${ApiConfig.visitControls}/$visitId/start';
     final response = await _api.put(uri);
@@ -125,7 +184,7 @@ class SupervisorVisitService {
     return null;
   }
 
-  /// Completa uma visita.
+  /// Completa uma visita — legado.
   Future<SupervisorVisit?> completeVisit(
     String visitId, {
     String? findings,
@@ -147,7 +206,7 @@ class SupervisorVisitService {
     return null;
   }
 
-  /// Busca funcionário no posto de trabalho (por CPF ou matrícula).
+  /// Busca funcionário no posto de trabalho (por CPF ou matrícula) — legado.
   Future<Map<String, dynamic>?> findEmployeeAtPost({
     String? cpf,
     String? registrationNumber,
@@ -173,3 +232,4 @@ class SupervisorVisitService {
     return null;
   }
 }
+

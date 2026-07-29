@@ -4,26 +4,31 @@ import 'api_service.dart';
 
 /// Serviço de Avaliações de Desempenho.
 ///
-/// Nota: Este serviço consulta funcionários via /api/employees/{id}
-/// para obter dados contextuais. As avaliações de desempenho
-/// atualmente não possuem um controller REST próprio. 
-/// Quando implementado, os endpoints devem ser atualizados.
+/// Consulta o endpoint REST /api/performance-evaluations/employee/{id}
+/// para obter as avaliações de desempenho de um funcionário.
 class EvaluationService {
   final ApiService _api = ApiService();
 
-  /// Busca avaliações de um funcionário.
-  /// Atualmente retorna dados mockados até o endpoint ser implementado.
+  /// Busca avaliações de desempenho de um funcionário pelo ID.
   Future<List<PerformanceEvaluation>> getByEmployeeId(
       String employeeId) async {
-    // Tentar buscar dados do funcionário como fallback
-    final employeeUri = '${ApiConfig.employees}/$employeeId';
-    final employeeResponse = await _api.get(employeeUri, silent: true);
+    final uri = '${ApiConfig.performanceEvaluations}/employee/$employeeId';
+    final response = await _api.get(uri, silent: true);
 
-    // Retornar lista vazia se não conseguir
-    if (!employeeResponse.success) return [];
+    if (!response.success || response.data == null) return [];
 
-    // Aguardar implementação do endpoint de avaliações
-    // TODO: Substituir quando /api/performance-evaluations/employee/{id} for criado
+    final dynamic data = response.data;
+    if (data is List) {
+      return data
+          .map((e) => PerformanceEvaluation.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    // Caso venha como Map com conteúdo (ex: paginação futura)
+    if (data is Map && data['content'] is List) {
+      return (data['content'] as List)
+          .map((e) => PerformanceEvaluation.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
     return [];
   }
 }

@@ -105,47 +105,63 @@ function fitContain(
 }
 
 /**
+ * Mede o fim de cada <tr> em coordenadas do canvas (mesmo momento do html2canvas).
+ * Deve ser chamado ANTES de restaurar padding/visibility do template.
+ */
+function measureTableRowBottomsPx(body: HTMLElement, canvasHeightPx: number): number[] {
+  const bodyHeight = Math.max(body.scrollHeight, body.offsetHeight, 1);
+  const scaleY = canvasHeightPx / bodyHeight;
+  const bodyRect = body.getBoundingClientRect();
+
+  return Array.from(body.querySelectorAll('tr'))
+    .map((tr) => {
+      const rect = tr.getBoundingClientRect();
+      // +1 px (escalado) para incluir a borda inferior da linha
+      return (rect.bottom - bodyRect.top) * scaleY + scaleY;
+    })
+    .filter((y) => y > 1 && y < canvasHeightPx - 1)
+    .sort((a, b) => a - b);
+}
+
+/**
  * Quebras de página alinhadas ao fim de linhas de tabela —
  * evita cortar uma linha no meio (texto “sumindo” no topo da próxima página).
+ *
+ * Prefere sempre terminar no fim de uma linha completa (espaço em branco no
+ * rodapé da página é aceitável). Só corta no meio se a linha for maior que a página.
  */
 function computeRowAwareBreaksPx(
-  body: HTMLElement,
+  rowBottoms: number[],
   canvasHeightPx: number,
   pageHeightPx: number
 ): number[] {
-  const bodyHeight = Math.max(body.scrollHeight, body.offsetHeight, 1);
-  const scaleY = canvasHeightPx / bodyHeight;
-  const bodyTop = body.getBoundingClientRect().top;
-
-  const rowBottoms = Array.from(body.querySelectorAll('tr'))
-    .map((tr) => {
-      const rect = tr.getBoundingClientRect();
-      return (rect.bottom - bodyTop) * scaleY;
-    })
-    .filter((y) => y > 0 && y < canvasHeightPx)
-    .sort((a, b) => a - b);
-
   const breaks: number[] = [0];
   let cursor = 0;
 
   while (cursor + pageHeightPx < canvasHeightPx - 1) {
     const limit = cursor + pageHeightPx;
-    let snap = limit;
-    // Última linha que termina antes do limite da página
+    let lastFit = -1;
+
     for (const bottom of rowBottoms) {
-      if (bottom > cursor + 4 && bottom <= limit) {
-        snap = bottom;
+      if (bottom > cursor + 2 && bottom <= limit) {
+        lastFit = bottom;
       }
       if (bottom > limit) break;
     }
-    // Evita página quase vazia
-    if (snap <= cursor + pageHeightPx * 0.25) {
+
+    let snap: number;
+    if (lastFit > cursor + 2) {
+      // Sempre quebra no fim da última linha completa que cabe
+      snap = lastFit;
+    } else {
+      // Nenhuma linha completa cabe (linha mais alta que a página) — corte duro
       snap = limit;
     }
-    // Evita avançar zero
+
     if (snap <= cursor + 1) {
       snap = Math.min(limit, canvasHeightPx);
     }
+
     breaks.push(snap);
     cursor = snap;
   }
@@ -260,6 +276,28 @@ class ReportLayoutService {
         windowWidth: isLandscape ? 1122 : 800,
       });
 
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        // Restaura DOM mesmo em falha
+        hiddenNodes.forEach((el) => {
+          el.style.visibility = el.dataset.prevVisibility || '';
+          delete el.dataset.prevVisibility;
+        });
+        const bodyFail =
+          (element.querySelector('[data-report-body]') as HTMLElement | null) ||
+          (element.querySelector('#report-content > div.relative') as HTMLElement | null);
+        if (bodyFail?.dataset.prevPaddingTop !== undefined) {
+          bodyFail.style.paddingTop = bodyFail.dataset.prevPaddingTop;
+          bodyFail.style.paddingBottom = bodyFail.dataset.prevPaddingBottom || '';
+          delete bodyFail.dataset.prevPaddingTop;
+          delete bodyFail.dataset.prevPaddingBottom;
+        }
+        if (tempContainer) tempContainer.remove();
+        throw new Error('O conteúdo do relatório está vazio ou não pôde ser renderizado.');
+      }
+
+      // Medir linhas COM o mesmo CSS usado no html2canvas (antes de restaurar padding/visibility)
+      const rowBottomsPx = measureTableRowBottomsPx(targetElement, canvas.height);
+
       hiddenNodes.forEach((el) => {
         el.style.visibility = el.dataset.prevVisibility || '';
         delete el.dataset.prevVisibility;
@@ -277,10 +315,6 @@ class ReportLayoutService {
 
       if (tempContainer) {
         tempContainer.remove();
-      }
-
-      if (!canvas || canvas.width === 0 || canvas.height === 0) {
-        throw new Error('O conteúdo do relatório está vazio ou não pôde ser renderizado.');
       }
 
       const templateDataUrl = await loadImageAsDataURL(templateSrc);
@@ -304,7 +338,7 @@ class ReportLayoutService {
 
       // Altura de uma página de conteúdo em pixels do canvas
       const pageHeightPx = (contentHeightMm / contentWidthMm) * canvas.width;
-      const breakStarts = computeRowAwareBreaksPx(targetElement, canvas.height, pageHeightPx);
+      const breakStarts = computeRowAwareBreaksPx(rowBottomsPx, canvas.height, pageHeightPx);
       const totalPages = Math.max(1, breakStarts.length);
 
       for (let pageIndex = 0; pageIndex < breakStarts.length; pageIndex++) {

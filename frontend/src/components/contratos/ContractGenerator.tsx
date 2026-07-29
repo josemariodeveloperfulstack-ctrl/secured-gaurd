@@ -16,7 +16,8 @@ import {
   Settings,
   CheckCircle,
   Loader2,
-  Building2
+  Building2,
+  Sparkles
 } from 'lucide-react';
 import { Contract, contractService } from '@/services/contractService';
 import { companyConfigService, CompanyConfig } from '@/services/companyConfigService';
@@ -29,7 +30,6 @@ import { getApiUrl } from '@/config/environment';
 import { ClientSearchCombobox } from '@/components/ui/client-search-combobox';
 import { workPostService, WorkPost } from '@/services/workPostService';
 import { Checkbox } from '@/components/ui/checkbox';
-import { WorkPostDrawer } from './WorkPostDrawer';
 
 
 interface ContractGeneratorProps {
@@ -89,7 +89,6 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   const [clientsLoading, setClientsLoading] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
-  const [isWorkPostDrawerOpen, setIsWorkPostDrawerOpen] = useState(false);
 
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [workPostsLoading, setWorkPostsLoading] = useState(false);
@@ -176,6 +175,40 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
       setGeneratedPdfUrl(null);
     }
   }, [open, generatedPdfUrl]);
+
+  const generateContractNumber = () => {
+    if (!selectedClientId && !contractData.clientName) {
+      toast({
+        title: 'Aviso',
+        description: 'Selecione um cliente primeiro',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const selectedClient = clients.find((c: any) => c.id === selectedClientId);
+    const clientName = (selectedClient?.name || contractData.clientName || '').toUpperCase().trim();
+    if (!clientName) {
+      toast({
+        title: 'Aviso',
+        description: 'Selecione um cliente primeiro',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const words = clientName.split(' ').filter((w: string) => w.length > 0);
+    const sigla = words.map((w: string) => w.charAt(0)).join('').substring(0, 4);
+    const currentYear = new Date().getFullYear();
+    const randomSuffix = Math.random().toString(36).substr(2, 4).toUpperCase();
+    const contractNumber = `CON-${sigla}-${currentYear}-${randomSuffix}`;
+
+    setContractData(prev => ({ ...prev, contractNumber }));
+    toast({
+      title: 'Número Gerado',
+      description: `Número do contrato gerado automaticamente: ${contractNumber}`,
+    });
+  };
 
   const loadCompanyConfig = async () => {
     setLoadingConfig(true);
@@ -280,32 +313,6 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
         clientPhone: createdClient.phone || createdClient.mobile || '',
         clientEmail: createdClient.email || createdClient.contactEmail || ''
       }));
-    }
-  };
-
-  const handleWorkPostCreated = (newPost: any) => {
-    if (newPost && newPost.id) {
-      if (selectedClientId) {
-        setWorkPostsLoading(true);
-        workPostService.getWorkPostsByClient(selectedClientId)
-          .then(posts => {
-            const list = Array.isArray(posts) ? posts : [];
-            setWorkPosts(list);
-            // Auto-select the newly created post
-            setSelectedWorkPostIds(prev => {
-              if (!prev.includes(newPost.id)) {
-                return [...prev, newPost.id];
-              }
-              return prev;
-            });
-          })
-          .catch(err => {
-            console.error("Erro ao carregar postos de trabalho após criação:", err);
-          })
-          .finally(() => {
-            setWorkPostsLoading(false);
-          });
-      }
     }
   };
 
@@ -613,57 +620,77 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
     `;
   };
 
-  const handlePreview = () => {
-    const htmlContent = generateContractHTML();
-    const previewWindow = window.open('', '_blank');
-    if (previewWindow) {
-      previewWindow.document.write(htmlContent);
-      previewWindow.document.close();
+  const buildContractPdfPayload = async () => {
+    let companyId: string | undefined;
+    try {
+      const companies = await companyService.getAllCompanies();
+      if (companies?.length > 0 && companies[0]?.id) {
+        companyId = companies[0].id;
+      }
+    } catch {
+      companyId = undefined;
     }
-    setStep('preview');
+
+    const startDateParsed = contractData.startDate
+      ? (parseDateFromBackend(contractData.startDate) || parseBrazilianDateString(contractData.startDate))
+      : null;
+    const endDateParsed = contractData.endDate
+      ? (parseDateFromBackend(contractData.endDate) || parseBrazilianDateString(contractData.endDate))
+      : null;
+
+    return {
+      companyId: selectedCompanyId || companyId || null,
+      companyConfigId: companyConfig?.id || null,
+      clientName: contractData.clientName || '',
+      clientDocument: contractData.clientDocument || '',
+      clientAddress: contractData.clientAddress || '',
+      clientPhone: contractData.clientPhone || '',
+      clientEmail: contractData.clientEmail || '',
+      contractNumber: contractData.contractNumber || '',
+      description: contractData.description || '',
+      value: contractData.value ?? 0,
+      startDate: formatDateForBackend(startDateParsed) || null,
+      endDate: formatDateForBackend(endDateParsed) || null,
+      paymentTerms: contractData.paymentTerms || '',
+      additionalTerms: contractData.additionalTerms || '',
+      observations: contractData.observations || '',
+      city: configForContract?.city || '',
+      contractDate: new Date().toISOString().split('T')[0],
+      workPostIds: selectedWorkPostIds || [],
+    };
+  };
+
+  const handlePreview = async () => {
+    setGenerating(true);
+    try {
+      const payload = await buildContractPdfPayload();
+      const blob = await contractService.generateContractPdf(payload);
+      const url = window.URL.createObjectURL(blob);
+      setGeneratedPdfUrl(url);
+      window.open(url, '_blank');
+      setStep('preview');
+      toast({
+        title: 'Preview do contrato',
+        description: 'Exibindo o contrato com o layout padrão do sistema (igual ao PDF gerado).',
+      });
+    } catch (error) {
+      console.error('Erro ao gerar preview do contrato:', error);
+      const msg =
+        error instanceof Error ? error.message : 'Não foi possível gerar o preview. Tente novamente.';
+      toast({
+        title: 'Erro',
+        description: msg,
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleGeneratePDF = async () => {
     setGenerating(true);
     try {
-      let companyId: string | undefined;
-      try {
-        const companies = await companyService.getAllCompanies();
-        if (companies?.length > 0 && companies[0]?.id) {
-          companyId = companies[0].id;
-        }
-      } catch {
-        companyId = undefined;
-      }
-
-      const startDateParsed = contractData.startDate
-        ? (parseDateFromBackend(contractData.startDate) || parseBrazilianDateString(contractData.startDate))
-        : null;
-      const endDateParsed = contractData.endDate
-        ? (parseDateFromBackend(contractData.endDate) || parseBrazilianDateString(contractData.endDate))
-        : null;
-
-      const payload = {
-        companyId: selectedCompanyId || companyId || null,
-        companyConfigId: companyConfig?.id || null,
-        clientName: contractData.clientName || '',
-        clientDocument: contractData.clientDocument || '',
-        clientAddress: contractData.clientAddress || '',
-        clientPhone: contractData.clientPhone || '',
-        clientEmail: contractData.clientEmail || '',
-        contractNumber: contractData.contractNumber || '',
-        description: contractData.description || '',
-        value: contractData.value ?? 0,
-        startDate: formatDateForBackend(startDateParsed) || null,
-        endDate: formatDateForBackend(endDateParsed) || null,
-        paymentTerms: contractData.paymentTerms || '',
-        additionalTerms: contractData.additionalTerms || '',
-        observations: contractData.observations || '',
-        city: configForContract?.city || '',
-        contractDate: new Date().toISOString().split('T')[0],
-        workPostIds: selectedWorkPostIds || [],
-      };
-
+      const payload = await buildContractPdfPayload();
       const blob = await contractService.generateContractPdf(payload);
       const url = window.URL.createObjectURL(blob);
       setGeneratedPdfUrl(url);
@@ -858,42 +885,30 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
 
             {selectedClientId && (
               <Card className="bg-seguranca-black border-2 border-zinc-800 rounded-none mt-4">
-                <CardHeader className="px-3 sm:px-6 py-3 sm:py-4 border-b border-zinc-800 flex flex-row items-center justify-between gap-4">
+                <CardHeader className="px-3 sm:px-6 py-3 sm:py-4 border-b border-zinc-800">
                   <div>
                     <CardTitle className="text-seguranca-lightgray text-xs sm:text-sm font-mono tracking-wider text-yellow-500 uppercase">
-                      [POSTOS DE TRABALHO DO CLIENTE]
+                      [SETORES DE TRABALHO DO CLIENTE]
                     </CardTitle>
-                    <p className="text-xs text-gray-400 mt-1">Selecione os postos de trabalho deste cliente que farão parte das cláusulas deste contrato.</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Selecione os setores e postos já cadastrados no cliente. O cadastro completo é feito na ficha do cliente.
+                    </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsWorkPostDrawerOpen(true)}
-                    className="border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black rounded-none font-mono text-xs uppercase shrink-0"
-                  >
-                    [CADASTRAR POSTO]
-                  </Button>
                 </CardHeader>
                 <CardContent className="space-y-4 px-3 sm:px-6 py-4">
                   {workPostsLoading ? (
                     <div className="flex items-center gap-2 text-seguranca-lightgray text-sm py-4">
                       <Loader2 className="h-4 w-4 animate-spin text-yellow-500" />
-                      <span>Carregando postos de trabalho do cliente...</span>
+                      <span>Carregando setores de trabalho do cliente...</span>
                     </div>
                   ) : workPosts.length === 0 ? (
                     <div className="p-6 border-2 border-dashed border-zinc-800 text-center rounded-none flex flex-col items-center gap-3">
-                      <p className="text-zinc-500 text-sm font-mono uppercase font-bold tracking-wider">[Nenhum posto de trabalho cadastrado para este cliente]</p>
-                      <p className="text-xs text-zinc-600">Adicione postos de trabalho de forma instantânea e permanente para este cliente.</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsWorkPostDrawerOpen(true)}
-                        className="border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black rounded-none font-mono text-xs uppercase"
-                      >
-                        [Cadastrar Primeiro Posto]
-                      </Button>
+                      <p className="text-zinc-500 text-sm font-mono uppercase font-bold tracking-wider">
+                        [Nenhum setor de trabalho cadastrado para este cliente]
+                      </p>
+                      <p className="text-xs text-zinc-600">
+                        Cadastre setores e postos na ficha do cliente e depois volte a este contrato.
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -949,12 +964,20 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
                                 className="mt-0.5 rounded-none border-2 border-zinc-600 data-[state=checked]:bg-yellow-500 data-[state=checked]:text-black data-[state=checked]:border-yellow-500"
                               />
                               <div className="flex-1 font-mono text-xs space-y-1">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2">
                                   <span className="font-bold text-seguranca-lightgray truncate">{wp.name}</span>
                                   {wp.postCode && (
-                                    <span className="px-1.5 py-0.5 bg-zinc-800 text-zinc-500 text-[10px] uppercase font-semibold">
+                                    <span className="px-1.5 py-0.5 bg-zinc-800 text-zinc-500 text-[10px] uppercase font-semibold shrink-0">
                                       COD: {wp.postCode}
                                     </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  <span className="px-1.5 py-0.5 bg-yellow-500/10 text-yellow-500 border border-yellow-500/30 text-[10px] uppercase font-semibold">
+                                    {(wp.type || '').replace(/^POSTO_/, 'Posto ').replace(/_/g, ' ') || 'Posto'}
+                                  </span>
+                                  {wp.primaryPositionName && (
+                                    <span className="text-zinc-500">Cargo: <strong className="text-zinc-400">{wp.primaryPositionName}</strong></span>
                                   )}
                                 </div>
                                 <div className="text-zinc-500 flex flex-wrap gap-x-3 gap-y-1">
@@ -974,7 +997,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
                         })}
                       </div>
                       <div className="text-[10px] font-mono text-zinc-500 text-right">
-                        {selectedWorkPostIds.length} de {workPosts.length} posto(s) selecionado(s)
+                        {selectedWorkPostIds.length} de {workPosts.length} setor(es) selecionado(s)
                       </div>
                     </div>
                   )}
@@ -986,13 +1009,6 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
               isOpen={isClientModalOpen}
               onClose={() => setIsClientModalOpen(false)}
               onSuccess={handleClientCreated}
-            />
-
-            <WorkPostDrawer
-              open={isWorkPostDrawerOpen}
-              onClose={() => setIsWorkPostDrawerOpen(false)}
-              clientId={selectedClientId}
-              onSuccess={handleWorkPostCreated}
             />
 
             {/* Dados do Contrato */}
@@ -1007,12 +1023,23 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <Label className="text-seguranca-lightgray text-xs sm:text-sm">Número do Contrato *</Label>
-                    <Input
-                      value={contractData.contractNumber}
-                      onChange={(e) => setContractData(prev => ({ ...prev, contractNumber: e.target.value }))}
-                      placeholder="Ex: CON-2024-001"
-                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray mt-1"
-                    />
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={contractData.contractNumber}
+                        onChange={(e) => setContractData(prev => ({ ...prev, contractNumber: e.target.value }))}
+                        placeholder="Deixe em branco para gerar"
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                      />
+                      <Button
+                        type="button"
+                        onClick={generateContractNumber}
+                        disabled={!selectedClientId && !contractData.clientName}
+                        className="bg-seguranca-graphite border border-gray-600 hover:bg-yellow-500 hover:text-black h-10 px-3 shrink-0"
+                        title="Gerar número com base no nome do cliente"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div>
                     <Label className="text-seguranca-lightgray text-xs sm:text-sm">Valor Total (R$) *</Label>
@@ -1115,10 +1142,15 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
               <div className="flex gap-3">
                 <Button
                   onClick={handlePreview}
+                  disabled={generating}
                   variant="outline"
                   className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black"
                 >
-                  <Eye className="h-4 w-4 mr-2" />
+                  {generating ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Eye className="h-4 w-4 mr-2" />
+                  )}
                   Preview
                 </Button>
 

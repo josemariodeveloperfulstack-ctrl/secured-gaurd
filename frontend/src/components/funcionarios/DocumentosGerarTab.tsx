@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import TermoValeTransporteForm from './TermoValeTransporteForm';
@@ -10,7 +10,6 @@ import OrdemServicosForm from './OrdemServicosForm';
 import AdvertenciaDisciplinarForm from './AdvertenciaDisciplinarForm';
 import DeclaracaoForm from './DeclaracaoForm';
 import TermoCienciaPrestadorForm from './TermoCienciaPrestadorForm';
-import OrdemServicoForm from './OrdemServicoForm';
 import ModelosDocumentosForm from './ModelosDocumentosForm';
 import TermoResponsabilidadeEspecificoForm from './TermoResponsabilidadeEspecificoForm';
 import TermoResponsabilidadeDanosMultasForm from './TermoResponsabilidadeDanosMultasForm';
@@ -18,8 +17,13 @@ import TermoBodyCamForm from './TermoBodyCamForm';
 import NppsForm from './NppsForm';
 import FichaEntregaEPIManualForm from './FichaEntregaEPIManualForm';
 import RelatorioMovimentacaoForm from './RelatorioMovimentacaoForm';
+import ValeSafetyTermsForm from './ValeSafetyTermsForm';
 import { FileText, Shield, FileSignature, FileCheck, UserX, File, CreditCard, ArrowRightLeft, Car, Video } from 'lucide-react';
 import type { Company } from '@/types/company';
+import { companyService } from '@/services/companyService';
+import { isVigilanciaCompany } from '@/utils/formatEmployeeAddress';
+
+const VIG_ONLY_KEYS = new Set(['lgpd-vig', 'regras-ouro-vale', 'autorizacao-toxicologico']);
 
 const tipos = [
   { key: 'modelos', label: 'Modelos de Documentos', icon: FileText, shortLabel: 'Modelos' },
@@ -31,6 +35,8 @@ const tipos = [
   { key: 'danos-multas', label: 'Termo de Responsabilidade por Danos e Multas', icon: Car, shortLabel: 'Danos/Multas' },
   { key: 'body-cam', label: 'Termo de Responsabilidade e Uso de Câmera Corporal – Body Cam', icon: Video, shortLabel: 'Body Cam' },
   { key: 'lgpd-vig', label: 'Termo de Proteção de Dados – LGPD (VIG)', icon: FileCheck, shortLabel: 'LGPD VIG' },
+  { key: 'regras-ouro-vale', label: 'Regras de Ouro da Vale', icon: Shield, shortLabel: 'Regras Ouro' },
+  { key: 'autorizacao-toxicologico', label: 'Autorização para Teste Toxicológico', icon: FileCheck, shortLabel: 'Toxicológico' },
   { key: 'lgpd-consentimento', label: 'Termo de Consentimento LGPD', icon: Shield, shortLabel: 'LGPD' },
   { key: 'termo-ciencia', label: 'Termo de Ciência do Prestador de Serviços', icon: File, shortLabel: 'Termo Ciência' },
   { key: 'npps', label: 'NPPS – Norma e Procedimento do Posto', icon: FileText, shortLabel: 'NPPS' },
@@ -64,10 +70,8 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({
   const params = new URLSearchParams(location.search);
   const tipoFromUrl = params.get('tipo');
 
-  const displayTipos = hideHeader ? tipos.filter(t => t.key !== 'modelos') : tipos;
-  const defaultTipo = tipoFromUrl || (hideHeader ? 'vt' : 'modelos');
-
-  const [tipo, setTipo] = useState(defaultTipo);
+  const [tipo, setTipo] = useState(tipoFromUrl || (hideHeader ? 'vt' : 'modelos'));
+  const [isVigCompany, setIsVigCompany] = useState(false);
 
   const finalEmployeeId = propEmployeeId || params.get('employeeId') || undefined;
   const finalCompanyId = propCompanyId || params.get('companyId') || undefined;
@@ -78,12 +82,52 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({
     employeeName: propEmployeeName,
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    const resolveVig = async () => {
+      if (!finalCompanyId) {
+        // Sem empresa fixa (tela geral de documentos): mostrar opções VIG.
+        if (!cancelled) setIsVigCompany(true);
+        return;
+      }
+      const fromProps = propCompanies?.find((c) => c.id === finalCompanyId);
+      if (fromProps) {
+        if (!cancelled) setIsVigCompany(isVigilanciaCompany(fromProps));
+        return;
+      }
+      try {
+        const company = await companyService.getCompanyById(finalCompanyId);
+        if (!cancelled) setIsVigCompany(isVigilanciaCompany(company));
+      } catch {
+        if (!cancelled) setIsVigCompany(false);
+      }
+    };
+    void resolveVig();
+    return () => {
+      cancelled = true;
+    };
+  }, [finalCompanyId, propCompanies]);
+
+  const displayTipos = useMemo(() => {
+    let list = hideHeader ? tipos.filter((t) => t.key !== 'modelos') : tipos;
+    if (!isVigCompany) {
+      list = list.filter((t) => !VIG_ONLY_KEYS.has(t.key));
+    }
+    return list;
+  }, [hideHeader, isVigCompany]);
+
   // Atualizar tipo quando mudar na URL
   useEffect(() => {
     if (tipoFromUrl) {
       setTipo(tipoFromUrl);
     }
   }, [tipoFromUrl]);
+
+  useEffect(() => {
+    if (!displayTipos.some((t) => t.key === tipo)) {
+      setTipo(displayTipos[0]?.key || (hideHeader ? 'vt' : 'modelos'));
+    }
+  }, [displayTipos, tipo, hideHeader]);
 
   return (
     <div className="space-y-6">
@@ -149,6 +193,12 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({
         {tipo === 'body-cam' && <TermoBodyCamForm {...sharedFormProps} />}
         {tipo === 'lgpd-vig' && (
           <TermoLGPDForm {...sharedFormProps} termVariant="VIGILANCIA" />
+        )}
+        {tipo === 'regras-ouro-vale' && (
+          <ValeSafetyTermsForm {...sharedFormProps} documentKind="golden-rules" />
+        )}
+        {tipo === 'autorizacao-toxicologico' && (
+          <ValeSafetyTermsForm {...sharedFormProps} documentKind="toxicological" />
         )}
         {tipo === 'lgpd-consentimento' && (
           <TermoLGPDForm {...sharedFormProps} termVariant="DEFAULT" />

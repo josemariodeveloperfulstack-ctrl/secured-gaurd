@@ -55,7 +55,8 @@ class SupervisorVisit {
       supervisorName: json['supervisorName'] as String?,
       workPostId: json['workPostId'] as String?,
       workPostName: json['workPostName'] as String?,
-      workPostCode: json['workPostCode'] as String?,
+      workPostCode: json['workPostCode'] as String? ??
+          (json['workPost'] is Map ? json['workPost']['postCode'] as String? : null),
       visitDate: json['visitDate'] as String? ?? '',
       scheduledAt: json['scheduledAt'] as String?,
       startedAt: json['startedAt'] as String?,
@@ -152,31 +153,61 @@ enum VisitStatus {
 }
 
 /// Estatísticas de visitas (VisitControlStatsDTO).
+///
+/// Mapeia os campos retornados pelo backend:
+/// - `today` → total de visitas de hoje
+/// - `completed` → visitas concluídas
+/// - `pending` → visitas pendentes (não concluídas)
+/// - `successRate` → taxa de sucesso (0.0 a 1.0)
+/// - `activeSupervisors` → supervisores ativos
 class VisitStats {
-  final int totalVisits;
+  /// Total de visitas hoje (campo `today` do backend).
   final int todayVisits;
-  final int inProgress;
+
+  /// Visitas concluídas (campo `completed` do backend).
   final int completed;
-  final int scheduled;
-  final int cancelled;
+
+  /// Visitas pendentes/não concluídas (campo `pending` do backend).
+  /// Exibe como "Em Andamento" no dashboard.
+  final int pending;
+
+  /// Taxa de sucesso das visitas (0.0 a 1.0).
+  final double successRate;
+
+  /// Número de supervisores ativos.
+  final int activeSupervisors;
+
+  /// Total geral (soma de completed + pending).
+  int get totalVisits => completed + pending;
+
+  /// Sinônimo de [pending] para compatibilidade com o dashboard.
+  int get inProgress => pending;
+
+  /// Sinônimo de [pending] para compatibilidade com o dashboard.
+  int get scheduled => pending;
+
+  /// Não fornecido pelo backend — sempre 0.
+  int get cancelled => 0;
 
   VisitStats({
-    this.totalVisits = 0,
     this.todayVisits = 0,
-    this.inProgress = 0,
     this.completed = 0,
-    this.scheduled = 0,
-    this.cancelled = 0,
+    this.pending = 0,
+    this.successRate = 0.0,
+    this.activeSupervisors = 0,
   });
 
   factory VisitStats.fromJson(Map<String, dynamic> json) {
+    final today = (json['today'] as num?)?.toInt() ?? 0;
+    final completed = (json['completed'] as num?)?.toInt() ?? 0;
+    final pending = (json['pending'] as num?)?.toInt() ?? 0;
+
     return VisitStats(
-      totalVisits: json['totalVisits'] as int? ?? 0,
-      todayVisits: json['todayVisits'] as int? ?? 0,
-      inProgress: json['inProgress'] as int? ?? 0,
-      completed: json['completed'] as int? ?? 0,
-      scheduled: json['scheduled'] as int? ?? 0,
-      cancelled: json['cancelled'] as int? ?? 0,
+      todayVisits: today,
+      completed: completed,
+      pending: pending,
+      successRate: (json['successRate'] as num?)?.toDouble() ?? 0.0,
+      activeSupervisors: (json['activeSupervisors'] as num?)?.toInt() ?? 0,
     );
   }
 }

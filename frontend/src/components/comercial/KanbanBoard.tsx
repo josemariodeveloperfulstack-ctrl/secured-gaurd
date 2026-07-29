@@ -16,8 +16,8 @@ import {
   Building2, 
   Calendar, 
   DollarSign, 
-  Phone, 
   Mail,
+  MessageSquare,
   Target,
   TrendingUp,
   Clock,
@@ -26,7 +26,7 @@ import {
   XCircle,
   Star,
   Trash2,
-  Send
+  Send,
 } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import styles from './KanbanBoard.module.css';
@@ -39,12 +39,18 @@ import {
   deleteOpportunity,
   deleteMultipleOpportunities,
   deleteAllOpportunities,
-  createInteractionHistory
+  createInteractionHistory,
+  fetchInteractionHistory,
 } from '@/services/crmService';
 import { userService } from '@/services/userService';
 import leadService from '@/services/leadService';
+import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  CardInteraction,
+  sortInteractionsDesc,
+} from './kanbanInteractionTypes';
 
 interface KanbanStatus {
   id: string | number;
@@ -291,9 +297,16 @@ export default function KanbanBoard() {
   const [deleteReason, setDeleteReason] = useState('Exclusão em massa via sistema');
   const [deleteSingleId, setDeleteSingleId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [messageModal, setMessageModal] = useState<{ open: boolean; opp: Opportunity | null; text: string }>({
-    open: false, opp: null, text: ''
-  });
+  const [contactModal, setContactModal] = useState<{
+    open: boolean;
+    type: 'EMAIL' | 'WHATSAPP' | 'NOTE' | null;
+    opp: Opportunity | null;
+    text: string;
+    destination: string;
+  }>({ open: false, type: null, opp: null, text: '', destination: '' });
+  const [sendingContact, setSendingContact] = useState(false);
+  /** Histórico de interações por opportunityId (e fallback por leadId). */
+  const [interactionsByOpp, setInteractionsByOpp] = useState<Record<string, CardInteraction[]>>({});
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
 
@@ -462,7 +475,8 @@ export default function KanbanBoard() {
   // Carregar o board primeiro; usuários/leads em background (só para formulários)
   useEffect(() => {
     loadData();
-    const timer = setTimeout(() => void loadUsersAndLeads(), 1500);
+    // Leads logo após o board — evita cards sem e-mail/telefone
+    const timer = setTimeout(() => void loadUsersAndLeads(), 400);
     return () => clearTimeout(timer);
   }, []);
 
@@ -486,6 +500,57 @@ export default function KanbanBoard() {
       loadUsersAndLeads();
     }
   }, [opportunities]);
+
+  // Enriquecer card com e-mail/telefone do lead quando a lista de leads chegar
+  useEffect(() => {
+    if (!leads.length || !opportunities.length) return;
+    setOpportunities((prev) =>
+      prev.map((opp) => {
+        const leadId = opp.lead?.id;
+        if (!leadId) return opp;
+        const found = leads.find((l: any) => String(l.id) === String(leadId));
+        if (!found) return opp;
+        const needsEnrich =
+          !opp.lead?.email ||
+          !opp.lead?.phone ||
+          opp.lead?.name === 'Lead não encontrado' ||
+          opp.lead?.name === 'Sem nome';
+        if (!needsEnrich) return opp;
+        return {
+          ...opp,
+          lead: {
+            ...opp.lead,
+            name: found.name || opp.lead.name,
+            company: found.company || opp.lead.company,
+            email: found.email || opp.lead.email || '',
+            phone: found.phone || opp.lead.phone || '',
+            status: found.status || opp.lead.status,
+            source: normalizeLeadSource(found.source) || opp.lead.source,
+          },
+        };
+      })
+    );
+    setFilteredOpportunities((prev) =>
+      prev.map((opp) => {
+        const leadId = opp.lead?.id;
+        if (!leadId) return opp;
+        const found = leads.find((l: any) => String(l.id) === String(leadId));
+        if (!found) return opp;
+        return {
+          ...opp,
+          lead: {
+            ...opp.lead,
+            name: found.name || opp.lead.name,
+            company: found.company || opp.lead.company,
+            email: found.email || opp.lead.email || '',
+            phone: found.phone || opp.lead.phone || '',
+            status: found.status || opp.lead.status,
+            source: normalizeLeadSource(found.source) || opp.lead.source,
+          },
+        };
+      })
+    );
+  }, [leads]);
 
   // Função helper para normalizar o source do Lead (pode vir como string, enum object ou null/undefined)
   function normalizeLeadSource(source: any): string {
@@ -608,13 +673,18 @@ export default function KanbanBoard() {
           const userName = usersMap.get(opp.assignedToId);
           if (userName) assignedToName = userName;
         }
+
+        const leadFromList = (leads || []).find(
+          (l: any) => String(l.id) === String(opp.lead?.id || opp.leadId || '')
+        );
+        const rawLead = opp.lead || leadFromList || null;
         
         return {
           id: opp.id,
           title: opp.title,
           description: opp.description || '',
           statusId: opp.statusId,
-          leadId: opp.lead?.id || opp.leadId || null,
+          leadId: rawLead?.id || opp.leadId || null,
           value: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
           estimatedValue: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
           expectedCloseDate: opp.closeDate || '',
@@ -625,16 +695,16 @@ export default function KanbanBoard() {
           priority: 'MEDIUM' as const,
           lastContact: opp.updatedAt || opp.createdAt || '',
           tags: [],
-          lead: opp.lead ? {
-            id: opp.lead.id || null,
-            name: opp.lead.name || 'Sem nome',
-            company: opp.lead.company || '',
-            email: opp.lead.email || '',
-            phone: opp.lead.phone || '',
-            status: opp.lead.status || 'NEW' as const,
-            source: normalizeLeadSource(opp.lead.source),
-            value: opp.lead.value ? Number(opp.lead.value) : (opp.estimatedValue ? Number(opp.estimatedValue) : 0),
-            createdAt: opp.lead.createdAt || opp.createdAt || ''
+          lead: rawLead ? {
+            id: rawLead.id || null,
+            name: rawLead.name || leadFromList?.name || 'Sem nome',
+            company: rawLead.company || leadFromList?.company || '',
+            email: rawLead.email || leadFromList?.email || '',
+            phone: rawLead.phone || leadFromList?.phone || '',
+            status: rawLead.status || 'NEW' as const,
+            source: normalizeLeadSource(rawLead.source),
+            value: rawLead.value ? Number(rawLead.value) : (opp.estimatedValue ? Number(opp.estimatedValue) : 0),
+            createdAt: rawLead.createdAt || opp.createdAt || ''
           } : {
             id: opp.leadId || null,
             name: 'Lead não encontrado',
@@ -653,6 +723,51 @@ export default function KanbanBoard() {
       setOpportunities(unique);
       setFilteredOpportunities(unique);
       setSelectedOppIds([]);
+
+      // Histórico de negociação/contatos para exibir nos cards
+      try {
+        const historyData = await fetchInteractionHistory();
+        const list = Array.isArray(historyData) ? historyData : [];
+        const byOpp: Record<string, CardInteraction[]> = {};
+        const byLead: Record<string, CardInteraction[]> = {};
+
+        for (const raw of list) {
+          const item: CardInteraction = {
+            id: String(raw.id),
+            opportunityId: raw.opportunityId ? String(raw.opportunityId) : null,
+            leadId: raw.leadId ? String(raw.leadId) : null,
+            userName: raw.userName || null,
+            action: raw.action || 'NOTE_ADDED',
+            note: raw.note || '',
+            createdAt: raw.createdAt || null,
+          };
+          if (item.opportunityId) {
+            (byOpp[item.opportunityId] ||= []).push(item);
+          }
+          if (item.leadId) {
+            (byLead[item.leadId] ||= []).push(item);
+          }
+        }
+
+        for (const opp of unique) {
+          const oppId = String(opp.id);
+          const leadId = opp.lead?.id ? String(opp.lead.id) : '';
+          const combined = [
+            ...(byOpp[oppId] || []),
+            ...((leadId && byLead[leadId]) || []).filter(
+              (h) => !h.opportunityId || String(h.opportunityId) === oppId
+            ),
+          ];
+          // dedupe by id
+          const map = new Map<string, CardInteraction>();
+          for (const h of combined) map.set(h.id, h);
+          byOpp[oppId] = sortInteractionsDesc(Array.from(map.values()));
+        }
+        setInteractionsByOpp(byOpp);
+      } catch (histErr) {
+        console.warn('Não foi possível carregar histórico de interações:', histErr);
+        setInteractionsByOpp({});
+      }
     } catch (err: any) {
       console.error('Erro crítico ao carregar dados do Kanban:', err);
       setError(err.message || 'Erro ao carregar dados');
@@ -981,24 +1096,146 @@ export default function KanbanBoard() {
     }
   };
 
+  const openContactModal = (opp: Opportunity, type: 'EMAIL' | 'WHATSAPP' | 'NOTE') => {
+    const defaultText =
+      type === 'EMAIL'
+        ? `Olá ${opp.lead?.name || ''},\n\nReferente à oportunidade: ${opp.title}\n\n`
+        : type === 'WHATSAPP'
+          ? `Olá ${opp.lead?.name || ''}, tudo bem?`
+          : '';
+    const destination =
+      type === 'EMAIL'
+        ? opp.lead?.email || ''
+        : type === 'WHATSAPP'
+          ? opp.lead?.phone || ''
+          : '';
+    setContactModal({ open: true, type, opp, text: defaultText, destination });
+  };
+
   const handleSendEmail = (opp: Opportunity) => {
-    const email = opp.lead?.email;
-    if (!email) return;
-    const subject = encodeURIComponent(`Oportunidade: ${opp.title}`);
-    window.open(`mailto:${email}?subject=${subject}`, '_blank');
-    recordInteraction(opp, 'EMAIL_SENT', `E-mail enviado para ${email}`);
+    openContactModal(opp, 'EMAIL');
   };
 
   const handleSendWhatsApp = (opp: Opportunity) => {
-    const phone = opp.lead?.phone?.replace(/\D/g, '');
-    if (!phone) return;
-    const text = encodeURIComponent(`Olá ${opp.lead?.name || ''}, tudo bem?`);
-    window.open(`https://wa.me/55${phone}?text=${text}`, '_blank');
-    recordInteraction(opp, 'WHATSAPP_SENT', `WhatsApp enviado para ${opp.lead?.phone}`);
+    openContactModal(opp, 'WHATSAPP');
   };
 
-  const handleSendMessage = (opp: Opportunity) => {
-    setMessageModal({ open: true, opp, text: '' });
+  const handleAddNegotiationNote = (opp: Opportunity) => {
+    openContactModal(opp, 'NOTE');
+  };
+
+  const normalizeWhatsAppPhone = (raw: string): string => {
+    const digits = (raw || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('55')) return digits;
+    if (digits.length >= 10 && digits.length <= 11) return `55${digits}`;
+    return digits;
+  };
+
+  const appendInteractionLocally = (opp: Opportunity, action: string, note: string) => {
+    const entry: CardInteraction = {
+      id: `local-${Date.now()}`,
+      opportunityId: String(opp.id),
+      leadId: opp.lead?.id ? String(opp.lead.id) : null,
+      userName: currentUser?.name || currentUser?.username || 'Comercial',
+      action,
+      note,
+      createdAt: new Date().toISOString(),
+    };
+    setInteractionsByOpp((prev) => ({
+      ...prev,
+      [String(opp.id)]: sortInteractionsDesc([entry, ...(prev[String(opp.id)] || [])]),
+    }));
+    setOpportunities((prev) =>
+      prev.map((o) =>
+        String(o.id) === String(opp.id) ? { ...o, lastContact: entry.createdAt || o.lastContact } : o
+      )
+    );
+    setFilteredOpportunities((prev) =>
+      prev.map((o) =>
+        String(o.id) === String(opp.id) ? { ...o, lastContact: entry.createdAt || o.lastContact } : o
+      )
+    );
+  };
+
+  const handleConfirmContact = async () => {
+    const opp = contactModal.opp;
+    const text = contactModal.text.trim();
+    const type = contactModal.type;
+    const destination = contactModal.destination.trim();
+    if (!opp || !text || !type || sendingContact) return;
+
+    if (type === 'WHATSAPP') {
+      const phone = normalizeWhatsAppPhone(destination);
+      if (!phone) {
+        toast({
+          title: 'Telefone obrigatório',
+          description: 'Informe o número do WhatsApp com DDD para enviar.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      try {
+        setSendingContact(true);
+        const { data } = await api.post('/whatsapp/send-test', {
+          telefone: phone,
+          mensagem: text,
+        });
+        if (!data?.sucesso) {
+          throw new Error(data?.message || 'Falha ao enviar pela conexão WhatsApp do sistema.');
+        }
+        await recordInteraction(opp, 'WHATSAPP_SENT', text);
+        appendInteractionLocally(opp, 'WHATSAPP_SENT', `[WhatsApp ${destination}] ${text}`);
+        setContactModal({ open: false, type: null, opp: null, text: '', destination: '' });
+        toast({
+          title: 'WhatsApp enviado',
+          description: 'Mensagem enviada pela conexão do sistema e registrada no card.',
+        });
+      } catch (error: any) {
+        console.error('Erro ao enviar WhatsApp pelo Kanban:', error);
+        toast({
+          title: 'Erro ao enviar WhatsApp',
+          description:
+            error?.response?.data?.message ||
+            error?.message ||
+            'Verifique a conexão WhatsApp do sistema e tente novamente.',
+          variant: 'destructive',
+        });
+      } finally {
+        setSendingContact(false);
+      }
+      return;
+    }
+
+    if (type === 'EMAIL') {
+      if (!destination || !destination.includes('@')) {
+        toast({
+          title: 'E-mail obrigatório',
+          description: 'Informe um e-mail válido para enviar.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      await recordInteraction(opp, 'EMAIL_SENT', text);
+      appendInteractionLocally(opp, 'EMAIL_SENT', `[E-mail ${destination}] ${text}`);
+      const subject = encodeURIComponent(`Oportunidade: ${opp.title}`);
+      const body = encodeURIComponent(text);
+      window.open(`mailto:${destination}?subject=${subject}&body=${body}`, '_blank');
+      setContactModal({ open: false, type: null, opp: null, text: '', destination: '' });
+      toast({
+        title: 'E-mail aberto',
+        description: 'Mensagem registrada no card e pronta no cliente de e-mail.',
+      });
+      return;
+    }
+
+    await recordInteraction(opp, 'NOTE_ADDED', text);
+    appendInteractionLocally(opp, 'NOTE_ADDED', text);
+    setContactModal({ open: false, type: null, opp: null, text: '', destination: '' });
+    toast({
+      title: 'Nota de negociação registrada',
+      description: 'O histórico do card foi atualizado para o time comercial.',
+    });
   };
 
   const handleDragStart = (event: any) => {
@@ -1251,7 +1488,8 @@ export default function KanbanBoard() {
                       onDelete={openSingleDeleteDialog}
                       onSendEmail={handleSendEmail}
                       onSendWhatsApp={handleSendWhatsApp}
-                      onSendMessage={handleSendMessage}
+                      onAddNegotiationNote={handleAddNegotiationNote}
+                      interactions={interactionsByOpp[String(opp.id)] || []}
                       formatCurrency={formatCurrency}
                       formatDate={formatDate}
                     />
@@ -1274,48 +1512,87 @@ export default function KanbanBoard() {
         })}
       </div>
 
-      {/* Modal de mensagem */}
-      <Dialog open={messageModal.open} onOpenChange={(open) => setMessageModal(prev => ({ ...prev, open }))}>
+      {/* Contato E-mail / WhatsApp — permanece no Kanban */}
+      <Dialog
+        open={contactModal.open}
+        onOpenChange={(open) => setContactModal((prev) => ({ ...prev, open }))}
+      >
         <DialogContent className="sm:max-w-md border border-gray-600 bg-seguranca-graphite p-6 text-seguranca-lightgray shadow-2xl [&>button]:text-seguranca-lightgray">
           <DialogHeader>
-            <DialogTitle className="text-seguranca-lightgray">
-              Mensagem para {messageModal.opp?.lead?.name || 'Lead'}
+            <DialogTitle className="text-seguranca-lightgray flex items-center gap-2">
+              {contactModal.type === 'EMAIL' ? (
+                <Mail className="h-4 w-4 text-seguranca-yellow" />
+              ) : contactModal.type === 'WHATSAPP' ? (
+                <MessageSquare className="h-4 w-4 text-green-400" />
+              ) : (
+                <MessageSquare className="h-4 w-4 text-seguranca-yellow" />
+              )}
+              {contactModal.type === 'EMAIL'
+                ? 'E-mail'
+                : contactModal.type === 'WHATSAPP'
+                  ? 'WhatsApp'
+                  : 'Nota de negociação'}{' '}
+              — {contactModal.opp?.lead?.name || contactModal.opp?.title || 'Lead'}
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              Registra a mensagem no histórico de interações da oportunidade.
+              {contactModal.type === 'NOTE'
+                ? 'Descreva o andamento da negociação para o próximo atendente.'
+                : contactModal.type === 'WHATSAPP'
+                  ? 'A mensagem será enviada pela conexão WhatsApp do sistema e registrada no card.'
+                  : 'A mensagem será registrada no card e aberta no cliente de e-mail para envio.'}
             </DialogDescription>
           </DialogHeader>
+          {(contactModal.type === 'EMAIL' || contactModal.type === 'WHATSAPP') && (
+            <div className="space-y-2">
+              <Label className="text-seguranca-lightgray">
+                {contactModal.type === 'EMAIL' ? 'E-mail do destinatário *' : 'Telefone WhatsApp (com DDD) *'}
+              </Label>
+              <Input
+                value={contactModal.destination}
+                onChange={(e) =>
+                  setContactModal((prev) => ({ ...prev, destination: e.target.value }))
+                }
+                placeholder={
+                  contactModal.type === 'EMAIL' ? 'cliente@empresa.com' : '(31) 99999-9999'
+                }
+                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+              />
+            </div>
+          )}
           <Textarea
-            value={messageModal.text}
-            onChange={(e) => setMessageModal(prev => ({ ...prev, text: e.target.value }))}
-            placeholder="Digite sua mensagem..."
+            value={contactModal.text}
+            onChange={(e) => setContactModal((prev) => ({ ...prev, text: e.target.value }))}
+            placeholder="Digite a mensagem..."
             className="bg-seguranca-black border-gray-600 text-seguranca-lightgray min-h-[120px]"
           />
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
-              onClick={() => setMessageModal({ open: false, opp: null, text: '' })}
+              onClick={() =>
+                setContactModal({ open: false, type: null, opp: null, text: '', destination: '' })
+              }
               className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
             >
               Cancelar
             </Button>
             <Button
-              onClick={() => {
-                const opp = messageModal.opp;
-                const text = messageModal.text.trim();
-                if (!opp || !text) return;
-                recordInteraction(opp, 'MESSAGE_SENT', text);
-                setMessageModal({ open: false, opp: null, text: '' });
-                toast({
-                  title: 'Mensagem registrada',
-                  description: 'A mensagem foi salva no histórico de interações.',
-                });
-              }}
+              onClick={handleConfirmContact}
               className="bg-seguranca-yellow text-black hover:bg-yellow-500"
-              disabled={!messageModal.text.trim()}
+              disabled={
+                sendingContact ||
+                !contactModal.text.trim() ||
+                ((contactModal.type === 'EMAIL' || contactModal.type === 'WHATSAPP') &&
+                  !contactModal.destination.trim())
+              }
             >
               <Send className="h-4 w-4 mr-2" />
-              Enviar
+              {sendingContact && contactModal.type === 'WHATSAPP'
+                ? 'Enviando...'
+                : contactModal.type === 'WHATSAPP'
+                  ? 'Enviar pelo sistema'
+                  : contactModal.type === 'EMAIL'
+                    ? 'Abrir e-mail e registrar'
+                    : 'Registrar no card'}
             </Button>
           </DialogFooter>
         </DialogContent>

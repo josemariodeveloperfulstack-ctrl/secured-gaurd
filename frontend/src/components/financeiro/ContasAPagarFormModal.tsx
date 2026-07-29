@@ -6,11 +6,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, CheckCircle } from 'lucide-react';
+import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, CheckCircle, FolderTree } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
-import { contasAPagarService, Supplier, CategoriaPai, Subcategoria, EmployeeSelect } from '@/services/contasAPagarService';
+import { contasAPagarService, Supplier, CategoriaPai, Subcategoria } from '@/services/contasAPagarService';
 import SupplierFormModal from '@/components/estoque/SupplierFormModal';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import { Link } from 'react-router-dom';
 
 export interface ContaAPagar {
   id?: string;
@@ -89,7 +91,6 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   const [categoriasPai, setCategoriasPai] = useState<CategoriaPai[]>([]);
   const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
   const [selectedCategoriaPaiId, setSelectedCategoriaPaiId] = useState<string>('');
-  const [employees, setEmployees] = useState<EmployeeSelect[]>([]);
   const [selectedSubcategoria, setSelectedSubcategoria] = useState<Subcategoria | null>(null);
 
   // Helpers para moeda BRL com 2 casas decimais
@@ -247,10 +248,6 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
       contasAPagarService.getSubcategorias()
         .then(data => setSubcategorias(Array.isArray(data) ? data : []))
         .catch(() => setSubcategorias([]));
-
-      contasAPagarService.getEmployeeList()
-        .then(data => setEmployees(Array.isArray(data) ? data : []))
-        .catch(() => setEmployees([]));
     }
   }, [open]);
 
@@ -363,6 +360,22 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
     }));
   };
 
+  // Restaurar Plano de Contas quando subcategorias carregarem (edição)
+  useEffect(() => {
+    if (!open || !editMode || !initialData?.subcategoriaId || subcategorias.length === 0) return;
+    const sub = subcategorias.find((s) => s.id === initialData.subcategoriaId);
+    if (sub) {
+      setSelectedSubcategoria(sub);
+      setSelectedCategoriaPaiId(sub.categoriaPaiId);
+    }
+  }, [open, editMode, initialData?.subcategoriaId, subcategorias]);
+
+  const filteredSubcategorias = selectedCategoriaPaiId
+    ? subcategorias.filter((s) => s.categoriaPaiId === selectedCategoriaPaiId)
+    : [];
+
+  const requiresEmployee = Boolean(selectedSubcategoria?.requerVinculoFuncionario);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -370,6 +383,33 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
       toast({
         title: "Erro",
         description: "Preencha todos os campos obrigatórios",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.companySigla && !formData.empresaId) {
+      toast({
+        title: "Erro",
+        description: "Selecione a empresa (SIGLA) da conta a pagar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (selectedSubcategoria?.requerVinculoFuncionario && !formData.employeeId) {
+      toast({
+        title: "Erro",
+        description: "Esta conta do Plano de Contas exige informar o funcionário beneficiário",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.employeeId && !formData.companySigla && !formData.empresaId) {
+      toast({
+        title: "Erro",
+        description: "Informe a empresa do funcionário vinculado ao pagamento",
         variant: "destructive"
       });
       return;
@@ -518,6 +558,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
             {/* Empresa */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Empresa (SIGLA) *</label>
+              <p className="text-xs text-gray-400 -mt-1">Obrigatória; define de qual empresa é o pagamento (e filtra funcionários).</p>
               <Select
                 value={formData.empresaId}
                 onValueChange={(value) => {
@@ -608,94 +649,135 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
               />
             </div>
 
-            {/* Categoria Pai (Plano de Contas) */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Categoria</label>
-              <Select
-                value={selectedCategoriaPaiId || 'none'}
-                onValueChange={(value) => {
-                  setSelectedCategoriaPaiId(value === 'none' ? '' : value);
-                  setSelectedSubcategoria(null);
-                  handleInputChange('subcategoriaId', '');
-                }}
-              >
-                <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-gray-600">
-                  <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
-                    Nenhuma
-                  </SelectItem>
-                  {categoriasPai.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      {cat.codigo} - {cat.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Subcategoria (dependente da categoria pai) */}
-            {selectedCategoriaPaiId && selectedCategoriaPaiId !== 'none' && selectedCategoriaPaiId.length > 20 && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Subcategoria</label>
-                <Select
-                  value={formData.subcategoriaId || ''}
-                  onValueChange={(value) => {
-                    handleInputChange('subcategoriaId', value);
-                    const sub = subcategorias.find(s => s.id === value);
-                    setSelectedSubcategoria(sub || null);
-                    if (!sub?.requerVinculoFuncionario) {
-                      handleInputChange('employeeId', '');
-                    }
-                  }}
+            {/* Plano de Contas */}
+            <div className="space-y-2 md:col-span-2 rounded-lg border border-seguranca-yellow/30 bg-black/20 p-4">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <label className="text-sm font-medium text-seguranca-yellow flex items-center gap-2">
+                  <FolderTree size={14} />
+                  Plano de Contas
+                </label>
+                <Link
+                  to="/plano-contas"
+                  className="text-xs text-seguranca-yellow underline"
+                  target="_blank"
+                  rel="noreferrer"
                 >
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                    <SelectValue placeholder="Selecione uma subcategoria" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {subcategorias
-                      .filter(s => s.categoriaPaiId === selectedCategoriaPaiId)
-                      .map((sub) => (
-                        <SelectItem key={sub.id} value={sub.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                          {sub.codigo} - {sub.nome}
+                  Gerenciar plano de contas
+                </Link>
+              </div>
+              <p className="text-xs text-gray-400 mb-3">
+                Use a conta contábil correta (ex.: rescisão, vale, ajuda de custo). Contas de RH pedem o funcionário e a empresa.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-seguranca-lightgray">Categoria *</label>
+                  <Select
+                    value={selectedCategoriaPaiId || 'none'}
+                    onValueChange={(value) => {
+                      setSelectedCategoriaPaiId(value === 'none' ? '' : value);
+                      setSelectedSubcategoria(null);
+                      handleInputChange('subcategoriaId', '');
+                      handleInputChange('employeeId', '');
+                    }}
+                  >
+                    <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                      <SelectValue placeholder="Selecione a categoria do plano" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600">
+                      <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
+                        Nenhuma
+                      </SelectItem>
+                      {categoriasPai.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                          {cat.codigo} - {cat.nome}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+                    </SelectContent>
+                  </Select>
+                  {categoriasPai.length === 0 && (
+                    <p className="text-xs text-amber-400">
+                      Nenhuma categoria cadastrada. Cadastre em Plano de Contas ou reinicie o backend para carregar o seed.
+                    </p>
+                  )}
+                </div>
 
-            {/* Funcionário (condicional) */}
-            {selectedSubcategoria?.requerVinculoFuncionario && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-yellow-400 flex items-center gap-2">
-                  <Users size={14} />
-                  Funcionário *
-                </label>
-                <Select
-                  value={formData.employeeId || ''}
-                  onValueChange={(value) => handleInputChange('employeeId', value)}
-                  required
-                >
-                  <SelectTrigger className="border-yellow-500 bg-seguranca-black text-seguranca-lightgray focus:border-yellow-400 focus:ring-yellow-400">
-                    <SelectValue placeholder="Selecione um funcionário" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {employees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                        {emp.name}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-seguranca-lightgray">Conta / Subcategoria *</label>
+                  <Select
+                    value={formData.subcategoriaId || 'none'}
+                    onValueChange={(value) => {
+                      if (value === 'none') {
+                        handleInputChange('subcategoriaId', '');
+                        setSelectedSubcategoria(null);
+                        handleInputChange('employeeId', '');
+                        return;
+                      }
+                      handleInputChange('subcategoriaId', value);
+                      const sub = filteredSubcategorias.find((s) => s.id === value) || subcategorias.find((s) => s.id === value);
+                      setSelectedSubcategoria(sub || null);
+                      if (!sub?.requerVinculoFuncionario) {
+                        handleInputChange('employeeId', '');
+                      }
+                    }}
+                    disabled={!selectedCategoriaPaiId}
+                  >
+                    <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                      <SelectValue placeholder={selectedCategoriaPaiId ? 'Selecione a conta' : 'Selecione a categoria primeiro'} />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600">
+                      <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
+                        Nenhuma
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-yellow-500/80">Esta subcategoria exige vínculo com um funcionário.</p>
+                      {filteredSubcategorias.map((sub) => (
+                        <SelectItem key={sub.id} value={sub.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                          {sub.codigo} - {sub.nome}
+                          {sub.requerVinculoFuncionario ? ' (funcionário)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            )}
+
+              {(requiresEmployee || formData.employeeId) && (
+                <div className="mt-4 space-y-3 rounded-md border border-yellow-500/40 bg-yellow-500/5 p-3">
+                  <label className="text-sm font-medium text-yellow-400 flex items-center gap-2">
+                    <Users size={14} />
+                    Funcionário beneficiário {requiresEmployee ? '*' : ''}
+                  </label>
+                  <p className="text-xs text-yellow-500/80">
+                    Pagamentos de rescisão, vale, ajuda de custo ou documentos fiscais de RH devem indicar o funcionário e a empresa (SIGLA) acima.
+                  </p>
+                  {!formData.empresaId && (
+                    <p className="text-xs text-amber-400">
+                      Selecione a Empresa (SIGLA) para filtrar os funcionários da empresa correta.
+                    </p>
+                  )}
+                  <EmployeeCombobox
+                    value={formData.employeeId || ''}
+                    onChange={(value) => handleInputChange('employeeId', value)}
+                    companyId={formData.empresaId || undefined}
+                    placeholder="Busque o funcionário pelo nome"
+                    onEmployeeSelect={(emp) => {
+                      handleInputChange('employeeId', emp.id);
+                      if (emp.companyId && !formData.empresaId) {
+                        const match = empresas.find((e: any) => String(e.id) === String(emp.companyId));
+                        if (match) {
+                          handleInputChange('empresaId', match.id);
+                          handleInputChange('empresa', match.name);
+                          handleInputChange('companySigla', match.sigla || match.name);
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              )}
+            </div>
 
             {/* Categoria antiga (fallback) */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-400">Categoria (texto livre)</label>
+              <label className="text-sm font-medium text-gray-400">Categoria (texto livre — legado)</label>
               <Select
                 value={(formData.categoria && formData.categoria !== '') ? formData.categoria : 'NENHUMA'}
                 onValueChange={(value) => handleInputChange('categoria', value)}

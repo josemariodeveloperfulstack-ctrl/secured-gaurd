@@ -19,7 +19,7 @@ import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
-import { employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
+import { employeeAdmissionIsoDate, employeeAdmissionIsoDateOrToday } from '@/utils/employeeAdmissionDate';
 import {
   applyOrdemServicoTemplate,
   findOrdemServicoTemplate,
@@ -455,7 +455,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       responsibility: form.responsibility,
       employeeObligations: form.employeeObligations,
       revision: form.revision,
-      hireDate: form.hireDate || fullEmployee.hireDate || null,
+      hireDate: employeeAdmissionIsoDate(form.hireDate || fullEmployee.hireDate) || null,
       layoutType: form.layoutType,
       activities: form.activities,
       risks: form.risks,

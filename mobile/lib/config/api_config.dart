@@ -67,6 +67,10 @@ class ApiConfig {
   static const String transportGuide = '/api/transport-guide';
   static const String rondas = '/api/rondas';
 
+  // Supervisor Visit (novo fluxo preview + checkin)
+  static const String supervisorVisitPreview = '/api/supervisor-visits/preview';
+  static const String supervisorVisitCheckin = '/api/supervisor-visits/checkin';
+
   // Operacional
   static const String occurrences = '/api/occurrences';
   static const String operationalOccurrences = '/api/operational/occurrences';
@@ -78,6 +82,7 @@ class ApiConfig {
   static const String sstMedicalExams = '/api/sst/medical-exams';
   static const String hrEmployees = '/api/hr/employees';
   static const String hrStats = '/api/hr/stats';
+  static const String performanceEvaluations = '/api/performance-evaluations';
 
   // DP (Departamento Pessoal)
   static const String payrolls = '/api/payrolls';

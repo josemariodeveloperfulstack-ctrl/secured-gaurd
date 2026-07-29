@@ -12,7 +12,7 @@ public class WhatsAppAgentConfig {
 
     @Bean
     public List<WhatsAppProvider> orderedWhatsAppProviders(
-            @Value("${whatsapp.agent.provider-order:uazapi,zapi,evolution,baileys}") String providerOrder,
+            @Value("${whatsapp.agent.provider-order:evolution,uazapi,zapi,baileys}") String providerOrder,
             UazapiWhatsAppProvider uazapi,
             ZapiWhatsAppProvider zapi,
             EvolutionWhatsAppProvider evolution,

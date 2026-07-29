@@ -21,6 +21,8 @@ export const DOCUMENT_TYPES = {
     DAMAGE_FINES_RESPONSIBILITY: 'damage-fines-responsibility',
     BODY_CAM_RESPONSIBILITY: 'body-cam-responsibility',
     SERVICE_PROVIDER_AWARENESS: 'service-provider-awareness',
+    VALE_GOLDEN_RULES: 'vale-golden-rules',
+    TOXICOLOGICAL_TEST_AUTH: 'toxicological-test-auth',
     DECLARATION: 'declaration',
 
     // 🔄 Onda 2: Ordens de Serviço
@@ -76,6 +78,8 @@ export const DOCUMENT_DISPLAY_NAMES: Record<string, string> = {
     [DOCUMENT_TYPES.DAMAGE_FINES_RESPONSIBILITY]: 'Termo de Responsabilidade por Danos e Multas',
     [DOCUMENT_TYPES.BODY_CAM_RESPONSIBILITY]: 'Termo de Responsabilidade e Uso de Body Cam',
     [DOCUMENT_TYPES.SERVICE_PROVIDER_AWARENESS]: 'Termo de Ciência do Prestador de Serviços',
+    [DOCUMENT_TYPES.VALE_GOLDEN_RULES]: 'Regras de Ouro da Vale',
+    [DOCUMENT_TYPES.TOXICOLOGICAL_TEST_AUTH]: 'Autorização para Teste Toxicológico',
     [DOCUMENT_TYPES.DECLARATION]: 'Declaração',
     [DOCUMENT_TYPES.SERVICE_ORDER_STANDARD]: 'Ordem de Serviço Padrão',
     [DOCUMENT_TYPES.SERVICE_ORDER_CSN]: 'Ordem de Serviço CSN',

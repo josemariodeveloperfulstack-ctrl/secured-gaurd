@@ -37,8 +37,24 @@ import { userService } from '@/services/userService';
 import { companyService } from '@/services/companyService';
 import { workPostService } from '@/services/workPostService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import WorkPostFormModal from '@/components/postos/WorkPostFormModal';
 import { formatCpfForInput, formatCnpjForInput } from '@/utils/validation';
+
+function formatWorkPostType(type?: string): string {
+  if (!type) return 'Posto não informado';
+  const map: Record<string, string> = {
+    POSTO_24H: 'Posto 24h',
+    POSTO_12H_DIURNO: 'Posto 12h Diurno',
+    POSTO_12H_NOTURNO: 'Posto 12h Noturno',
+    POSTO_8H_DIURNO: 'Posto 8h Diurno',
+    POSTO_8H_NOTURNO: 'Posto 8h Noturno',
+    POSTO_SDF: 'Posto SDF',
+    POSTO_ESPECIAL: 'Posto Especial',
+    POSTO_6H: 'Posto 6h',
+    POSTO_8H: 'Posto 8h',
+    OUTROS: 'Outros',
+  };
+  return map[type] || type.replace(/^POSTO_/, 'Posto ').replace(/_/g, ' ');
+}
 
 type StatusType = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'SUSPENDED';
 type OriginType = 'PROPOSAL' | 'RENEWAL' | 'MANUAL';
@@ -104,8 +120,6 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
   const [companiesList, setCompaniesList] = useState<any[]>([]);
   const [clientWorkPosts, setClientWorkPosts] = useState<any[]>([]);
   const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
-  const [workPostModalOpen, setWorkPostModalOpen] = useState(false);
-  const [lastAddedPostName, setLastAddedPostName] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<ContratoFormData>({
     clientId: '',
@@ -180,7 +194,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
     }
   }, [open]);
 
-  // Carregar postos de trabalho do cliente selecionado
+  // Carregar setores de trabalho do cliente selecionado
   useEffect(() => {
     if (formData.clientId) {
       loadClientWorkPosts(formData.clientId);
@@ -238,12 +252,12 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
   const loadClientWorkPosts = async (clientId: string) => {
     setLoadingWorkPosts(true);
     try {
-      console.log('🔄 Buscando postos para o cliente:', clientId);
+      console.log('🔄 Buscando setores de trabalho do cliente:', clientId);
       const data = await workPostService.getWorkPostsByClient(clientId);
       setClientWorkPosts(data || []);
-      console.log('✅ Postos carregados:', data);
+      console.log('✅ Setores carregados:', data);
     } catch (error) {
-      console.error('Erro ao carregar postos de trabalho do cliente:', error);
+      console.error('Erro ao carregar setores de trabalho do cliente:', error);
       setClientWorkPosts([]);
     } finally {
       setLoadingWorkPosts(false);
@@ -383,32 +397,6 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
         description: `Nova filial física selecionada: ${matched.name}`,
       });
     }
-  };
-
-  // Sucesso da Drawer Lateral (Opção A: Salva de forma permanente no banco de dados)
-  const handleWorkPostSuccess = (newPost: any) => {
-    // 1. Mostrar o aviso/confirmação explícita de que foi salvo no banco e selecionado
-    toast({
-      title: "Vínculo Confirmado!",
-      description: `O posto "${newPost.name}" foi salvo permanentemente no banco de dados sob este cliente e selecionado automaticamente no contrato!`,
-    });
-    
-    // 2. Alerta visual na tela por 10s
-    setLastAddedPostName(newPost.name);
-    setTimeout(() => {
-      setLastAddedPostName(null);
-    }, 10000);
-
-    // 3. Recarregar os postos do cliente
-    if (formData.clientId) {
-      loadClientWorkPosts(formData.clientId);
-    }
-
-    // 4. Selecionar automaticamente na lista
-    setFormData(prev => ({
-      ...prev,
-      workPostIds: [...(prev.workPostIds || []), newPost.id]
-    }));
   };
 
   const handleWorkPostCheckboxChange = (postId: string, checked: boolean) => {
@@ -589,7 +577,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
                 {contrato ? 'Editar Contrato Comercial' : 'Novo Contrato Comercial'}
               </DialogTitle>
               <DialogDescription className="text-xs text-zinc-400 mt-1 uppercase tracking-wide">
-                Configuração dinâmica de minuta comercial, filial executora e postos de trabalho
+                Configuração dinâmica de minuta comercial, filial executora e setores de trabalho
               </DialogDescription>
             </div>
           </div>
@@ -897,75 +885,47 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
               </div>
             </div>
 
-            {/* CARD 4: POSTOS DE TRABALHO VINCULADOS AO CLIENTE (CHECKLIST & DRAWER INLINE) */}
+            {/* CARD 4: SETORES DE TRABALHO DO CLIENTE (somente seleção do cadastro) */}
             <div className="bg-[#161616] border border-zinc-800 p-4 rounded-none space-y-4">
               <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
                 <h3 className="text-xs font-bold text-yellow-500 uppercase tracking-widest flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4" /> Postos de Trabalho do Cliente
+                  <MapPin className="h-4 w-4" /> Setores de Trabalho do Cliente
                 </h3>
-                <Button
-                  type="button"
-                  onClick={() => setWorkPostModalOpen(true)}
-                  disabled={!formData.clientId}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold uppercase tracking-wider rounded-none h-7 px-3 text-[10px]"
-                >
-                  <Plus className="h-3 w-3 mr-1" /> Novo Posto
-                </Button>
               </div>
 
-              {/* Alerta de Confirmação Explicita (Opção A) */}
               <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-none text-xs text-zinc-400 space-y-1">
                 <p className="font-bold text-yellow-500 uppercase tracking-wider flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5" /> Fluxo de Salvamento Instantâneo
+                  <AlertCircle className="h-3.5 w-3.5" /> Cadastro no Cliente
                 </p>
                 <p>
-                  Todos os postos criados no botão <strong className="text-yellow-500">"+ Novo Posto"</strong> são persistidos imediatamente no banco de dados sob o cliente. Se você decidir fechar ou cancelar este contrato, os postos cadastrados <strong className="text-white">NÃO serão perdidos</strong>.
+                  Os setores e postos são definidos no <strong className="text-white">cadastro do cliente</strong>.
+                  Aqui você apenas seleciona quais serão vinculados a este contrato.
                 </p>
               </div>
 
-              {/* Alerta Dinâmico Temporário de Sucesso */}
-              {lastAddedPostName && (
-                <div className="bg-green-950/40 border border-green-800 p-3 rounded-none text-xs text-green-300 animate-pulse flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-bold">
-                    <CheckCircle className="h-4 w-4 text-green-400" />
-                    O posto "{lastAddedPostName}" foi criado e associado ao cliente com sucesso! Já o selecionamos para você abaixo.
-                  </span>
-                  <button 
-                    type="button" 
-                    onClick={() => setLastAddedPostName(null)}
-                    className="text-green-500 hover:text-green-300 font-bold"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-
-              {/* Checklist Grid */}
               <div className="space-y-2">
-                <Label className="text-xs text-zinc-300 font-bold uppercase">Selecione os postos vinculados a este contrato:</Label>
+                <Label className="text-xs text-zinc-300 font-bold uppercase">
+                  Selecione os setores (e seus postos) vinculados a este contrato:
+                </Label>
                 
                 {!formData.clientId ? (
                   <div className="bg-black/50 border border-dashed border-zinc-800 p-5 text-center text-xs text-zinc-500">
-                    Selecione um Cliente Contratante primeiro para listar os postos de trabalho correspondentes.
+                    Selecione um Cliente Contratante primeiro para listar os setores de trabalho e seus postos.
                   </div>
                 ) : loadingWorkPosts ? (
                   <div className="flex items-center justify-center p-6 bg-black/30 border border-zinc-800">
                     <Loader2 className="h-5 w-5 text-yellow-500 animate-spin mr-2" />
-                    <span className="text-xs text-zinc-400">Carregando postos de trabalho do cliente...</span>
+                    <span className="text-xs text-zinc-400">Carregando setores de trabalho do cliente...</span>
                   </div>
                 ) : clientWorkPosts.length === 0 ? (
                   <div className="bg-black/50 border border-dashed border-zinc-800 p-5 text-center text-xs text-zinc-500 space-y-2">
-                    <p>Nenhum posto de trabalho cadastrado para este cliente.</p>
-                    <Button
-                      type="button"
-                      onClick={() => setWorkPostModalOpen(true)}
-                      className="bg-zinc-900 border border-zinc-700 hover:bg-yellow-500 hover:text-black rounded-none h-7 px-3 text-[10px] uppercase font-bold"
-                    >
-                      Criar Primeiro Posto
-                    </Button>
+                    <p>Nenhum setor de trabalho cadastrado para este cliente.</p>
+                    <p className="text-zinc-600">
+                      Cadastre setores e postos na ficha do cliente e depois volte a este contrato.
+                    </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[160px] overflow-y-auto bg-black p-3 border border-zinc-800">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[220px] overflow-y-auto bg-black p-3 border border-zinc-800">
                     {clientWorkPosts.map(post => {
                       const isChecked = (formData.workPostIds || []).includes(post.id);
                       return (
@@ -983,18 +943,32 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
                             onCheckedChange={(checked) => handleWorkPostCheckboxChange(post.id, !!checked)}
                             className="mt-0.5 border-zinc-800 data-[state=checked]:bg-yellow-500 data-[state=checked]:text-black"
                           />
-                          <div className="space-y-0.5">
+                          <div className="space-y-1 min-w-0">
                             <Label 
                               htmlFor={`post-${post.id}`} 
-                              className="text-xs font-bold text-white uppercase tracking-wide cursor-pointer flex items-center gap-1.5"
+                              className="text-xs font-bold text-white uppercase tracking-wide cursor-pointer flex flex-wrap items-center gap-1.5"
                             >
-                              {post.name} 
+                              <span className="truncate">{post.name}</span>
                               <Badge className="bg-zinc-800 text-zinc-400 font-mono text-[9px] hover:bg-zinc-800 border-none rounded-none px-1 h-3.5">
                                 {post.postCode}
                               </Badge>
                             </Label>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge className="bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 text-[9px] uppercase rounded-none px-1.5 h-4">
+                                {formatWorkPostType(post.type)}
+                              </Badge>
+                              {post.primaryPositionName && (
+                                <span className="text-[10px] text-zinc-500 truncate">
+                                  Cargo: {post.primaryPositionName}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-zinc-500 font-mono">
-                              {post.workSchedule} • {post.shiftStart}-{post.shiftEnd} • Efetivo: {post.requiredVigilantes || 1}
+                              {post.workSchedule || '—'}
+                              {post.shiftStart || post.shiftEnd
+                                ? ` • ${post.shiftStart || '—'}-${post.shiftEnd || '—'}`
+                                : ''}
+                              {' • '}Efetivo: {post.requiredVigilantes || 1}
                             </p>
                           </div>
                         </div>
@@ -1096,27 +1070,6 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
             </Button>
           </div>
         </form>
-
-        <WorkPostFormModal
-          open={workPostModalOpen}
-          onOpenChange={setWorkPostModalOpen}
-          clients={clients}
-          onSubmit={(savedWorkPost) => {
-            setWorkPostModalOpen(false);
-            if (savedWorkPost) {
-              handleWorkPostSuccess(savedWorkPost);
-              return;
-            }
-            if (formData.clientId) {
-              void loadClientWorkPosts(formData.clientId);
-            }
-          }}
-          forcedClientId={formData.clientId || undefined}
-          defaultAddress={selectedClient?.address}
-          defaultCity={selectedClient?.city}
-          defaultState={selectedClient?.state}
-          defaultZipCode={selectedClient?.zipCode}
-        />
 
       </DialogContent>
     </Dialog>
