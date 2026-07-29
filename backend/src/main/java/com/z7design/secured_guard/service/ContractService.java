@@ -204,22 +204,21 @@ public class ContractService {
         contract.setClient(client);
         resolveAndSetRelatedEntities(contract, contractDTO);
         Contract savedContract = contractRepository.save(contract);
-
-        // Notificação é best-effort e nunca deve afetar a resposta de criação.
-        // Snapshot dos dados antes do afterCommit (sessão Hibernate já fecha no commit).
-        final String contractNumber = savedContract.getContractNumber();
-        final String clientName = client.getName() != null ? client.getName() : "-";
-        final String clientCnpj = client.getCnpj() != null ? client.getCnpj() : "-";
-        final String description = savedContract.getDescription() != null ? savedContract.getDescription() : "-";
-        final BigDecimal value = savedContract.getValue() != null ? savedContract.getValue() : BigDecimal.ZERO;
-        final String startDate = savedContract.getStartDate() != null ? savedContract.getStartDate().toString() : "-";
-        final String endDate = savedContract.getEndDate() != null ? savedContract.getEndDate().toString() : "-";
-        final String senderUsername = resolveAuthenticatedUsername();
-
-        scheduleNewContractNotification(
-                contractNumber, clientName, clientCnpj, description, value, startDate, endDate, senderUsername);
-
+        scheduleNewContractNotificationFromEntity(savedContract, client);
         return savedContract;
+    }
+
+    private void scheduleNewContractNotificationFromEntity(Contract saved, Client client) {
+        final String contractNumber = saved.getContractNumber();
+        final String clientName = client != null && client.getName() != null ? client.getName() : "-";
+        final String clientCnpj = client != null && client.getCnpj() != null ? client.getCnpj() : "-";
+        final String description = saved.getDescription() != null ? saved.getDescription() : "-";
+        final BigDecimal value = saved.getValue() != null ? saved.getValue() : BigDecimal.ZERO;
+        final String startDate = saved.getStartDate() != null ? saved.getStartDate().toString() : "-";
+        final String endDate = saved.getEndDate() != null ? saved.getEndDate().toString() : "-";
+        scheduleNewContractNotification(
+                contractNumber, clientName, clientCnpj, description, value, startDate, endDate,
+                resolveAuthenticatedUsername());
     }
 
     private String resolveAuthenticatedUsername() {
@@ -376,7 +375,7 @@ public class ContractService {
         Contract saved = contractRepository.save(contract);
         proposal.setContract(saved);
         proposalRepository.save(proposal);
-        notifyDepartmentsNewContract(saved);
+        scheduleNewContractNotificationFromEntity(saved, client);
         return saved;
     }
 
@@ -422,7 +421,7 @@ public class ContractService {
         renewed.setAnnualValue(valueToUse.multiply(java.math.BigDecimal.valueOf(12)));
 
         Contract saved = contractRepository.save(renewed);
-        notifyDepartmentsNewContract(saved);
+        scheduleNewContractNotificationFromEntity(saved, existing.getClient());
         return saved;
     }
 
