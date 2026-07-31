@@ -210,9 +210,17 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
     });
   };
 
-  const loadCompanyConfig = async () => {
+  const loadCompanyConfig = async (companyId?: string) => {
     setLoadingConfig(true);
     try {
+      const id = companyId || selectedCompanyId;
+      if (id) {
+        const byCompany = await companyConfigService.getConfigByCompanyId(id);
+        if (byCompany) {
+          setCompanyConfig(byCompany);
+          return;
+        }
+      }
       const activeConfig = await companyConfigService.getActiveConfig();
       setCompanyConfig(activeConfig);
     } catch (error) {
@@ -244,6 +252,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
 
   const handleSelectCompany = (id: string) => {
     setSelectedCompanyId(id);
+    void loadCompanyConfig(id);
   };
 
   const selectedCompany = selectedCompanyId

@@ -104,6 +104,15 @@ public class EmployeeController {
         return ResponseEntity.ok(stats);
     }
 
+    @GetMapping("/me")
+    @Operation(summary = "Funcionário vinculado ao usuário logado",
+            description = "Retorna o cadastro de funcionário ligado ao usuário autenticado (userId, CPF/username ou e-mail).")
+    public ResponseEntity<EmployeeDTO> getMyEmployee(Authentication authentication) {
+        return employeeService.findDtoForAuthenticatedUser(authentication)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/status/test")
     @Operation(summary = "Teste simples de status", description = "Endpoint de teste para verificar funcionamento")
     public ResponseEntity<Object> testStatus() {

@@ -115,6 +115,9 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     phone: '',
     mobile: '',
     address: '',
+    neighborhood: '',
+    addressNumber: '',
+    addressComplement: '',
     city: '',
     state: '',
     zipCode: '',
@@ -208,12 +211,11 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
       if (response.ok) {
         const data = await response.json();
-        const enderecoCompleto = [data.street, data.neighborhood, data.city]
-          .filter(Boolean)
-          .join(', ');
+        const enderecoLogradouro = data.street || '';
         setFormData(prev => ({
           ...prev,
-          address: enderecoCompleto || prev.address,
+          address: enderecoLogradouro || prev.address,
+          neighborhood: data.neighborhood || prev.neighborhood,
           city: data.city || prev.city,
           state: data.state || prev.state,
           zipCode: formatZipCode(cepLimpo)
@@ -290,6 +292,9 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         phone: client.phone ? formatPhone(client.phone) : '',
         mobile: client.mobile ? formatPhone(client.mobile) : '',
         address: client.address || '',
+        neighborhood: client.neighborhood || '',
+        addressNumber: client.addressNumber || '',
+        addressComplement: client.addressComplement || '',
         city: client.city || '',
         state: client.state || '',
         zipCode: client.zipCode ? formatZipCode(client.zipCode) : '',
@@ -309,6 +314,9 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         phone: '',
         mobile: '',
         address: '',
+        neighborhood: '',
+        addressNumber: '',
+        addressComplement: '',
         city: '',
         state: '',
         zipCode: '',
@@ -341,44 +349,50 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     }));
   };
 
-  // Seleção múltipla de Empresas para o Cliente
+  // Seleção de empresa do cliente (o backend aceita uma única companyId)
   const selectedCompanyIds = (formData.companyId || '')
     .split(',')
     .map((id) => id.trim())
     .filter(Boolean);
 
   const handleToggleCompany = (companyId: string, checked: boolean) => {
-    let updated: string[];
-    if (checked) {
-      updated = Array.from(new Set([...selectedCompanyIds, companyId]));
-    } else {
-      updated = selectedCompanyIds.filter((id) => id !== companyId);
-    }
-    handleInputChange('companyId', updated.join(','));
+    // Apenas uma empresa: marcar substitui a anterior; desmarcar limpa
+    handleInputChange('companyId', checked ? companyId : '');
   };
 
-  const handleRemoveCompany = (companyId: string) => {
-    const updated = selectedCompanyIds.filter((id) => id !== companyId);
-    handleInputChange('companyId', updated.join(','));
+  const handleRemoveCompany = (_companyId: string) => {
+    handleInputChange('companyId', '');
   };
 
-  const buildClientPayload = () => ({
-    ...formData,
-    cnpj: formData.cnpj.replace(/\D/g, ''),
-    companyId: formData.companyId?.trim() || undefined,
-    email: normalizeOptionalEmail(formData.email),
-    contactEmail: normalizeOptionalEmail(formData.contactEmail),
-    phone: formData.phone?.replace(/\D/g, '') || undefined,
-    mobile: formData.mobile?.replace(/\D/g, '') || undefined,
-    address: formData.address?.trim() || undefined,
-    city: formData.city?.trim() || undefined,
-    state: formData.state?.trim() || undefined,
-    zipCode: formData.zipCode?.replace(/\D/g, '') || undefined,
-    contactName: formData.contactName?.trim() || undefined,
-    contactPhone: formData.contactPhone?.replace(/\D/g, '') || undefined,
-    notes: formData.notes?.trim() || undefined,
-    notifiedDepartments: (formData.notifiedDepartments || []).filter(Boolean)
-  });
+  const buildClientPayload = () => {
+    const companyIds = (formData.companyId || '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    // Backend espera UUID único — nunca enviar lista separada por vírgula
+    const companyId = companyIds[0] || undefined;
+
+    return {
+      ...formData,
+      cnpj: formData.cnpj.replace(/\D/g, ''),
+      companyId,
+      email: normalizeOptionalEmail(formData.email),
+      contactEmail: normalizeOptionalEmail(formData.contactEmail),
+      phone: formData.phone?.replace(/\D/g, '') || undefined,
+      mobile: formData.mobile?.replace(/\D/g, '') || undefined,
+      address: formData.address?.trim() || undefined,
+      neighborhood: formData.neighborhood?.trim() || undefined,
+      addressNumber: formData.addressNumber?.trim() || undefined,
+      addressComplement: formData.addressComplement?.trim() || undefined,
+      city: formData.city?.trim() || undefined,
+      state: formData.state?.trim().toUpperCase().slice(0, 2) || undefined,
+      zipCode: formData.zipCode?.replace(/\D/g, '') || undefined,
+      contactName: formData.contactName?.trim() || undefined,
+      contactPhone: formData.contactPhone?.replace(/\D/g, '') || undefined,
+      notes: formData.notes?.trim() || undefined,
+      notifiedDepartments: (formData.notifiedDepartments || []).filter(Boolean)
+    };
+  };
 
   const normalizeOptionalEmail = (value?: string) => {
     const normalized = value?.trim().toLowerCase() || '';
@@ -394,9 +408,27 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     try {
       console.log('[DEBUG] ClientFormModal - Dados do formulário:', formData);
 
-      if (activeClient) {
-        const cleanData = buildClientPayload();
+      const cleanData = buildClientPayload();
+      if (!cleanData.companyId) {
+        toast({
+          title: "Empresa obrigatória",
+          description: "Selecione a empresa vinculada ao cliente antes de salvar.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+      if (!cleanData.cnpj || String(cleanData.cnpj).replace(/\D/g, '').length !== 14) {
+        toast({
+          title: "CNPJ inválido",
+          description: "Informe um CNPJ com 14 dígitos.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
 
+      if (activeClient) {
         const saved = await clientService.updateClient(activeClient.id, cleanData);
         toast({
           title: "✅ Cliente atualizado",
@@ -413,11 +445,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         onClose();
         return saved;
       } else {
-        console.log('[DEBUG] ClientFormModal - Criando novo cliente com dados:', formData);
-
-        const cleanData = buildClientPayload();
-
-        console.log('[DEBUG] ClientFormModal - Dados limpos:', cleanData);
+        console.log('[DEBUG] ClientFormModal - Criando novo cliente com dados:', cleanData);
         const saved = await clientService.createClient(cleanData);
         console.log('[DEBUG] ClientFormModal - Cliente criado com sucesso:', saved);
         
@@ -437,9 +465,13 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     } catch (error: any) {
       console.error('[ERROR] ClientFormModal - Erro ao salvar cliente:', error);
       console.error('[ERROR] ClientFormModal - Response data:', error.response?.data);
+      const apiMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        (typeof error.response?.data === 'string' ? error.response.data : null);
       toast({
-        title: "❌ Erro",
-        description: error.response?.data?.message || "Erro ao salvar cliente",
+        title: "❌ Erro ao salvar cliente",
+        description: apiMessage || "Não foi possível salvar o cliente. Verifique CNPJ, empresa e demais campos.",
         variant: "destructive",
       });
     } finally {
@@ -574,8 +606,9 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                   <div className="space-y-3 md:col-span-2">
                     <Label htmlFor="companyId" className="text-seguranca-lightgray flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
-                      Empresas Vinculadas <span className="text-seguranca-red">*</span>
+                      Empresa Vinculada <span className="text-seguranca-red">*</span>
                     </Label>
+                    <p className="text-xs text-gray-500">Selecione uma empresa do grupo (obrigatório).</p>
                     
                     {/* Lista de Checkboxes de Empresas */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border border-gray-600/60 rounded-lg p-3 bg-seguranca-black/70">
@@ -603,7 +636,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                     {selectedCompanyIds.length > 0 && (
                       <div className="space-y-1.5 pt-1">
                         <span className="text-xs font-medium text-gray-400">
-                          Empresas Selecionadas ({selectedCompanyIds.length}):
+                          Empresa selecionada:
                         </span>
                         <div className="flex flex-wrap gap-2">
                           {selectedCompanyIds.map((compKey) => {
@@ -746,18 +779,60 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="address" className="text-seguranca-lightgray flex items-center gap-2">
                       <MapPin className="h-4 w-4" />
-                      Endereço Completo
+                      Logradouro (Rua/Avenida)
                     </Label>
                     <Input
                       id="address"
                       value={formData.address}
                       onChange={(e) => handleInputChange('address', e.target.value)}
-                      placeholder="Rua, Número, Bairro, Complemento"
+                      placeholder="Nome da rua ou avenida"
                       className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
                     />
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="addressNumber" className="text-seguranca-lightgray flex items-center gap-2">
+                      <Home className="h-4 w-4" />
+                      Número
+                    </Label>
+                    <Input
+                      id="addressNumber"
+                      value={formData.addressNumber}
+                      onChange={(e) => handleInputChange('addressNumber', e.target.value)}
+                      placeholder="Nº"
+                      className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="addressComplement" className="text-seguranca-lightgray flex items-center gap-2">
+                      <Home className="h-4 w-4" />
+                      Complemento
+                    </Label>
+                    <Input
+                      id="addressComplement"
+                      value={formData.addressComplement}
+                      onChange={(e) => handleInputChange('addressComplement', e.target.value)}
+                      placeholder="Apto, sala, bloco..."
+                      className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="neighborhood" className="text-seguranca-lightgray flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Bairro
+                    </Label>
+                    <Input
+                      id="neighborhood"
+                      value={formData.neighborhood}
+                      onChange={(e) => handleInputChange('neighborhood', e.target.value)}
+                      placeholder="Bairro"
+                      className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="city" className="text-seguranca-lightgray flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
                       Cidade

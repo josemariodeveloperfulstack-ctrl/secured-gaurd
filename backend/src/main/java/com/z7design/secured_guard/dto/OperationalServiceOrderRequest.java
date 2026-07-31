@@ -61,4 +61,16 @@ public class OperationalServiceOrderRequest {
 
     /** Procedimento em caso de acidentes (layout Bombeiro Civil) */
     private String accidentProcedure;
+
+    /**
+     * Profissional de SST cujo carimbo vai no 3º quadro do cabeçalho da OS.
+     * Se nulo, usa o padrão da empresa.
+     */
+    private UUID safetyEngineerId;
+
+    /**
+     * URL do carimbo a usar no 3º quadro (opcional).
+     * Quando informado, tem prioridade sobre o carimbo do profissional.
+     */
+    private String stampImageUrl;
 }

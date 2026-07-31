@@ -156,7 +156,7 @@ public class StandardReportLayoutService {
     }
 
     /**
-     * Cria um novo documento PDF com layout padrão
+     * Cria documento PDF com layout padrão
      * Retorna o Document e o PdfDocument para permitir adicionar header/footer após
      * o conteúdo
      */
@@ -169,7 +169,10 @@ public class StandardReportLayoutService {
                         () -> new ResourceNotFoundException("Empresa não encontrada com ID: " + config.getCompanyId()));
 
         // Registrar o manipulador de eventos para layout padrão
-        StandardReportLayoutHandler handler = new StandardReportLayoutHandler(company, config, this);
+        // showHeader=false: apenas rodapé (ex.: Ordem de Serviço com cabeçalho próprio)
+        IEventHandler handler = config.isShowHeader()
+                ? new StandardReportLayoutHandler(company, config, this)
+                : new FooterOnlyLayoutHandler(company, config, this);
         pdfDoc.addEventHandler(PdfDocumentEvent.END_PAGE, handler);
 
         PageSize pageSize = config.isLandscape()
@@ -325,35 +328,43 @@ public class StandardReportLayoutService {
             float pageHeight = pageSize.getHeight();
 
             try {
-                // 1. Camada de Background (abaixo do conteúdo)
+                // showHeader=false: OS e docs com cabeçalho próprio — não desenha template/gradiente/logo do topo
+                final boolean drawStandardHeader = config == null || config.isShowHeader();
+
                 PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
 
-                // Usar layout programático quando configurado (ex: contrato de cliente com layout correto)
-                boolean useProgrammatic = config.isUseProgrammaticLayout();
-                ImageData backgroundTemplateData = useProgrammatic ? null : service.loadReportBackgroundTemplateData(config.isLandscape());
-                if (backgroundTemplateData != null) {
-                    try {
-                        Image backgroundImage = new Image(backgroundTemplateData);
-                        backgroundImage.setFixedPosition(0, 0);
-                        backgroundImage.setWidth(pageWidth);
-                        backgroundImage.setHeight(pageHeight);
+                if (drawStandardHeader) {
+                    boolean useProgrammatic = config.isUseProgrammaticLayout();
+                    ImageData backgroundTemplateData = useProgrammatic ? null
+                            : service.loadReportBackgroundTemplateData(config.isLandscape());
+                    if (backgroundTemplateData != null) {
+                        try {
+                            Image backgroundImage = new Image(backgroundTemplateData);
+                            backgroundImage.setFixedPosition(0, 0);
+                            backgroundImage.setWidth(pageWidth);
+                            backgroundImage.setHeight(pageHeight);
 
-                        Canvas canvasLayout = new Canvas(backgroundCanvas, pageSize);
-                        canvasLayout.add(backgroundImage);
-                        canvasLayout.close();
-                    } catch (Exception e) {
+                            Canvas canvasLayout = new Canvas(backgroundCanvas, pageSize);
+                            canvasLayout.add(backgroundImage);
+                            canvasLayout.close();
+                        } catch (Exception e) {
+                            service.drawBackgroundElements(backgroundCanvas, pdfDoc, pageWidth, pageHeight, company);
+                        }
+                    } else {
                         service.drawBackgroundElements(backgroundCanvas, pdfDoc, pageWidth, pageHeight, company);
                     }
                 } else {
-                    service.drawBackgroundElements(backgroundCanvas, pdfDoc, pageWidth, pageHeight, company);
+                    // Mantém apenas a faixa gradiente do rodapé
+                    service.drawFooterBackgroundLine(backgroundCanvas, pdfDoc, pageWidth, company);
                 }
                 backgroundCanvas.release();
 
-                // 2. Camada de Header/Footer (acima do conteúdo)
                 PdfCanvas headerFooterCanvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdfDoc);
                 Canvas canvasLayout = new Canvas(headerFooterCanvas, pageSize);
 
-                service.addHeader(canvasLayout, pageSize, company, config, pdfDoc);
+                if (drawStandardHeader) {
+                    service.addHeader(canvasLayout, pageSize, company, config, pdfDoc);
+                }
                 service.addFooter(canvasLayout, pageSize, company, config, pdfDoc);
 
                 canvasLayout.close();
@@ -361,6 +372,40 @@ public class StandardReportLayoutService {
 
             } catch (Exception e) {
                 log.error("Erro ao aplicar layout automático na página: {}", e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
+     * Apenas rodapé + linha gradiente inferior — sem template/logo/barra do topo.
+     * Usado pela Ordem de Serviço (cabeçalho OS 01 próprio).
+     */
+    @RequiredArgsConstructor
+    private static class FooterOnlyLayoutHandler implements IEventHandler {
+        private final Company company;
+        private final ReportLayoutConfig config;
+        private final StandardReportLayoutService service;
+
+        @Override
+        public void handleEvent(Event event) {
+            PdfDocumentEvent docEvent = (PdfDocumentEvent) event;
+            PdfDocument pdfDoc = docEvent.getDocument();
+            PdfPage page = docEvent.getPage();
+            Rectangle pageSize = page.getPageSize();
+            float pageWidth = pageSize.getWidth();
+
+            try {
+                PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
+                service.drawFooterBackgroundLine(backgroundCanvas, pdfDoc, pageWidth, company);
+                backgroundCanvas.release();
+
+                PdfCanvas footerCanvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdfDoc);
+                Canvas canvasLayout = new Canvas(footerCanvas, pageSize);
+                service.addFooter(canvasLayout, pageSize, company, config, pdfDoc);
+                canvasLayout.close();
+                footerCanvas.release();
+            } catch (Exception e) {
+                log.error("Erro ao aplicar rodapé (sem cabeçalho) na página: {}", e.getMessage(), e);
             }
         }
     }
@@ -403,62 +448,65 @@ public class StandardReportLayoutService {
             log.error("❌ Erro ao carregar logo da empresa {}: {}", company.getName(), e.getMessage());
         }
 
-        // Safety Engineer info and stamp on the right side of the header
-        try {
-            SafetyEngineer safetyEngineer = null;
-            if (company.getSafetyEngineerId() != null) {
-                safetyEngineer = safetyEngineerRepository.findById(company.getSafetyEngineerId()).orElse(null);
-            }
-            if (safetyEngineer == null) {
-                // Try to get first safety engineer for the company
-                safetyEngineer = safetyEngineerRepository.findFirstByCompanyIdOrderByNameAsc(company.getId()).orElse(null);
-            }
-
-            if (safetyEngineer != null) {
-                float rightAreaWidth = 250f;
-                float rightAreaX = pageWidth - rightAreaWidth - config.getRightMargin();
-                float rightAreaY = headerTop - 10f;
-
-                // Add safety engineer info
-                Paragraph safetyInfo = new Paragraph()
-                        .setTextAlignment(TextAlignment.RIGHT)
-                        .setMultipliedLeading(1.1f);
-
-                safetyInfo.add(new com.itextpdf.layout.element.Text("Saúde e Segurança do Trabalho\n")
-                        .setFontSize(10f)
-                        .setBold());
-
-                if (safetyEngineer.getName() != null && !safetyEngineer.getName().isEmpty()) {
-                    safetyInfo.add(new com.itextpdf.layout.element.Text(safetyEngineer.getName() + "\n")
-                            .setFontSize(9f));
+        // Engenheiro SST + carimbo: só quando explicitamente habilitado.
+        // Ordem de Serviço desenha o carimbo no próprio cabeçalho OS; contratos não devem exibir.
+        if (config.isShowSafetyEngineerStamp()) {
+            try {
+                SafetyEngineer safetyEngineer = null;
+                if (company.getSafetyEngineerId() != null) {
+                    safetyEngineer = safetyEngineerRepository.findById(company.getSafetyEngineerId()).orElse(null);
+                }
+                if (safetyEngineer == null) {
+                    safetyEngineer = safetyEngineerRepository
+                            .findFirstByCompanyIdAndActiveTrueOrderByNameAsc(company.getId())
+                            .or(() -> safetyEngineerRepository.findFirstByCompanyIdOrderByNameAsc(company.getId()))
+                            .orElse(null);
                 }
 
-                if (safetyEngineer.getCreaNumber() != null && !safetyEngineer.getCreaNumber().isEmpty()) {
-                    safetyInfo.add(new com.itextpdf.layout.element.Text(safetyEngineer.getCreaNumber() + "\n")
-                            .setFontSize(9f));
-                }
+                if (safetyEngineer != null) {
+                    float rightAreaWidth = 250f;
+                    float rightAreaX = pageWidth - rightAreaWidth - config.getRightMargin();
+                    float rightAreaY = headerTop - 10f;
 
-                safetyInfo.setFixedPosition(rightAreaX, rightAreaY - 80f, rightAreaWidth);
-                canvas.add(safetyInfo);
+                    Paragraph safetyInfo = new Paragraph()
+                            .setTextAlignment(TextAlignment.RIGHT)
+                            .setMultipliedLeading(1.1f);
 
-                // Add stamp image if available
-                if (safetyEngineer.getStampImageUrl() != null && !safetyEngineer.getStampImageUrl().isEmpty()) {
-                    Image stampImage = loadStampImage(safetyEngineer, pdfDoc);
-                    if (stampImage != null) {
-                        float stampW = 100f;
-                        float stampH = 100f;
-                        float stampX = rightAreaX + (rightAreaWidth - stampW) / 2f;
-                        float stampY = rightAreaY - 190f;
-                        stampImage.setFixedPosition(stampX, stampY);
-                        stampImage.setWidth(stampW);
-                        stampImage.setHeight(stampH);
-                        canvas.add(stampImage);
-                        log.debug("✅ Carimbo do engenheiro {} no cabeçalho ({}, {}) {}x{}", safetyEngineer.getName(), stampX, stampY, stampW, stampH);
+                    safetyInfo.add(new com.itextpdf.layout.element.Text("Saúde e Segurança do Trabalho\n")
+                            .setFontSize(10f)
+                            .setBold());
+
+                    if (safetyEngineer.getName() != null && !safetyEngineer.getName().isEmpty()) {
+                        safetyInfo.add(new com.itextpdf.layout.element.Text(safetyEngineer.getName() + "\n")
+                                .setFontSize(9f));
+                    }
+
+                    if (safetyEngineer.getCreaNumber() != null && !safetyEngineer.getCreaNumber().isEmpty()) {
+                        safetyInfo.add(new com.itextpdf.layout.element.Text(safetyEngineer.getCreaNumber() + "\n")
+                                .setFontSize(9f));
+                    }
+
+                    safetyInfo.setFixedPosition(rightAreaX, rightAreaY - 80f, rightAreaWidth);
+                    canvas.add(safetyInfo);
+
+                    if (safetyEngineer.getStampImageUrl() != null && !safetyEngineer.getStampImageUrl().isEmpty()) {
+                        Image stampImage = loadStampImage(safetyEngineer, pdfDoc);
+                        if (stampImage != null) {
+                            float stampW = 100f;
+                            float stampH = 100f;
+                            float stampX = rightAreaX + (rightAreaWidth - stampW) / 2f;
+                            float stampY = rightAreaY - 190f;
+                            stampImage.setFixedPosition(stampX, stampY);
+                            stampImage.setWidth(stampW);
+                            stampImage.setHeight(stampH);
+                            canvas.add(stampImage);
+                            log.debug("✅ Carimbo do engenheiro {} no cabeçalho ({}, {}) {}x{}", safetyEngineer.getName(), stampX, stampY, stampW, stampH);
+                        }
                     }
                 }
+            } catch (Exception e) {
+                log.error("❌ Erro ao carregar dados do engenheiro de segurança: {}", e.getMessage(), e);
             }
-        } catch (Exception e) {
-            log.error("❌ Erro ao carregar dados do engenheiro de segurança: {}", e.getMessage(), e);
         }
 
         // Título do relatório (centralizado, FORA da barra gradiente)
@@ -544,7 +592,6 @@ public class StandardReportLayoutService {
         float leftFooterX = config.getLeftMargin();
         float rightFooterWidth = FOOTER_RIGHT_BLOCK_WIDTH;
         float leftFooterWidth = pageWidth - leftFooterX - config.getRightMargin() - rightFooterWidth - FOOTER_COLUMN_GAP;
-        float rightFooterX = pageWidth - rightFooterWidth - config.getRightMargin();
 
         // Criação de um parágrafo único para conter Nome, Endereço e CNPJ
         // Isso evita quebras e sobreposições caso o endereço ocupe mais de uma linha.
@@ -587,38 +634,8 @@ public class StandardReportLayoutService {
         // a partir desta base, adaptando-se caso tenha mais linhas de endereço.
         canvas.add(leftBlock.setFixedPosition(leftFooterX, yPosition + 10f, leftFooterWidth));
 
-        // Bloco direito: usuário e data da geração (acima da numeração), alinhado à direita
-        DeviceRgb metaColor = new DeviceRgb(55, 55, 55);
-
-        // Resolver usuário (prioriza config, fallback para contexto de emissão)
-        String userSummary = config.getFooterUserSummary();
-        if (userSummary == null || userSummary.isBlank()) {
-            userSummary = com.z7design.secured_guard.util.ReportIssuanceContext.resolveUserLabelForReportFooter();
-        }
-        
-        if (userSummary != null && !userSummary.isBlank() && !userSummary.equals("—")) {
-            Paragraph userFooter = new Paragraph("Usuário: " + userSummary.trim())
-                    .setFontSize(7.1f)
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setFontColor(metaColor)
-                    .setMarginBottom(0f);
-            canvas.add(userFooter.setFixedPosition(rightFooterX, yPosition + 40f, rightFooterWidth));
-        }
-
-        // Resolver data/hora (prioriza config, fallback para contexto de emissão)
-        String reportAt = config.getFooterReportAt();
-        if (reportAt == null || reportAt.isBlank()) {
-            reportAt = com.z7design.secured_guard.util.ReportIssuanceContext.resolveReportTimestampFooter();
-        }
-
-        if (reportAt != null && !reportAt.isBlank()) {
-            Paragraph dateFooter = new Paragraph("Data do relatório: " + reportAt.trim())
-                    .setFontSize(7.1f)
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setFontColor(metaColor)
-                    .setMarginBottom(0f);
-            canvas.add(dateFooter.setFixedPosition(rightFooterX, yPosition + 28f, rightFooterWidth));
-        }
+        // Bloco direito: apenas numeração de página (em applyPageNumbers).
+        // Usuário e data do relatório removidos do rodapé.
     }
 
     private void addPageNumberFooter(Canvas canvas, Rectangle pageSize, ReportLayoutConfig config,
@@ -711,7 +728,11 @@ public class StandardReportLayoutService {
         // Forma curva escura no canto superior esquerdo
         addDarkCurveShape(pdfCanvas, pageWidth, pageHeight);
 
-        // Linha gradiente fina na parte inferior (amarelo → laranja → vermelho)
+        drawFooterBackgroundLine(pdfCanvas, pdfDoc, pageWidth, company);
+    }
+
+    /** Linha gradiente fina na base da página (rodapé visual). */
+    private void drawFooterBackgroundLine(PdfCanvas pdfCanvas, PdfDocument pdfDoc, float pageWidth, Company company) {
         float footerLineHeight = 4f;
         addHorizontalGradient(pdfCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, footerLineHeight), company);
     }

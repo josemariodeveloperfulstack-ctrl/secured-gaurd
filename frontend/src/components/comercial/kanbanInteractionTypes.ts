@@ -8,6 +8,21 @@ export interface CardInteraction {
   createdAt?: string | null;
 }
 
+/** Referência estável — evita `|| []` / default `[]` recriados a cada render (loop no KanbanCard). */
+export const EMPTY_INTERACTIONS: CardInteraction[] = [];
+
+export function interactionsEqual(a: CardInteraction[], b: CardInteraction[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every(
+    (item, i) =>
+      item.id === b[i]?.id &&
+      item.action === b[i]?.action &&
+      item.createdAt === b[i]?.createdAt &&
+      item.note === b[i]?.note
+  );
+}
+
 export const INTERACTION_ACTION_LABEL: Record<string, string> = {
   EMAIL_SENT: 'E-mail',
   WHATSAPP_SENT: 'WhatsApp',

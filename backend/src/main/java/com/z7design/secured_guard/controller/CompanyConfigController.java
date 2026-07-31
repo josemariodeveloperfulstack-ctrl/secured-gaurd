@@ -44,6 +44,17 @@ public class CompanyConfigController {
     }
 
     /**
+     * Configuração de layout/contrato de uma empresa específica.
+     */
+    @GetMapping("/by-company/{companyId}")
+    public ResponseEntity<CompanyConfigDTO> getConfigByCompanyId(@PathVariable UUID companyId) {
+        log.info("GET /api/company-config/by-company/{} - Buscando configuração por empresa", companyId);
+        return companyConfigService.getConfigByCompanyId(companyId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build());
+    }
+
+    /**
      * Lista todas as configurações de empresa (para seleção)
      */
     @GetMapping("/all")

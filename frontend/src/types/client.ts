@@ -11,6 +11,9 @@ export interface Client {
   phone?: string;
   mobile?: string;
   address?: string;
+  neighborhood?: string;
+  addressNumber?: string;
+  addressComplement?: string;
   city?: string;
   state?: string;
   zipCode?: string;
@@ -39,6 +42,9 @@ export interface ClientFormData {
   phone?: string;
   mobile?: string;
   address?: string;
+  neighborhood?: string;
+  addressNumber?: string;
+  addressComplement?: string;
   city?: string;
   state?: string;
   zipCode?: string;

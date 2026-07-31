@@ -1120,6 +1120,72 @@ public class EmployeeService {
         return findByCpfExact(cpf).map(this::toDTO);
     }
 
+    /**
+     * Resolve o funcionário do usuário autenticado: userId → CPF/username → e-mail → nome.
+     */
+    @Transactional(readOnly = true)
+    public Optional<EmployeeDTO> findDtoForAuthenticatedUser(
+            org.springframework.security.core.Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return Optional.empty();
+        }
+
+        Optional<User> userOpt = Optional.empty();
+        if (authentication.getPrincipal() instanceof User principal && principal.getId() != null) {
+            userOpt = Optional.of(principal);
+        }
+        if (userOpt.isEmpty()) {
+            String name = authentication.getName();
+            if (name != null && !name.isBlank()) {
+                userOpt = userRepository.findByUsername(name)
+                        .or(() -> userRepository.findByEmail(name));
+            }
+        }
+
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            if (user.getId() != null) {
+                Optional<Employee> byUser = employeeRepository.findByUserId(user.getId());
+                if (byUser.isPresent()) {
+                    return byUser.map(this::toDTO);
+                }
+            }
+            String cpfDigits = user.getCpf() != null ? user.getCpf().replaceAll("\\D", "") : "";
+            if (cpfDigits.isBlank() && user.getUsername() != null) {
+                cpfDigits = user.getUsername().replaceAll("\\D", "");
+            }
+            if (cpfDigits.length() >= 11) {
+                Optional<EmployeeDTO> byCpf = getEmployeeDtoByCpfExact(cpfDigits);
+                if (byCpf.isPresent()) {
+                    return byCpf;
+                }
+            }
+            if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                Optional<EmployeeDTO> byEmail = getEmployeeDtoByEmail(user.getEmail());
+                if (byEmail.isPresent()) {
+                    return byEmail;
+                }
+            }
+        }
+
+        String loginName = authentication.getName();
+        if (loginName != null && !loginName.isBlank()) {
+            String digits = loginName.replaceAll("\\D", "");
+            if (digits.length() >= 11) {
+                Optional<EmployeeDTO> byLoginCpf = getEmployeeDtoByCpfExact(digits);
+                if (byLoginCpf.isPresent()) {
+                    return byLoginCpf;
+                }
+            }
+            List<Employee> byName = employeeRepository.findByNameContainingIgnoreCase(loginName);
+            if (byName != null && !byName.isEmpty()) {
+                return Optional.of(toDTO(byName.get(0)));
+            }
+        }
+
+        return Optional.empty();
+    }
+
     public Optional<Employee> findByEmail(String email) {
         return employeeRepository.findByEmail(email);
     }
@@ -1201,35 +1267,65 @@ public class EmployeeService {
             return employees.stream()
                     .filter(emp -> emp != null && emp.getId() != null)
                     .limit(50)
-                    .map(emp -> SimpleEmployeeDTO.builder()
-                            .id(emp.getId())
-                            .name(emp.getName())
-                            .document(emp.getDocument())
-                            .cpf(emp.getCpf())
-                            .email(emp.getEmail())
-                            .phone(emp.getPhone())
-                            .address(emp.getAddress())
-                            .registrationNumber(emp.getRegistrationNumber())
-                            .hireDate(emp.getHireDate())
-                            .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
-                            .unitName(emp.getUnit() != null ? emp.getUnit().getName() : null)
-                            .departmentName(emp.getDepartment() != null ? emp.getDepartment().getName() : null)
-                            .workPostName(emp.getWorkPost() != null ? emp.getWorkPost().getName() : null)
-                            .workPostId(emp.getWorkPost() != null ? emp.getWorkPost().getId() : null)
-                            .companyId(emp.getCompany() != null ? emp.getCompany().getId() : null)
-                            .companySigla(emp.getCompany() != null ? emp.getCompany().getSigla() : null)
-                            .salario(emp.getSalario())
-                            .escalaTrabalho(emp.getEscalaTrabalho())
-                            .horarioTrabalho(emp.getHorarioTrabalho())
-                            .status(emp.getStatus() != null ? emp.getStatus().name() : null)
-                            .build())
+                    .map(emp -> {
+                        try {
+                            return SimpleEmployeeDTO.builder()
+                                    .id(emp.getId())
+                                    .name(emp.getName())
+                                    .document(emp.getDocument())
+                                    .cpf(emp.getCpf())
+                                    .email(emp.getEmail())
+                                    .phone(emp.getPhone())
+                                    .address(emp.getAddress())
+                                    .registrationNumber(emp.getRegistrationNumber())
+                                    .hireDate(emp.getHireDate())
+                                    .positionName(safeName(() -> emp.getPosition() != null ? emp.getPosition().getName() : null))
+                                    .unitName(safeName(() -> emp.getUnit() != null ? emp.getUnit().getName() : null))
+                                    .departmentName(safeName(() -> emp.getDepartment() != null ? emp.getDepartment().getName() : null))
+                                    .workPostName(safeName(() -> emp.getWorkPost() != null ? emp.getWorkPost().getName() : null))
+                                    .workPostId(safeId(() -> emp.getWorkPost() != null ? emp.getWorkPost().getId() : null))
+                                    .companyId(safeId(() -> emp.getCompany() != null ? emp.getCompany().getId() : null))
+                                    .companySigla(safeName(() -> emp.getCompany() != null ? emp.getCompany().getSigla() : null))
+                                    .salario(emp.getSalario())
+                                    .escalaTrabalho(emp.getEscalaTrabalho())
+                                    .horarioTrabalho(emp.getHorarioTrabalho())
+                                    .status(emp.getStatus() != null ? emp.getStatus().name() : null)
+                                    .build();
+                        } catch (Exception ex) {
+                            System.err.println("[WARN] Falha ao mapear funcionário " + emp.getId() + ": " + ex.getMessage());
+                            return SimpleEmployeeDTO.builder()
+                                    .id(emp.getId())
+                                    .name(emp.getName())
+                                    .document(emp.getDocument())
+                                    .cpf(emp.getCpf())
+                                    .status(emp.getStatus() != null ? emp.getStatus().name() : null)
+                                    .build();
+                        }
+                    })
                     .collect(java.util.stream.Collectors.toList());
 
         } catch (Exception e) {
             System.err.println(
                     "[ERROR] EmployeeService.findSimpleEmployeesByNameOrDocument - Erro ao buscar funcionários: "
                             + e.getMessage());
+            e.printStackTrace();
             throw new RuntimeException("Erro ao buscar funcionários por nome ou documento: " + e.getMessage());
+        }
+    }
+
+    private static String safeName(java.util.concurrent.Callable<String> supplier) {
+        try {
+            return supplier.call();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static java.util.UUID safeId(java.util.concurrent.Callable<java.util.UUID> supplier) {
+        try {
+            return supplier.call();
+        } catch (Exception e) {
+            return null;
         }
     }
 

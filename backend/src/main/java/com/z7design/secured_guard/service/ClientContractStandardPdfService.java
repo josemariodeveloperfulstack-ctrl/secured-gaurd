@@ -102,8 +102,8 @@ public class ClientContractStandardPdfService {
         }
 
         /**
-         * Resolve {@link CompanyConfig} para PDF: ID explícito, config ativa no banco, ou
-         * fallback sintético a partir da empresa (evita falha em ambientes sem config ativa).
+         * Resolve {@link CompanyConfig} para PDF: ID explícito, config da empresa,
+         * config ativa no banco, ou fallback sintético a partir da empresa.
          */
         private CompanyConfig resolveCompanyConfigForPdf(ClientContractRequest request) {
                 if (request.getCompanyConfigId() != null) {
@@ -112,12 +112,22 @@ public class ClientContractStandardPdfService {
                                         .orElseThrow(() -> new ResourceNotFoundException(
                                                         "Configuração da empresa não encontrada"));
                 }
+                UUID resolvedCompanyId = request.getCompanyId();
+                if (resolvedCompanyId != null) {
+                        final UUID companyIdForLookup = resolvedCompanyId;
+                        Optional<CompanyConfig> byCompany = companyConfigRepository
+                                        .findFirstByCompanyIdAndActiveTrueOrderByUpdatedAtDesc(companyIdForLookup)
+                                        .or(() -> companyConfigRepository
+                                                        .findFirstByCompanyIdOrderByUpdatedAtDesc(companyIdForLookup));
+                        if (byCompany.isPresent()) {
+                                return byCompany.get();
+                        }
+                }
                 Optional<CompanyConfig> active = companyConfigRepository
                                 .findFirstByActiveTrueOrderByCreatedAtDesc();
                 if (active.isPresent()) {
                         return active.get();
                 }
-                UUID resolvedCompanyId = request.getCompanyId();
                 if (resolvedCompanyId == null) {
                         resolvedCompanyId = companyRepository.findAll().stream()
                                         .findFirst()
@@ -133,7 +143,7 @@ public class ClientContractStandardPdfService {
                 Company company = companyRepository.findById(companyId)
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "Empresa não encontrada com ID: " + companyId));
-                log.warn("PDF contrato: sem CompanyConfig ativa — usando dados sintéticos da empresa {} ({})",
+                log.warn("PDF contrato: sem CompanyConfig — usando dados sintéticos da empresa {} ({})",
                                 companyId, company.getName());
                 return buildSyntheticCompanyConfig(company);
         }

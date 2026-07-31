@@ -21,7 +21,10 @@ import {
   QrCode,
   Printer,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +52,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { workPostService, WorkPost, WorkPostFilters } from '@/services/workPostService';
 import { clientService } from '@/services/clientService';
 import { Client } from '@/types/client';
@@ -164,6 +168,8 @@ const Postos: React.FC = () => {
 
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const [detailModalGroupKey, setDetailModalGroupKey] = useState<string | null>(null);
 
   // Carregar dados
   useEffect(() => {
@@ -323,6 +329,101 @@ const Postos: React.FC = () => {
     return Object.values(groupsMap);
   }, [filteredWorkPosts, clients]);
 
+  type ClientGroupSortKey = 'client' | 'sector' | 'status' | 'implementation' | 'posts';
+  const [sortKey, setSortKey] = useState<ClientGroupSortKey>('client');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const toggleSort = (key: ClientGroupSortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'implementation' ? 'desc' : 'asc');
+    }
+  };
+
+  const sortedClientGroups = React.useMemo(() => {
+    const list = [...clientGroups];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const statusOrder = (s: string) => {
+      const map: Record<string, number> = {
+        ATIVO: 1,
+        EM_IMPLANTACAO: 2,
+        SUSPENSO: 3,
+        INATIVO: 4,
+        CANCELADO: 5,
+      };
+      return map[s] ?? 99;
+    };
+    list.sort((a, b) => {
+      let av: string | number = '';
+      let bv: string | number = '';
+      switch (sortKey) {
+        case 'client':
+          av = (a.clientName || '').toLocaleLowerCase('pt-BR');
+          bv = (b.clientName || '').toLocaleLowerCase('pt-BR');
+          break;
+        case 'sector':
+          av = (a.sectors[0] || '').toLocaleLowerCase('pt-BR');
+          bv = (b.sectors[0] || '').toLocaleLowerCase('pt-BR');
+          break;
+        case 'status':
+          av = Math.min(...(a.statuses.length ? a.statuses.map(statusOrder) : [99]));
+          bv = Math.min(...(b.statuses.length ? b.statuses.map(statusOrder) : [99]));
+          break;
+        case 'implementation': {
+          const aDates = a.implementationDates.filter(Boolean).sort();
+          const bDates = b.implementationDates.filter(Boolean).sort();
+          av = aDates[0] || '';
+          bv = bDates[0] || '';
+          // Sem data fica no fim em ASC e no início em DESC (valor extremo)
+          if (!av && !bv) return 0;
+          if (!av) return 1;
+          if (!bv) return -1;
+          break;
+        }
+        case 'posts':
+          av = (a.postTypes[0] || '').toLocaleLowerCase('pt-BR');
+          bv = (b.postTypes[0] || '').toLocaleLowerCase('pt-BR');
+          break;
+      }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return (a.clientName || '').localeCompare(b.clientName || '', 'pt-BR') * dir;
+    });
+    return list;
+  }, [clientGroups, sortKey, sortDir]);
+
+  const SortIcon = ({ column }: { column: ClientGroupSortKey }) => {
+    if (sortKey !== column) return <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />;
+    return sortDir === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />;
+  };
+
+  const SortableHead = ({
+    column,
+    children,
+    className,
+  }: {
+    column: ClientGroupSortKey;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleSort(column);
+        }}
+        className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors font-medium"
+        title="Clique para ordenar (asc/desc)"
+      >
+        {children}
+        <SortIcon column={column} />
+      </button>
+    </TableHead>
+  );
+
   // Handlers
   const [forcedClientId, setForcedClientId] = useState<string | undefined>(undefined);
 
@@ -465,6 +566,170 @@ const Postos: React.FC = () => {
     } finally {
       setQrLoading(false);
     }
+  };
+
+  const openClientDetail = (clientKey: string) => {
+    if (isMobile) {
+      toggleClientExpanded(clientKey);
+    } else {
+      setDetailModalGroupKey(clientKey);
+    }
+  };
+
+  const detailModalGroup = React.useMemo(
+    () => sortedClientGroups.find((g) => g.clientKey === detailModalGroupKey) || null,
+    [sortedClientGroups, detailModalGroupKey]
+  );
+
+  const renderClientSectorsDetail = (group: (typeof sortedClientGroups)[number]) => {
+    const sectorsMap: Record<string, { code: string; name: string; posts: WorkPost[] }> = {};
+    group.posts.forEach((post) => {
+      const sectorKey = (post.name || post.postCode || 'Setor Geral').trim();
+      if (!sectorsMap[sectorKey]) {
+        sectorsMap[sectorKey] = {
+          code: post.postCode || 'SETOR',
+          name: post.name || 'Setor sem nome',
+          posts: [],
+        };
+      }
+      sectorsMap[sectorKey].posts.push(post);
+    });
+    const sectorList = Object.values(sectorsMap);
+
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-3">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <Building className="h-4 w-4 text-primary shrink-0" />
+            <span className="font-semibold text-base text-foreground truncate">
+              Setores e Postos — {group.clientName}
+            </span>
+            {group.clientCnpj && (
+              <Badge variant="outline" className="text-xs font-normal">
+                CNPJ: {group.clientCnpj}
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs flex items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCreateForClient(group.clientId);
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Novo Setor
+            </Button>
+            <Badge variant="outline" className="text-xs">
+              {group.sectors.length} Setor{group.sectors.length > 1 ? 'es' : ''} | {group.posts.length}{' '}
+              Posto{group.posts.length > 1 ? 's' : ''}
+            </Badge>
+          </div>
+        </div>
+
+        {sectorList.map((sector, secIdx) => (
+          <div key={secIdx} className="rounded-lg border bg-card p-3 sm:p-4 space-y-3 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-muted/40 p-2.5 rounded-md">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <Badge variant="default" className="text-xs font-semibold shrink-0">
+                  Setor: {sector.code}
+                </Badge>
+                <span className="font-medium text-sm text-foreground truncate">{sector.name}</span>
+              </div>
+              <Badge variant="secondary" className="text-xs w-fit">
+                {sector.posts.length} Posto{sector.posts.length > 1 ? 's' : ''} de Trabalho
+              </Badge>
+            </div>
+
+            <div className="rounded-md border overflow-x-auto bg-background">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30 text-xs">
+                    <TableHead>Posto de Trabalho</TableHead>
+                    <TableHead>Localização</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Implantação</TableHead>
+                    <TableHead>Escala / Vigilantes</TableHead>
+                    <TableHead className="text-right">Ações do Posto</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sector.posts.map((post) => (
+                    <TableRow key={post.id} className="hover:bg-muted/30">
+                      <TableCell>
+                        <div className="font-semibold text-sm">{getTypeText(post.type)}</div>
+                        {post.primaryPositionName && (
+                          <div className="text-xs text-muted-foreground">{post.primaryPositionName}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-xs">
+                          <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <span>
+                            {post.city && post.state
+                              ? `${post.city}, ${post.state}`
+                              : post.address
+                                ? post.address.substring(0, 30) + '...'
+                                : 'Não informada'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(post.status)}>{getStatusText(post.status)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground">
+                          {post.implementationDate
+                            ? new Date(post.implementationDate).toLocaleDateString('pt-BR')
+                            : 'Não definida'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-xs">
+                          <div>{post.requiredVigilantes || 1} vigilante(s)</div>
+                          <div className="text-muted-foreground">{post.workSchedule || '12X36'}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Abrir menu</span>
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewWorkPost(post)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Visualizar Posto
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditWorkPost(post)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar Posto
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openQrModalForWorkPost(post)}>
+                              <QrCode className="mr-2 h-4 w-4" />
+                              QR Codes do Posto
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteWorkPost(post)}>
+                              <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                              Excluir Posto
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const handleGenerateQrCode = async () => {
@@ -621,7 +886,7 @@ const Postos: React.FC = () => {
 
   if (loading) {
     return (
-      <StandardLayout title="Postos de Trabalho" subtitle="Gestão e implantação de postos de serviço">
+      <StandardLayout>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -633,7 +898,7 @@ const Postos: React.FC = () => {
   }
 
   return (
-    <StandardLayout title="Postos de Trabalho" subtitle="Gestão e implantação de postos de serviço">
+    <StandardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -813,16 +1078,16 @@ const Postos: React.FC = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Setor de Trabalho</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Implantação</TableHead>
-                    <TableHead>Postos</TableHead>
+                    <SortableHead column="client">Cliente</SortableHead>
+                    <SortableHead column="sector">Setor de Trabalho</SortableHead>
+                    <SortableHead column="status">Status</SortableHead>
+                    <SortableHead column="implementation">Implantação</SortableHead>
+                    <SortableHead column="posts">Postos</SortableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clientGroups.length === 0 ? (
+                  {sortedClientGroups.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8">
                         <div className="flex flex-col items-center gap-2">
@@ -832,7 +1097,7 @@ const Postos: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    clientGroups.map((group) => {
+                    sortedClientGroups.map((group) => {
                       const isExpanded = !!expandedClients[group.clientKey];
                       const hasMultiplePosts = group.posts.length > 1;
                       const firstPost = group.posts[0];
@@ -840,7 +1105,7 @@ const Postos: React.FC = () => {
                       return (
                         <React.Fragment key={group.clientKey}>
                           <TableRow
-                            onClick={() => toggleClientExpanded(group.clientKey)}
+                            onClick={() => openClientDetail(group.clientKey)}
                             className="cursor-pointer hover:bg-muted/40 font-medium transition-colors select-none"
                           >
                             {/* 1. Cliente */}
@@ -926,173 +1191,25 @@ const Postos: React.FC = () => {
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  toggleClientExpanded(group.clientKey);
+                                  openClientDetail(group.clientKey);
                                 }}
                                 className="h-8 text-xs flex items-center gap-1.5 float-right"
                               >
-                                <span>{isExpanded ? 'Recolher' : 'Ver Setores'}</span>
-                                <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                <span>{isMobile ? (isExpanded ? 'Recolher' : 'Ver Setores') : 'Ver detalhes'}</span>
+                                {isMobile ? (
+                                  <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                ) : (
+                                  <Eye className="h-3.5 w-3.5" />
+                                )}
                               </Button>
                             </TableCell>
                           </TableRow>
 
-                          {/* Conteúdo do Accordion quando expandido */}
-                          {isExpanded && (
+                          {/* No celular: accordion inline. Em tablet/desktop/laptop: modal */}
+                          {isMobile && isExpanded && (
                             <TableRow className="bg-muted/15 hover:bg-muted/15">
                               <TableCell colSpan={6} className="p-4">
-                                <div className="space-y-4">
-                                  <div className="flex items-center justify-between border-b pb-2">
-                                    <div className="flex items-center gap-2">
-                                      <Building className="h-4 w-4 text-primary" />
-                                      <span className="font-semibold text-base text-foreground">
-                                        Setores e Postos de Trabalho — {group.clientName}
-                                      </span>
-                                      {group.clientCnpj && (
-                                        <Badge variant="outline" className="text-xs font-normal">
-                                          CNPJ: {group.clientCnpj}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-7 text-xs flex items-center gap-1"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleCreateForClient(group.clientId);
-                                        }}
-                                      >
-                                        <Plus className="h-3.5 w-3.5" />
-                                        Novo Setor
-                                      </Button>
-                                      <Badge variant="outline" className="text-xs">
-                                        {group.sectors.length} Setor{group.sectors.length > 1 ? 'es' : ''} | {group.posts.length} Posto{group.posts.length > 1 ? 's' : ''}
-                                      </Badge>
-                                    </div>
-                                  </div>
-
-                                  {/* Agrupamento por Setor de Trabalho */}
-                                  {(() => {
-                                    const sectorsMap: Record<string, { code: string; name: string; posts: WorkPost[] }> = {};
-                                    group.posts.forEach((post) => {
-                                      const sectorKey = (post.name || post.postCode || 'Setor Geral').trim();
-                                      if (!sectorsMap[sectorKey]) {
-                                        sectorsMap[sectorKey] = {
-                                          code: post.postCode || 'SETOR',
-                                          name: post.name || 'Setor sem nome',
-                                          posts: [],
-                                        };
-                                      }
-                                      sectorsMap[sectorKey].posts.push(post);
-                                    });
-
-                                    const sectorList = Object.values(sectorsMap);
-
-                                    return sectorList.map((sector, secIdx) => (
-                                      <div key={secIdx} className="rounded-lg border bg-card p-4 space-y-3 shadow-sm">
-                                        <div className="flex items-center justify-between bg-muted/40 p-2.5 rounded-md">
-                                          <div className="flex items-center gap-2">
-                                            <Badge variant="default" className="text-xs font-semibold">
-                                              Setor: {sector.code}
-                                            </Badge>
-                                            <span className="font-medium text-sm text-foreground">{sector.name}</span>
-                                          </div>
-                                          <Badge variant="secondary" className="text-xs">
-                                            {sector.posts.length} Posto{sector.posts.length > 1 ? 's' : ''} de Trabalho
-                                          </Badge>
-                                        </div>
-
-                                        <div className="rounded-md border overflow-x-auto bg-background">
-                                          <Table>
-                                            <TableHeader>
-                                              <TableRow className="bg-muted/30 text-xs">
-                                                <TableHead>Posto de Trabalho</TableHead>
-                                                <TableHead>Localização</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Implantação</TableHead>
-                                                <TableHead>Escala / Vigilantes</TableHead>
-                                                <TableHead className="text-right">Ações do Posto</TableHead>
-                                              </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                              {sector.posts.map((post) => (
-                                                <TableRow key={post.id} className="hover:bg-muted/30">
-                                                  <TableCell>
-                                                    <div className="font-semibold text-sm">
-                                                      {getTypeText(post.type)}
-                                                    </div>
-                                                    {post.primaryPositionName && (
-                                                      <div className="text-xs text-muted-foreground">
-                                                        {post.primaryPositionName}
-                                                      </div>
-                                                    )}
-                                                  </TableCell>
-                                                  <TableCell>
-                                                    <div className="flex items-center gap-1 text-xs">
-                                                      <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
-                                                      <span>
-                                                        {post.city && post.state
-                                                          ? `${post.city}, ${post.state}`
-                                                          : (post.address ? post.address.substring(0, 30) + '...' : 'Não informada')}
-                                                      </span>
-                                                    </div>
-                                                  </TableCell>
-                                                  <TableCell>
-                                                    <Badge className={getStatusColor(post.status)}>
-                                                      {getStatusText(post.status)}
-                                                    </Badge>
-                                                  </TableCell>
-                                                  <TableCell>
-                                                    <span className="text-xs text-muted-foreground">
-                                                      {post.implementationDate
-                                                        ? new Date(post.implementationDate).toLocaleDateString('pt-BR')
-                                                        : 'Não definida'}
-                                                    </span>
-                                                  </TableCell>
-                                                  <TableCell>
-                                                    <div className="text-xs">
-                                                      <div>{post.requiredVigilantes || 1} vigilante(s)</div>
-                                                      <div className="text-muted-foreground">{post.workSchedule || '12X36'}</div>
-                                                    </div>
-                                                  </TableCell>
-                                                  <TableCell className="text-right">
-                                                    <DropdownMenu>
-                                                      <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" className="h-8 w-8 p-0">
-                                                          <span className="sr-only">Abrir menu</span>
-                                                          <FileText className="h-4 w-4" />
-                                                        </Button>
-                                                      </DropdownMenuTrigger>
-                                                      <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={() => handleViewWorkPost(post)}>
-                                                          <Eye className="mr-2 h-4 w-4" />
-                                                          Visualizar Posto
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleEditWorkPost(post)}>
-                                                          <Edit className="mr-2 h-4 w-4" />
-                                                          Editar Posto
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => openQrModalForWorkPost(post)}>
-                                                          <QrCode className="mr-2 h-4 w-4" />
-                                                          QR Codes do Posto
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleDeleteWorkPost(post)}>
-                                                          <Trash2 className="mr-2 h-4 w-4 text-destructive" />
-                                                          Excluir Posto
-                                                        </DropdownMenuItem>
-                                                      </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                  </TableCell>
-                                                </TableRow>
-                                              ))}
-                                            </TableBody>
-                                          </Table>
-                                        </div>
-                                      </div>
-                                    ));
-                                  })()}
-                                </div>
+                                {renderClientSectorsDetail(group)}
                               </TableCell>
                             </TableRow>
                           )}
@@ -1105,6 +1222,27 @@ const Postos: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Modal de detalhes — tablet, laptop e desktop */}
+        <Dialog
+          open={!isMobile && !!detailModalGroupKey}
+          onOpenChange={(open) => {
+            if (!open) setDetailModalGroupKey(null);
+          }}
+        >
+          <DialogContent className="max-w-[95vw] md:max-w-5xl lg:max-w-6xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-700 text-white">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Building className="h-5 w-5 text-seguranca-yellow" />
+                {detailModalGroup?.clientName || 'Setores de Trabalho'}
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Visualize setores, postos e ações (visualizar, editar, QR Code, excluir) com mais espaço na tela.
+              </DialogDescription>
+            </DialogHeader>
+            {detailModalGroup && renderClientSectorsDetail(detailModalGroup)}
+          </DialogContent>
+        </Dialog>
 
         {/* Modais */}
         <WorkPostFormModal

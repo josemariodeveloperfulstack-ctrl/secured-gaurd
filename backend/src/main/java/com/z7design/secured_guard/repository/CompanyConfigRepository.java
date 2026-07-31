@@ -24,6 +24,13 @@ public interface CompanyConfigRepository extends JpaRepository<CompanyConfig, UU
     Optional<CompanyConfig> findFirstByActiveTrueOrderByCreatedAtDesc();
 
     /**
+     * Configuração (layout/contrato) vinculada a uma empresa cadastrada.
+     */
+    Optional<CompanyConfig> findFirstByCompanyIdAndActiveTrueOrderByUpdatedAtDesc(UUID companyId);
+
+    Optional<CompanyConfig> findFirstByCompanyIdOrderByUpdatedAtDesc(UUID companyId);
+
+    /**
      * Verifica se existe uma configuração ativa
      */
     @Query("SELECT COUNT(cc) > 0 FROM CompanyConfig cc WHERE cc.active = true")

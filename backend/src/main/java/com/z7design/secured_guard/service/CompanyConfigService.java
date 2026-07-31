@@ -31,11 +31,22 @@ public class CompanyConfigService {
     private final Validator validator;
 
     /**
-     * Busca a configuração ativa da empresa
+     * Busca a configuração ativa da empresa (legado — usa a mais recente ativa).
      */
     public Optional<CompanyConfigDTO> getActiveConfig() {
         log.info("Buscando configuração ativa da empresa");
         return companyConfigRepository.findFirstByActiveTrueOrderByCreatedAtDesc()
+                .map(this::convertToDTO);
+    }
+
+    /**
+     * Configuração de layout/contrato específica de uma empresa.
+     */
+    @Transactional(readOnly = true)
+    public Optional<CompanyConfigDTO> getConfigByCompanyId(UUID companyId) {
+        log.info("Buscando configuração da empresa {}", companyId);
+        return companyConfigRepository.findFirstByCompanyIdAndActiveTrueOrderByUpdatedAtDesc(companyId)
+                .or(() -> companyConfigRepository.findFirstByCompanyIdOrderByUpdatedAtDesc(companyId))
                 .map(this::convertToDTO);
     }
 
@@ -57,13 +68,12 @@ public class CompanyConfigService {
     }
 
     /**
-     * Salva ou atualiza configuração da empresa
+     * Salva ou atualiza configuração por empresa (cada companyId tem seu próprio layout/template).
      */
     public CompanyConfigDTO saveConfig(CompanyConfigDTO configDTO) {
         log.info("Salvando configuração da empresa: {}", configDTO.getName());
         normalizeConfigFields(configDTO);
 
-        // Se companyId informado, buscar dados da empresa na tabela companies
         if (configDTO.getCompanyId() != null) {
             Company company = companyRepository.findById(configDTO.getCompanyId())
                     .orElseThrow(() -> new RuntimeException("Empresa não encontrada com ID: " + configDTO.getCompanyId()));
@@ -84,44 +94,29 @@ public class CompanyConfigService {
 
         validateConfig(configDTO);
 
-        // Verificar se CNPJ já existe para outra empresa
-        if (configDTO.getId() != null) {
-            if (companyConfigRepository.existsByCnpjAndIdNotAndActiveTrue(
-                    configDTO.getCnpj(), configDTO.getId())) {
-                throw new RuntimeException("CNPJ já cadastrado para outra empresa");
-            }
-        } else {
-            if (companyConfigRepository.findByCnpjAndActiveTrue(configDTO.getCnpj()).isPresent()) {
-                throw new RuntimeException("CNPJ já cadastrado");
-            }
-        }
-
-        CompanyConfig config;
-        
-        if (configDTO.getId() != null) {
-            // Atualizar configuração existente
-            config = companyConfigRepository.findFirstByIdOrderByCreatedAtDesc(configDTO.getId())
-                    .orElseThrow(() -> new RuntimeException("Configuração não encontrada"));
-            
-            // Desativar todas as outras configurações
-            deactivateAllConfigs();
-            
-            // Atualizar campos
-            updateConfigFromDTO(config, configDTO);
-        } else {
-            // Criar nova configuração
-            // Desativar todas as configurações existentes
-            deactivateAllConfigs();
-            
-            config = new CompanyConfig();
-            updateConfigFromDTO(config, configDTO);
-            config.setActive(true);
-        }
+        CompanyConfig config = resolveConfigEntityForSave(configDTO);
+        updateConfigFromDTO(config, configDTO);
+        config.setActive(true);
 
         config = companyConfigRepository.save(config);
-        log.info("Configuração da empresa salva com ID: {}", config.getId());
-        
+        log.info("Configuração da empresa salva com ID: {} (companyId={})", config.getId(), config.getCompanyId());
+
         return convertToDTO(config);
+    }
+
+    private CompanyConfig resolveConfigEntityForSave(CompanyConfigDTO configDTO) {
+        if (configDTO.getCompanyId() != null) {
+            Optional<CompanyConfig> byCompany = companyConfigRepository
+                    .findFirstByCompanyIdOrderByUpdatedAtDesc(configDTO.getCompanyId());
+            if (byCompany.isPresent()) {
+                return byCompany.get();
+            }
+        }
+        if (configDTO.getId() != null) {
+            return companyConfigRepository.findFirstByIdOrderByCreatedAtDesc(configDTO.getId())
+                    .orElseThrow(() -> new RuntimeException("Configuração não encontrada"));
+        }
+        return new CompanyConfig();
     }
 
     /**
@@ -144,20 +139,6 @@ public class CompanyConfigService {
                 });
     }
 
-    /**
-     * Desativa todas as configurações
-     */
-    private void deactivateAllConfigs() {
-        companyConfigRepository.findAll()
-                .forEach(config -> {
-                    config.setActive(false);
-                    companyConfigRepository.save(config);
-                });
-    }
-
-    /**
-     * Atualiza entidade com dados do DTO
-     */
     private void updateConfigFromDTO(CompanyConfig config, CompanyConfigDTO dto) {
         config.setCompanyId(dto.getCompanyId());
         config.setName(dto.getName());
@@ -204,9 +185,6 @@ public class CompanyConfigService {
         throw new IllegalArgumentException(message);
     }
 
-    /**
-     * Converte entidade para DTO
-     */
     private CompanyConfigDTO convertToDTO(CompanyConfig config) {
         CompanyConfigDTO dto = new CompanyConfigDTO();
         BeanUtils.copyProperties(config, dto);

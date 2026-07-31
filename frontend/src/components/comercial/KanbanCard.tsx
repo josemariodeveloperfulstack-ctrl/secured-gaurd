@@ -22,8 +22,10 @@ import {
 } from 'lucide-react';
 import {
   CardInteraction,
+  EMPTY_INTERACTIONS,
   daysSince,
   interactionActionLabel,
+  interactionsEqual,
   sortInteractionsDesc,
 } from './kanbanInteractionTypes';
 import { fetchInteractionHistoryByOpportunity } from '@/services/crmService';
@@ -91,7 +93,7 @@ export default function KanbanCard({
   onSendEmail,
   onSendWhatsApp,
   onAddNegotiationNote,
-  interactions = [],
+  interactions = EMPTY_INTERACTIONS,
   formatCurrency,
   formatDate,
   isDragOverlay = false,
@@ -101,6 +103,7 @@ export default function KanbanCard({
   const [localInteractions, setLocalInteractions] = useState<CardInteraction[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const didDragRef = useRef(false);
+  const historyFetchedForRef = useRef<string | null>(null);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: isDragOverlay ? `overlay-${opportunity.id}` : String(opportunity.id),
     data: { opportunity },
@@ -114,22 +117,34 @@ export default function KanbanCard({
   }, [isDragging]);
 
   useEffect(() => {
-    setLocalInteractions(sortInteractionsDesc(interactions || []));
+    historyFetchedForRef.current = null;
+  }, [opportunity.id]);
+
+  useEffect(() => {
+    const next = sortInteractionsDesc(interactions ?? EMPTY_INTERACTIONS);
+    setLocalInteractions((prev) => (interactionsEqual(prev, next) ? prev : next));
   }, [interactions, opportunity.id]);
 
   useEffect(() => {
     if (!showNegotiation || isDragOverlay) return;
     if (localInteractions.length > 0) return;
+    const oppKey = String(opportunity.id);
+    if (historyFetchedForRef.current === oppKey) return;
     let cancelled = false;
     setLoadingHistory(true);
-    fetchInteractionHistoryByOpportunity(String(opportunity.id))
+    fetchInteractionHistoryByOpportunity(oppKey)
       .then((data) => {
         if (cancelled) return;
+        historyFetchedForRef.current = oppKey;
         const list = Array.isArray(data) ? data : [];
-        setLocalInteractions(sortInteractionsDesc(list as CardInteraction[]));
+        const next = sortInteractionsDesc(list as CardInteraction[]);
+        setLocalInteractions((prev) => (interactionsEqual(prev, next) ? prev : next));
       })
       .catch(() => {
-        if (!cancelled) setLocalInteractions([]);
+        if (!cancelled) {
+          historyFetchedForRef.current = oppKey;
+          setLocalInteractions((prev) => (prev.length === 0 ? prev : EMPTY_INTERACTIONS));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingHistory(false);

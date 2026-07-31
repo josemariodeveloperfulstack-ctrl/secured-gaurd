@@ -28,7 +28,8 @@ import {
   Settings,
   BarChart3,
   UserX,
-  Gift
+  Gift,
+  Stethoscope
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import hrService from '@/services/hrService';
@@ -470,6 +471,20 @@ const RH: React.FC = () => {
                 </CardContent>
               </Card>
 
+              <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/rh/atestados')}>
+                <CardHeader>
+                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                    <Stethoscope className="h-5 w-5 text-rose-400" />
+                    Gestão de Atestados
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-400 text-sm">
+                    Atestados, declarações, CID, dias/horas e alerta INSS
+                  </p>
+                </CardContent>
+              </Card>
+
               <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/rh/aniversariantes')}>
                 <CardHeader>
                   <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
@@ -563,12 +578,12 @@ const RH: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-green-500" />
-                    Postos de Trabalho
+                    Setor de Trabalho
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-400 text-sm">
-                    Implantação e gestão de postos de trabalho
+                    Implantação e gestão de setores e postos de trabalho
                   </p>
                 </CardContent>
               </Card>

@@ -19,14 +19,20 @@ import com.itextpdf.layout.properties.VerticalAlignment;
 import com.z7design.secured_guard.dto.OperationalServiceOrderRequest;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.SafetyEngineer;
+import com.z7design.secured_guard.repository.SafetyEngineerRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -36,15 +42,21 @@ public class OsStandardPdfService {
 
         private final EmployeeDocumentDateResolver documentDateResolver;
         private final StandardReportLayoutService pdfLayoutService;
+        private final SafetyEngineerRepository safetyEngineerRepository;
+
+        @Value("${app.upload.base-dir:uploads}")
+        private String uploadBaseDir;
 
         private static final String ASSET_CARIMBO = "static/certificates/os/carimbo-engenheiro-sst.png";
         private static final String ASSET_PROMOVER = "static/certificates/nr06/promover-logo.png";
         private static final DeviceRgb NAVY = new DeviceRgb(15, 59, 115);
 
         public OsStandardPdfService(EmployeeDocumentDateResolver documentDateResolver,
-                        StandardReportLayoutService pdfLayoutService) {
+                        StandardReportLayoutService pdfLayoutService,
+                        SafetyEngineerRepository safetyEngineerRepository) {
                 this.documentDateResolver = documentDateResolver;
                 this.pdfLayoutService = pdfLayoutService;
+                this.safetyEngineerRepository = safetyEngineerRepository;
         }
 
         public byte[] generatePdf(OperationalServiceOrderRequest request) {
@@ -55,10 +67,12 @@ public class OsStandardPdfService {
                         PdfWriter writer = new PdfWriter(outputStream);
                         var configBuilder = ReportLayoutConfig.builder()
                                         .companyId(request.getCompanyId())
-                                        // Título superior removido: o cabeçalho da OS já traz "ORDEM DE SERVIÇO"
+                                        // Título/cabeçalho padrão removidos: a OS tem cabeçalho próprio (logo | título | carimbo)
                                         .reportTitle(null)
+                                        .showHeader(false)
                                         .includeEmailInFooter(true)
-                                        .marginExtraTop(-35f)
+                                        .topMargin(28f)
+                                        .marginExtraTop(0f)
                                         .bottomMargin(60f)
                                         .leftMargin(28f)
                                         .rightMargin(28f);
@@ -79,8 +93,8 @@ public class OsStandardPdfService {
         }
 
         private void addContent(Document document, OperationalServiceOrderRequest request, Company company) {
-                // Coluna obrigatória do carimbo SST (modelo OS 01)
-                addOs01HeaderWithStamp(document);
+                // Coluna obrigatória do carimbo SST (modelo OS 01) — usa profissional/carimbo selecionado quando houver
+                addOs01HeaderWithStamp(document, company, request);
 
                 String introText = "Conforme estabelecido no item 1.7, letra \"b\", NR-01 da Portaria 3214/MTE, cabe ao empregador elaborar Ordem de Serviço (OS) sobre Segurança e Medicina do Trabalho, dando ciência aos empregados.";
                 document.add(new Paragraph(introText)
@@ -145,8 +159,10 @@ public class OsStandardPdfService {
 
         /**
          * Cabeçalho OS 01 em 3 colunas: logo/NR-01 | ORDEM DE SERVIÇO | carimbo SST (obrigatório).
+         * Preferência: safetyEngineerId / stampImageUrl do request; depois padrão da empresa; fallback asset.
          */
-        private void addOs01HeaderWithStamp(Document document) {
+        private void addOs01HeaderWithStamp(Document document, Company company,
+                        OperationalServiceOrderRequest request) {
                 Table header = new Table(UnitValue.createPercentArray(new float[] { 28, 36, 36 }))
                                 .useAllAvailableWidth()
                                 .setMarginBottom(10f);
@@ -197,24 +213,105 @@ public class OsStandardPdfService {
                                 .setTextAlignment(TextAlignment.CENTER)
                                 .setMarginBottom(2f));
 
-                ImageData carimbo = loadImage(ASSET_CARIMBO);
+                SafetyEngineer engineer = resolveSafetyEngineer(company, request);
+                ImageData carimbo = null;
+                if (request != null && request.getStampImageUrl() != null && !request.getStampImageUrl().isBlank()) {
+                        carimbo = loadStampFromUrl(request.getStampImageUrl().trim());
+                }
+                if (carimbo == null) {
+                        carimbo = loadEngineerStamp(engineer);
+                }
+                if (carimbo == null) {
+                        carimbo = loadImage(ASSET_CARIMBO);
+                }
+
                 if (carimbo != null) {
                         stampCell.add(new Image(carimbo)
                                         .setMaxHeight(72)
                                         .setMaxWidth(170)
                                         .setHorizontalAlignment(HorizontalAlignment.CENTER));
-                } else {
-                        log.warn("Carimbo SST não encontrado em classpath ({}) — usando texto fallback", ASSET_CARIMBO);
-                        stampCell.add(new Paragraph("Alexsandro Cirino Taveira")
+                } else if (engineer != null) {
+                        stampCell.add(new Paragraph(engineer.getName() != null ? engineer.getName() : "Profissional SST")
                                         .setBold().setFontSize(8f).setTextAlignment(TextAlignment.CENTER));
-                        stampCell.add(new Paragraph("Engenheiro de Segurança do Trabalho")
+                        stampCell.add(new Paragraph(professionalTypeLabel(engineer))
                                         .setFontSize(7f).setTextAlignment(TextAlignment.CENTER));
-                        stampCell.add(new Paragraph("CREA/MG 119986 D")
+                        if (engineer.getCreaNumber() != null) {
+                                stampCell.add(new Paragraph(engineer.getCreaNumber())
+                                                .setFontSize(7f).setTextAlignment(TextAlignment.CENTER));
+                        }
+                } else {
+                        log.warn("Carimbo SST não encontrado — usando texto fallback");
+                        stampCell.add(new Paragraph("Profissional de SST")
+                                        .setBold().setFontSize(8f).setTextAlignment(TextAlignment.CENTER));
+                        stampCell.add(new Paragraph("Cadastre o carimbo em SST → Profissionais")
                                         .setFontSize(7f).setTextAlignment(TextAlignment.CENTER));
                 }
                 header.addCell(stampCell);
 
                 document.add(header);
+        }
+
+        private SafetyEngineer resolveSafetyEngineer(Company company, OperationalServiceOrderRequest request) {
+                try {
+                        if (request != null && request.getSafetyEngineerId() != null) {
+                                return safetyEngineerRepository.findById(request.getSafetyEngineerId()).orElse(null);
+                        }
+                        if (company == null || company.getId() == null) {
+                                return null;
+                        }
+                        if (company.getSafetyEngineerId() != null) {
+                                return safetyEngineerRepository.findById(company.getSafetyEngineerId()).orElse(null);
+                        }
+                        return safetyEngineerRepository
+                                        .findFirstByCompanyIdAndActiveTrueOrderByNameAsc(company.getId())
+                                        .or(() -> safetyEngineerRepository.findFirstByCompanyIdOrderByNameAsc(company.getId()))
+                                        .orElse(null);
+                } catch (Exception e) {
+                        log.warn("Não foi possível resolver profissional de SST: {}", e.getMessage());
+                        return null;
+                }
+        }
+
+        private ImageData loadEngineerStamp(SafetyEngineer engineer) {
+                if (engineer == null || engineer.getStampImageUrl() == null || engineer.getStampImageUrl().isBlank()) {
+                        return null;
+                }
+                return loadStampFromUrl(engineer.getStampImageUrl().trim());
+        }
+
+        private ImageData loadStampFromUrl(String url) {
+                if (url == null || url.isBlank()) {
+                        return null;
+                }
+                try {
+                        String relative = url;
+                        int idx = url.indexOf("/uploads/");
+                        if (idx >= 0) {
+                                relative = url.substring(idx + "/uploads/".length());
+                        } else if (url.startsWith("/api/uploads/")) {
+                                relative = url.substring("/api/uploads/".length());
+                        }
+                        Path path = Paths.get(uploadBaseDir).resolve(relative).normalize();
+                        if (Files.exists(path)) {
+                                return ImageDataFactory.create(Files.readAllBytes(path));
+                        }
+                        log.warn("Arquivo de carimbo não encontrado em disco: {}", path);
+                } catch (Exception e) {
+                        log.warn("Falha ao carregar carimbo {}: {}", url, e.getMessage());
+                }
+                return null;
+        }
+
+        private String professionalTypeLabel(SafetyEngineer engineer) {
+                if (engineer.getProfessionalType() == null) {
+                        return "Profissional de SST";
+                }
+                return switch (engineer.getProfessionalType()) {
+                        case ENGENHEIRO_SEGURANCA -> "Engenheiro de Segurança do Trabalho";
+                        case TECNICO_SEGURANCA -> "Técnico de Segurança do Trabalho";
+                        case MEDICO_TRABALHO -> "Médico do Trabalho";
+                        default -> "Profissional de SST";
+                };
         }
 
         private ImageData loadImage(String classpath) {

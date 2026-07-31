@@ -621,6 +621,31 @@ export const employeeService = {
     }
   },
 
+  /** Funcionário vinculado ao usuário autenticado (userId / CPF / e-mail). */
+  async getMyEmployee(): Promise<Employee | null> {
+    try {
+      const response = await api.get('/api/employees/me');
+      return this.normalizeEmployee(response.data);
+    } catch (error: any) {
+      if (error?.response?.status === 404) return null;
+      console.warn('Não foi possível obter funcionário do usuário logado:', error);
+      return null;
+    }
+  },
+
+  async getEmployeeByCpfExact(cpf: string): Promise<Employee | null> {
+    const digits = (cpf || '').replace(/\D/g, '');
+    if (digits.length < 11) return null;
+    try {
+      const response = await api.get(`/api/employees/search/cpf/${encodeURIComponent(digits)}`);
+      return this.normalizeEmployee(response.data);
+    } catch (error: any) {
+      if (error?.response?.status === 404) return null;
+      console.warn('Erro ao buscar funcionário por CPF:', error);
+      return null;
+    }
+  },
+
   /**
    * Normaliza dados do funcionário do backend para o frontend
    */

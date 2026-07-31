@@ -93,6 +93,23 @@ public class ReportLayoutConfig {
     private boolean includeEmailInFooter = true;
 
     /**
+     * Se deve desenhar o cabeçalho padrão (logo, barra gradiente, título).
+     * Use false em documentos com cabeçalho próprio (ex.: Ordem de Serviço).
+     * Padrão: true
+     */
+    @Builder.Default
+    private boolean showHeader = true;
+
+    /**
+     * Se deve exibir engenheiro SST + carimbo no cabeçalho padrão.
+     * O carimbo da OS é desenhado no cabeçalho próprio da Ordem de Serviço;
+     * contratos e demais PDFs comerciais não devem mostrar o carimbo.
+     * Padrão: false
+     */
+    @Builder.Default
+    private boolean showSafetyEngineerStamp = false;
+
+    /**
      * Orientação da página: true = paisagem (landscape), false = retrato (portrait)
      * Padrão: false (retrato)
      */

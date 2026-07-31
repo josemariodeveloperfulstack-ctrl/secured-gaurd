@@ -183,17 +183,19 @@ const rhMenuItems = [
   { icon: Users, text: 'RH Principal', to: '/rh', id: 'rh' },
   { icon: User2, text: 'Funcionários', to: '/rh/funcionarios', id: 'rh-funcionarios' },
   { icon: Settings, text: 'Departamentos', to: '/rh/departamentos', id: 'rh-departamentos' },
-  { icon: MapPin, text: 'Postos de Trabalho', to: '/rh/postos', id: 'rh-postos' },
+  { icon: MapPin, text: 'Setor de Trabalho', to: '/rh/postos', id: 'rh-postos' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'rh-vagas' },
   { icon: Award, text: 'Benefícios', to: '/rh/beneficios', id: 'rh-beneficios' },
   { icon: Gift, text: 'Aniversariantes', to: '/rh/aniversariantes', id: 'rh-aniversariantes' },
   { icon: GraduationCap, text: 'Treinamentos', to: '/rh/treinamentos', id: 'rh-treinamentos' },
+  { icon: Stethoscope, text: 'Gestão de Atestados', to: '/rh/atestados', id: 'rh-atestados' },
   { icon: BarChart3Icon, text: 'Relatórios RH', to: '/rh/relatorios', id: 'rh-relatorios' },
 ];
 
 // Módulo SST - Saúde e Segurança do Trabalho
 const sstMenuItems = [
   { icon: Shield, text: 'Controle SST', to: '/rh/sst', id: 'rh-sst' },
+  { icon: UserCog, text: 'Profissionais de SST', to: '/rh/sst/profissionais', id: 'rh-sst-profissionais' },
   { icon: Stethoscope, text: 'Exames Médicos', to: '/rh/sst/exames', id: 'rh-sst-exames' },
   { icon: HardHat, text: 'EPIs', to: '/rh/sst/epis', id: 'rh-sst-epis' },
   { icon: AlertTriangle, text: 'Acidentes', to: '/rh/sst/acidentes', id: 'rh-sst-acidentes' },
@@ -213,6 +215,7 @@ const departamentoPessoalMenuItems = [
 
   // Gestão de Tempo e Frequência
   { icon: Calendar, text: 'Férias', to: '/rh/ferias', id: 'dp-ferias' },
+  { icon: Stethoscope, text: 'Gestão de Atestados', to: '/rh/atestados', id: 'dp-atestados' },
   { icon: CalendarDays, text: 'Ponto Eletrônico', to: '/rh/ponto-eletronico', id: 'dp-ponto-eletronico' },
   { icon: FileText, text: 'Fechamento de Horas', to: '/rh/fechamento-horas', id: 'rh-fechamento-horas' },
 
@@ -225,7 +228,7 @@ const departamentoPessoalMenuItems = [
   // Estrutura Organizacional
   { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'dp-funcoes' },
   { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'dp-cargos' },
-  { icon: MapPin, text: 'Postos', to: '/rh/postos', id: 'dp-postos' },
+  { icon: MapPin, text: 'Setor de Trabalho', to: '/rh/postos', id: 'dp-postos' },
 
   // Segurança e Compliance
   { icon: Shield, text: 'EPIs', to: '/rh/epis', id: 'dp-epis' },
@@ -244,6 +247,7 @@ const operacionalMenuItems = [
   { icon: Building2, text: 'Gestão de Postos', to: '/operacional/postos', id: 'operacional-postos' },
   { icon: Clock, text: 'Gestão de Escalas', to: '/operacional/escalas', id: 'operacional-escalas' },
   { icon: Calendar, text: 'Gestão de Férias', to: '/operacional/ferias', id: 'operacional-ferias' },
+  { icon: Stethoscope, text: 'Gestão de Atestados', to: '/operacional/atestados', id: 'operacional-atestados' },
   { icon: CheckSquare, text: 'Gestão de Tarefas', to: '/operacional/tarefas', id: 'operacional-tarefas' },
   { icon: FileText, text: 'Relatórios Operacionais', to: '/operacional/relatorios', id: 'operacional-relatorios' },
   { icon: Clock, text: 'Apuração de Horas', to: '/operacional/apuracao-horas', id: 'operacional-apuracao-horas' },

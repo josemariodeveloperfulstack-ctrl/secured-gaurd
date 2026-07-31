@@ -20,83 +20,66 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/safety-engineers")
 @RequiredArgsConstructor
-@Tag(name = "Engenheiros de Segurança", description = "Gerenciamento de engenheiros de segurança do trabalho")
+@Tag(name = "Profissionais de SST", description = "Cadastro do profissional responsável por SST (assinatura/carimbo em OS e relatórios)")
 public class SafetyEngineerController {
     private final SafetyEngineerService safetyEngineerService;
 
+    @GetMapping
+    @Operation(summary = "Listar todos os profissionais de SST")
+    public ResponseEntity<List<SafetyEngineerDTO>> getAll() {
+        return ResponseEntity.ok(safetyEngineerService.getAll());
+    }
+
     @GetMapping("/company/{companyId}")
-    @Operation(summary = "Listar engenheiros por empresa", description = "Retorna todos os engenheiros de segurança de uma empresa")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de engenheiros retornada com sucesso")
-    })
+    @Operation(summary = "Listar profissionais por empresa")
     public ResponseEntity<List<SafetyEngineerDTO>> getAllByCompanyId(
             @Parameter(description = "ID da empresa") @PathVariable UUID companyId) {
-        List<SafetyEngineerDTO> engineers = safetyEngineerService.getAllByCompanyId(companyId);
-        return ResponseEntity.ok(engineers);
+        return ResponseEntity.ok(safetyEngineerService.getAllByCompanyId(companyId));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Obter engenheiro por ID", description = "Retorna um engenheiro de segurança pelo seu ID")
+    @Operation(summary = "Obter profissional por ID")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Engenheiro encontrado"),
-            @ApiResponse(responseCode = "404", description = "Engenheiro não encontrado")
+            @ApiResponse(responseCode = "200", description = "Encontrado"),
+            @ApiResponse(responseCode = "404", description = "Não encontrado")
     })
     public ResponseEntity<SafetyEngineerDTO> getById(
-            @Parameter(description = "ID do engenheiro de segurança") @PathVariable UUID id) {
-        SafetyEngineerDTO engineer = safetyEngineerService.getById(id);
-        return ResponseEntity.ok(engineer);
+            @Parameter(description = "ID do profissional") @PathVariable UUID id) {
+        return ResponseEntity.ok(safetyEngineerService.getById(id));
     }
 
     @PostMapping
-    @Operation(summary = "Criar engenheiro", description = "Cria um novo engenheiro de segurança do trabalho")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Engenheiro criado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
-            @ApiResponse(responseCode = "404", description = "Empresa não encontrada")
-    })
-    public ResponseEntity<SafetyEngineerDTO> create(
-            @Valid @RequestBody SafetyEngineerDTO dto) {
-        SafetyEngineerDTO created = safetyEngineerService.create(dto);
-        return ResponseEntity.ok(created);
+    @Operation(summary = "Cadastrar profissional de SST")
+    public ResponseEntity<SafetyEngineerDTO> create(@Valid @RequestBody SafetyEngineerDTO dto) {
+        return ResponseEntity.ok(safetyEngineerService.create(dto));
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Atualizar engenheiro", description = "Atualiza os dados de um engenheiro de segurança")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Engenheiro atualizado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
-            @ApiResponse(responseCode = "404", description = "Engenheiro ou empresa não encontrados")
-    })
+    @Operation(summary = "Atualizar profissional de SST")
     public ResponseEntity<SafetyEngineerDTO> update(
-            @Parameter(description = "ID do engenheiro de segurança") @PathVariable UUID id,
+            @PathVariable UUID id,
             @Valid @RequestBody SafetyEngineerDTO dto) {
-        SafetyEngineerDTO updated = safetyEngineerService.update(id, dto);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(safetyEngineerService.update(id, dto));
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Excluir engenheiro", description = "Exclui um engenheiro de segurança do trabalho")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Engenheiro excluído com sucesso"),
-            @ApiResponse(responseCode = "404", description = "Engenheiro não encontrado")
-    })
-    public ResponseEntity<Map<String, String>> delete(
-            @Parameter(description = "ID do engenheiro de segurança") @PathVariable UUID id) {
+    @Operation(summary = "Excluir profissional de SST")
+    public ResponseEntity<Map<String, String>> delete(@PathVariable UUID id) {
         safetyEngineerService.delete(id);
-        return ResponseEntity.ok(Map.of("message", "Engenheiro de segurança excluído com sucesso"));
+        return ResponseEntity.ok(Map.of("message", "Profissional de SST excluído com sucesso"));
     }
 
     @PatchMapping("/{id}/stamp-image-url")
-    @Operation(summary = "Atualizar URL do carimbo", description = "Atualiza a URL da imagem do carimbo do engenheiro")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "URL do carimbo atualizada com sucesso"),
-            @ApiResponse(responseCode = "404", description = "Engenheiro não encontrado")
-    })
+    @Operation(summary = "Atualizar URL do carimbo de assinatura")
     public ResponseEntity<SafetyEngineerDTO> updateStampImageUrl(
-            @Parameter(description = "ID do engenheiro de segurança") @PathVariable UUID id,
+            @PathVariable UUID id,
             @RequestBody Map<String, String> request) {
-        String stampImageUrl = request.get("stampImageUrl");
-        SafetyEngineerDTO updated = safetyEngineerService.updateStampImageUrl(id, stampImageUrl);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(safetyEngineerService.updateStampImageUrl(id, request.get("stampImageUrl")));
+    }
+
+    @PostMapping("/{id}/set-default")
+    @Operation(summary = "Definir como profissional padrão da empresa (usado em OS/relatórios)")
+    public ResponseEntity<SafetyEngineerDTO> setAsCompanyDefault(@PathVariable UUID id) {
+        return ResponseEntity.ok(safetyEngineerService.setAsCompanyDefault(id));
     }
 }

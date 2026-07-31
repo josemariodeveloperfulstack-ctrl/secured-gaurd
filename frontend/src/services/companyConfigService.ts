@@ -67,6 +67,21 @@ class CompanyConfigService {
   }
 
   /**
+   * Configuração de layout/contrato de uma empresa específica.
+   */
+  async getConfigByCompanyId(companyId: string): Promise<CompanyConfig | null> {
+    try {
+      const response = await api.get(`${API_BASE_URL}/by-company/${companyId}`);
+      if (response.status === 204 || !response.data) return null;
+      return response.data;
+    } catch (error: any) {
+      if (error?.response?.status === 204 || error?.response?.status === 404) return null;
+      console.error('❌ Erro ao buscar configuração por empresa:', error);
+      return null;
+    }
+  }
+
+  /**
    * Verifica se existe configuração ativa
    */
   async hasActiveConfig(): Promise<boolean> {

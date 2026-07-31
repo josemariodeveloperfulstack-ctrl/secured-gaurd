@@ -136,6 +136,8 @@ public class SecurityConfig {
                                                 // Logos de empresas - permitir acesso público (para exibição em
                                                 // relatórios)
                                                 .requestMatchers("/api/uploads/companies/logos/**").permitAll()
+                                                // Carimbos de profissionais SST (preview em <img> sem header Authorization)
+                                                .requestMatchers("/api/uploads/safety-engineers/stamps/**").permitAll()
                                                 .requestMatchers("/api/uploads/**").authenticated() // Outros arquivos
                                                                                                     // do chat requerem
                                                                                                     // autenticação
@@ -628,6 +630,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/work-post-assignments/**").permitAll()
                                                 .requestMatchers("/api/specific-activities/**").permitAll()
                                                 .requestMatchers("/api/absences/**").permitAll()
+                                                .requestMatchers("/api/medical-documents/**").authenticated()
                                                 // Endpoints operacionais - temporariamente públicos para debug
                                                 .requestMatchers("/api/equipment/**").permitAll()
                                                 .requestMatchers("/api/alerts/**").permitAll()

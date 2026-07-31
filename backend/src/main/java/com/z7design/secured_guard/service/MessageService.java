@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.z7design.secured_guard.dto.MessageRequestDTO;
@@ -629,8 +630,10 @@ public class MessageService {
     }
 
     /**
-     * Envia notificação em tempo real para todos os setores sobre novo cliente ou posto
+     * Envia notificação em tempo real para todos os setores sobre novo cliente ou posto.
+     * Transação própria para não derrubar o cadastro do cliente se a mensagem falhar.
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notifyNewClientOrWorkPost(String title, String content, User sender) {
         try {
             log.info("Notificando setores sobre novo cliente/posto: {}", title);
@@ -662,7 +665,7 @@ public class MessageService {
             message.setCreatedAt(LocalDateTime.now());
             message.setUpdatedAt(LocalDateTime.now());
             
-            message = messageRepository.save(message);
+            message = messageRepository.saveAndFlush(message);
             sendMessageNow(message);
             
             log.info("Notificação de novo cliente/posto enviada para {} destinatários", recipients.size());

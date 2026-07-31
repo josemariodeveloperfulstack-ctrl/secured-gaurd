@@ -515,6 +515,20 @@ const SST: React.FC = () => {
           {/* Conformidade */}
           <TabsContent value="compliance" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/rh/sst/profissionais')}>
+                <CardHeader>
+                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                    <Users className="h-5 w-5 text-amber-500" />
+                    Profissionais de SST
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-400 text-sm">
+                    Cadastro do responsável (nome, registro, contatos e carimbo) que assina OS e orienta as regras de SST
+                  </p>
+                </CardContent>
+              </Card>
+
               <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/rh/sst/exames')}>
                 <CardHeader>
                   <CardTitle className="text-seguranca-lightgray flex items-center gap-2">

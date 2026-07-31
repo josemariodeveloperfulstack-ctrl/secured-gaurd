@@ -56,8 +56,12 @@ public class ClientService {
             }
             log.info("[DEBUG] CNPJ (normalizado): {}", normalizedCnpj);
 
-            log.info("[DEBUG] Verificando se CNPJ já existe: {}", clientDTO.getCnpj());
-            boolean cnpjExists = clientRepository.existsByCnpj(normalizedCnpj);
+            if (normalizedCnpj.length() != 14) {
+                throw new BusinessException("CNPJ deve conter 14 dígitos");
+            }
+
+            log.info("[DEBUG] Verificando se CNPJ já existe: {}", normalizedCnpj);
+            boolean cnpjExists = clientRepository.existsByCnpjDigits(normalizedCnpj);
             log.info("[DEBUG] CNPJ existe: {}", cnpjExists);
             
             if (cnpjExists) {
@@ -67,29 +71,15 @@ public class ClientService {
             
             log.info("[DEBUG] CNPJ válido, criando cliente");
             Client client = new Client();
-            BeanUtils.copyProperties(clientDTO, client);
+            BeanUtils.copyProperties(clientDTO, client, "id", "createdAt", "updatedAt", "company");
             client.setCompany(resolveCompany(clientDTO.getCompanyId()));
 
             // Forçar salvar CNPJ normalizado
             client.setCnpj(normalizedCnpj);
             
-            // Limpar campos vazios para evitar problemas de validação
-            if (client.getEmail() != null && client.getEmail().trim().isEmpty()) {
-                client.setEmail(null);
-            }
-            if (client.getContactEmail() != null && client.getContactEmail().trim().isEmpty()) {
-                client.setContactEmail(null);
-            }
-            
-            // Validar formato de email se fornecido
-            if (client.getEmail() != null && !client.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
-                log.error("[ERROR] Email inválido: {}", client.getEmail());
-                throw new BusinessException("Formato de email inválido: " + client.getEmail());
-            }
-            if (client.getContactEmail() != null && !client.getContactEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
-                log.error("[ERROR] Email de contato inválido: {}", client.getContactEmail());
-                throw new BusinessException("Formato de email de contato inválido: " + client.getContactEmail());
-            }
+            normalizeOptionalEmails(client);
+            validateEmailFormats(client);
+            normalizeState(client);
             
             // Definir status padrão se não fornecido
             if (client.getStatus() == null) {
@@ -158,19 +148,60 @@ public class ClientService {
             throw new BusinessException("CNPJ é obrigatório");
         }
         
-        // Verificar se o CNPJ foi alterado e se já existe outro cliente com o novo CNPJ
-        if (!existingClient.getCnpj().equals(normalizedCnpj) &&
-            clientRepository.existsByCnpj(normalizedCnpj)) {
+        if (normalizedCnpj.length() != 14) {
+            throw new BusinessException("CNPJ deve conter 14 dígitos");
+        }
+
+        // Verificar se já existe outro cliente com o mesmo CNPJ (só dígitos)
+        if (clientRepository.existsByCnpjDigitsAndIdNot(normalizedCnpj, id.toString())) {
             throw new BusinessException("Já existe um cliente cadastrado com este CNPJ: " + normalizedCnpj);
         }
         
-        BeanUtils.copyProperties(clientDTO, existingClient, "id", "createdAt", "company");
+        BeanUtils.copyProperties(clientDTO, existingClient, "id", "createdAt", "updatedAt", "company");
         existingClient.setCnpj(normalizedCnpj);
         existingClient.setCompany(resolveCompany(clientDTO.getCompanyId()));
+        normalizeOptionalEmails(existingClient);
+        validateEmailFormats(existingClient);
+        normalizeState(existingClient);
         
         Client updatedClient = clientRepository.save(existingClient);
         
         return toDTO(updatedClient);
+    }
+
+    private void normalizeOptionalEmails(Client client) {
+        if (client.getEmail() != null) {
+            String email = client.getEmail().trim();
+            client.setEmail(email.isEmpty() ? null : email.toLowerCase());
+        }
+        if (client.getContactEmail() != null) {
+            String email = client.getContactEmail().trim();
+            client.setContactEmail(email.isEmpty() ? null : email.toLowerCase());
+        }
+    }
+
+    private void validateEmailFormats(Client client) {
+        if (client.getEmail() != null && !client.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new BusinessException("Formato de email inválido: " + client.getEmail());
+        }
+        if (client.getContactEmail() != null && !client.getContactEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new BusinessException("Formato de email de contato inválido: " + client.getContactEmail());
+        }
+    }
+
+    private void normalizeState(Client client) {
+        if (client.getState() == null) {
+            return;
+        }
+        String state = client.getState().trim().toUpperCase();
+        if (state.isEmpty()) {
+            client.setState(null);
+            return;
+        }
+        if (state.length() > 2) {
+            throw new BusinessException("UF deve ter no máximo 2 caracteres (ex.: SP, MG). Valor informado: " + client.getState());
+        }
+        client.setState(state);
     }
     
     @Cacheable(value = "clients", key = "#id")
@@ -273,6 +304,13 @@ public class ClientService {
     
     
     public boolean existsByCnpj(String cnpj) {
-        return clientRepository.existsByCnpj(cnpj);
+        if (cnpj == null) {
+            return false;
+        }
+        String digits = cnpj.replaceAll("\\D", "");
+        if (digits.isBlank()) {
+            return false;
+        }
+        return clientRepository.existsByCnpjDigits(digits);
     }
 } 

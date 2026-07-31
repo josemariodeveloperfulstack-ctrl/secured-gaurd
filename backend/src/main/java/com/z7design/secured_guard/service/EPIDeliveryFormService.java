@@ -113,16 +113,12 @@ public class EPIDeliveryFormService {
             log.info("🏢 Usando empresa do funcionário: {}", company.getName());
         }
 
-        Employee responsibleEmployee = null;
-        if (dto.getResponsibleEmployeeId() != null) {
-            responsibleEmployee = employeeRepository.findById(dto.getResponsibleEmployeeId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Funcionário responsável não encontrado com id: " + dto.getResponsibleEmployeeId()));
-        }
-
         User createdBy = null;
         if (createdByUserId != null) {
             createdBy = userRepository.findById(createdByUserId).orElse(null);
         }
+
+        Employee responsibleEmployee = resolveResponsibleEmployee(dto.getResponsibleEmployeeId(), createdBy);
 
         String workSectorSnapshot = dto.getEmployeeWorkSector() != null ? dto.getEmployeeWorkSector() : buildWorkSectorSnapshot(employee);
         EPIDeliveryType deliveryType = dto.getDeliveryType() != null ? dto.getDeliveryType() : EPIDeliveryType.PRIMEIRA_ENTREGA;
@@ -193,12 +189,14 @@ public class EPIDeliveryFormService {
         boolean wasCompleted = form.getStatus() == com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus.COMPLETED;
         
         // Atualizar campos básicos
-        if (dto.getResponsibleEmployeeId() != null) {
-            Employee resp = employeeRepository.findById(dto.getResponsibleEmployeeId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Responsável não encontrado"));
-            form.setResponsibleEmployee(resp);
+        User updatedBy = updatedByUserId != null ? userRepository.findById(updatedByUserId).orElse(null) : null;
+        if (dto.getResponsibleEmployeeId() != null || form.getResponsibleEmployee() == null) {
+            Employee resp = resolveResponsibleEmployee(dto.getResponsibleEmployeeId(), updatedBy);
+            if (resp != null) {
+                form.setResponsibleEmployee(resp);
+            }
         }
-        
+
         form.setDeliveryDate(dto.getDeliveryDate());
         form.setObservations(dto.getObservations());
         form.setDeliveryType(dto.getDeliveryType() != null ? dto.getDeliveryType() : form.getDeliveryType());
@@ -246,10 +244,41 @@ public class EPIDeliveryFormService {
         }
 
 
-        User updatedBy = updatedByUserId != null ? userRepository.findById(updatedByUserId).orElse(null) : null;
         recordHistoryForForm(savedForm, updatedBy, "ATUALIZAÇÃO");
 
         return EPIDeliveryFormDTO.fromEntity(savedForm);
+    }
+
+    /**
+     * Resolve o responsável pela entrega: ID informado, senão funcionário vinculado ao usuário logado (userId/CPF).
+     */
+    private Employee resolveResponsibleEmployee(UUID responsibleEmployeeId, User actingUser) {
+        if (responsibleEmployeeId != null) {
+            return employeeRepository.findById(responsibleEmployeeId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Funcionário responsável não encontrado com id: " + responsibleEmployeeId));
+        }
+        if (actingUser == null || actingUser.getId() == null) {
+            return null;
+        }
+        Optional<Employee> byUser = employeeRepository.findByUserId(actingUser.getId());
+        if (byUser.isPresent()) {
+            return byUser.get();
+        }
+        if (actingUser.getCpf() != null && !actingUser.getCpf().isBlank()) {
+            String cpf = actingUser.getCpf().replaceAll("\\D", "");
+            if (!cpf.isBlank()) {
+                Optional<Employee> byCpf = employeeRepository.findByCpf(cpf);
+                if (byCpf.isPresent()) {
+                    return byCpf.get();
+                }
+                byCpf = employeeRepository.findByDocument(cpf);
+                if (byCpf.isPresent()) {
+                    return byCpf.get();
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -363,6 +392,7 @@ public class EPIDeliveryFormService {
             movDto.setEmployeeId(form.getEmployee().getId());
             movDto.setRequisitionNumber(requisition.getRequisitionNumber());
             movDto.setNotes("Baixa automática via Ficha de EPI");
+            movDto.setSkipEpiDeliveryFormAutoRecord(true);
             movDto.setDigitalSignature(form.getSignatureBase64());
             movDto.setSignatureType(StockMovement.SignatureType.DIGITAL);
             movDto.setSignatureDate(LocalDateTime.now());

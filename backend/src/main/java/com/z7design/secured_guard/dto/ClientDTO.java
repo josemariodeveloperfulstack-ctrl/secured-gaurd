@@ -31,6 +31,15 @@ public class ClientDTO {
     @Size(max = 255, message = "Endereço deve ter no máximo 255 caracteres")
     private String address;
 
+    @Size(max = 120, message = "Bairro deve ter no máximo 120 caracteres")
+    private String neighborhood;
+
+    @Size(max = 30, message = "Número deve ter no máximo 30 caracteres")
+    private String addressNumber;
+
+    @Size(max = 120, message = "Complemento deve ter no máximo 120 caracteres")
+    private String addressComplement;
+
     @Size(max = 100, message = "Cidade deve ter no máximo 100 caracteres")
     private String city;
 
@@ -129,6 +138,30 @@ public class ClientDTO {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getNeighborhood() {
+        return neighborhood;
+    }
+
+    public void setNeighborhood(String neighborhood) {
+        this.neighborhood = neighborhood;
+    }
+
+    public String getAddressNumber() {
+        return addressNumber;
+    }
+
+    public void setAddressNumber(String addressNumber) {
+        this.addressNumber = addressNumber;
+    }
+
+    public String getAddressComplement() {
+        return addressComplement;
+    }
+
+    public void setAddressComplement(String addressComplement) {
+        this.addressComplement = addressComplement;
     }
 
     public String getCity() {
@@ -253,6 +286,9 @@ public class ClientDTO {
         dto.setPhone(entity.getPhone());
         dto.setMobile(entity.getMobile());
         dto.setAddress(entity.getAddress());
+        dto.setNeighborhood(entity.getNeighborhood());
+        dto.setAddressNumber(entity.getAddressNumber());
+        dto.setAddressComplement(entity.getAddressComplement());
         dto.setCity(entity.getCity());
         dto.setState(entity.getState());
         dto.setZipCode(entity.getZipCode());

@@ -178,27 +178,41 @@ public class GlobalExceptionHandler {
             log.warn("Causa: {}", ex.getCause().getMessage());
         }
 
-        String message = "Erro ao salvar dados. Verifique se os dados já existem (ex: username ou email já cadastrado).";
+        String message = "Erro ao salvar dados. Verifique se há informações duplicadas ou inválidas.";
 
         // Tentar extrair uma mensagem mais específica da exceção
         String msg = ex.getMessage() != null ? ex.getMessage() : "";
         String causeMsg = ex.getCause() != null ? ex.getCause().getMessage() : "";
-        String fullMsg = msg + " " + causeMsg;
+        String rootMsg = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : "";
+        String fullMsg = (msg + " " + causeMsg + " " + rootMsg).toLowerCase();
+        boolean isClientsPath = path.contains("/clients") || path.contains("clients");
 
-        if ((path.contains("/clients") || path.contains("clients"))
-                && (fullMsg.toLowerCase().contains("clients_cnpj")
-                        || fullMsg.toLowerCase().contains("clients_cnpj_key")
-                        || fullMsg.toLowerCase().contains("uk")
-                        && fullMsg.toLowerCase().contains("cnpj")
-                        || fullMsg.toLowerCase().contains("duplicate key")
-                                && fullMsg.toLowerCase().contains("cnpj"))) {
+        // Importante: o SQL do Hibernate lista colunas (ex.: email) em qualquer INSERT/UPDATE.
+        // Não usar contains("email") genérico — isso gerava "Email já está em uso" falso.
+        boolean emailUniqueViolation = fullMsg.contains("key (email)")
+                || fullMsg.contains("(email)=")
+                || fullMsg.contains("users_email")
+                || fullMsg.contains("uk_users_email")
+                || (fullMsg.contains("uq_") && fullMsg.contains("email") && fullMsg.contains("duplicate"))
+                || (fullMsg.contains("unique") && fullMsg.contains("email")
+                        && (fullMsg.contains("users") || fullMsg.contains("supervisors") || fullMsg.contains("units")));
+
+        if (isClientsPath && (fullMsg.contains("clients_cnpj")
+                || fullMsg.contains("cnpj_key")
+                || (fullMsg.contains("duplicate") && fullMsg.contains("cnpj"))
+                || (fullMsg.contains("unique") && fullMsg.contains("cnpj")))) {
             message = "Já existe um cliente cadastrado com este CNPJ.";
-        } else if ((path.contains("/clients") || path.contains("clients"))
-                && fullMsg.toLowerCase().contains("company_id")) {
+        } else if (fullMsg.contains("chk_messages_type")) {
+            message = "Falha ao registrar notificação interna (tipo de mensagem inválido). O cadastro principal pode ter sido concluído — atualize a lista e tente novamente se necessário.";
+        } else if (isClientsPath && fullMsg.contains("company_id")) {
             message = "Empresa é obrigatória ou inválida para o cliente.";
-        } else if (fullMsg.contains("username") || (fullMsg.contains("UK_") && fullMsg.contains("username"))) {
+        } else if (isClientsPath && (fullMsg.contains("22001") || fullMsg.contains("too long") || fullMsg.contains("value too long"))) {
+            message = "Um dos campos do cliente excede o tamanho permitido (verifique UF com 2 letras, telefone e CEP).";
+        } else if (isClientsPath) {
+            message = "Não foi possível salvar o cliente. Verifique CNPJ, empresa vinculada e demais campos obrigatórios.";
+        } else if (fullMsg.contains("username") || (fullMsg.contains("uk_") && fullMsg.contains("username"))) {
             message = "Nome de usuário já está em uso";
-        } else if (fullMsg.contains("email") || (fullMsg.contains("UK_") && fullMsg.contains("email"))) {
+        } else if (emailUniqueViolation) {
             message = "Email já está em uso";
         } else if (fullMsg.contains("contract_number") || fullMsg.contains("contracts_contract_number")) {
             message = "Número do contrato já está em uso por outro contrato.";
@@ -207,13 +221,13 @@ public class GlobalExceptionHandler {
         } else if (path.contains("remanejamentos") && (fullMsg.contains("remanejamento_id") || fullMsg.contains("remanejamentos_historico") || fullMsg.contains("not-null"))) {
             message = "Não foi possível concluir a exclusão do remanejamento (integridade dos dados). Execute as migrações do banco (Flyway) ou contate o suporte.";
         } else if (path.contains("/dependents") || path.contains("dependents")) {
-            if (fullMsg.toLowerCase().contains("muito longo") || fullMsg.contains("22001")) {
-                if (fullMsg.toLowerCase().contains("rg")) {
+            if (fullMsg.contains("muito longo") || fullMsg.contains("22001")) {
+                if (fullMsg.contains("rg")) {
                     message = "RG do dependente é muito longo (máximo 50 caracteres). Use só o número ou abrevie órgão/UF.";
                 } else {
                     message = "Um dos campos do dependente excede o tamanho permitido. Revise RG, nome e demais textos.";
                 }
-            } else if (fullMsg.toLowerCase().contains("cpf") || fullMsg.contains("dependents")) {
+            } else if (fullMsg.contains("cpf") || fullMsg.contains("dependents")) {
                 message = "Este CPF já está cadastrado como dependente (restrição no banco de dados). Use outro CPF ou edite o registo existente.";
             }
         }

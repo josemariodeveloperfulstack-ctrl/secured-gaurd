@@ -166,7 +166,11 @@ public class EPIDeliveryStandardPdfService {
         public byte[] generateEPIDeliveryPdfFromForm(EPIDeliveryForm form) throws Exception {
                 log.info("📄 Gerando ficha de entrega de EPI a partir do formulário ID: {}", form.getId());
 
+                // Recarrega o funcionário para garantir hireDate do cadastro (sem cache/proxy stale)
                 Employee employee = form.getEmployee();
+                if (employee != null && employee.getId() != null) {
+                        employee = employeeRepository.findById(employee.getId()).orElse(employee);
+                }
                 Company company = form.getCompany();
 
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -246,7 +250,7 @@ public class EPIDeliveryStandardPdfService {
                         
                         String hireDate = formatDate(employee.getHireDate());
                         String terminationDate = formatDate(employee.getTerminationDate());
-                        String responsibleName = form.getResponsibleEmployee() != null ? form.getResponsibleEmployee().getName().toUpperCase() : "ALMOXARIFADO";
+                        String responsibleName = resolveResponsibleName(form);
 
                         secondInfoTable.addCell(new Cell().add(new Paragraph("ADMISSÃO: " + hireDate).setFontSize(8.5f)).setPadding(3f));
                         secondInfoTable.addCell(new Cell().add(new Paragraph("DEMISSÃO: " + terminationDate).setFontSize(8.5f)).setPadding(3f));
@@ -370,6 +374,9 @@ public class EPIDeliveryStandardPdfService {
                 log.info("📊 Gerando ficha de entrega de EPI (Excel) a partir do formulário ID: {}", form.getId());
 
                 Employee employee = form.getEmployee();
+                if (employee != null && employee.getId() != null) {
+                        employee = employeeRepository.findById(employee.getId()).orElse(employee);
+                }
                 Company company = form.getCompany();
 
                 try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -675,7 +682,19 @@ public class EPIDeliveryStandardPdfService {
         private String formatDate(LocalDate date) {
                 if (date == null)
                         return "";
-                return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                // Formata pelos componentes do LocalDate (sem Instant/UTC) para não subtrair 1 dia
+                return String.format("%02d/%02d/%04d",
+                                date.getDayOfMonth(), date.getMonthValue(), date.getYear());
+        }
+
+        private String resolveResponsibleName(EPIDeliveryForm form) {
+                if (form.getResponsibleEmployee() != null && form.getResponsibleEmployee().getName() != null) {
+                        return form.getResponsibleEmployee().getName().toUpperCase();
+                }
+                if (form.getCreatedBy() != null && form.getCreatedBy().getName() != null) {
+                        return form.getCreatedBy().getName().toUpperCase();
+                }
+                return "ALMOXARIFADO";
         }
 
         /**

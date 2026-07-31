@@ -170,6 +170,7 @@ const SSTRiscosOcupacionais = lazy(() => import('@/pages/RH/SST/RiscosOcupaciona
 const SSTTemplates = lazy(() => import('@/pages/RH/SST/Templates'));
 const SSTCIPA = lazy(() => import('@/pages/RH/SST/CIPA'));
 const SSTTreinamentos = lazy(() => import('@/pages/RH/SST/Treinamentos'));
+const SSTProfissionais = lazy(() => import('@/pages/RH/SST/ProfissionaisSST'));
 const Treinamentos = lazy(() => import('@/pages/RH/Treinamentos'));
 const PontoEletronico = lazy(() => import('@/pages/RH/PontoEletronico'));
 const FechamentoHoras = lazy(() => import('@/pages/RH/FechamentoHoras'));
@@ -177,6 +178,7 @@ const Aniversariantes = lazy(() => import('@/pages/RH/Aniversariantes'));
 const FechamentoHorasDetalhes = lazy(() => import('@/pages/RH/FechamentoHorasDetalhes'));
 const ImportarBatidas = lazy(() => import('@/pages/RH/ImportarBatidas'));
 const AvaliacaoDesempenho = lazy(() => import('@/pages/RH/AvaliacaoDesempenho'));
+const GestaoAtestados = lazy(() => import('@/pages/GestaoAtestados'));
 const Vagas = lazy(() => import('@/pages/Vagas'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
 const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
@@ -227,7 +229,7 @@ const ImportarWhatsappPDF = lazy(() => import('@/pages/ImportarWhatsappPDF'));
 // Páginas adicionais
 const Filiais = lazy(() => import('@/pages/Filiais'));
 const GestaoServicos = lazy(() => import('@/pages/GestaoServicos'));
-const Operacional = lazy(() => import('@/pages/Operacional'));
+const Operacional = lazyWithRetry(() => import('@/pages/Operacional'), 'Operacional');
 const ControleRondas = lazy(() => import('@/pages/ControleRondas'));
 
 // Módulo Comercial
@@ -920,6 +922,13 @@ function App() {
                         <SSTTreinamentos />
                       </ProtectedRoute>
                     } />
+                    <Route path="/rh/sst/profissionais" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <SSTProfissionais />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
                     <Route path="/rh/treinamentos" element={
                       <ProtectedRoute>
                         <Treinamentos />
@@ -1017,6 +1026,20 @@ function App() {
                     <Route path="/rh/ferias" element={
                       <ProtectedRoute>
                         <FeriasPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/atestados" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoAtestados />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/operacional/atestados" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoAtestados />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/rh/aniversariantes" element={

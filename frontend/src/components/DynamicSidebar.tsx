@@ -415,7 +415,7 @@ export function DynamicSidebar() {
     },
     {
       icon: MapPin,
-      text: 'Postos de Trabalho',
+      text: 'Setor de Trabalho',
       to: '/postos',
       id: 'postos',
       requiredPermission: 'EMPLOYEES_READ'

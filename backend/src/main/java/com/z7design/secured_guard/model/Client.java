@@ -47,6 +47,18 @@ public class Client {
     @Column(name = "address")
     private String address;
 
+    @Size(max = 120, message = "Bairro deve ter no máximo 120 caracteres")
+    @Column(name = "neighborhood")
+    private String neighborhood;
+
+    @Size(max = 30, message = "Número deve ter no máximo 30 caracteres")
+    @Column(name = "address_number")
+    private String addressNumber;
+
+    @Size(max = 120, message = "Complemento deve ter no máximo 120 caracteres")
+    @Column(name = "address_complement")
+    private String addressComplement;
+
     @Size(max = 100, message = "Cidade deve ter no máximo 100 caracteres")
     @Column(name = "city")
     private String city;
@@ -173,6 +185,30 @@ public class Client {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getNeighborhood() {
+        return neighborhood;
+    }
+
+    public void setNeighborhood(String neighborhood) {
+        this.neighborhood = neighborhood;
+    }
+
+    public String getAddressNumber() {
+        return addressNumber;
+    }
+
+    public void setAddressNumber(String addressNumber) {
+        this.addressNumber = addressNumber;
+    }
+
+    public String getAddressComplement() {
+        return addressComplement;
+    }
+
+    public void setAddressComplement(String addressComplement) {
+        this.addressComplement = addressComplement;
     }
 
     public String getCity() {

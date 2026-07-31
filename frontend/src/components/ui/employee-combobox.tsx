@@ -37,6 +37,8 @@ interface EmployeeComboboxProps {
   minChars?: number;
   /** Nome do funcionário para exibir quando value está preenchido (ex.: ao editar) e o combobox ainda não carregou o item */
   initialDisplayName?: string;
+  /** Nome exibido quando ainda não há value (ex.: usuário logado como padrão). */
+  fallbackDisplayName?: string;
   /** Callback disparado quando um funcionário é selecionado, retornando o objeto completo */
   onEmployeeSelect?: (employee: SimpleEmployee) => void;
   /**
@@ -59,6 +61,7 @@ export function EmployeeCombobox({
   disabled = false,
   minChars = 3,
   initialDisplayName,
+  fallbackDisplayName,
   onEmployeeSelect,
   positionFilter,
   displayNameOnly = false,
@@ -238,7 +241,7 @@ export function EmployeeCombobox({
     ? formatEmployeeLabel(effectiveSelected, displayNameOnly)
     : value && initialDisplayName
       ? (displayNameOnly ? initialDisplayName.split(' - ')[0].split(' (')[0].trim() : initialDisplayName)
-      : null
+      : (!value && fallbackDisplayName ? fallbackDisplayName : null)
 
   const isSelectedInactive = effectiveSelected && isInactive(effectiveSelected.status);
   const selectedStatusLabel = effectiveSelected ? getStatusLabel(effectiveSelected.status) : "";

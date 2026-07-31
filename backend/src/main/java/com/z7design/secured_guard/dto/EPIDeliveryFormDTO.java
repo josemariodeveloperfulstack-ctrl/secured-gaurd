@@ -264,6 +264,9 @@ public class EPIDeliveryFormDTO {
                 if (form.getResponsibleEmployee() != null) {
                         dto.setResponsibleEmployeeId(form.getResponsibleEmployee().getId());
                         dto.setResponsibleEmployeeName(form.getResponsibleEmployee().getName());
+                } else if (form.getCreatedBy() != null && form.getCreatedBy().getName() != null) {
+                        // Fallback: usuário logado que registrou a entrega
+                        dto.setResponsibleEmployeeName(form.getCreatedBy().getName());
                 }
                 dto.setObservations(form.getObservations());
                 dto.setPdfUrl(form.getPdfUrl());

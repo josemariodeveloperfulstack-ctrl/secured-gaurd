@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { FileText, Download, Eye, User, Building, Calendar, Clock, MapPin, AlertTriangle, CheckCircle2, Loader2, Briefcase } from 'lucide-react';
+import { FileText, Download, Eye, User, Building, Calendar, Clock, MapPin, AlertTriangle, CheckCircle2, Loader2, Briefcase, Stamp } from 'lucide-react';
 import { employeeService, SimpleEmployee, employeeToSimpleEmployee } from '@/services/employeeService';
 import { SearchableSelect } from '../ui/searchable-select';
 import { EmployeeCombobox } from '../ui/employee-combobox';
@@ -15,6 +15,11 @@ import { EmployeeCombobox } from '../ui/employee-combobox';
 import { companyService } from '@/services/companyService';
 import { clientService, Client } from '@/services/clientService';
 import { workPostService } from '@/services/workPostService';
+import {
+  SST_PROFESSIONAL_TYPE_LABELS,
+  SstProfessional,
+  sstProfessionalService,
+} from '@/services/sstProfessionalService';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
@@ -71,6 +76,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     uniformSectionTitle: '',
     mandatoryTrainings: '',
     accidentProcedure: '',
+    safetyEngineerId: '',
   });
 
   const [activeTemplateLabel, setActiveTemplateLabel] = useState<string | null>(null);
@@ -84,11 +90,24 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
   const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
   const [syncingEmployeeContext, setSyncingEmployeeContext] = useState(false);
   const [resolvedClientPreview, setResolvedClientPreview] = useState<ClientPreview | null>(null);
+  const [sstProfessionals, setSstProfessionals] = useState<SstProfessional[]>([]);
+  const [loadingSst, setLoadingSst] = useState(false);
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
   const selectedWorkPost = workPosts.find((wp) => wp.id === form.workPostId);
   const cliente = form.clientId ? clients.find((c) => c.id === form.clientId) : undefined;
+  const selectedSst = sstProfessionals.find((p) => p.id === form.safetyEngineerId);
+
+  const stampSrc = (url?: string) => {
+    if (!url) return null;
+    if (url.startsWith('http') || url.startsWith('blob:')) return url;
+    return url.startsWith('/') ? url : `/${url}`;
+  };
+
+  const professionalsWithStamp = sstProfessionals.filter(
+    (p) => p.active !== false && Boolean(p.stampImageUrl),
+  );
 
   /** Exibe cliente da lista, preview resolvido do posto ou dados do posto selecionado */
   const clienteExibicao =
@@ -158,6 +177,44 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       companyId: companyId || prev.companyId
     }));
   }, [employeeId, companyId]);
+
+  useEffect(() => {
+    const companyIdToLoad = form.companyId;
+    if (!companyIdToLoad) {
+      setSstProfessionals([]);
+      setForm((prev) => (prev.safetyEngineerId ? { ...prev, safetyEngineerId: '' } : prev));
+      return;
+    }
+
+    let cancelled = false;
+    const loadSst = async () => {
+      setLoadingSst(true);
+      try {
+        const list = await sstProfessionalService.listByCompany(companyIdToLoad);
+        if (cancelled) return;
+        const active = (list || []).filter((p) => p.active !== false);
+        setSstProfessionals(active);
+        setForm((prev) => {
+          const stillValid = active.some((p) => p.id === prev.safetyEngineerId);
+          if (stillValid) return prev;
+          const preferred =
+            active.find((p) => p.companyDefault && p.stampImageUrl) ||
+            active.find((p) => p.stampImageUrl) ||
+            active[0];
+          return { ...prev, safetyEngineerId: preferred?.id || '' };
+        });
+      } catch (err) {
+        console.error('Erro ao carregar profissionais de SST:', err);
+        if (!cancelled) setSstProfessionals([]);
+      } finally {
+        if (!cancelled) setLoadingSst(false);
+      }
+    };
+    void loadSst();
+    return () => {
+      cancelled = true;
+    };
+  }, [form.companyId]);
 
   const resolveClientFromWorkPost = useCallback(
     async (
@@ -464,6 +521,8 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       uniformSectionTitle: form.uniformSectionTitle || undefined,
       mandatoryTrainings: form.mandatoryTrainings,
       accidentProcedure: form.accidentProcedure,
+      safetyEngineerId: form.safetyEngineerId || undefined,
+      stampImageUrl: selectedSst?.stampImageUrl || undefined,
     };
   };
 
@@ -688,6 +747,67 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                   )}
                 </div>
               )}
+
+              <div className="space-y-2 md:col-span-2">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Stamp className="h-4 w-4 text-amber-500" />
+                  Carimbo SST (3º quadro do PDF)
+                  <span className="block text-[11px] font-normal text-muted-foreground/80 w-full">
+                    Imagem do profissional de SST que aparece à direita do cabeçalho da Ordem de Serviço.
+                    Se houver mais de um cadastrado, escolha qual carimbo usar.
+                  </span>
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-start">
+                  <Select
+                    value={form.safetyEngineerId || undefined}
+                    onValueChange={(value) => setForm((prev) => ({ ...prev, safetyEngineerId: value }))}
+                    disabled={loadingSst || !form.companyId}
+                  >
+                    <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60">
+                      <SelectValue
+                        placeholder={
+                          loadingSst
+                            ? 'Carregando profissionais...'
+                            : professionalsWithStamp.length === 0
+                              ? 'Nenhum carimbo cadastrado para a empresa'
+                              : 'Selecione o carimbo / profissional'
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {professionalsWithStamp.length === 0 ? (
+                        <div className="p-3 text-sm text-muted-foreground">
+                          Cadastre o carimbo em RH → SST → Profissionais.
+                        </div>
+                      ) : (
+                        professionalsWithStamp.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                            {p.creaNumber ? ` — ${p.creaNumber}` : ''}
+                            {p.companyDefault ? ' (padrão)' : ''}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {selectedSst?.stampImageUrl ? (
+                    <div className="rounded border border-border bg-white/5 p-2 inline-flex flex-col items-center gap-1 min-w-[160px]">
+                      <img
+                        src={stampSrc(selectedSst.stampImageUrl) || ''}
+                        alt={`Carimbo de ${selectedSst.name}`}
+                        className="max-h-20 max-w-[170px] object-contain"
+                      />
+                      <span className="text-[10px] text-muted-foreground text-center">
+                        {SST_PROFESSIONAL_TYPE_LABELS[selectedSst.professionalType] || selectedSst.professionalType}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="rounded border border-dashed border-amber-600/50 p-3 text-xs text-amber-400 max-w-[200px]">
+                      Sem prévia — envie o carimbo no cadastro do profissional de SST.
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <div className="space-y-2">
                 <Label className="text-base font-semibold">

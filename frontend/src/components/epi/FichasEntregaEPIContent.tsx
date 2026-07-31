@@ -40,8 +40,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { epiDeliveryFormService, EPIDeliveryForm, EPIDeliveryType } from '@/services/epiDeliveryFormService';
 import { useGSAP } from '@/hooks/use-gsap';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { formatAdmissionDateBr } from '@/utils/employeeAdmissionDate';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import FichaEntregaEPIForm from '@/components/funcionarios/FichaEntregaEPIForm';
@@ -439,7 +438,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
                             </TableCell>
                             <TableCell>
                               {ficha.deliveryDate
-                                ? format(new Date(ficha.deliveryDate), 'dd/MM/yyyy', { locale: ptBR })
+                                ? formatAdmissionDateBr(ficha.deliveryDate)
                                 : '-'}
                             </TableCell>
                             <TableCell>
@@ -448,7 +447,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {ficha.responsibleEmployeeName || '-'}
+                              {ficha.responsibleEmployeeName || ficha.createdByName || '-'}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
@@ -562,8 +561,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
               <FichaEntregaEPIForm 
                 fichaId={editingFichaId || undefined} 
                 onSuccess={() => {
-                  setManualEntryOpen(false);
-                  setEditingFichaId(null);
+                  // Mantém o formulário aberto para continuar adicionando itens na mesma ficha
                   loadFichas();
                 }}
               />
@@ -612,13 +610,13 @@ export const FichasEntregaEPIContent: React.FC = () => {
                     <Label className="text-xs text-muted-foreground">Data de Entrega</Label>
                     <p className="font-medium">
                       {selectedFicha.deliveryDate
-                        ? format(new Date(selectedFicha.deliveryDate), 'dd/MM/yyyy', { locale: ptBR })
+                        ? formatAdmissionDateBr(selectedFicha.deliveryDate)
                         : '-'}
                     </p>
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Responsável</Label>
-                    <p className="font-medium">{selectedFicha.responsibleEmployeeName || '-'}</p>
+                    <p className="font-medium">{selectedFicha.responsibleEmployeeName || selectedFicha.createdByName || '-'}</p>
                   </div>
                   {selectedFicha.employeeWorkSector && (
                     <div className="col-span-2">
@@ -656,7 +654,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
                             <TableCell>{item.ca || '-'}</TableCell>
                             <TableCell>
                               {item.validityDate
-                                ? format(new Date(item.validityDate), 'dd/MM/yyyy', { locale: ptBR })
+                                ? formatAdmissionDateBr(item.validityDate)
                                 : '-'}
                             </TableCell>
                             <TableCell>{item.observations || '-'}</TableCell>

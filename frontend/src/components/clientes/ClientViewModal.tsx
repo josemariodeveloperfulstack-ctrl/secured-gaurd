@@ -140,16 +140,21 @@ export const ClientViewModal: React.FC<ClientViewModalProps> = ({
                   </div>
                 )}
                 
-                {client.address && (
+                {(client.address || client.neighborhood || client.city) && (
                   <div className="flex items-start gap-2">
                     <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Endereço</p>
                       <p className="text-sm text-gray-600">
-                        {client.address}
-                        {client.city && `, ${client.city}`}
-                        {client.state && ` - ${client.state}`}
-                        {client.zipCode && `, ${client.zipCode}`}
+                        {[
+                          client.address,
+                          client.addressNumber ? `nº ${client.addressNumber}` : null,
+                          client.addressComplement,
+                          client.neighborhood,
+                          client.city,
+                          client.state,
+                          client.zipCode,
+                        ].filter(Boolean).join(', ')}
                       </p>
                     </div>
                   </div>

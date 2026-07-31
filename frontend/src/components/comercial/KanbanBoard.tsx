@@ -1489,7 +1489,7 @@ export default function KanbanBoard() {
                       onSendEmail={handleSendEmail}
                       onSendWhatsApp={handleSendWhatsApp}
                       onAddNegotiationNote={handleAddNegotiationNote}
-                      interactions={interactionsByOpp[String(opp.id)] || []}
+                      interactions={interactionsByOpp[String(opp.id)] ?? undefined}
                       formatCurrency={formatCurrency}
                       formatDate={formatDate}
                     />

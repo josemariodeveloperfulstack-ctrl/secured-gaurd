@@ -19,6 +19,19 @@ public interface ClientRepository extends JpaRepository<Client, java.util.UUID>,
     Optional<Client> findByCnpj(String cnpj);
     
     boolean existsByCnpj(String cnpj);
+
+    @Query(value = "SELECT EXISTS (" +
+            "SELECT 1 FROM clients " +
+            "WHERE REGEXP_REPLACE(COALESCE(cnpj, ''), '[^0-9]', '', 'g') = :cnpj" +
+            ")", nativeQuery = true)
+    boolean existsByCnpjDigits(@Param("cnpj") String cnpj);
+
+    @Query(value = "SELECT EXISTS (" +
+            "SELECT 1 FROM clients " +
+            "WHERE REGEXP_REPLACE(COALESCE(cnpj, ''), '[^0-9]', '', 'g') = :cnpj " +
+            "AND id <> CAST(:id AS uuid)" +
+            ")", nativeQuery = true)
+    boolean existsByCnpjDigitsAndIdNot(@Param("cnpj") String cnpj, @Param("id") String id);
     
     List<Client> findByStatus(ClientStatus status);
     

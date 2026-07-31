@@ -77,6 +77,7 @@ public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm
         LEFT JOIN FETCH f.employee
         LEFT JOIN FETCH f.company
         LEFT JOIN FETCH f.responsibleEmployee
+        LEFT JOIN FETCH f.createdBy
         LEFT JOIN FETCH f.items
         WHERE f.id = :id
         """)
