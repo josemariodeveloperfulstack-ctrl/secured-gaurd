@@ -221,6 +221,34 @@ export interface EmployeeSelect {
   name: string;
 }
 
+// Campos usados para formatar a conta do Plano de Contas (compartilhado por
+// ContaAPagar e ContaAReceber, que possuem a mesma estrutura de subcategoria).
+export interface ContaPlanoDeContasFields {
+  subcategoriaNome?: string | null;
+  subcategoriaCodigo?: string | null;
+  categoriaPaiCodigo?: string | null;
+}
+
+// Formata a conta do plano de contas para exibição (ex.: "CODIGO - Nome")
+export function formatContaPlanoDeContas(conta: ContaPlanoDeContasFields): string {
+  if (conta.subcategoriaNome) {
+    const codigo = conta.subcategoriaCodigo || conta.categoriaPaiCodigo || '';
+    return `${codigo ? codigo + ' - ' : ''}${conta.subcategoriaNome}`;
+  }
+  return '';
+}
+
+const CATEGORIA_RESCISAO_FUNCIONARIOS = 'Rescisão de funcionários';
+
+// Em contas de rescisão de funcionários, exibe o nome do funcionário vinculado
+// em vez do fornecedor. Nas demais contas, mantém o fornecedor.
+function resolveFornecedorOuFuncionario(invoice: any): string {
+  if (invoice.categoriaPaiNome === CATEGORIA_RESCISAO_FUNCIONARIOS && invoice.employeeName) {
+    return invoice.employeeName;
+  }
+  return invoice.supplierName || 'Não informado';
+}
+
 export const contasAPagarService = {
   // ===== CONTAS A PAGAR =====
 
@@ -255,9 +283,8 @@ export const contasAPagarService = {
         ? (typeof invoice.supplierId === 'string' ? invoice.supplierId : String(invoice.supplierId))
         : undefined;
 
-      // Se não houver supplierName mas houver supplierId, usar 'Não informado' 
-      // (o nome será preenchido quando o fornecedor for carregado)
-      const fornecedorNome = invoice.supplierName || 'Não informado';
+      // Em rescisão de funcionários, exibe o funcionário vinculado em vez do fornecedor
+      const fornecedorNome = resolveFornecedorOuFuncionario(invoice);
 
       return {
         id: invoice.id,
@@ -278,7 +305,12 @@ export const contasAPagarService = {
         observacoes: invoice.notes,
         categoria: invoice.category,
         subcategoriaId: invoice.subcategoriaId,
+        subcategoriaNome: invoice.subcategoriaNome,
+        subcategoriaCodigo: invoice.subcategoriaCodigo,
+        categoriaPaiNome: invoice.categoriaPaiNome,
+        categoriaPaiCodigo: invoice.categoriaPaiCodigo,
         employeeId: invoice.employeeId,
+        employeeName: invoice.employeeName,
         centroCusto: invoice.centroCusto
       };
     });
@@ -308,7 +340,7 @@ export const contasAPagarService = {
       ? (typeof invoice.supplierId === 'string' ? invoice.supplierId : String(invoice.supplierId))
       : undefined;
 
-    const fornecedorNome = invoice.supplierName || 'Não informado';
+    const fornecedorNome = resolveFornecedorOuFuncionario(invoice);
 
     return {
       id: invoice.id,
@@ -333,8 +365,15 @@ export const contasAPagarService = {
       observacoes: invoice.notes,
       categoria: invoice.category,
       subcategoriaId: invoice.subcategoriaId,
-      employeeId: invoice.employeeId,
-      centroCusto: invoice.centroCusto
+      subcategoriaNome: invoice.subcategoriaNome,
+      subcategoriaCodigo: invoice.subcategoriaCodigo,
+        categoriaPaiNome: invoice.categoriaPaiNome,
+        categoriaPaiCodigo: invoice.categoriaPaiCodigo,
+        employeeId: invoice.employeeId,
+        employeeName: invoice.employeeName,
+        centroCusto: invoice.centroCusto,
+        createdById: invoice.createdById,
+        createdByName: invoice.createdByName,
     };
   },
 
@@ -390,7 +429,7 @@ export const contasAPagarService = {
     const requestData: Partial<CreateContaAPagarRequest> = {};
 
     if (conta.descricao) requestData.description = conta.descricao;
-    if (conta.fornecedorId) requestData.supplierId = conta.fornecedorId;
+    if (conta.fornecedorId !== undefined) requestData.supplierId = conta.fornecedorId || null;
     if (conta.valor !== undefined) requestData.amount = conta.valor;
     if (conta.tipo) requestData.type = conta.tipo;
     if (conta.status) requestData.status = mapFrontendStatusToBackend(conta.status) as any;
@@ -920,7 +959,7 @@ export const contasAPagarService = {
       id: invoice.id,
       dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
-      fornecedor: invoice.supplierName || 'Não informado',
+      fornecedor: resolveFornecedorOuFuncionario(invoice),
       fornecedorId: invoice.supplierId,
       descricao: invoice.description,
       tipo: invoice.type || 'VARIAVEL',
@@ -932,10 +971,17 @@ export const contasAPagarService = {
       observacoes: invoice.notes,
       categoria: invoice.category,
       subcategoriaId: invoice.subcategoriaId,
+      subcategoriaNome: invoice.subcategoriaNome,
+      subcategoriaCodigo: invoice.subcategoriaCodigo,
+      categoriaPaiNome: invoice.categoriaPaiNome,
+      categoriaPaiCodigo: invoice.categoriaPaiCodigo,
       employeeId: invoice.employeeId,
+      employeeName: invoice.employeeName,
       centroCusto: invoice.centroCusto,
       companySigla: invoice.companySigla,
-      createdAt: parseDateFromBackend(invoice.createdAt)
+      createdAt: parseDateFromBackend(invoice.createdAt),
+      createdById: invoice.createdById,
+      createdByName: invoice.createdByName,
     };
   }
 };

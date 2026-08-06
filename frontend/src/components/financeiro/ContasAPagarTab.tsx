@@ -29,7 +29,7 @@ import { ContasAPagarFormModal, ContaAPagar } from '@/components/financeiro/Cont
 import { ContasAPagarTable } from '@/components/financeiro/ContasAPagarTable';
 import { ContasAPagarDashboard } from '@/components/financeiro/ContasAPagarDashboard';
 import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewModal';
-import { contasAPagarService } from '@/services/contasAPagarService';
+import { contasAPagarService, formatContaPlanoDeContas } from '@/services/contasAPagarService';
 import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import { format, addDays, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -465,7 +465,7 @@ const ContasAPagarTab: React.FC = () => {
     }
 
     try {
-      const headers = ['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa', 'Categoria'];
+      const headers = ['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa', 'Conta', 'Categoria'];
       const csvContent = [
         headers.join(','),
         ...filteredReportDisplayData.map((conta: ContaAPagar) => [
@@ -476,6 +476,7 @@ const ContasAPagarTab: React.FC = () => {
           getStatusDisplayName(conta.status),
           conta.tipo,
           conta.empresa || conta.companySigla || 'Não informado',
+          `"${formatContaPlanoDeContas(conta)}"`,
           conta.categoria || ''
         ].join(','))
       ].join('\n');
@@ -521,7 +522,7 @@ const ContasAPagarTab: React.FC = () => {
     }
 
     try {
-      const headers = ['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa', 'Categoria'];
+      const headers = ['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa', 'Conta', 'Categoria'];
 
       let htmlContent = `
         <html>
@@ -552,6 +553,7 @@ const ContasAPagarTab: React.FC = () => {
                   <td>${getStatusDisplayName(conta.status)}</td>
                   <td>${conta.tipo}</td>
                   <td>${conta.empresa || conta.companySigla || 'Não informado'}</td>
+                  <td>${formatContaPlanoDeContas(conta)}</td>
                   <td>${conta.categoria || ''}</td>
                 </tr>
               `).join('')}
@@ -1339,6 +1341,7 @@ const ContasAPagarTab: React.FC = () => {
                         <tr className="bg-seguranca-black/70">
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Empresa</th>
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Descrição</th>
+                          <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Conta</th>
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Fornecedor</th>
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Valor</th>
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Vencimento</th>
@@ -1375,6 +1378,11 @@ const ContasAPagarTab: React.FC = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">{conta.descricao}</td>
+                              <td className="px-4 py-3 text-gray-400 border-b border-gray-700/30">
+                                <div className="max-w-xs truncate" title={formatContaPlanoDeContas(conta)}>
+                                  {formatContaPlanoDeContas(conta) || '-'}
+                                </div>
+                              </td>
                               <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">{conta.fornecedor}</td>
                               <td className="px-4 py-3 text-green-400 font-medium border-b border-gray-700/30">{formatCurrency(conta.valor)}</td>
                               <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">

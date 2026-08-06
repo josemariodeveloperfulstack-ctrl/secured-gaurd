@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -70,6 +71,28 @@ public class EPIDeliveryFormItem {
     /** Motivo da substituição (coluna MOTIVO DA SUBST. no PDF). */
     @Column(name = "replacement_reason", length = 255)
     private String replacementReason;
+
+    /** Token do link público /epi-confirm/{token} individual do item (confirmação por item). */
+    @Column(name = "confirmation_token")
+    private UUID confirmationToken;
+
+    /** Código de 6 dígitos enviado no WhatsApp para este item. */
+    @Column(name = "confirmation_code", length = 6)
+    private String confirmationCode;
+
+    @Column(name = "confirmation_expires_at")
+    private LocalDateTime confirmationExpiresAt;
+
+    @Column(name = "confirmation_sent_at")
+    private LocalDateTime confirmationSentAt;
+
+    /** Data/hora em que o funcionário confirmou o recebimento deste item. */
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
+
+    /** Assinatura digital capturada na confirmação individual deste item. */
+    @Column(name = "signature_base64", columnDefinition = "TEXT")
+    private String signatureBase64;
 }
 
 

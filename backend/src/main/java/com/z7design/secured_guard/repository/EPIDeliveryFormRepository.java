@@ -102,6 +102,8 @@ public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm
      */
     Optional<EPIDeliveryForm> findFirstByStockRequisitionIdOrderByCreatedAtDesc(UUID stockRequisitionId);
 
+    long countByEmployeeIdAndStatus(UUID employeeId, com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status);
+
     @Query("""
         SELECT f FROM EPIDeliveryForm f
         LEFT JOIN FETCH f.employee
@@ -110,6 +112,15 @@ public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm
         WHERE f.confirmationToken = :token
         """)
     Optional<EPIDeliveryForm> findByConfirmationTokenWithDetails(@Param("token") UUID token);
+
+    @Query("""
+        SELECT DISTINCT f FROM EPIDeliveryForm f
+        LEFT JOIN FETCH f.employee
+        LEFT JOIN FETCH f.company
+        LEFT JOIN FETCH f.items
+        WHERE EXISTS (SELECT i FROM f.items i WHERE i.confirmationToken = :token)
+        """)
+    Optional<EPIDeliveryForm> findByItemsConfirmationTokenWithDetails(@Param("token") UUID token);
 }
 
 

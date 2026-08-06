@@ -21,6 +21,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { ContaAPagar } from './ContasAPagarFormModal';
+import { formatContaPlanoDeContas } from '@/services/contasAPagarService';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 
@@ -55,7 +56,8 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
     const matchesSearch = 
       conta.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
       conta.fornecedor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      conta.codigoBarras?.toLowerCase().includes(searchTerm.toLowerCase());
+      conta.codigoBarras?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      formatContaPlanoDeContas(conta).toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = !statusFilter || conta.status === statusFilter;
     const matchesTipo = !tipoFilter || conta.tipo === tipoFilter;
@@ -185,6 +187,7 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
                   <TableHead className="text-gray-200 font-semibold">Vencimento</TableHead>
                   <TableHead className="text-gray-200 font-semibold">Fornecedor</TableHead>
                   <TableHead className="text-gray-200 font-semibold">Descrição</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Conta</TableHead>
                   <TableHead className="text-gray-200 font-semibold">Empresa</TableHead>
                   <TableHead className="text-gray-200 font-semibold">Tipo</TableHead>
                   <TableHead className="text-gray-200 font-semibold">Valor</TableHead>
@@ -224,6 +227,11 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
                     <TableCell className="text-gray-300">
                       <div className="max-w-xs truncate" title={conta.descricao}>
                         {conta.descricao}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-300">
+                      <div className="max-w-xs truncate text-gray-400" title={formatContaPlanoDeContas(conta)}>
+                        {formatContaPlanoDeContas(conta) || '-'}
                       </div>
                     </TableCell>
                     <TableCell className="font-medium text-gray-200">{conta.companySigla || '-'}</TableCell>

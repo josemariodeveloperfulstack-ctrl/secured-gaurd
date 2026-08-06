@@ -90,10 +90,15 @@ public class InvoiceDTO {
     private java.util.UUID subcategoriaId;
     private String subcategoriaNome;
     private String subcategoriaCodigo;
+    private String categoriaPaiNome;
+    private String categoriaPaiCodigo;
     private Boolean requerVinculoFuncionario;
 
     private java.util.UUID employeeId;
     private String employeeName;
+
+    private java.util.UUID createdById;
+    private String createdByName;
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -194,12 +199,18 @@ public class InvoiceDTO {
                     dto.setSubcategoriaNome(invoice.getSubcategoria().getNome());
                     dto.setSubcategoriaCodigo(invoice.getSubcategoria().getCodigo());
                     dto.setRequerVinculoFuncionario(invoice.getSubcategoria().getRequerVinculoFuncionario());
+                    if (invoice.getSubcategoria().getCategoriaPai() != null) {
+                        dto.setCategoriaPaiNome(invoice.getSubcategoria().getCategoriaPai().getNome());
+                        dto.setCategoriaPaiCodigo(invoice.getSubcategoria().getCategoriaPai().getCodigo());
+                    }
                 }
             } catch (Exception e) {
                 System.err.println("⚠️ Erro ao acessar subcategoria da invoice " + invoice.getId() + ": " + e.getMessage());
                 dto.setSubcategoriaId(null);
                 dto.setSubcategoriaNome(null);
                 dto.setSubcategoriaCodigo(null);
+                dto.setCategoriaPaiNome(null);
+                dto.setCategoriaPaiCodigo(null);
                 dto.setRequerVinculoFuncionario(null);
             }
 
@@ -210,6 +221,15 @@ public class InvoiceDTO {
                 System.err.println("⚠️ Erro ao acessar employee da invoice " + invoice.getId() + ": " + e.getMessage());
                 dto.setEmployeeId(null);
                 dto.setEmployeeName(null);
+            }
+
+            try {
+                dto.setCreatedById(invoice.getCreatedBy() != null ? invoice.getCreatedBy().getId() : null);
+                dto.setCreatedByName(invoice.getCreatedBy() != null ? invoice.getCreatedBy().getName() : null);
+            } catch (Exception e) {
+                System.err.println("⚠️ Erro ao acessar createdBy da invoice " + invoice.getId() + ": " + e.getMessage());
+                dto.setCreatedById(null);
+                dto.setCreatedByName(null);
             }
 
             dto.setCreatedAt(invoice.getCreatedAt());

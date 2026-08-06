@@ -287,6 +287,13 @@ public class EPIDeliveryFormDTO {
                 boolean pending = form.getConfirmationToken() != null
                                 && form.getSignedAt() == null
                                 && form.getStatus() != com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus.COMPLETED;
+                if (!pending && form.getItems() != null) {
+                        // Item pendente = teve confirmação emitida (token do link OU código WhatsApp)
+                        // e ainda não foi confirmado.
+                        pending = form.getItems().stream()
+                                        .anyMatch(i -> (i.getConfirmationToken() != null || i.getConfirmationCode() != null)
+                                                        && i.getConfirmedAt() == null);
+                }
                 dto.setConfirmationPending(pending);
 
                 if (form.getItems() != null) {
@@ -305,6 +312,10 @@ public class EPIDeliveryFormDTO {
                                                 itemDto.setStockItemId(item.getStockItemId());
                                                 itemDto.setSubstitutedDate(item.getSubstitutedDate());
                                                 itemDto.setReplacementReason(item.getReplacementReason());
+                                                itemDto.setConfirmationCode(item.getConfirmationCode());
+                                                itemDto.setConfirmationExpiresAt(item.getConfirmationExpiresAt());
+                                                itemDto.setConfirmationSentAt(item.getConfirmationSentAt());
+                                                itemDto.setConfirmedAt(item.getConfirmedAt());
                                                 return itemDto;
                                         })
                                         .collect(Collectors.toList()));

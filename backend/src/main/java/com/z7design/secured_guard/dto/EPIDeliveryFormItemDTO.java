@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.dto;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public class EPIDeliveryFormItemDTO {
@@ -16,6 +17,10 @@ public class EPIDeliveryFormItemDTO {
     private UUID stockItemId;
     private LocalDate substitutedDate;
     private String replacementReason;
+    private String confirmationCode;
+    private LocalDateTime confirmationExpiresAt;
+    private LocalDateTime confirmationSentAt;
+    private LocalDateTime confirmedAt;
 
     public EPIDeliveryFormItemDTO() {
     }
@@ -114,5 +119,37 @@ public class EPIDeliveryFormItemDTO {
 
     public void setObservations(String observations) {
         this.observations = observations;
+    }
+
+    public String getConfirmationCode() {
+        return confirmationCode;
+    }
+
+    public void setConfirmationCode(String confirmationCode) {
+        this.confirmationCode = confirmationCode;
+    }
+
+    public LocalDateTime getConfirmationExpiresAt() {
+        return confirmationExpiresAt;
+    }
+
+    public void setConfirmationExpiresAt(LocalDateTime confirmationExpiresAt) {
+        this.confirmationExpiresAt = confirmationExpiresAt;
+    }
+
+    public LocalDateTime getConfirmationSentAt() {
+        return confirmationSentAt;
+    }
+
+    public void setConfirmationSentAt(LocalDateTime confirmationSentAt) {
+        this.confirmationSentAt = confirmationSentAt;
+    }
+
+    public LocalDateTime getConfirmedAt() {
+        return confirmedAt;
+    }
+
+    public void setConfirmedAt(LocalDateTime confirmedAt) {
+        this.confirmedAt = confirmedAt;
     }
 }

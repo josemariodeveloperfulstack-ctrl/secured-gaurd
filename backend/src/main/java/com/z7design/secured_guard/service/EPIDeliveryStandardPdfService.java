@@ -342,7 +342,7 @@ public class EPIDeliveryStandardPdfService {
                                 epiTable.addCell(createEpiDataCell(formatDate(movement.deliveryDate())));
                                 epiTable.addCell(createEpiDataCell(movement.substitutionInfo()));
                                 epiTable.addCell(createEpiDataCell(movement.substitutionReason()));
-                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiSignatureCell(movement.signatureBase64()));
                         }
 
                         // Manter um número fixo de linhas
@@ -645,6 +645,31 @@ public class EPIDeliveryStandardPdfService {
                                 .setPadding(3f).setHeight(15f);
         }
 
+        /**
+         * Célula da coluna ASSINATURA do item: renderiza a assinatura digital capturada
+         * na confirmação do item ou deixa espaço em branco para assinatura física.
+         */
+        private Cell createEpiSignatureCell(String signatureBase64) {
+                if (signatureBase64 == null || signatureBase64.isBlank()) {
+                        return createEpiDataCell("");
+                }
+                try {
+                        String base64Data = signatureBase64;
+                        if (base64Data.contains(",")) {
+                                base64Data = base64Data.split(",")[1];
+                        }
+                        byte[] imageBytes = java.util.Base64.getDecoder().decode(base64Data);
+                        com.itextpdf.layout.element.Image img = new com.itextpdf.layout.element.Image(
+                                        com.itextpdf.io.image.ImageDataFactory.create(imageBytes));
+                        img.setMaxHeight(13f);
+                        img.setMaxWidth(70f);
+                        return new Cell().add(img).setPadding(1f).setHeight(15f);
+                } catch (Exception e) {
+                        log.warn("Erro ao renderizar assinatura do item no PDF: {}", e.getMessage());
+                        return createEpiDataCell("");
+                }
+        }
+
         private void addTableRow(Table table, String label, String value) {
                 table.addCell(new Cell().add(new Paragraph(label).setBold().setFontSize(9f)));
                 table.addCell(new Cell().add(new Paragraph(value != null ? value : "-").setFontSize(9f)));
@@ -706,7 +731,8 @@ public class EPIDeliveryStandardPdfService {
                         int quantity,
                         LocalDate deliveryDate,
                         String substitutionInfo,
-                        String substitutionReason) {
+                        String substitutionReason,
+                        String signatureBase64) {
         }
 
         /**
@@ -782,7 +808,8 @@ public class EPIDeliveryStandardPdfService {
                                         qty,
                                         deliveryDate,
                                         substitutionInfo,
-                                        substitutionReason));
+                                        substitutionReason,
+                                        item.getSignatureBase64()));
                 }
         }
 }

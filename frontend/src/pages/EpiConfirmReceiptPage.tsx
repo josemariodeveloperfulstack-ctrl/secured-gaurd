@@ -81,7 +81,13 @@ export default function EpiConfirmReceiptPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Obrigado, <strong>{data?.employeeName}</strong>. O recebimento dos EPIs foi registrado com sucesso.
+              Obrigado, <strong>{data?.employeeName}</strong>. O recebimento{' '}
+              {data?.perItem && data?.items?.[0] ? (
+                <>do item <strong>{data.items[0].epiName}</strong></>
+              ) : (
+                <>dos EPIs</>
+              )}{' '}
+              foi registrado com sucesso.
             </p>
             <p className="mt-4 text-sm text-gray-500">Você já pode fechar esta aba.</p>
           </CardContent>
@@ -160,7 +166,7 @@ export default function EpiConfirmReceiptPage() {
             </div>
 
             <div>
-              <Label className="mb-2 block">Itens entregues</Label>
+              <Label className="mb-2 block">{data?.perItem ? 'Item entregue' : 'Itens entregues'}</Label>
               <div className="border rounded-md overflow-hidden">
                 <Table>
                   <TableHeader className="bg-muted">
@@ -172,7 +178,7 @@ export default function EpiConfirmReceiptPage() {
                   </TableHeader>
                   <TableBody>
                     {data?.items?.map((item, idx) => (
-                      <TableRow key={idx}>
+                      <TableRow key={item.id || idx}>
                         <TableCell className="font-medium">{item.epiName}</TableCell>
                         <TableCell>{item.ca || '-'}</TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>

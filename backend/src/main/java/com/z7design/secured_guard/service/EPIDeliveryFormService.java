@@ -19,6 +19,7 @@ import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.PersonalProtectiveEquipment;
 import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
+import com.z7design.secured_guard.model.enums.EmploymentStatus;
 import com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus;
 import com.z7design.secured_guard.model.enums.MovementReason;
 import com.z7design.secured_guard.model.enums.MovementType;
@@ -128,11 +129,14 @@ public class EPIDeliveryFormService {
         String signatureType = dto.getSignatureType() != null ? dto.getSignatureType() : "ON_SCREEN";
         assertWhatsAppNotCompletedWithoutConfirm(status, signatureType, null);
 
+        LocalDate resolvedDeliveryDate = resolveDeliveryDate(
+                employee.getId(), null, deliveryType, dto.getDeliveryDate(), employee.getHireDate());
+
         EPIDeliveryForm form = EPIDeliveryForm.builder()
 
                 .employee(employee)
                 .company(company)
-                .deliveryDate(dto.getDeliveryDate())
+                .deliveryDate(resolvedDeliveryDate)
                 .responsibleEmployee(responsibleEmployee)
                 .deliveryType(deliveryType)
                 .employeeWorkSector(workSectorSnapshot)
@@ -197,9 +201,15 @@ public class EPIDeliveryFormService {
             }
         }
 
-        form.setDeliveryDate(dto.getDeliveryDate());
+        EPIDeliveryType nextDeliveryType = dto.getDeliveryType() != null ? dto.getDeliveryType() : form.getDeliveryType();
+        form.setDeliveryDate(resolveDeliveryDate(
+                form.getEmployee().getId(),
+                form.getId(),
+                nextDeliveryType,
+                dto.getDeliveryDate(),
+                form.getEmployee().getHireDate()));
         form.setObservations(dto.getObservations());
-        form.setDeliveryType(dto.getDeliveryType() != null ? dto.getDeliveryType() : form.getDeliveryType());
+        form.setDeliveryType(nextDeliveryType);
         form.setSignatureBase64(dto.getSignatureBase64());
         String nextSignatureType = dto.getSignatureType() != null ? dto.getSignatureType() : form.getSignatureType();
         form.setSignatureType(nextSignatureType);
@@ -209,9 +219,16 @@ public class EPIDeliveryFormService {
         form.setStatus(nextStatus);
 
         // Atualizar itens (remover antigos e adicionar novos para simplificar)
+        Map<UUID, EPIDeliveryFormItem> existingItemsById = new HashMap<>();
+        for (EPIDeliveryFormItem oldItem : form.getItems()) {
+            if (oldItem.getId() != null) {
+                existingItemsById.put(oldItem.getId(), oldItem);
+            }
+        }
         form.getItems().clear();
         if (dto.getItems() != null) {
             for (EPIDeliveryFormItemDTO itemDto : dto.getItems()) {
+                EPIDeliveryFormItem existing = itemDto.getId() != null ? existingItemsById.get(itemDto.getId()) : null;
                 EPIDeliveryFormItem item = EPIDeliveryFormItem.builder()
                         .deliveryForm(form)
                         .epiName(itemDto.getEpiName())
@@ -226,6 +243,14 @@ public class EPIDeliveryFormService {
                         .substitutedDate(itemDto.getSubstitutedDate())
                         .replacementReason(itemDto.getReplacementReason())
                         .build();
+                if (existing != null) {
+                    item.setConfirmationToken(existing.getConfirmationToken());
+                    item.setConfirmationCode(existing.getConfirmationCode());
+                    item.setConfirmationExpiresAt(existing.getConfirmationExpiresAt());
+                    item.setConfirmationSentAt(existing.getConfirmationSentAt());
+                    item.setConfirmedAt(existing.getConfirmedAt());
+                    item.setSignatureBase64(existing.getSignatureBase64());
+                }
                 form.getItems().add(item);
             }
         }
@@ -747,6 +772,8 @@ public class EPIDeliveryFormService {
 
     /**
      * Gera token + código e envia (AUTO) ou monta link wa.me (MANUAL) para confirmação de recebimento.
+     * Na primeira entrega (e funcionários não ativos) a confirmação é única por ficha.
+     * Nas demais entregas com funcionário ativo no sistema, cada item recebe código e link próprios.
      */
     @Transactional
     public EpiConfirmationSendResponseDTO sendWhatsAppConfirmation(UUID formId, String mode, String frontendBaseUrl) {
@@ -776,6 +803,10 @@ public class EPIDeliveryFormService {
 
         String resolvedMode = mode != null && mode.equalsIgnoreCase("MANUAL") ? "MANUAL" : "AUTO";
         String baseUrl = sanitizeFrontendBaseUrl(frontendBaseUrl);
+
+        if (isPerItemMode(form)) {
+            return sendPerItemConfirmations(form, employee, normalizedPhone, resolvedMode, baseUrl);
+        }
 
         UUID token = UUID.randomUUID();
         String code = generateSixDigitCode();
@@ -822,11 +853,136 @@ public class EPIDeliveryFormService {
                 .build();
     }
 
+    /**
+     * Modo por item: entregas que não sejam a primeira, enquanto o funcionário estiver ativo no sistema.
+     */
+    private boolean isPerItemMode(EPIDeliveryForm form) {
+        if (form.getDeliveryType() == null || form.getDeliveryType() == EPIDeliveryType.PRIMEIRA_ENTREGA) {
+            return false;
+        }
+        Employee employee = form.getEmployee();
+        return employee != null && employee.getStatus() == EmploymentStatus.ACTIVE;
+    }
+
+    /**
+     * Gera código e link de confirmação individuais para cada item da ficha.
+     */
+    private EpiConfirmationSendResponseDTO sendPerItemConfirmations(
+            EPIDeliveryForm form, Employee employee, String normalizedPhone, String resolvedMode, String baseUrl) {
+        LocalDateTime sentAt = LocalDateTime.now();
+        String dateStr = form.getDeliveryDate() != null
+                ? form.getDeliveryDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                : "-";
+        String firstName = employee.getName() != null && !employee.getName().isBlank()
+                ? employee.getName().trim().split("\\s+")[0]
+                : "colaborador";
+
+        List<EpiConfirmationSendResponseDTO.ItemConfirmation> confirmations = new ArrayList<>();
+        UUID firstToken = null;
+        StringBuilder message = new StringBuilder();
+        message.append("Olá ").append(firstName).append("!\n\n");
+        message.append("Confirme o recebimento de cada EPI entregue em ").append(dateStr).append(".\n\n");
+
+        boolean hasPendingItem = false;
+        for (EPIDeliveryFormItem item : form.getItems()) {
+            if (item.getConfirmedAt() != null) {
+                continue;
+            }
+            hasPendingItem = true;
+            UUID token = UUID.randomUUID();
+            String code = generateSixDigitCode();
+            LocalDateTime expiresAt = sentAt.plusHours(CONFIRMATION_TTL_HOURS);
+            item.setConfirmationToken(token);
+            item.setConfirmationCode(code);
+            item.setConfirmationExpiresAt(expiresAt);
+            item.setConfirmationSentAt(sentAt);
+            item.setConfirmedAt(null);
+            if (firstToken == null) {
+                firstToken = token;
+            }
+
+            String url = baseUrl + "/epi-confirm/" + token;
+            confirmations.add(EpiConfirmationSendResponseDTO.ItemConfirmation.builder()
+                    .itemId(item.getId())
+                    .epiName(item.getEpiName())
+                    .confirmationCode(code)
+                    .confirmUrl(url)
+                    .expiresAt(expiresAt)
+                    .confirmed(false)
+                    .build());
+
+            message.append("• ").append(item.getEpiName() != null && !item.getEpiName().isBlank()
+                    ? item.getEpiName().toUpperCase() : "EPI");
+            if (item.getCa() != null && !item.getCa().isBlank()) {
+                message.append(" (CA ").append(item.getCa()).append(")");
+            }
+            message.append("\n    Código: *").append(code).append("*\n    Link: ").append(url).append("\n\n");
+        }
+        message.append("Validade: ").append(CONFIRMATION_TTL_HOURS).append("h.");
+
+        if (!hasPendingItem || confirmations.isEmpty()) {
+            throw new BusinessException("Todos os itens desta ficha já foram confirmados.");
+        }
+
+        form.setConfirmationToken(null);
+        form.setConfirmationCode(null);
+        form.setConfirmationExpiresAt(null);
+        form.setConfirmationSentAt(sentAt);
+        form.setSignatureType(SIGNATURE_WHATSAPP);
+        form.setStatus(EPIDeliveryFormStatus.DRAFT);
+        form.setSignedAt(null);
+        form.setSignatureOrigin(null);
+        epiDeliveryFormRepository.save(form);
+
+        String messageBody = message.toString();
+        String whatsappUrl = "https://wa.me/" + normalizedPhone + "?text="
+                + URLEncoder.encode(messageBody, StandardCharsets.UTF_8);
+
+        boolean sent = false;
+        if ("AUTO".equals(resolvedMode)) {
+            sent = whatsAppAgentService.sendTextMessage(normalizedPhone, messageBody);
+            if (!sent) {
+                log.warn("Falha no envio automático WhatsApp por item da ficha EPI {}. Link wa.me disponível.", form.getId());
+            }
+        }
+
+        EpiConfirmationSendResponseDTO.ItemConfirmation first =
+                confirmations.isEmpty() ? null : confirmations.get(0);
+        String msg = "AUTO".equals(resolvedMode)
+                ? (sent ? "Mensagem enviada pelo WhatsApp." : "Não foi possível enviar automaticamente. Use o link manual.")
+                : "Link WhatsApp gerado. Abra e envie manualmente.";
+
+        return EpiConfirmationSendResponseDTO.builder()
+                .formId(form.getId())
+                .confirmationToken(firstToken)
+                .confirmationCode(first != null ? first.getConfirmationCode() : null)
+                .confirmUrl(first != null ? first.getConfirmUrl() : null)
+                .whatsappUrl(whatsappUrl)
+                .phoneMasked(maskPhone(normalizedPhone))
+                .sent(sent)
+                .mode(resolvedMode)
+                .expiresAt(first != null ? first.getExpiresAt() : sentAt.plusHours(CONFIRMATION_TTL_HOURS))
+                .message(msg)
+                .items(confirmations)
+                .build();
+    }
+
     @Transactional(readOnly = true)
     public PublicEpiConfirmationDTO getPublicConfirmation(UUID token) {
-        EPIDeliveryForm form = epiDeliveryFormRepository.findByConfirmationTokenWithDetails(token)
+        Optional<EPIDeliveryForm> byForm = epiDeliveryFormRepository.findByConfirmationTokenWithDetails(token);
+        if (byForm.isPresent()) {
+            return buildFormPublicConfirmation(byForm.get());
+        }
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByItemsConfirmationTokenWithDetails(token)
                 .orElseThrow(() -> new ResourceNotFoundException("Link de confirmação inválido ou expirado."));
+        EPIDeliveryFormItem item = findItemByToken(form, token);
+        if (item == null) {
+            throw new ResourceNotFoundException("Link de confirmação inválido ou expirado.");
+        }
+        return buildItemPublicConfirmation(form, item);
+    }
 
+    private PublicEpiConfirmationDTO buildFormPublicConfirmation(EPIDeliveryForm form) {
         boolean alreadyConfirmed = form.getStatus() == EPIDeliveryFormStatus.COMPLETED || form.getSignedAt() != null;
         boolean expired = !alreadyConfirmed
                 && form.getConfirmationExpiresAt() != null
@@ -835,10 +991,12 @@ public class EPIDeliveryFormService {
         List<PublicEpiConfirmationDTO.Item> items = form.getItems() == null ? List.of()
                 : form.getItems().stream()
                 .map(i -> PublicEpiConfirmationDTO.Item.builder()
+                        .id(i.getId())
                         .epiName(i.getEpiName())
                         .quantity(i.getQuantity())
                         .ca(i.getCa())
                         .caName(i.getCaName())
+                        .confirmed(i.getConfirmedAt() != null)
                         .build())
                 .collect(Collectors.toList());
 
@@ -854,23 +1012,65 @@ public class EPIDeliveryFormService {
                 .build();
     }
 
+    private PublicEpiConfirmationDTO buildItemPublicConfirmation(EPIDeliveryForm form, EPIDeliveryFormItem item) {
+        boolean alreadyConfirmed = item.getConfirmedAt() != null;
+        boolean expired = !alreadyConfirmed
+                && item.getConfirmationExpiresAt() != null
+                && item.getConfirmationExpiresAt().isBefore(LocalDateTime.now());
+
+        return PublicEpiConfirmationDTO.builder()
+                .employeeName(form.getEmployee() != null ? form.getEmployee().getName() : null)
+                .companyName(form.getCompany() != null ? form.getCompany().getName() : null)
+                .deliveryDate(form.getDeliveryDate())
+                .deliveryType(form.getDeliveryType() != null ? form.getDeliveryType().name() : null)
+                .perItem(true)
+                .itemId(item.getId())
+                .items(List.of(PublicEpiConfirmationDTO.Item.builder()
+                        .id(item.getId())
+                        .epiName(item.getEpiName())
+                        .quantity(item.getQuantity())
+                        .ca(item.getCa())
+                        .caName(item.getCaName())
+                        .confirmed(alreadyConfirmed)
+                        .build()))
+                .alreadyConfirmed(alreadyConfirmed)
+                .expired(expired)
+                .awaitingConfirmation(!alreadyConfirmed && !expired)
+                .build();
+    }
+
     @Transactional
     public PublicEpiConfirmationDTO confirmPublicReceipt(UUID token, String code, String signatureBase64,
                                                          String ip, String userAgent) {
-        EPIDeliveryForm form = epiDeliveryFormRepository.findByConfirmationTokenWithDetails(token)
+        Optional<EPIDeliveryForm> byForm = epiDeliveryFormRepository.findByConfirmationTokenWithDetails(token);
+        if (byForm.isPresent()) {
+            applyConfirmation(byForm.get(), code, signatureBase64, "WHATSAPP_LINK", ip, userAgent, null);
+            return getPublicConfirmation(token);
+        }
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByItemsConfirmationTokenWithDetails(token)
                 .orElseThrow(() -> new ResourceNotFoundException("Link de confirmação inválido ou expirado."));
-        applyConfirmation(form, code, signatureBase64, "WHATSAPP_LINK", ip, userAgent, null);
+        EPIDeliveryFormItem item = findItemByToken(form, token);
+        if (item == null) {
+            throw new ResourceNotFoundException("Link de confirmação inválido ou expirado.");
+        }
+        applyItemConfirmation(form, item, code, signatureBase64, "WHATSAPP_LINK", ip, userAgent, null);
         return getPublicConfirmation(token);
     }
 
     /**
      * Confirmação pelo operador digitando o código informado pelo funcionário.
+     * Valida o código da ficha (modo por ficha) ou o código individual do item (modo por item).
      */
     @Transactional
     public EPIDeliveryFormDTO confirmWithCode(UUID formId, String code, UUID actingUserId) {
         EPIDeliveryForm form = epiDeliveryFormRepository.findByIdWithDetails(formId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + formId));
-        applyConfirmation(form, code, null, "ADMIN_CODE", null, null, actingUserId);
+        if (form.getConfirmationCode() != null && form.getConfirmationExpiresAt() != null) {
+            applyConfirmation(form, code, null, "ADMIN_CODE", null, null, actingUserId);
+        } else {
+            EPIDeliveryFormItem item = findItemByCode(form, normalizeCode(code));
+            applyItemConfirmation(form, item, code, null, "ADMIN_CODE", null, null, actingUserId);
+        }
         return EPIDeliveryFormDTO.fromEntity(form);
     }
 
@@ -891,20 +1091,27 @@ public class EPIDeliveryFormService {
             throw new BusinessException("Recebimento já confirmado.");
         }
 
-        boolean hasWhatsAppCode = form.getConfirmationCode() != null && form.getConfirmationExpiresAt() != null;
-        if (hasWhatsAppCode) {
+        boolean hasFormCode = form.getConfirmationCode() != null && form.getConfirmationExpiresAt() != null;
+        if (hasFormCode) {
             applyConfirmation(form, code, null, "PORTAL_CODE", null, null, actingUserId);
         } else {
-            form.setStatus(EPIDeliveryFormStatus.COMPLETED);
-            form.setSignedAt(LocalDateTime.now());
-            form.setSignatureOrigin("PORTAL_SELF");
-            form.setSignatureType("ON_SCREEN");
-            EPIDeliveryForm saved = epiDeliveryFormRepository.save(form);
-            applyStockDeductionIfNeeded(saved, actingUserId);
-            User actingUser = actingUserId != null ? userRepository.findById(actingUserId).orElse(null) : null;
-            recordHistoryForForm(saved, actingUser, "CONFIRMAÇÃO PORTAL FUNCIONÁRIO");
-            log.info("✅ Recebimento EPI confirmado no portal pelo funcionário na ficha {}", form.getId());
-            return EPIDeliveryFormDTO.fromEntity(saved);
+            boolean hasItemCodes = form.getItems() != null && form.getItems().stream()
+                    .anyMatch(i -> i.getConfirmationCode() != null && i.getConfirmationExpiresAt() != null);
+            if (hasItemCodes) {
+                EPIDeliveryFormItem item = findItemByCode(form, normalizeCode(code));
+                applyItemConfirmation(form, item, code, null, "PORTAL_CODE", null, null, actingUserId);
+            } else {
+                form.setStatus(EPIDeliveryFormStatus.COMPLETED);
+                form.setSignedAt(LocalDateTime.now());
+                form.setSignatureOrigin("PORTAL_SELF");
+                form.setSignatureType("ON_SCREEN");
+                EPIDeliveryForm saved = epiDeliveryFormRepository.save(form);
+                applyStockDeductionIfNeeded(saved, actingUserId);
+                User actingUser = actingUserId != null ? userRepository.findById(actingUserId).orElse(null) : null;
+                recordHistoryForForm(saved, actingUser, "CONFIRMAÇÃO PORTAL FUNCIONÁRIO");
+                log.info("✅ Recebimento EPI confirmado no portal pelo funcionário na ficha {}", form.getId());
+                return EPIDeliveryFormDTO.fromEntity(saved);
+            }
         }
         return EPIDeliveryFormDTO.fromEntity(form);
     }
@@ -945,6 +1152,84 @@ public class EPIDeliveryFormService {
         User actingUser = actingUserId != null ? userRepository.findById(actingUserId).orElse(null) : null;
         recordHistoryForForm(saved, actingUser, "CONFIRMAÇÃO WHATSAPP");
         log.info("✅ Recebimento EPI confirmado via {} na ficha {}", origin, form.getId());
+    }
+
+    /**
+     * Confirma o recebimento de um item individual (modo por item).
+     * Ao confirmar todos os itens, conclui a ficha e aplica a baixa de estoque.
+     */
+    private void applyItemConfirmation(EPIDeliveryForm form, EPIDeliveryFormItem item, String code,
+                                       String signatureBase64, String origin, String ip, String userAgent,
+                                       UUID actingUserId) {
+        if (item == null) {
+            throw new BusinessException("Código de confirmação inválido.");
+        }
+        if (item.getConfirmedAt() != null) {
+            throw new BusinessException("Este item já foi confirmado.");
+        }
+        if (item.getConfirmationCode() == null || item.getConfirmationExpiresAt() == null) {
+            throw new BusinessException("Nenhuma confirmação WhatsApp foi gerada para este item.");
+        }
+        if (item.getConfirmationExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new BusinessException("O código de confirmação expirou. Gere um novo envio.");
+        }
+        if (!item.getConfirmationCode().equals(normalizeCode(code))) {
+            throw new BusinessException("Código de confirmação inválido.");
+        }
+
+        item.setConfirmedAt(LocalDateTime.now());
+        if (signatureBase64 != null && !signatureBase64.isBlank()) {
+            item.setSignatureBase64(signatureBase64);
+        }
+        if (ip != null) {
+            form.setAuditIp(ip.length() > 80 ? ip.substring(0, 80) : ip);
+        }
+        if (userAgent != null) {
+            form.setAuditUserAgent(userAgent.length() > 500 ? userAgent.substring(0, 500) : userAgent);
+        }
+
+        boolean allConfirmed = form.getItems() != null && form.getItems().stream()
+                .allMatch(i -> i.getConfirmedAt() != null);
+        User actingUser = actingUserId != null ? userRepository.findById(actingUserId).orElse(null) : null;
+
+        if (allConfirmed) {
+            form.setStatus(EPIDeliveryFormStatus.COMPLETED);
+            form.setSignedAt(LocalDateTime.now());
+            form.setSignatureOrigin(origin);
+            form.setSignatureType(SIGNATURE_WHATSAPP);
+            EPIDeliveryForm saved = epiDeliveryFormRepository.save(form);
+            applyStockDeductionIfNeeded(saved, actingUserId);
+            recordHistoryForForm(saved, actingUser, "CONFIRMAÇÃO WHATSAPP");
+            log.info("✅ Recebimento EPI confirmado via {} na ficha {} (todos os itens)", origin, form.getId());
+        } else {
+            epiDeliveryFormRepository.save(form);
+            recordHistoryForForm(form, actingUser, "CONFIRMAÇÃO ITEM WHATSAPP");
+            log.info("✅ Item de EPI confirmado via {} na ficha {} (parcial)", origin, form.getId());
+        }
+    }
+
+    private EPIDeliveryFormItem findItemByToken(EPIDeliveryForm form, UUID token) {
+        if (form.getItems() == null || token == null) {
+            return null;
+        }
+        return form.getItems().stream()
+                .filter(i -> token.equals(i.getConfirmationToken()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private EPIDeliveryFormItem findItemByCode(EPIDeliveryForm form, String normalizedCode) {
+        if (form.getItems() == null || normalizedCode == null) {
+            return null;
+        }
+        return form.getItems().stream()
+                .filter(i -> i.getConfirmationCode() != null && i.getConfirmationCode().equals(normalizedCode))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static String normalizeCode(String code) {
+        return code == null ? "" : code.trim().replaceAll("\\s+", "");
     }
 
     private void assertWhatsAppNotCompletedWithoutConfirm(EPIDeliveryFormStatus status, String signatureType,
@@ -1006,6 +1291,38 @@ public class EPIDeliveryFormService {
     /**
      * Registra um evento no histórico de alterações do funcionário.
      */
+    /**
+     * Primeira entrega concluída usa a data de admissão; entregas seguintes usam a data informada (ou hoje).
+     */
+    private LocalDate resolveDeliveryDate(
+            UUID employeeId,
+            UUID excludeFormId,
+            EPIDeliveryType deliveryType,
+            LocalDate requestedDate,
+            LocalDate hireDate) {
+        boolean hasPriorCompleted = hasCompletedDeliveries(employeeId, excludeFormId);
+        if (!hasPriorCompleted && deliveryType == EPIDeliveryType.PRIMEIRA_ENTREGA && hireDate != null) {
+            return hireDate;
+        }
+        if (requestedDate != null) {
+            return requestedDate;
+        }
+        return LocalDate.now();
+    }
+
+    private boolean hasCompletedDeliveries(UUID employeeId, UUID excludeFormId) {
+        if (employeeId == null) {
+            return false;
+        }
+        if (excludeFormId == null) {
+            return epiDeliveryFormRepository.countByEmployeeIdAndStatus(employeeId, EPIDeliveryFormStatus.COMPLETED) > 0;
+        }
+        return epiDeliveryFormRepository
+                .findByEmployeeIdAndStatusWithItemsOrderByDeliveryDateAsc(employeeId, EPIDeliveryFormStatus.COMPLETED)
+                .stream()
+                .anyMatch(form -> !excludeFormId.equals(form.getId()));
+    }
+
     private void recordHistory(UUID employeeId, User changedBy, String fieldName, String fieldLabel,
                                String newValue, String reason) {
         try {

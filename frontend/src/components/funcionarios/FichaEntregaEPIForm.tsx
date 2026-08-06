@@ -9,13 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { FileText, Download, Eye, User, Building, Calendar, Shield, Plus, X, HardHat, Loader2, CheckCircle2, ChevronsUpDown, Check, AlertCircle, MessageCircle, Copy, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { employeeService, SimpleEmployee, Employee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 
-import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
+import { epiDeliveryFormService, EPIDeliveryType, EPIDeliveryFormItem, EpiItemConfirmation } from '@/services/epiDeliveryFormService';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 import { employeeAdmissionIsoDateOrToday, formatAdmissionDateBr, todayIsoDateLocal } from '@/utils/employeeAdmissionDate';
 import { useToast } from '@/hooks/use-toast';
@@ -68,6 +69,7 @@ interface FichaEntregaEPIFormProps {
 }
 
 const emptyEpiRow = () => ({
+  id: '',
   nome: '',
   quantidade: '1',
   ca: '',
@@ -129,9 +131,12 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
             employeeWorkSector: ficha.employeeWorkSector || '',
             tipoEntrega: ficha.deliveryType || 'PRIMEIRA_ENTREGA',
           });
+          setHasPriorEpiDelivery((ficha.deliveryType || 'PRIMEIRA_ENTREGA') !== 'PRIMEIRA_ENTREGA');
           setCurrentFichaId(ficha.id);
           setConfirmationPending(!!ficha.confirmationPending);
+          setItemConfirmations(ficha.items || []);
           setEpis(ficha.items.map(item => ({
+            id: item.id || '',
             nome: item.epiName,
             quantidade: String(item.quantity),
             ca: item.ca || '',
@@ -165,6 +170,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
               address: emp.address,
               companyId: emp.company?.id,
               companySigla: emp.company?.sigla,
+              status: emp.status,
             } as SimpleEmployee;
             setSelectedEmployeeData(mappedEmp);
           }
@@ -232,9 +238,17 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
     phoneMasked: string;
     sent: boolean;
     message: string;
+    items?: EpiItemConfirmation[];
   } | null>(null);
   const [adminConfirmCode, setAdminConfirmCode] = useState('');
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [itemConfirmations, setItemConfirmations] = useState<EPIDeliveryFormItem[]>([]);
+
+  /** Confirmação por item: entregas que não sejam a primeira, enquanto o funcionário estiver ativo no sistema. */
+  const perItemMode = useMemo(
+    () => form.tipoEntrega !== 'PRIMEIRA_ENTREGA' && selectedEmployeeData?.status === 'ACTIVE',
+    [form.tipoEntrega, selectedEmployeeData?.status]
+  );
 
   const [epis, setEpis] = useState([emptyEpiRow()]);
 
@@ -249,6 +263,24 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
   const [selectedResponsibleData, setSelectedResponsibleData] = useState<SimpleEmployee | null>(null);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [hasPriorEpiDelivery, setHasPriorEpiDelivery] = useState<boolean | null>(null);
+
+  const resolveDeliveryDefaults = async (emp: SimpleEmployee) => {
+    try {
+      const fichas = await epiDeliveryFormService.getByEmployeeId(emp.id);
+      const hasCompleted = fichas.some((f) => f.status === 'COMPLETED' && f.id !== fichaId);
+      if (hasCompleted) {
+        return { dataEntrega: todayIsoDateLocal(), tipoEntrega: 'SUBSTITUICAO' as EPIDeliveryType, hasPrior: true };
+      }
+    } catch (error) {
+      console.warn('Não foi possível verificar histórico de EPI do funcionário:', error);
+    }
+    return {
+      dataEntrega: employeeAdmissionIsoDateOrToday(emp.hireDate),
+      tipoEntrega: 'PRIMEIRA_ENTREGA' as EPIDeliveryType,
+      hasPrior: false,
+    };
+  };
 
   const stockItemOptions = useMemo(
     () =>
@@ -406,10 +438,22 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
               workPostName: emp.workPost?.name,
               address: emp.address,
               companyId: emp.company?.id,
-              companySigla: emp.company?.sigla
+              companySigla: emp.company?.sigla,
+              status: emp.status
             } as SimpleEmployee;
             setSelectedEmployeeData(mappedEmp);
-            setForm(prev => ({ ...prev, employeeWorkSector: buildWorkSectorSnapshot(mappedEmp) }));
+            if (!fichaId) {
+              const defaults = await resolveDeliveryDefaults(mappedEmp);
+              setHasPriorEpiDelivery(defaults.hasPrior);
+              setForm(prev => ({
+                ...prev,
+                employeeWorkSector: buildWorkSectorSnapshot(mappedEmp),
+                dataEntrega: defaults.dataEntrega,
+                tipoEntrega: defaults.tipoEntrega,
+              }));
+            } else {
+              setForm(prev => ({ ...prev, employeeWorkSector: buildWorkSectorSnapshot(mappedEmp) }));
+            }
           }
         } catch (error) {
           console.error("Erro ao carregar dados iniciais do funcionário:", error);
@@ -589,6 +633,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
 
   const mapEpisToFormItems = (source = getFilledEpis()) =>
     source.map(epi => ({
+      id: epi.id || undefined,
       epiName: epi.nome,
       quantity: Math.max(1, parseInt(String(epi.quantidade).trim(), 10) || 1),
       ca: epi.ca || undefined,
@@ -978,6 +1023,11 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       setWhatsappResult(result);
       setConfirmationPending(true);
 
+      if (result.items?.length) {
+        const fresh = await epiDeliveryFormService.getById(id);
+        setItemConfirmations(fresh.items || []);
+      }
+
       toast({
         title: result.sent ? 'WhatsApp enviado' : 'Link gerado',
         description: result.message,
@@ -1017,14 +1067,23 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
     try {
       setSendingWhatsApp(true);
       await epiDeliveryFormService.confirmWithCode(currentFichaId, adminConfirmCode.trim());
-      setForm(prev => ({ ...prev, status: 'COMPLETED' }));
-      setConfirmationPending(false);
+      let finalStatus: 'DRAFT' | 'COMPLETED' = 'COMPLETED';
+      if (perItemMode) {
+        const fresh = await epiDeliveryFormService.getById(currentFichaId);
+        setItemConfirmations(fresh.items || []);
+        setConfirmationPending(!!fresh.confirmationPending);
+        finalStatus = (fresh.items || []).every((i) => !!i.confirmedAt) ? 'COMPLETED' : 'DRAFT';
+        setForm(prev => ({ ...prev, status: finalStatus }));
+      } else {
+        setConfirmationPending(false);
+        setForm(prev => ({ ...prev, status: 'COMPLETED' }));
+      }
       setWhatsappResult(null);
       toast({
         title: 'Recebimento confirmado',
-        description: 'Ficha concluída e estoque atualizado.',
+        description: perItemMode ? 'Item confirmado. Confira os demais itens pendentes.' : 'Ficha concluída e estoque atualizado.',
       });
-      if (onSuccess) onSuccess({ fichaId: currentFichaId, status: 'COMPLETED' });
+      if (onSuccess) onSuccess({ fichaId: currentFichaId, status: finalStatus });
     } catch (err: any) {
       toast({
         title: 'Erro',
@@ -1078,15 +1137,18 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                 <EmployeeCombobox
                   value={form.funcionarioId}
                   onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
-                  onEmployeeSelect={(emp) => {
+                  onEmployeeSelect={async (emp) => {
                     setSelectedEmployeeData(emp);
                     const cid = resolveCompanyIdFromEmployee(emp);
+                    const defaults = await resolveDeliveryDefaults(emp);
+                    setHasPriorEpiDelivery(defaults.hasPrior);
                     setForm(prev => ({
                       ...prev,
                       funcionarioId: emp.id,
                       empresaId: cid || prev.empresaId,
                       employeeWorkSector: buildWorkSectorSnapshot(emp),
-                      dataEntrega: employeeAdmissionIsoDateOrToday(emp.hireDate),
+                      dataEntrega: defaults.dataEntrega,
+                      tipoEntrega: defaults.tipoEntrega,
                     }));
                   }}
                 />
@@ -1271,6 +1333,11 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                   className="h-11 bg-background border-2 border-gray-600 focus:border-seguranca-yellow"
                   max="9999-12-31"
                 />
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {hasPriorEpiDelivery
+                    ? 'Entregas seguintes registram a data em que o item foi entregue (ex.: hoje). Itens anteriores permanecem no histórico da ficha.'
+                    : 'Na primeira entrega, a data padrão é a admissão do funcionário. Próximas entregas usarão a data real de cada item.'}
+                </p>
               </div>
 
               <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
@@ -1878,7 +1945,11 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
               </div>
 
               <p className="text-sm text-muted-foreground">
-                O funcionário recebe um link e um código de 6 dígitos. Ao confirmar, a ficha é concluída e o estoque é baixado.
+                {perItemMode ? (
+                  <>O funcionário ativo recebe um código e um link de 6 dígitos <strong>para cada item</strong> entregue. A ficha só é concluída quando todos os itens forem confirmados.</>
+                ) : (
+                  <>O funcionário recebe um link e um código de 6 dígitos. Ao confirmar, a ficha é concluída e o estoque é baixado.</>
+                )}
                 {funcionario?.phone ? (
                   <> Telefone cadastrado: <strong>{funcionario.phone}</strong>.</>
                 ) : (
@@ -1908,7 +1979,77 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                 </Button>
               </div>
 
-              {whatsappResult && (
+              {whatsappResult && whatsappResult.items?.length ? (
+                <div className="rounded-lg border bg-background p-4 space-y-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted-foreground font-medium">Códigos por item:</span>
+                    <span className="text-muted-foreground ml-auto">Tel. {whatsappResult.phoneMasked}</span>
+                  </div>
+                  <div className="border rounded-md overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted">
+                        <TableRow>
+                          <TableHead>EPI</TableHead>
+                          <TableHead>Código</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {whatsappResult.items.map((item) => (
+                          <TableRow key={item.itemId}>
+                            <TableCell className="font-medium">{item.epiName}</TableCell>
+                            <TableCell>
+                              <code className="font-mono text-lg tracking-widest font-bold">{item.confirmationCode}</code>
+                            </TableCell>
+                            <TableCell className="text-right space-x-1">
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(item.confirmationCode);
+                                  toast({ title: 'Código copiado' });
+                                }}
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                                onClick={() => window.open(item.confirmUrl, '_blank')}
+                                title="Abrir link de confirmação"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Cada código confirma um item individualmente. Copie os códigos para informar ao funcionário ou
+                    {whatsappResult.whatsappUrl && (
+                      <> reabra o WhatsApp: </>
+                    )}
+                    {whatsappResult.whatsappUrl && (
+                      <Button type="button" variant="link" size="sm" className="p-0 h-auto text-xs underline" onClick={() => window.open(whatsappResult.whatsappUrl!, '_blank')}>
+                        abrir mensagem
+                      </Button>
+                    )}
+                    {!whatsappResult.whatsappUrl && '.'}
+                  </p>
+                  {!whatsappResult.sent && whatsappResult.whatsappUrl && (
+                    <Button type="button" variant="secondary" size="sm" className="gap-2" onClick={() => window.open(whatsappResult.whatsappUrl!, '_blank')}>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Reabrir WhatsApp
+                    </Button>
+                  )}
+                </div>
+              ) : whatsappResult ? (
                 <div className="rounded-lg border bg-background p-4 space-y-3 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-muted-foreground">Código:</span>
@@ -1945,10 +2086,53 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                     </Button>
                   )}
                 </div>
+              ) : null}
+
+              {perItemMode && itemConfirmations.some((i) => i.confirmationCode || i.confirmedAt) && (
+                <div className="rounded-lg border bg-background p-4 space-y-2 text-sm">
+                  <span className="text-muted-foreground font-medium">Status da confirmação por item</span>
+                  <div className="border rounded-md overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted">
+                        <TableRow>
+                          <TableHead>EPI</TableHead>
+                          <TableHead className="text-right">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {itemConfirmations.map((item) => (
+                          <TableRow key={item.id || item.epiName}>
+                            <TableCell className="font-medium">{item.epiName}</TableCell>
+                            <TableCell className="text-right">
+                              {item.confirmedAt ? (
+                                <Badge className="bg-green-500 text-white border-none gap-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Confirmado
+                                </Badge>
+                              ) : item.confirmationCode ? (
+                                <Badge variant="outline" className="text-amber-600 border-amber-500 gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  Aguardando confirmação
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">Sem envio</Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
               )}
 
               <div className="border-t pt-4 space-y-2">
                 <Label className="text-sm">Confirmar com código informado pelo funcionário</Label>
+                <p className="text-xs text-muted-foreground">
+                  {perItemMode
+                    ? 'Digite o código de 6 dígitos de um item para confirmá-lo individualmente.'
+                    : 'Digite o código de 6 dígitos recebido pelo funcionário para confirmar a ficha inteira.'}
+                </p>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Input
                     inputMode="numeric"
@@ -1964,7 +2148,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                     disabled={sendingWhatsApp || adminConfirmCode.length !== 6}
                     onClick={handleAdminConfirmCode}
                   >
-                    Validar código e concluir
+                    Validar código {perItemMode ? 'do item' : 'e concluir'}
                   </Button>
                 </div>
               </div>

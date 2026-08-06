@@ -273,12 +273,13 @@ public class ContasAPagarReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Vencimento"));
                 table.addHeaderCell(createHeaderCell("Fornecedor"));
                 table.addHeaderCell(createHeaderCell("Descrição"));
+                table.addHeaderCell(createHeaderCell("Conta"));
                 table.addHeaderCell(createHeaderCell("Tipo"));
                 table.addHeaderCell(createHeaderCell("Valor"));
                 table.addHeaderCell(createHeaderCell("Status"));
@@ -298,6 +299,8 @@ public class ContasAPagarReportService {
                         desc = desc.substring(0, 37) + "...";
                     }
                     table.addCell(createCell(desc));
+
+                    table.addCell(createCell(getContaPlanoDeContas(invoice)));
 
                     table.addCell(createCell(getTypeDisplayName(invoice.getType())));
                     table.addCell(
@@ -503,12 +506,13 @@ public class ContasAPagarReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Vencimento"));
                 table.addHeaderCell(createHeaderCell("Fornecedor"));
                 table.addHeaderCell(createHeaderCell("Descrição"));
+                table.addHeaderCell(createHeaderCell("Conta"));
                 table.addHeaderCell(createHeaderCell("Tipo"));
                 table.addHeaderCell(createHeaderCell("Valor"));
                 table.addHeaderCell(createHeaderCell("Status"));
@@ -520,16 +524,8 @@ public class ContasAPagarReportService {
                     table.addCell(
                             createCell(invoice.getDueDate() != null ? invoice.getDueDate().format(dateFormatter) : ""));
 
-                    // Defensive null check for lazy-loaded Supplier
-                    String supplierName = "Não informado";
-                    try {
-                        if (invoice.getSupplier() != null) {
-                            supplierName = invoice.getSupplier().getName();
-                        }
-                    } catch (Exception e) {
-                        log.warn("Erro ao acessar fornecedor da fatura {}: {}", invoice.getId(), e.getMessage());
-                    }
-                    table.addCell(createCell(supplierName));
+                    // Em rescisão de funcionários exibe o funcionário; nas demais, o fornecedor
+                    table.addCell(createCell(getFornecedorOuFuncionario(invoice)));
 
                     // Descrição (truncar se muito longa)
                     String desc = invoice.getDescription() != null ? invoice.getDescription() : "";
@@ -537,6 +533,8 @@ public class ContasAPagarReportService {
                         desc = desc.substring(0, 37) + "...";
                     }
                     table.addCell(createCell(desc));
+
+                    table.addCell(createCell(getContaPlanoDeContas(invoice)));
 
                     table.addCell(createCell(getTypeDisplayName(invoice.getType())));
                     table.addCell(
@@ -735,12 +733,13 @@ public class ContasAPagarReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Vencimento"));
                 table.addHeaderCell(createHeaderCell("Fornecedor"));
                 table.addHeaderCell(createHeaderCell("Descrição"));
+                table.addHeaderCell(createHeaderCell("Conta"));
                 table.addHeaderCell(createHeaderCell("Tipo"));
                 table.addHeaderCell(createHeaderCell("Valor"));
                 table.addHeaderCell(createHeaderCell("Status"));
@@ -760,6 +759,8 @@ public class ContasAPagarReportService {
                         desc = desc.substring(0, 37) + "...";
                     }
                     table.addCell(createCell(desc));
+
+                    table.addCell(createCell(getContaPlanoDeContas(invoice)));
 
                     table.addCell(createCell(getTypeDisplayName(invoice.getType())));
                     table.addCell(
@@ -896,14 +897,61 @@ public class ContasAPagarReportService {
         invoiceData.put("vencimento",
                 invoice.getDueDate() != null ? invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                         : "-");
-        invoiceData.put("fornecedor",
-                invoice.getSupplier() != null ? invoice.getSupplier().getName() : "Não informado");
+        invoiceData.put("fornecedor", getFornecedorOuFuncionario(invoice));
         invoiceData.put("descricao", invoice.getDescription() != null ? invoice.getDescription() : "-");
         invoiceData.put("tipo", getTypeDisplayName(invoice.getType()));
         invoiceData.put("valor", formatCurrency(invoice.getAmount()));
         invoiceData.put("status", getStatusDisplayName(invoice.getStatus()));
+        invoiceData.put("empresa", invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "-");
+        invoiceData.put("conta", getContaPlanoDeContas(invoice));
 
         return invoiceData;
+    }
+
+    /**
+     * Obtém a conta do plano de contas vinculada à invoice (ex.: código - nome),
+     * de forma segura contra lazy loading.
+     */
+    private String getContaPlanoDeContas(Invoice invoice) {
+        try {
+            if (invoice.getSubcategoria() != null) {
+                String codigo = invoice.getSubcategoria().getCodigo();
+                String nome = invoice.getSubcategoria().getNome();
+                return (codigo != null ? codigo : "") + " - " + (nome != null ? nome : "");
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao acessar subcategoria da fatura {}: {}", invoice.getId(), e.getMessage());
+        }
+        return "Não informado";
+    }
+
+    private static final String CATEGORIA_RESCISAO_FUNCIONARIOS = "Rescisão de funcionários";
+
+    /**
+     * Em contas de rescisão de funcionários, exibe o nome do funcionário vinculado
+     * em vez do fornecedor. Nas demais contas, mantém o fornecedor.
+     */
+    private String getFornecedorOuFuncionario(Invoice invoice) {
+        try {
+            if (invoice.getSubcategoria() != null
+                    && invoice.getSubcategoria().getCategoriaPai() != null
+                    && CATEGORIA_RESCISAO_FUNCIONARIOS.equals(invoice.getSubcategoria().getCategoriaPai().getNome())
+                    && invoice.getEmployee() != null
+                    && invoice.getEmployee().getName() != null
+                    && !invoice.getEmployee().getName().isBlank()) {
+                return invoice.getEmployee().getName();
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao acessar funcionário da fatura {}: {}", invoice.getId(), e.getMessage());
+        }
+        try {
+            if (invoice.getSupplier() != null) {
+                return invoice.getSupplier().getName();
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao acessar fornecedor da fatura {}: {}", invoice.getId(), e.getMessage());
+        }
+        return "Não informado";
     }
 
     /**

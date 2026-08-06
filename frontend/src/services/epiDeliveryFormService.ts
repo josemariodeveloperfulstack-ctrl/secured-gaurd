@@ -15,6 +15,12 @@ export interface EPIDeliveryFormItem {
   substitutedDate?: string;
   /** Motivo da substituição — coluna MOTIVO DA SUBST. no PDF */
   replacementReason?: string;
+  /** Código de 6 dígitos enviado no WhatsApp para este item (modo por item) */
+  confirmationCode?: string;
+  confirmationSentAt?: string;
+  confirmationExpiresAt?: string;
+  /** Data/hora em que o funcionário confirmou o recebimento deste item */
+  confirmedAt?: string;
 }
 
 export type EPIDeliveryType = 'PRIMEIRA_ENTREGA' | 'SUBSTITUICAO' | 'DEVOLUCAO' | 'TROCA';
@@ -61,6 +67,15 @@ export interface EPIDeliveryForm {
   confirmationPending?: boolean;
 }
 
+export interface EpiItemConfirmation {
+  itemId: string;
+  epiName: string;
+  confirmationCode: string;
+  confirmUrl: string;
+  expiresAt?: string;
+  confirmed?: boolean;
+}
+
 export interface EpiConfirmationSendResponse {
   formId: string;
   confirmationToken: string;
@@ -72,6 +87,8 @@ export interface EpiConfirmationSendResponse {
   mode: 'AUTO' | 'MANUAL';
   expiresAt: string;
   message: string;
+  /** Confirmações individuais por item (modo por item). Ausente/vazio = confirmação por ficha. */
+  items?: EpiItemConfirmation[];
 }
 
 export interface PublicEpiConfirmation {
@@ -79,10 +96,13 @@ export interface PublicEpiConfirmation {
   companyName?: string;
   deliveryDate: string;
   deliveryType?: string;
-  items: Array<{ epiName: string; quantity: number; ca?: string; caName?: string }>;
+  items: Array<{ id?: string; epiName: string; quantity: number; ca?: string; caName?: string; confirmed?: boolean }>;
   alreadyConfirmed: boolean;
   expired: boolean;
   awaitingConfirmation: boolean;
+  /** true quando o link corresponde à confirmação individual de um item (modo por item) */
+  perItem?: boolean;
+  itemId?: string;
 }
 
 export interface EPIDeliveryFormFilters {

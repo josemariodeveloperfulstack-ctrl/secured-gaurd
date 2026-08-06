@@ -13,6 +13,7 @@ import { contasAPagarService, Supplier, CategoriaPai, Subcategoria } from '@/ser
 import SupplierFormModal from '@/components/estoque/SupplierFormModal';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface ContaAPagar {
   id?: string;
@@ -34,9 +35,16 @@ export interface ContaAPagar {
   comprovante?: File;
   categoria?: string | undefined;
   subcategoriaId?: string | undefined;
+  subcategoriaNome?: string | undefined;
+  subcategoriaCodigo?: string | undefined;
+  categoriaPaiNome?: string | undefined;
+  categoriaPaiCodigo?: string | undefined;
   employeeId?: string | undefined;
+  employeeName?: string | undefined;
   centroCusto?: string | undefined;
   createdAt?: Date;
+  createdById?: string;
+  createdByName?: string;
 }
 
 interface ContasAPagarFormModalProps {
@@ -55,6 +63,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   initialData = null
 }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [fornecedores, setFornecedores] = useState<Supplier[]>([]);
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -375,14 +384,25 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
     : [];
 
   const requiresEmployee = Boolean(selectedSubcategoria?.requerVinculoFuncionario);
+  const requiresSupplier = !requiresEmployee;
+  const loggedInUserLabel = user?.name || user?.username || 'Usuário logado';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.fornecedor || !formData.descricao || !formData.valor || !formData.vencimento) {
+    if (!formData.descricao || !formData.valor || !formData.vencimento) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos obrigatórios",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (requiresSupplier && !formData.fornecedor && !formData.fornecedorId) {
+      toast({
+        title: "Erro",
+        description: "Selecione o fornecedor da conta a pagar",
         variant: "destructive"
       });
       return;
@@ -505,7 +525,9 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
             {/* Fornecedor */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Fornecedor *</label>
+              <label className="text-sm font-medium text-seguranca-lightgray">
+                Fornecedor {requiresSupplier ? '*' : '(opcional para Pessoal / RH)'}
+              </label>
               <Select
                 value={formData.fornecedorId}
                 onValueChange={(value) => {
@@ -513,7 +535,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                   handleInputChange('fornecedorId', value);
                   handleInputChange('fornecedor', fornecedor?.name || '');
                 }}
-                required
+                required={requiresSupplier}
               >
                 <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                   <SelectValue placeholder="Selecione um fornecedor" />
@@ -716,7 +738,10 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                       handleInputChange('subcategoriaId', value);
                       const sub = filteredSubcategorias.find((s) => s.id === value) || subcategorias.find((s) => s.id === value);
                       setSelectedSubcategoria(sub || null);
-                      if (!sub?.requerVinculoFuncionario) {
+                      if (sub?.requerVinculoFuncionario) {
+                        handleInputChange('fornecedorId', '');
+                        handleInputChange('fornecedor', '');
+                      } else {
                         handleInputChange('employeeId', '');
                       }
                     }}
@@ -904,6 +929,20 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
               </div>
             </div>
           )}
+
+          <div className="rounded-md border border-gray-600 bg-seguranca-black/40 p-3">
+            <label className="text-sm font-medium text-seguranca-lightgray">Lançado por</label>
+            <p className="mt-1 text-sm text-white">
+              {editMode
+                ? (initialData?.createdByName || formData.createdByName || 'Não registrado')
+                : loggedInUserLabel}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {editMode
+                ? 'Usuário que registrou este lançamento no sistema.'
+                : 'Será registrado automaticamente com o usuário logado ao salvar.'}
+            </p>
+          </div>
 
           {/* Botões */}
           <div className="flex justify-end gap-3 pt-6 border-t border-gray-600">
