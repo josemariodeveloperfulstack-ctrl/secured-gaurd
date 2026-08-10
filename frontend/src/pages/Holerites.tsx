@@ -2955,6 +2955,52 @@ const Holerites: React.FC = () => {
     }
   };
 
+  // REGRA DE NEGÓCIO: A conta corrente do holerite deve ser a mesma conta creditada
+  // no comprovante para que a unificação (automática e manual) fique disponível.
+  // Retorna true se a unificação pode prosseguir, false caso contrário.
+  const validateAccountForUnification = (holerite: any, recibo: any): boolean => {
+    const holeriteConta = (holerite?.contaCorrente || '').replace(/[^0-9]/g, '');
+    const reciboConta = (recibo?.creditedAccount || '').replace(/[^0-9]/g, '');
+
+    // Ambos com conta: devem ser iguais (obrigatório)
+    if (holeriteConta && reciboConta) {
+      if (holeriteConta === reciboConta) {
+        console.log('✅ Conta corrente confere:', holeriteConta);
+        return true;
+      }
+      toast({
+        title: "❌ Conta corrente diferente",
+        description: `A conta do holerite (${holerite.contaCorrente}) é diferente da conta creditada no comprovante (${recibo.creditedAccount}). A unificação NÃO está disponível.`,
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // Holerite sem conta extraída: usar conta do cadastro (employees) via backend
+    if (!holeriteConta && reciboConta) {
+      toast({
+        title: "⚠️ Conta não extraída do holerite",
+        description: `A conta corrente não foi identificada no PDF do holerite. A unificação será validada pela conta do cadastro do funcionário (${recibo.creditedAccount}).`,
+        variant: "default"
+      });
+      return true;
+    }
+
+    // Comprovante sem conta creditada: não é possível verificar no momento
+    if (holeriteConta && !reciboConta) {
+      toast({
+        title: "⚠️ Conta creditada não extraída do comprovante",
+        description: `Não foi possível identificar a conta creditada no comprovante. A unificação ficará sujeita à validação da conta do holerite (${holerite.contaCorrente}).`,
+        variant: "default"
+      });
+      return true;
+    }
+
+    // Nenhuma conta disponível
+    console.log('⚠️ Nenhuma conta corrente disponível para validação');
+    return true;
+  };
+
   const createUnification = (holerite: any, recibo: any) => {
     // Verificar se os objetos são válidos
     if (!holerite || !recibo) {
@@ -3016,6 +3062,12 @@ const Holerites: React.FC = () => {
     }
 
     console.log('✅ ValidaÃ§Ã£o aprovada - Criando unificação para:', holerite.employeeName || 'N/A');
+
+    // REGRA DE NEGÓCIO: conta corrente obrigatória para unificação
+    if (!validateAccountForUnification(holerite, recibo)) {
+      return;
+    }
+
 
     // Criar nova unificação individual
     const newUnification = {
@@ -4867,7 +4919,8 @@ const Holerites: React.FC = () => {
           cpf: file.cpf || '',
           month: file.month?.toString() || '',
           year: file.year?.toString() || '',
-          path: file.filePath || file.path || ''
+          path: file.filePath || file.path || '',
+          contaCorrente: file.contaCorrente || ''
         }));
         setProcessedHolerites(holeritesProcessados);
         console.log('✅ Holerites processados mapeados:', holeritesProcessados.length);
@@ -4888,7 +4941,8 @@ const Holerites: React.FC = () => {
             employeeName: receipt.employeeName || '',
             month: receipt.month?.toString() || '',
             year: receipt.year?.toString() || '',
-            path: receipt.filePath || `uploads/payment-receipts/${receipt.year}/${receipt.month}/${receipt.fileName}`
+            path: receipt.filePath || `uploads/payment-receipts/${receipt.year}/${receipt.month}/${receipt.fileName}`,
+            creditedAccount: receipt.creditedAccount || ''
           }));
           setProcessedRecibos(comprovantesProcessados);
           console.log('✅ Comprovantes processados carregados:', comprovantesProcessados.length);
@@ -7091,6 +7145,15 @@ const Holerites: React.FC = () => {
                                 <Badge variant="outline" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-300">
                                   {holerite.month}/{holerite.year}
                                 </Badge>
+                                {holerite.contaCorrente ? (
+                                  <Badge variant="outline" title="Conta corrente do holerite (usada na unificação)" className="text-xs bg-seguranca-graphite border-seguranca-yellow/50 text-seguranca-yellow">
+                                    Conta: {holerite.contaCorrente}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" title="Conta corrente não extraída do PDF. A unificação usará a conta do cadastro do funcionário." className="text-xs bg-seguranca-graphite border-gray-600 text-gray-500">
+                                    Conta: não identificada
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                             <Button
@@ -7179,6 +7242,15 @@ const Holerites: React.FC = () => {
                                 <Badge variant="outline" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-300">
                                   {recibo.month}/{recibo.year}
                                 </Badge>
+                                {recibo.creditedAccount ? (
+                                  <Badge variant="outline" title="Conta creditada no comprovante (usada na unificação)" className="text-xs bg-seguranca-graphite border-green-500/50 text-green-400">
+                                    Conta creditada: {recibo.creditedAccount}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" title="Conta creditada não extraída do comprovante" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-500">
+                                    Conta creditada: não identificada
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                             <Button

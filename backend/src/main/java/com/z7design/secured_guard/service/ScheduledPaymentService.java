@@ -1,17 +1,24 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.ScheduledPaymentDTO;
+import com.z7design.secured_guard.model.AccountsReceivable;
 import com.z7design.secured_guard.model.Client;
 import com.z7design.secured_guard.model.ScheduledPayment;
+import com.z7design.secured_guard.model.Subcategoria;
+import com.z7design.secured_guard.model.enums.PaymentMethod;
 import com.z7design.secured_guard.model.enums.ScheduledPaymentStatus;
+import com.z7design.secured_guard.repository.AccountsReceivableRepository;
 import com.z7design.secured_guard.repository.ClientRepository;
 import com.z7design.secured_guard.repository.ScheduledPaymentRepository;
+import com.z7design.secured_guard.repository.SubcategoriaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,7 +34,10 @@ public class ScheduledPaymentService {
     
     private final ScheduledPaymentRepository scheduledPaymentRepository;
     private final ClientRepository clientRepository;
+    private final SubcategoriaRepository subcategoriaRepository;
+    private final AccountsReceivableRepository accountsReceivableRepository;
     private final NotificationService notificationService;
+    private final ScheduledPaymentNotificationService scheduledPaymentNotificationService;
     
     /**
      * Buscar todos os pagamentos agendados com paginação
@@ -63,10 +73,27 @@ public class ScheduledPaymentService {
     }
     
     /**
-     * Criar novo pagamento agendado
+     * Criar novo pagamento agendado.
+     *
+     * <p>Quando {@code accountsReceivableId} (ou {@code paymentId}) é informado,
+     * o agendamento herda automaticamente cliente, descrição, valor, forma de
+     * pagamento, número da fatura e a subcategoria do Plano de Contas da conta
+     * a receber de origem.</p>
      */
     public ScheduledPaymentDTO createScheduledPayment(ScheduledPaymentDTO dto) {
-        log.info("Criando novo pagamento agendado para cliente: {}", dto.getClientId());
+        log.info("Criando novo pagamento agendado para conta de origem: {}", dto.getAccountsReceivableId());
+        
+        // Herdar dados da conta a receber de origem, quando informada
+        AccountsReceivable origin = null;
+        if (dto.getAccountsReceivableId() != null) {
+            origin = accountsReceivableRepository.findById(dto.getAccountsReceivableId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "Conta a receber de origem não encontrada com ID: " + dto.getAccountsReceivableId()));
+            applyInheritanceFromOrigin(dto, origin);
+        }
+        
+        // Validação manual (a herança preenche os campos quando há origem)
+        validateRequiredFields(dto);
         
         // Buscar cliente
         Client client = clientRepository.findById(dto.getClientId())
@@ -77,12 +104,78 @@ public class ScheduledPaymentService {
         payment.setClient(client);
         payment.setStatus(ScheduledPaymentStatus.SCHEDULED);
         payment.setAlertSent(false);
+        payment.setAccountsReceivable(origin);
+        payment.setSubcategoria(resolveSubcategoria(dto.getSubcategoriaId()));
         
         // Salvar
         ScheduledPayment savedPayment = scheduledPaymentRepository.save(payment);
-        log.info("Pagamento agendado criado com sucesso: {}", savedPayment.getId());
+        log.info("Pagamento agendado criado com sucesso: {} (herdou subcategoria: {})",
+                savedPayment.getId(),
+                payment.getSubcategoria() != null ? payment.getSubcategoria().getNome() : "nenhuma");
         
         return ScheduledPaymentDTO.fromEntity(savedPayment);
+    }
+
+    /**
+     * Cria um pagamento agendado a partir de uma conta a receber já persistida
+     * (fluxo de agendamento no cadastro/edição da conta a receber).
+     * Herda automaticamente todos os dados e a subcategoria da conta de origem.
+     */
+    public ScheduledPaymentDTO createScheduledPaymentFromReceivable(AccountsReceivable account, LocalDate scheduledDate) {
+        ScheduledPaymentDTO dto = new ScheduledPaymentDTO();
+        dto.setAccountsReceivableId(account.getId());
+        dto.setScheduledDate(scheduledDate);
+        applyInheritanceFromOrigin(dto, account);
+        return createScheduledPayment(dto);
+    }
+
+    /**
+     * Valida os campos obrigatórios após a herança. Quando não há conta de
+     * origem, todos os campos precisam vir da requisição.
+     */
+    private void validateRequiredFields(ScheduledPaymentDTO dto) {
+        if (dto.getClientId() == null) {
+            throw new IllegalArgumentException("Cliente é obrigatório");
+        }
+        if (dto.getDescription() == null || dto.getDescription().isBlank()) {
+            throw new IllegalArgumentException("Descrição é obrigatória");
+        }
+        if (dto.getAmount() == null || dto.getAmount().signum() <= 0) {
+            throw new IllegalArgumentException("Valor deve ser maior que zero");
+        }
+        if (dto.getPaymentMethod() == null) {
+            throw new IllegalArgumentException("Forma de pagamento é obrigatória");
+        }
+        if (dto.getScheduledDate() == null) {
+            throw new IllegalArgumentException("Data de agendamento é obrigatória");
+        }
+    }
+
+    /**
+     * Aplica herança automática dos dados da conta a receber de origem no DTO.
+     * Preenche apenas os campos ainda não informados pelo cliente.
+     */
+    private void applyInheritanceFromOrigin(ScheduledPaymentDTO dto, AccountsReceivable origin) {
+        if (dto.getClientId() == null) {
+            dto.setClientId(origin.getClient() != null ? origin.getClient().getId() : null);
+        }
+        if (dto.getDescription() == null || dto.getDescription().isBlank()) {
+            dto.setDescription(origin.getDescription());
+        }
+        if (dto.getAmount() == null) {
+            dto.setAmount(origin.getAmount());
+        }
+        if (dto.getPaymentMethod() == null && origin.getPaymentMethod() != null) {
+            dto.setPaymentMethod(origin.getPaymentMethod());
+        }
+        if (dto.getInvoiceNumber() == null || dto.getInvoiceNumber().isBlank()) {
+            dto.setInvoiceNumber(origin.getInvoiceNumber());
+        }
+        if ((dto.getSubcategoriaId() == null) && origin.getSubcategoria() != null) {
+            dto.setSubcategoriaId(origin.getSubcategoria().getId());
+            log.info("Herança automática: agendamento recebeu subcategoria '{} - {}' da conta a receber {}",
+                    origin.getSubcategoria().getCodigo(), origin.getSubcategoria().getNome(), origin.getId());
+        }
     }
     
     /**
@@ -94,16 +187,30 @@ public class ScheduledPaymentService {
         ScheduledPayment existingPayment = scheduledPaymentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Pagamento agendado não encontrado com ID: " + id));
         
-        // Atualizar campos
-        existingPayment.setDescription(dto.getDescription());
-        existingPayment.setAmount(dto.getAmount());
-        existingPayment.setScheduledDate(dto.getScheduledDate());
-        existingPayment.setPaymentMethod(dto.getPaymentMethod());
-        existingPayment.setInvoiceNumber(dto.getInvoiceNumber());
-        existingPayment.setNotes(dto.getNotes());
+        // Herdar dados da conta a receber de origem quando informada (e ainda não vinculada)
+        if (dto.getAccountsReceivableId() != null && existingPayment.getAccountsReceivable() == null) {
+            AccountsReceivable origin = accountsReceivableRepository.findById(dto.getAccountsReceivableId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "Conta a receber de origem não encontrada com ID: " + dto.getAccountsReceivableId()));
+            applyInheritanceFromOrigin(dto, origin);
+            existingPayment.setAccountsReceivable(origin);
+        }
+        
+        // Validação manual: apenas campos realmente obrigatórios ao atualizar
+        validateRequiredFields(dto);
+        
+        // Atualizar campos (apenas valores não nulos, preservando os existentes)
+        if (dto.getDescription() != null) existingPayment.setDescription(dto.getDescription());
+        if (dto.getAmount() != null) existingPayment.setAmount(dto.getAmount());
+        if (dto.getScheduledDate() != null) existingPayment.setScheduledDate(dto.getScheduledDate());
+        if (dto.getPaymentMethod() != null) existingPayment.setPaymentMethod(dto.getPaymentMethod());
+        if (dto.getInvoiceNumber() != null) existingPayment.setInvoiceNumber(dto.getInvoiceNumber());
+        if (dto.getNotes() != null) existingPayment.setNotes(dto.getNotes());
+        existingPayment.setSubcategoria(resolveSubcategoria(dto.getSubcategoriaId()));
         
         // Se mudou a data, resetar alerta
-        if (!existingPayment.getScheduledDate().equals(dto.getScheduledDate())) {
+        if (existingPayment.getScheduledDate() != null && dto.getScheduledDate() != null
+                && !existingPayment.getScheduledDate().equals(dto.getScheduledDate())) {
             existingPayment.setAlertSent(false);
             existingPayment.setAlertSentDate(null);
         }
@@ -114,6 +221,13 @@ public class ScheduledPaymentService {
         return ScheduledPaymentDTO.fromEntity(updatedPayment);
     }
     
+    private Subcategoria resolveSubcategoria(UUID subcategoriaId) {
+        if (subcategoriaId == null) {
+            return null;
+        }
+        return subcategoriaRepository.findById(subcategoriaId).orElse(null);
+    }
+
     /**
      * Deletar pagamento agendado
      */
@@ -210,6 +324,65 @@ public class ScheduledPaymentService {
         log.info("Pagamento agendado cancelado: {}", updatedPayment.getId());
         
         return ScheduledPaymentDTO.fromEntity(updatedPayment);
+    }
+    
+    /**
+     * Cancelar automaticamente o agendamento de pagamento vinculado a uma conta a receber.
+     * Chamado na exclusão da conta a receber de origem para manter o histórico consistente.
+     * Somente agendamentos ainda pendentes (SCHEDULED) são cancelados; agendamentos já
+     * executados permanecem como registro histórico.
+     */
+    public void cancelByAccountsReceivableId(UUID accountsReceivableId) {
+        scheduledPaymentRepository.findByAccountsReceivableId(accountsReceivableId)
+                .filter(payment -> payment.getStatus() == ScheduledPaymentStatus.SCHEDULED)
+                .ifPresent(payment -> {
+                    log.info("Cancelando agendamento {} vinculado à conta a receber {} (exclusão da origem)",
+                            payment.getId(), accountsReceivableId);
+                    payment.setStatus(ScheduledPaymentStatus.CANCELLED);
+                    scheduledPaymentRepository.save(payment);
+                    // Notificar o cliente sobre o cancelamento (best-effort, nunca interrompe a exclusão)
+                    scheduleClientCancellationNotice(payment);
+                });
+    }
+    
+    /**
+     * Prepara a notificação de cancelamento ao cliente e agenda o envio para APÓS o commit
+     * da transação de exclusão. Assim, se a exclusão da conta a receber falhar e houver
+     * rollback, o cliente não recebe um aviso de cancelamento falso.
+     */
+    private void scheduleClientCancellationNotice(ScheduledPayment payment) {
+        try {
+            // Captura os dados dentro da transação (lazy loading seguro) para envio pós-commit
+            ScheduledPaymentNotificationService.CancellationNotice notice =
+                    ScheduledPaymentNotificationService.CancellationNotice.from(payment);
+            if (notice.email() == null && notice.telefoneNormalizado() == null) {
+                log.info("Cliente {} sem e-mail e telefone cadastrados — notificação de cancelamento não enviada.",
+                        notice.clienteNome());
+                return;
+            }
+            if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+                try {
+                    scheduledPaymentNotificationService.sendCancellationNotice(notice);
+                } catch (Exception e) {
+                    log.error("Erro ao despachar notificação assíncrona de cancelamento: {}", e.getMessage());
+                }
+                return;
+            }
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    // Envio assíncrono (@Async) — o DELETE não espera o e-mail/WhatsApp
+                    try {
+                        scheduledPaymentNotificationService.sendCancellationNotice(notice);
+                    } catch (Exception e) {
+                        log.error("Erro ao despachar notificação assíncrona de cancelamento: {}", e.getMessage());
+                    }
+                }
+            });
+        } catch (Exception e) {
+            log.error("Erro ao preparar notificação de cancelamento do agendamento {}: {}",
+                    payment.getId(), e.getMessage());
+        }
     }
     
     /**

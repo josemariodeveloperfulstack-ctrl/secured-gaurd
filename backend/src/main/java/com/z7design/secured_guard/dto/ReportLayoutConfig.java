@@ -161,4 +161,12 @@ public class ReportLayoutConfig {
      */
     @Builder.Default
     private float footerCompanyNameFontSize = 9f;
+
+    /**
+     * Desenha uma linha horizontal separando o conteúdo do rodapé (dados da empresa).
+     * Útil em documentos com cabeçalho próprio (ex.: Ordem de Serviço).
+     * Padrão: false
+     */
+    @Builder.Default
+    private boolean showFooterContentSeparator = false;
 }

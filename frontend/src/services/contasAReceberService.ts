@@ -40,6 +40,7 @@ export interface CreateContaAReceberRequest {
   lateFee?: number; // Taxa de atraso
   latePenalty?: number; // Multa de atraso
   workPostId?: string; // ID do posto de trabalho
+  subcategoriaId?: string | null; // ID da subcategoria do Plano de Contas
 }
 
 export interface UpdateContaAReceberRequest extends Partial<CreateContaAReceberRequest> {
@@ -185,6 +186,11 @@ function mapAccountsReceivableListItem(account: any): ContaAReceber | null {
     measurementId: account.measurementId,
     measurementInfo: account.measurementInfo,
     dueDate: parseDateFromBackend(account.dueDate) || new Date(),
+    subcategoriaId: account.subcategoriaId || undefined,
+    subcategoriaNome: account.subcategoriaNome,
+    subcategoriaCodigo: account.subcategoriaCodigo,
+    categoriaPaiNome: account.categoriaPaiNome,
+    categoriaPaiCodigo: account.categoriaPaiCodigo,
     client: account.client
       ? {
           id: account.client.id,
@@ -297,7 +303,12 @@ export const contasAReceberService = {
       categoria: account.category || 'INVOICE', // Garantir categoria
       workPostId: account.workPostId || account.workPost?.id,
       workPostName: account.workPostName || account.workPost?.name,
-      paymentMethod: account.paymentMethod || 'PIX' // Incluir paymentMethod do backend
+      paymentMethod: account.paymentMethod || 'PIX', // Incluir paymentMethod do backend
+      subcategoriaId: account.subcategoriaId || undefined,
+      subcategoriaNome: account.subcategoriaNome,
+      subcategoriaCodigo: account.subcategoriaCodigo,
+      categoriaPaiNome: account.categoriaPaiNome,
+      categoriaPaiCodigo: account.categoriaPaiCodigo
     };
   },
 
@@ -333,7 +344,8 @@ export const contasAReceberService = {
       paymentMethod: paymentMethod,
       status: mapFrontendStatusToBackend(conta.status) || 'PENDING',
       notes: conta.observacoes,
-      workPostId: conta.workPostId || undefined
+      workPostId: conta.workPostId || undefined,
+      subcategoriaId: conta.subcategoriaId || null
     };
 
     // Adicionar invoiceNumber apenas se fornecido
@@ -385,7 +397,8 @@ export const contasAReceberService = {
       measurementNumber: conta.measurementNumber !== undefined ? (conta.measurementNumber || undefined) : contaExistente.measurementNumber,
       overdueDays: Number(contaExistente.overdueDays || 0),
       lateFee: Number(contaExistente.lateFee || 0),
-      latePenalty: Number(contaExistente.latePenalty || 0)
+      latePenalty: Number(contaExistente.latePenalty || 0),
+      subcategoriaId: conta.subcategoriaId !== undefined ? (conta.subcategoriaId || null) : (contaExistente.subcategoriaId || null)
     };
     
     // Número da fatura (obrigatório - @NotBlank)
@@ -513,6 +526,11 @@ export const contasAReceberService = {
     if (requestData.latePenalty !== undefined && requestData.latePenalty !== null) {
       cleanRequestData.latePenalty = Number(requestData.latePenalty);
     }
+    // Plano de Contas: sempre enviar subcategoriaId — sem isto, o backend recebia o
+    // campo ausente (null) e zerava o vínculo com o Plano de Contas em toda edição.
+    cleanRequestData.subcategoriaId = requestData.subcategoriaId
+      ? String(requestData.subcategoriaId)
+      : null;
 
     console.log('📤 Dados da requisição de atualização (limpos):', JSON.stringify(cleanRequestData, null, 2));
     console.log('📋 ID da conta:', id);

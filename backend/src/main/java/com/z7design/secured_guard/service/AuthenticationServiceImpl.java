@@ -147,7 +147,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
 
-            User user = userRepository.findByUsername(request.getUsername())
+            String login = request.getUsername() != null ? request.getUsername().trim() : "";
+            User user = userRepository.findByUsername(login)
+                    .or(() -> login.contains("@") ? userRepository.findByEmailIgnoreCase(login) : java.util.Optional.empty())
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
             log.info("✅ Usuário encontrado: {} (ID: {})", user.getUsername(), user.getId());
@@ -287,6 +289,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         String username = authentication.getName();
         return userRepository.findByUsername(username)
+                .or(() -> username != null && username.contains("@")
+                        ? userRepository.findByEmailIgnoreCase(username.trim())
+                        : java.util.Optional.empty())
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 }

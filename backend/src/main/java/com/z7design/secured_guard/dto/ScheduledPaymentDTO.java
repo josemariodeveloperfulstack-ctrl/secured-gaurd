@@ -16,16 +16,18 @@ public class ScheduledPaymentDTO {
     
     private UUID id;
     
-    @NotNull(message = "Cliente é obrigatório")
+    /** ID da conta a receber de origem — quando informado, o agendamento herda
+     * automaticamente cliente, descrição, valor, forma de pagamento e subcategoria. */
+    @com.fasterxml.jackson.annotation.JsonAlias("paymentId")
+    private UUID accountsReceivableId;
+    
     private UUID clientId;
     
     private ClientDTO client;
     
-    @NotBlank(message = "Descrição é obrigatória")
     @Size(max = 500, message = "Descrição deve ter no máximo 500 caracteres")
     private String description;
     
-    @NotNull(message = "Valor é obrigatório")
     @DecimalMin(value = "0.0", inclusive = false, message = "Valor deve ser maior que zero")
     private BigDecimal amount;
     
@@ -36,13 +38,22 @@ public class ScheduledPaymentDTO {
     
     private ScheduledPaymentStatus status = ScheduledPaymentStatus.SCHEDULED;
     
-    @NotNull(message = "Forma de pagamento é obrigatória")
     private PaymentMethod paymentMethod;
     
     @Size(max = 100, message = "Número da fatura deve ter no máximo 100 caracteres")
     private String invoiceNumber;
     
     private String notes;
+    
+    private UUID subcategoriaId;
+    
+    private String subcategoriaNome;
+    
+    private String subcategoriaCodigo;
+    
+    private String categoriaPaiNome;
+    
+    private String categoriaPaiCodigo;
     
     private Boolean alertSent = false;
     
@@ -61,8 +72,13 @@ public class ScheduledPaymentDTO {
     public static ScheduledPaymentDTO fromEntity(ScheduledPayment entity) {
         ScheduledPaymentDTO dto = new ScheduledPaymentDTO();
         dto.setId(entity.getId());
-        dto.setClientId(entity.getClient().getId());
-        dto.setClient(ClientDTO.fromEntity(entity.getClient()));
+        if (entity.getAccountsReceivable() != null) {
+            dto.setAccountsReceivableId(entity.getAccountsReceivable().getId());
+        }
+        if (entity.getClient() != null) {
+            dto.setClientId(entity.getClient().getId());
+            dto.setClient(ClientDTO.fromEntity(entity.getClient()));
+        }
         dto.setDescription(entity.getDescription());
         dto.setAmount(entity.getAmount());
         dto.setScheduledDate(entity.getScheduledDate());
@@ -71,6 +87,15 @@ public class ScheduledPaymentDTO {
         dto.setPaymentMethod(entity.getPaymentMethod());
         dto.setInvoiceNumber(entity.getInvoiceNumber());
         dto.setNotes(entity.getNotes());
+        if (entity.getSubcategoria() != null) {
+            dto.setSubcategoriaId(entity.getSubcategoria().getId());
+            dto.setSubcategoriaNome(entity.getSubcategoria().getNome());
+            dto.setSubcategoriaCodigo(entity.getSubcategoria().getCodigo());
+            if (entity.getSubcategoria().getCategoriaPai() != null) {
+                dto.setCategoriaPaiNome(entity.getSubcategoria().getCategoriaPai().getNome());
+                dto.setCategoriaPaiCodigo(entity.getSubcategoria().getCategoriaPai().getCodigo());
+            }
+        }
         dto.setAlertSent(entity.getAlertSent());
         dto.setAlertSentDate(entity.getAlertSentDate());
         dto.setCreatedAt(entity.getCreatedAt());

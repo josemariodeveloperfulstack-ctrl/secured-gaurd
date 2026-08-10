@@ -7,7 +7,7 @@ VALUES (
     'Super Administrador do Sistema',
     'superadmin@promover.com',
     'superadmin',
-    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', -- senha: Password123!
+    '$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2', -- senha: Password123!
     'SUPER_ADMIN',
     true,
     NOW(),

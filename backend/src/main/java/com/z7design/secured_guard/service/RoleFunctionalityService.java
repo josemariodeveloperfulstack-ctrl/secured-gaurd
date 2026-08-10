@@ -41,7 +41,10 @@ public class RoleFunctionalityService {
                         allFunctionalities.addAll(getFunctionalitiesForRole(role));
                 }
 
-                return new ArrayList<>(allFunctionalities);
+                // HashSet não preserva ordem: ordenar pelo campo order (ordem do menu)
+                List<Functionality> result = new ArrayList<>(allFunctionalities);
+                result.sort(java.util.Comparator.comparingInt(Functionality::getOrder));
+                return result;
         }
 
         /**

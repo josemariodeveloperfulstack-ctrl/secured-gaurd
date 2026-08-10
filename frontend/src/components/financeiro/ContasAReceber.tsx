@@ -66,6 +66,7 @@ import { format, addDays, isAfter, isBefore, startOfMonth, endOfMonth, startOfDa
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { DateRange } from 'react-day-picker';
 import { contasAReceberService, Cliente, ContaAReceber } from '@/services/contasAReceberService';
+import { contasAPagarService, formatContaPlanoDeContas, Subcategoria } from '@/services/contasAPagarService';
 import { unitService } from '@/services/unitService';
 
 interface HistoricoCobranca {
@@ -197,6 +198,8 @@ export const ContasAReceber: React.FC = () => {
   const [filterAmountMin, setFilterAmountMin] = useState('');
   const [filterAmountMax, setFilterAmountMax] = useState('');
   const [units, setUnits] = useState<any[]>([]);
+  const [filterSubcategoria, setFilterSubcategoria] = useState('all');
+  const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
   /** Sem período por defeito: antes filtrava só o mês actual e a lista parecia vazia quando os vencimentos eram outros meses. Use "Filtros Avançados" para restringir por vencimento. */
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
@@ -361,6 +364,7 @@ export const ContasAReceber: React.FC = () => {
       if (filterCategoria !== 'all') params.set('categoryFilter', filterCategoria);
       if (filterAmountMin) params.set('amountMin', filterAmountMin);
       if (filterAmountMax) params.set('amountMax', filterAmountMax);
+      if (filterSubcategoria !== 'all') params.set('subcategoriaId', filterSubcategoria);
       
       if (opts.segment) {
         params.set('reportSegment', opts.segment);
@@ -610,6 +614,14 @@ export const ContasAReceber: React.FC = () => {
         console.error('Erro ao carregar filiais:', err);
       }
 
+      // Carregar Plano de Contas (subcategorias) para o filtro
+      try {
+        const subsData = await contasAPagarService.getSubcategorias();
+        setSubcategorias(Array.isArray(subsData) ? subsData : []);
+      } catch (err) {
+        console.error('Erro ao carregar subcategorias do Plano de Contas:', err);
+      }
+
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
@@ -655,6 +667,7 @@ export const ContasAReceber: React.FC = () => {
     const matchesCategoria = filterCategoria === 'all' || conta.categoria === filterCategoria;
     const matchesCliente = filterCliente === 'all' || conta.client?.id === filterCliente;
     const matchesUnit = filterUnit === 'all' || conta.unit?.id === filterUnit || conta.empresaId === filterUnit;
+    const matchesSubcategoria = filterSubcategoria === 'all' || conta.subcategoriaId === filterSubcategoria;
 
     // Filtro por data de vencimento (só quando o utilizador define período em Filtros Avançados)
     let matchesDate = true;
@@ -671,7 +684,7 @@ export const ContasAReceber: React.FC = () => {
       }
     }
 
-    return matchesSearch && matchesStatus && matchesCategoria && matchesCliente && matchesUnit && matchesDate;
+    return matchesSearch && matchesStatus && matchesCategoria && matchesCliente && matchesUnit && matchesSubcategoria && matchesDate;
   }).sort((a, b) => {
     if (!sortBy || !sortDir) return 0;
     
@@ -1022,6 +1035,25 @@ export const ContasAReceber: React.FC = () => {
                   </div>
 
                   <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Plano de Contas</label>
+                    <Select value={filterSubcategoria} onValueChange={setFilterSubcategoria}>
+                      <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                        <SelectValue placeholder="Todas as contas" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Todas as Subcategorias</SelectItem>
+                        {subcategorias && Array.isArray(subcategorias) ? subcategorias
+                          .filter(sub => sub && sub.id && sub.nome)
+                          .map(sub => (
+                            <SelectItem key={sub.id} value={sub.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                              {sub.codigo ? `${sub.codigo} - ${sub.nome}` : sub.nome}
+                            </SelectItem>
+                          )) : null}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex-1">
                     <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Valor Mínimo</label>
                     <Input
                       type="number"
@@ -1053,6 +1085,7 @@ export const ContasAReceber: React.FC = () => {
                       setFilterCategoria('all');
                       setFilterCliente('all');
                       setFilterUnit('all');
+                      setFilterSubcategoria('all');
                       setFilterAmountMin('');
                       setFilterAmountMax('');
                       setDateRange(undefined);
@@ -1393,6 +1426,9 @@ export const ContasAReceber: React.FC = () => {
                             )}
                           </div>
                         </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider select-none">
+                          <span>Plano de Contas</span>
+                        </th>
                         <th
                           onClick={() => handleSort('valor')}
                           className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
@@ -1477,6 +1513,23 @@ export const ContasAReceber: React.FC = () => {
                                       Ref.: {conta.measurementNumber}
                                     </div>
                                   )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            {formatContaPlanoDeContas(conta) ? (
+                              <div className="max-w-[200px]">
+                                <div
+                                  className="text-sm text-seguranca-lightgray truncate"
+                                  title={formatContaPlanoDeContas(conta)}
+                                >
+                                  {formatContaPlanoDeContas(conta)}
+                                </div>
+                                {conta.categoriaPaiNome && (
+                                  <div className="text-xs text-gray-400 truncate">{conta.categoriaPaiNome}</div>
+                                )}
                               </div>
                             ) : (
                               <span className="text-sm text-gray-500">—</span>
@@ -1761,6 +1814,15 @@ export const ContasAReceber: React.FC = () => {
                   <div>
                     <Label className="text-seguranca-lightgray">Forma de Pagamento</Label>
                     <p className="text-white font-medium">{selectedConta.paymentMethod || 'PIX'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-seguranca-lightgray">Plano de Contas</Label>
+                    <p className="text-white font-medium">
+                      {formatContaPlanoDeContas(selectedConta) || 'Não informado'}
+                    </p>
+                    {selectedConta.categoriaPaiNome && (
+                      <p className="text-xs text-gray-400">{selectedConta.categoriaPaiNome}</p>
+                    )}
                   </div>
                   {selectedConta.overdueDays && selectedConta.overdueDays > 0 && (
                     <div>

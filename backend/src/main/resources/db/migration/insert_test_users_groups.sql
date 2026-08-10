@@ -5,39 +5,39 @@
 INSERT INTO users (id, username, email, password, name, role, status, active, created_at, updated_at) VALUES
 -- Super Admin
 ('550e8400-e29b-41d4-a716-446655440001', 'superadmin@promover.com', 'superadmin@promover.com', 
- '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', 'Super Administrador', 'CEO', 'ACTIVE', true, NOW(), NOW()),
+ '$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2', 'Super Administrador', 'CEO', 'ACTIVE', true, NOW(), NOW()),
 
 -- Admin
 ('550e8400-e29b-41d4-a716-446655440002', 'admin@promover.com', 'admin@promover.com', 
- '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', 'Administrador', 'ADMIN', 'ACTIVE', true, NOW(), NOW()),
+ '$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2', 'Administrador', 'ADMIN', 'ACTIVE', true, NOW(), NOW()),
 
 -- RH
 ('550e8400-e29b-41d4-a716-446655440003', 'rh@promover.com', 'rh@promover.com', 
- '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', 'Recursos Humanos', 'RH', 'ACTIVE', true, NOW(), NOW()),
+ '$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2', 'Recursos Humanos', 'RH', 'ACTIVE', true, NOW(), NOW()),
 
 -- Departamento Pessoal
 ('550e8400-e29b-41d4-a716-446655440004', 'dpe@promover.com', 'dpe@promover.com', 
- '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', 'Departamento Pessoal', 'DEPARTAMENTO_PESSOAL', 'ACTIVE', true, NOW(), NOW()),
+ '$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2', 'Departamento Pessoal', 'DEPARTAMENTO_PESSOAL', 'ACTIVE', true, NOW(), NOW()),
 
 -- Gestor
 ('550e8400-e29b-41d4-a716-446655440005', 'gestor@promover.com', 'gestor@promover.com', 
- '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', 'Gestor', 'GESTOR', 'ACTIVE', true, NOW(), NOW()),
+ '$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2', 'Gestor', 'GESTOR', 'ACTIVE', true, NOW(), NOW()),
 
 -- Supervisor
 ('550e8400-e29b-41d4-a716-446655440006', 'supervisor@promover.com', 'supervisor@promover.com', 
- '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', 'Supervisor', 'SUPERVISOR', 'ACTIVE', true, NOW(), NOW()),
+ '$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2', 'Supervisor', 'SUPERVISOR', 'ACTIVE', true, NOW(), NOW()),
 
 -- Colaborador
 ('550e8400-e29b-41d4-a716-446655440007', 'colaborador@promover.com', 'colaborador@promover.com', 
- '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', 'Colaborador', 'COLABORADOR', 'ACTIVE', true, NOW(), NOW()),
+ '$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2', 'Colaborador', 'COLABORADOR', 'ACTIVE', true, NOW(), NOW()),
 
 -- Vigilante
 ('550e8400-e29b-41d4-a716-446655440008', 'vigilante@promover.com', 'vigilante@promover.com', 
- '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', 'Vigilante', 'VIGILANTE', 'ACTIVE', true, NOW(), NOW()),
+ '$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2', 'Vigilante', 'VIGILANTE', 'ACTIVE', true, NOW(), NOW()),
 
 -- Usuário Multi Grupo (para teste)
 ('550e8400-e29b-41d4-a716-446655440009', 'multigrupo@promover.com', 'multigrupo@promover.com', 
- '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', 'Usuário Multi Grupo', 'COLABORADOR', 'ACTIVE', true, NOW(), NOW());
+ '$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2', 'Usuário Multi Grupo', 'COLABORADOR', 'ACTIVE', true, NOW(), NOW());
 
 -- Associar usuários aos grupos padrão
 -- Super Admin -> GRUPO_SUPER_ADMIN

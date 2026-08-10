@@ -243,6 +243,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
   const [adminConfirmCode, setAdminConfirmCode] = useState('');
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [itemConfirmations, setItemConfirmations] = useState<EPIDeliveryFormItem[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
 
   /** Confirmação por item: entregas que não sejam a primeira, enquanto o funcionário estiver ativo no sistema. */
   const perItemMode = useMemo(
@@ -259,7 +260,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [selectedResponsibleData, setSelectedResponsibleData] = useState<SimpleEmployee | null>(null);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [showSignaturePad, setShowSignaturePad] = useState(false);

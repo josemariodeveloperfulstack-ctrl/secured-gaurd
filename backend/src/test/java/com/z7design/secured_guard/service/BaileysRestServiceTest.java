@@ -52,6 +52,8 @@ class BaileysRestServiceTest {
         ReflectionTestUtils.setField(baileysRestService, "baileysRestUrl", "http://localhost:3333");
         ReflectionTestUtils.setField(baileysRestService, "baileysToken", "test-token");
         ReflectionTestUtils.setField(baileysRestService, "instanceKey", "test-instance");
+        // O serviço só tenta enviar/verificar conexão quando baileys.enabled=true
+        ReflectionTestUtils.setField(baileysRestService, "baileysEnabled", true);
     }
 
     @Test
@@ -61,8 +63,13 @@ class BaileysRestServiceTest {
         String message = "Test message";
         ResponseEntity<String> mockResponse = new ResponseEntity<>("{\"success\":true}", HttpStatus.OK);
         
+        // O envio exige conexão aberta (checkConnection -> connectionState)
+        when(restTemplate.getForEntity(anyString(), eq(String.class)))
+            .thenReturn(new ResponseEntity<>("{\"state\":\"open\"}", HttpStatus.OK));
         when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(String.class)))
             .thenReturn(mockResponse);
+        // O corpo JSON do texto é montado com createObjectNode()
+        when(objectMapper.createObjectNode()).thenReturn(new ObjectMapper().createObjectNode());
         
         // Act
         boolean result = baileysRestService.sendTextMessage(phoneNumber, message);
@@ -103,6 +110,9 @@ class BaileysRestServiceTest {
             HttpStatus.OK
         );
         
+        // O envio exige conexão aberta (checkConnection -> connectionState)
+        when(restTemplate.getForEntity(anyString(), eq(String.class)))
+            .thenReturn(new ResponseEntity<>("{\"state\":\"open\"}", HttpStatus.OK));
         when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(String.class)))
             .thenReturn(mockResponse);
         

@@ -5,10 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, Ruler, MapPin } from 'lucide-react';
+import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, Ruler, MapPin, FolderTree } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { DatePicker } from '@/components/ui/date-picker';
 import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
 import { contasAReceberService, Client } from '@/services/contasAReceberService';
+import { contasAPagarService, CategoriaPai, Subcategoria } from '@/services/contasAPagarService';
 import { measurementService } from '@/services/measurementService';
 import { workPostService } from '@/services/workPostService';
 import type { WorkPost } from '@/services/workPostService';
@@ -42,6 +44,11 @@ export interface ContaAReceber {
   measurementId?: string; // FK para o Boletim de Medição (opcional)
   measurementNumber?: string; // Texto livre da medição (ex.: número, contrato)
   measurementInfo?: string; // Texto amigável devolvido pelo backend
+  subcategoriaId?: string | undefined;
+  subcategoriaNome?: string | undefined;
+  subcategoriaCodigo?: string | undefined;
+  categoriaPaiNome?: string | undefined;
+  categoriaPaiCodigo?: string | undefined;
   createdAt?: Date;
 }
 
@@ -91,12 +98,18 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
     workPostName: undefined,
     paymentMethod: 'PIX', // Valor padrão - enum PaymentMethod
     measurementId: undefined,
-    measurementNumber: ''
+    measurementNumber: '',
+    subcategoriaId: undefined
   });
 
   const [categories, setCategories] = useState<string[]>([]);
   const [newCategoryModalOpen, setNewCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Plano de Contas state
+  const [categoriasPai, setCategoriasPai] = useState<CategoriaPai[]>([]);
+  const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
+  const [selectedCategoriaPaiId, setSelectedCategoriaPaiId] = useState<string>('');
 
   // Limpa termos corporativos e acentos, e gera sigla amigável do cliente (3 a 5 letras em maiúsculas)
   const obterSiglaCliente = (nome: string): string => {
@@ -287,6 +300,15 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           setMedicoes([]);
         })
         .finally(() => setMedicoesLoading(false));
+
+      // Carregar Plano de Contas
+      contasAPagarService.getCategoriasPai()
+        .then(data => setCategoriasPai(Array.isArray(data) ? data : []))
+        .catch(() => setCategoriasPai([]));
+
+      contasAPagarService.getSubcategorias()
+        .then(data => setSubcategorias(Array.isArray(data) ? data : []))
+        .catch(() => setSubcategorias([]));
     }
   }, [open]);
 
@@ -341,7 +363,8 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           workPostName: initialData.workPostName || undefined,
           paymentMethod: initialData.paymentMethod || 'PIX',
           measurementId: initialData.measurementId || undefined,
-          measurementNumber: initialData.measurementNumber || ''
+          measurementNumber: initialData.measurementNumber || '',
+          subcategoriaId: initialData.subcategoriaId || undefined
         });
         
         console.log('✅ FormData preenchido:', {
@@ -390,12 +413,26 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           workPostName: undefined,
           paymentMethod: 'PIX',
           measurementId: undefined,
-          measurementNumber: ''
+          measurementNumber: '',
+          subcategoriaId: undefined
         });
         setAutoInvoiceNumber(false);
       }
     }
   }, [editMode, initialData, open]);
+
+  // Restaurar Plano de Contas quando subcategorias carregarem (edição)
+  useEffect(() => {
+    if (!open || !editMode || !initialData?.subcategoriaId || subcategorias.length === 0) return;
+    const sub = subcategorias.find((s) => s.id === initialData.subcategoriaId);
+    if (sub) {
+      setSelectedCategoriaPaiId(sub.categoriaPaiId);
+    }
+  }, [open, editMode, initialData?.subcategoriaId, subcategorias]);
+
+  const filteredSubcategorias = selectedCategoriaPaiId
+    ? subcategorias.filter((s) => s.categoriaPaiId === selectedCategoriaPaiId)
+    : [];
 
   // Atualizar clienteId e empresaId quando clientes e empresas forem carregados (modo edição)
   useEffect(() => {
@@ -1111,6 +1148,91 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                     <SelectItem value="CANCELADA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Plano de Contas */}
+              <div className="space-y-2 md:col-span-2 rounded-lg border border-seguranca-yellow/30 bg-black/20 p-4">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <label className="text-sm font-medium text-seguranca-yellow flex items-center gap-2">
+                    <FolderTree size={14} />
+                    Plano de Contas
+                  </label>
+                  <Link
+                    to="/plano-contas"
+                    className="text-xs text-seguranca-yellow underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Gerenciar plano de contas
+                  </Link>
+                </div>
+                <p className="text-xs text-gray-400 mb-3">
+                  Opcional. Víncula esta conta a receber a uma conta contábil do Plano de Contas.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-seguranca-lightgray">Categoria *</label>
+                    <Select
+                      value={selectedCategoriaPaiId || 'none'}
+                      onValueChange={(value) => {
+                        setSelectedCategoriaPaiId(value === 'none' ? '' : value);
+                        handleInputChange('subcategoriaId', '');
+                      }}
+                    >
+                      <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                        <SelectValue placeholder="Selecione a categoria do plano" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
+                          Nenhuma
+                        </SelectItem>
+                        {categoriasPai.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                            {cat.codigo} - {cat.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {categoriasPai.length === 0 && (
+                      <p className="text-xs text-amber-400">
+                        Nenhuma categoria cadastrada. Cadastre em Plano de Contas ou reinicie o backend para carregar o seed.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-seguranca-lightgray">Conta / Subcategoria *</label>
+                    <Select
+                      value={formData.subcategoriaId || 'none'}
+                      onValueChange={(value) => {
+                        if (value === 'none') {
+                          handleInputChange('subcategoriaId', '');
+                          return;
+                        }
+                        handleInputChange('subcategoriaId', value);
+                      }}
+                      disabled={!selectedCategoriaPaiId}
+                    >
+                      <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                        <SelectValue placeholder="Selecione a conta contábil" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
+                          Nenhuma
+                        </SelectItem>
+                        {filteredSubcategorias.map((sub) => (
+                          <SelectItem key={sub.id} value={sub.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                            {sub.codigo} - {sub.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!selectedCategoriaPaiId && (
+                      <p className="text-xs text-gray-400">Selecione a categoria do plano para listar as contas.</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

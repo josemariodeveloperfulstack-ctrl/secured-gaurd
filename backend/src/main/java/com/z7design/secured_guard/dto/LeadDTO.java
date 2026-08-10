@@ -36,9 +36,9 @@ public class LeadDTO {
     @Size(max = 1000, message = "Descrição deve ter no máximo 1000 caracteres")
     private String description;
     
-    private LeadStatus status = LeadStatus.NEW;
+    private LeadStatus status;
     
-    private LeadSource source = LeadSource.OTHER;
+    private LeadSource source;
     
     private BigDecimal estimatedValue;
     

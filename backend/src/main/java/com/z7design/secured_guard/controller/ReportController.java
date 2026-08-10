@@ -23,6 +23,7 @@ import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/reports")
@@ -484,7 +485,8 @@ public class ReportController {
             @RequestParam(value = "client", required = false) String client,
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "segment", required = false) String segment,
-            @RequestParam(value = "sortDir", required = false, defaultValue = "ASC") String sortDir) {
+            @RequestParam(value = "sortDir", required = false, defaultValue = "ASC") String sortDir,
+            @RequestParam(value = "subcategoriaId", required = false) UUID subcategoriaId) {
         try {
             String effectiveSegment = (segment != null && !segment.isBlank()) ? segment : null;
             if (effectiveSegment == null && status != null && !status.isBlank()
@@ -492,7 +494,8 @@ public class ReportController {
                 effectiveSegment = "INADIMPLENCIA";
             }
             byte[] pdf = paymentReportService.generateAccountsReceivableReportPDF(
-                    startDate, endDate, client, status, null, null, null, null, null, null, effectiveSegment, sortDir);
+                    startDate, endDate, client, status, null, null, null, null, null, null, effectiveSegment, sortDir,
+                    subcategoriaId);
             String filename = accountsReceivablePdfFilename(effectiveSegment);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)

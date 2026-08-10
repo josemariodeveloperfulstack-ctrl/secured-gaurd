@@ -69,12 +69,28 @@ public class AccountsReceivableDTO {
     private BigDecimal latePenalty = BigDecimal.ZERO;
     
     private String notes;
+
+    /** Quando true e {@code dataAgendamento} informada, cria/atualiza automaticamente
+     *  o pagamento agendado herdando a subcategoria desta conta a receber. */
+    private Boolean agendarPagamento;
+
+    private LocalDate dataAgendamento;
     
     private UUID unitId;
     
     private UUID workPostId;
     
     private String workPostName;
+    
+    private UUID subcategoriaId;
+    
+    private String subcategoriaNome;
+    
+    private String subcategoriaCodigo;
+    
+    private String categoriaPaiNome;
+    
+    private String categoriaPaiCodigo;
     
     // Constructors
     public AccountsReceivableDTO() {}
@@ -111,6 +127,15 @@ public class AccountsReceivableDTO {
         if (entity.getWorkPost() != null) {
             this.workPostId = entity.getWorkPost().getId();
             this.workPostName = entity.getWorkPost().getName();
+        }
+        if (entity.getSubcategoria() != null) {
+            this.subcategoriaId = entity.getSubcategoria().getId();
+            this.subcategoriaNome = entity.getSubcategoria().getNome();
+            this.subcategoriaCodigo = entity.getSubcategoria().getCodigo();
+            if (entity.getSubcategoria().getCategoriaPai() != null) {
+                this.categoriaPaiNome = entity.getSubcategoria().getCategoriaPai().getNome();
+                this.categoriaPaiCodigo = entity.getSubcategoria().getCategoriaPai().getCodigo();
+            }
         }
     }
     

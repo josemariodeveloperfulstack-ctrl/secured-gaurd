@@ -13,7 +13,7 @@ VALUES (
     'Super Admin Teste',
     'superadmin@teste.com',
     'superadmin',
-    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', -- senha: 123456
+    '$2a$10$kT51cjIP29VMVtKOuJHfMO7sFDcWYzRD4mHG7JgrW7neCyc8CM0W.', -- senha: 123456
     'SUPER_ADMIN',
     true,
     NOW(),
@@ -26,7 +26,7 @@ VALUES (
     'Admin Teste',
     'admin@teste.com',
     'admin',
-    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', -- senha: 123456
+    '$2a$10$kT51cjIP29VMVtKOuJHfMO7sFDcWYzRD4mHG7JgrW7neCyc8CM0W.', -- senha: 123456
     'ADMIN',
     true,
     NOW(),
@@ -39,7 +39,7 @@ VALUES (
     'Supervisor Teste',
     'supervisor@teste.com',
     'supervisor',
-    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', -- senha: 123456
+    '$2a$10$kT51cjIP29VMVtKOuJHfMO7sFDcWYzRD4mHG7JgrW7neCyc8CM0W.', -- senha: 123456
     'SUPERVISOR',
     true,
     NOW(),
@@ -52,7 +52,7 @@ VALUES (
     'RH Teste',
     'rh@teste.com',
     'rh',
-    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', -- senha: 123456
+    '$2a$10$kT51cjIP29VMVtKOuJHfMO7sFDcWYzRD4mHG7JgrW7neCyc8CM0W.', -- senha: 123456
     'RH',
     true,
     NOW(),
@@ -65,7 +65,7 @@ VALUES (
     'Financeiro Teste',
     'financeiro@teste.com',
     'financeiro',
-    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', -- senha: 123456
+    '$2a$10$kT51cjIP29VMVtKOuJHfMO7sFDcWYzRD4mHG7JgrW7neCyc8CM0W.', -- senha: 123456
     'FINANCEIRO',
     true,
     NOW(),
@@ -78,7 +78,7 @@ VALUES (
     'TI Suporte Teste',
     'ti@teste.com',
     'ti',
-    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', -- senha: 123456
+    '$2a$10$kT51cjIP29VMVtKOuJHfMO7sFDcWYzRD4mHG7JgrW7neCyc8CM0W.', -- senha: 123456
     'TI_SUPORTE',
     true,
     NOW(),
@@ -91,7 +91,7 @@ VALUES (
     'Auditor Teste',
     'auditor@teste.com',
     'auditor',
-    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', -- senha: 123456
+    '$2a$10$kT51cjIP29VMVtKOuJHfMO7sFDcWYzRD4mHG7JgrW7neCyc8CM0W.', -- senha: 123456
     'AUDITOR',
     true,
     NOW(),
@@ -104,7 +104,7 @@ VALUES (
     'Colaborador Teste',
     'colaborador@teste.com',
     'colaborador',
-    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa', -- senha: 123456
+    '$2a$10$kT51cjIP29VMVtKOuJHfMO7sFDcWYzRD4mHG7JgrW7neCyc8CM0W.', -- senha: 123456
     'COLABORADOR',
     true,
     NOW(),

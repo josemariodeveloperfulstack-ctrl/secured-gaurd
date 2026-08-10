@@ -4,11 +4,15 @@ import com.z7design.secured_guard.dto.AccountsReceivableDTO;
 import com.z7design.secured_guard.model.AccountsReceivable;
 import com.z7design.secured_guard.model.Client;
 import com.z7design.secured_guard.model.MeasurementBulletin;
+import com.z7design.secured_guard.model.ScheduledPayment;
 import com.z7design.secured_guard.model.enums.ReceivableStatus;
+import com.z7design.secured_guard.model.Subcategoria;
 import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.repository.AccountsReceivableRepository;
 import com.z7design.secured_guard.repository.ClientRepository;
 import com.z7design.secured_guard.repository.MeasurementBulletinRepository;
+import com.z7design.secured_guard.repository.ScheduledPaymentRepository;
+import com.z7design.secured_guard.repository.SubcategoriaRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
 import com.z7design.secured_guard.repository.WorkPostRepository;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
@@ -37,6 +41,9 @@ public class AccountsReceivableService {
     private final UnitRepository unitRepository;
     private final MeasurementBulletinRepository measurementBulletinRepository;
     private final WorkPostRepository workPostRepository;
+    private final SubcategoriaRepository subcategoriaRepository;
+    private final ScheduledPaymentRepository scheduledPaymentRepository;
+    private final ScheduledPaymentService scheduledPaymentService;
     
     /**
      * Buscar todas as contas a receber com paginação
@@ -122,12 +129,18 @@ public class AccountsReceivableService {
                     .orElseThrow(() -> new ResourceNotFoundException("Posto de trabalho não encontrado com ID: " + dto.getWorkPostId())));
         }
         
+        // Definir subcategoria do Plano de Contas se fornecida
+        account.setSubcategoria(resolveSubcategoria(dto.getSubcategoriaId()));
+        
         // Calcular dias em atraso
         account.calculateOverdueDays();
         
         // Salvar
         AccountsReceivable savedAccount = accountsReceivableRepository.save(account);
         log.info("Conta a receber criada com sucesso: {}", savedAccount.getId());
+        
+        // Agendamento automático: herda subcategoria e dados da conta de origem
+        syncScheduledPaymentIfRequested(savedAccount, dto);
         
         return AccountsReceivableDTO.fromEntity(savedAccount);
     }
@@ -195,12 +208,18 @@ public class AccountsReceivableService {
             account.setWorkPost(null);
         }
         
+        // Atualizar subcategoria do Plano de Contas
+        account.setSubcategoria(resolveSubcategoria(dto.getSubcategoriaId()));
+        
         // Calcular dias em atraso
         account.calculateOverdueDays();
         
         // Salvar
         AccountsReceivable savedAccount = accountsReceivableRepository.save(account);
         log.info("Conta a receber atualizada com sucesso: {}", savedAccount.getId());
+        
+        // Agendamento automático: herda subcategoria e dados da conta de origem
+        syncScheduledPaymentIfRequested(savedAccount, dto);
         
         return AccountsReceivableDTO.fromEntity(savedAccount);
     }
@@ -214,6 +233,46 @@ public class AccountsReceivableService {
      * usam apenas o texto). Se vier apenas {@code measurementNumber}, deixamos
      * o vínculo nulo e gravamos só o texto livre.
      */
+    /**
+     * Resolve a subcategoria do Plano de Contas vinculada à conta a receber.
+     * Retorna null quando nenhum ID é informado ou a subcategoria não existe.
+     */
+    private Subcategoria resolveSubcategoria(UUID subcategoriaId) {
+        if (subcategoriaId == null) {
+            return null;
+        }
+        return subcategoriaRepository.findById(subcategoriaId).orElse(null);
+    }
+
+    /**
+     * Cria ou atualiza o pagamento agendado quando o cadastro/edição da conta a
+     * receber veio com {@code agendarPagamento = true} e {@code dataAgendamento}.
+     * O agendamento herda automaticamente cliente, descrição, valor, forma de
+     * pagamento e a subcategoria do Plano de Contas da conta a receber de origem.
+     */
+    private void syncScheduledPaymentIfRequested(AccountsReceivable savedAccount, AccountsReceivableDTO dto) {
+        if (!Boolean.TRUE.equals(dto.getAgendarPagamento()) || dto.getDataAgendamento() == null) {
+            return;
+        }
+        java.util.Optional<ScheduledPayment> existing = scheduledPaymentRepository.findByAccountsReceivableId(savedAccount.getId());
+        if (existing.isPresent()) {
+            ScheduledPayment payment = existing.get();
+            payment.setScheduledDate(dto.getDataAgendamento());
+            payment.setDescription(savedAccount.getDescription());
+            payment.setAmount(savedAccount.getAmount());
+            payment.setPaymentMethod(savedAccount.getPaymentMethod());
+            payment.setInvoiceNumber(savedAccount.getInvoiceNumber());
+            payment.setNotes(savedAccount.getNotes());
+            payment.setSubcategoria(savedAccount.getSubcategoria());
+            scheduledPaymentRepository.save(payment);
+            log.info("Agendamento {} atualizado com herança da conta a receber {}",
+                    payment.getId(), savedAccount.getId());
+        } else {
+            scheduledPaymentService.createScheduledPaymentFromReceivable(savedAccount, dto.getDataAgendamento());
+            log.info("Agendamento criado com herança da conta a receber {}", savedAccount.getId());
+        }
+    }
+
     private void applyMeasurement(AccountsReceivable account, AccountsReceivableDTO dto) {
         if (dto.getMeasurementId() != null) {
             MeasurementBulletin bulletin = measurementBulletinRepository.findById(dto.getMeasurementId())
@@ -253,6 +312,9 @@ public class AccountsReceivableService {
             log.warn("Conta a receber {} já não existe no banco — tratando DELETE como idempotente (no-op).", id);
             return;
         }
+
+        // Cancelar automaticamente o agendamento de pagamento vinculado à conta excluída
+        scheduledPaymentService.cancelByAccountsReceivableId(id);
 
         accountsReceivableRepository.deleteByIds(List.of(id));
         log.info("Conta a receber excluída com sucesso: {}", id);

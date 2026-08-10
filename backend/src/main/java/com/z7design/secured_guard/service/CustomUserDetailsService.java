@@ -19,11 +19,19 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         System.out.println("🔍 CustomUserDetailsService: Buscando usuário: " + username);
-        
-        User user = userRepository.findByUsername(username)
+
+        String login = username != null ? username.trim() : "";
+        User user = userRepository.findByUsername(login)
+                .or(() -> {
+                    // Permite login com e-mail (campo da tela / AuthContext envia o identificador digitado)
+                    if (login.contains("@")) {
+                        return userRepository.findByEmailIgnoreCase(login);
+                    }
+                    return java.util.Optional.empty();
+                })
                 .orElseThrow(() -> {
-                    System.out.println("❌ CustomUserDetailsService: Usuário não encontrado: " + username);
-                    return new UsernameNotFoundException("Usuário não encontrado: " + username);
+                    System.out.println("❌ CustomUserDetailsService: Usuário não encontrado: " + login);
+                    return new UsernameNotFoundException("Usuário não encontrado: " + login);
                 });
 
         System.out.println("✅ CustomUserDetailsService: Usuário encontrado: " + user.getUsername() + ", Ativo: " + user.isActive());

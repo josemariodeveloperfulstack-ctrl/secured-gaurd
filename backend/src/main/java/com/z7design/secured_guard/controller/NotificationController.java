@@ -126,9 +126,28 @@ public class NotificationController {
         }
 
         @PostMapping("/email")
-        public ResponseEntity<Void> sendEmail(@RequestBody EmailNotificationDTO emailDTO) {
-                boolean success = emailService.sendEmail(emailDTO.getTo(), emailDTO.getSubject(), emailDTO.getBody());
-                return success ? ResponseEntity.ok().build() : ResponseEntity.status(500).build();
+        public ResponseEntity<?> sendEmail(@RequestBody EmailNotificationDTO emailDTO) {
+                if (emailDTO == null || emailDTO.getTo() == null || emailDTO.getTo().isBlank()) {
+                        return ResponseEntity.badRequest()
+                                        .body(java.util.Map.of("error", "Bad Request",
+                                                        "message", "Destinatário (to) é obrigatório."));
+                }
+                String subject = emailDTO.getSubject() != null ? emailDTO.getSubject() : "(sem assunto)";
+                String body = emailDTO.getBody() != null ? emailDTO.getBody() : "";
+                try {
+                        boolean success = emailService.sendEmail(emailDTO.getTo().trim(), subject, body);
+                        if (success) {
+                                return ResponseEntity.ok().build();
+                        }
+                        return ResponseEntity.status(503)
+                                        .body(java.util.Map.of("error", "Service Unavailable",
+                                                        "message",
+                                                        "Falha ao enviar e-mail. Verifique a configuração SMTP ou use app.email.mock=true em local."));
+                } catch (Exception e) {
+                        return ResponseEntity.status(500)
+                                        .body(java.util.Map.of("error", "Internal Server Error",
+                                                        "message", "Erro ao enviar e-mail: " + e.getMessage()));
+                }
         }
 
         @PostMapping("/panel")

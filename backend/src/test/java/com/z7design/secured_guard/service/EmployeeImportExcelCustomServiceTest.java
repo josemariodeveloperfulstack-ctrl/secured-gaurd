@@ -2,6 +2,7 @@ package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,9 @@ public class EmployeeImportExcelCustomServiceTest {
     private CompanyRepository companyRepository;
 
     @Mock
+    private EmployeeRepository employeeRepository;
+
+    @Mock
     private EmployeeImportRowService rowService;
 
     @InjectMocks
@@ -41,6 +45,7 @@ public class EmployeeImportExcelCustomServiceTest {
         company.setName("Promover Terceirização");
 
         when(companyRepository.findByNormalizedCnpj("36698521000101")).thenReturn(Optional.of(company));
+        when(employeeRepository.existsByNormalizedDocument("12345678909")).thenReturn(false);
 
         // Mock rowService.processRow to return true and set isNewRef[0] = true
         when(rowService.processRow(

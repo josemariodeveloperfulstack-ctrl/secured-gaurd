@@ -1485,6 +1485,47 @@ public class PayslipService {
             log.info("📊 Valor Líquido calculado: {} ({} - {})", valorLiquido, totalVencimentos, totalDescontos);
         }
 
+        // 3.6. EXTRAÇÃO DA CONTA CORRENTE DO HOLERITE
+        // Necessária para validar a unificação automática/manual com o comprovante:
+        // a conta corrente do holerite deve ser a mesma conta creditada no comprovante.
+        // Padrões comuns: "Conta corrente: 12345-6", "Conta: 123456", "C/C 12345-6",
+        // "Conta Corrente: 000123456", ou na mesma linha da agência "Agência: 1234 Conta: 5678-9"
+        String contaCorrente = null;
+        String contaCorrenteLinha = null;
+        // IMPORTANTE: o padrão específico "Conta corrente" deve ter PRIORIDADE sobre o
+        // genérico "Conta"/"C/C", pois o holerite também exibe a conta de débito da
+        // empresa — usar o genérico primeiro pode capturar a conta errada.
+        java.util.List<String> contaPatterns = java.util.List.of(
+                "Conta\\s*corrente\\s*:?\\s*([\\d]{4,}[\\d\\s\\-]*)",
+                "Conta\\s*(?:corrente)?\\s*:\\s*([\\d]{4,}[\\d\\s\\-]*)",
+                "C/C\\s*:\\s*([\\d]{4,}[\\d\\s\\-]*)");
+        for (String linhaConta : linhas) {
+            String linhaLimpa = linhaConta.trim();
+            if (linhaLimpa.isEmpty() || (!linhaLimpa.toLowerCase().contains("conta") && !linhaLimpa.contains("C/C"))) {
+                continue;
+            }
+            for (String patternStr : contaPatterns) {
+                Matcher contaMatcher = Pattern.compile(patternStr, Pattern.CASE_INSENSITIVE).matcher(linhaLimpa);
+                if (contaMatcher.find()) {
+                    String candidata = contaMatcher.group(1).trim();
+                    String digitos = candidata.replaceAll("[^0-9]", "");
+                    // Validar que tem pelo menos 4 dígitos (conta corrente real)
+                    if (digitos.length() >= 4) {
+                        contaCorrente = digitos;
+                        contaCorrenteLinha = linhaLimpa;
+                        log.info("✅ Conta corrente do holerite encontrada: {} (linha: {})", contaCorrente, contaCorrenteLinha);
+                        break;
+                    }
+                }
+            }
+            if (contaCorrente != null) {
+                break;
+            }
+        }
+        if (contaCorrente == null) {
+            log.warn("⚠️ Conta corrente não encontrada no holerite (página {}). A unificação com comprovante dependerá do cadastro do funcionário.", pageNumber);
+        }
+
         // 4. VALIDAÇÕES DE CAMPOS OBRIGATÓRIOS
         // Campos obrigatórios: Empresa, CNPJ, Período, Setor, Nome do Funcionário, CPF
         List<String> camposFaltantes = new ArrayList<>();
@@ -1571,6 +1612,7 @@ public class PayslipService {
                     .totalEarnings(totalVencimentos)
                     .totalDeductions(totalDescontos)
                     .netValue(valorLiquido)
+                    .contaCorrente(contaCorrente)
                     .tableDetails(tableDetails)
                     .build();
 

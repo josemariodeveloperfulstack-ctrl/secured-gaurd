@@ -313,7 +313,7 @@ const Login = () => {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="bg-seguranca-black border-gray-600 focus:border-seguranca-yellow text-white"
-                    placeholder="Seu usuário"
+                    placeholder="Usuário ou e-mail"
                   />
                 </div>
 

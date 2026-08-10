@@ -6,7 +6,7 @@
 -- Hash BCrypt para senha "Admin123!" (senha padrão para CI)
 -- Gerado com BCryptPasswordEncoder (10 rounds)
 -- Senha: Admin123!
--- Hash: $2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa
+-- Hash: $2a$10$1EDooWMtD2IMfFavIfCmROawQKDuFnsIAU2H.LF2khD8PcpO0Vb.2
 
 -- 1. USUÁRIO ADMINISTRADOR CI
 -- =====================================================
@@ -32,7 +32,7 @@ BEGIN
         SELECT 
             '11111111-1111-1111-1111-111111111111'::uuid,
             'admin@ci',
-            '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa',
+            '$2a$10$1EDooWMtD2IMfFavIfCmROawQKDuFnsIAU2H.LF2khD8PcpO0Vb.2',
             'admin@ci.z7botsolutions.com.br',
             'Administrador CI',
             'ADMIN',
@@ -49,7 +49,7 @@ BEGIN
         SELECT 
             '11111111-1111-1111-1111-111111111111'::uuid,
             'admin@ci',
-            '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa',
+            '$2a$10$1EDooWMtD2IMfFavIfCmROawQKDuFnsIAU2H.LF2khD8PcpO0Vb.2',
             'admin@ci.z7botsolutions.com.br',
             'Administrador CI',
             'ACTIVE',

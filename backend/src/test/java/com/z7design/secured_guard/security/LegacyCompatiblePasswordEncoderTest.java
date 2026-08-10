@@ -20,8 +20,8 @@ class LegacyCompatiblePasswordEncoderTest {
 
     @Test
     void matchesKnownSeedBcryptHash() {
-        // Hash usado em insert_test_users_groups.sql — senha: Password123!
-        String hash = "$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVEFDa";
+        // Hash corrigido usado em insert_test_users_groups.sql — senha: Password123!
+        String hash = "$2a$10$OBl8ladijxaXgamhFDpcEOZNV1JwicpBJw4G1Ey1oTHepQLErltJ2";
         assertTrue(encoder.matches("Password123!", hash));
     }
 }

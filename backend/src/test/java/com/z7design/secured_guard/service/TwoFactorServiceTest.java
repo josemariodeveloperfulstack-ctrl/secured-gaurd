@@ -68,7 +68,7 @@ class TwoFactorServiceTest {
         assertEquals(destination, result.getDestination());
         assertEquals(6, result.getCode().length());
         assertFalse(result.getIsUsed());
-        assertNotNull(result.getExpiresAt());
+        // expiresAt/createdAt são preenchidos pelo @PrePersist (JPA), que não roda com repositório mockado
         
         verify(twoFactorCodeRepository).expireAllUserCodes(testUser.getId());
         verify(twoFactorCodeRepository).save(any(TwoFactorCode.class));

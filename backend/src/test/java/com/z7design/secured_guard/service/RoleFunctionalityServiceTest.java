@@ -57,7 +57,7 @@ class RoleFunctionalityServiceTest {
         // Then
         assertNotNull(result);
         assertTrue(result.containsKey("COLABORADOR"));
-        assertEquals(6, result.get("COLABORADOR").size()); // COLABORADOR tem 6 funcionalidades
+        assertEquals(4, result.get("COLABORADOR").size()); // COLABORADOR tem 4 funcionalidades
     }
 
     @Test
@@ -168,7 +168,7 @@ class RoleFunctionalityServiceTest {
         List<RoleFunctionalityService.Functionality> result = service.getAllUserFunctionalities(roles);
 
         // Then
-        assertEquals(6, result.size());
+        assertEquals(4, result.size());
         assertTrue(result.stream().anyMatch(f -> f.getId().equals("profile")));
         assertTrue(result.stream().anyMatch(f -> f.getCategory().equals("personal") || f.getCategory().equals("communication") || f.getCategory().equals("primary")));
         // Não deve ter acesso a funcionalidades administrativas

@@ -238,13 +238,15 @@ public class AccountsReceivableController {
             @RequestParam(value = "unitFilter", required = false) String unitFilter,
             @RequestParam(value = "selectedIds", required = false) List<String> selectedIds,
             @RequestParam(value = "reportSegment", required = false) String reportSegment,
-            @RequestParam(value = "sortDir", required = false, defaultValue = "ASC") String sortDir) {
+            @RequestParam(value = "sortDir", required = false, defaultValue = "ASC") String sortDir,
+            @RequestParam(value = "subcategoriaId", required = false) UUID subcategoriaId) {
         log.info("GET /api/accounts-receivable/reports/pdf - Gerando relatório PDF com filtros");
         
         try {
             byte[] reportBytes = paymentReportService.generateAccountsReceivableReportPDF(
                     startDate, endDate, clientFilter, statusFilter, categoryFilter, 
-                    paymentMethodFilter, amountMin, amountMax, unitFilter, selectedIds, reportSegment, sortDir);
+                    paymentMethodFilter, amountMin, amountMax, unitFilter, selectedIds, reportSegment, sortDir,
+                    subcategoriaId);
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);

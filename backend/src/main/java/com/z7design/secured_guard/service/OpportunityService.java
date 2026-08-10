@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -240,40 +241,36 @@ public class OpportunityService {
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + username));
     }
 
+    public User findUserById(UUID userId) {
+        return userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + userId));
+    }
+
     @Transactional
     public void delete(UUID id, String reason, User user) {
-        Opportunity opportunity = findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Oportunidade não encontrada com ID: " + id));
-        
-        opportunity.setDeleted(true);
-        opportunity.setDeletionReason(reason);
-        opportunity.setDeletedAt(java.time.LocalDateTime.now());
-        opportunity.setDeletedBy(user);
-        
-        opportunityRepository.save(opportunity);
+        // Verifica existência (respeita @SQLRestriction / is_deleted = false)
+        if (opportunityRepository.findById(id).isEmpty()) {
+            throw new ResourceNotFoundException("Oportunidade não encontrada com ID: " + id);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int updated = opportunityRepository.softDeleteById(id, reason, now, user);
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Oportunidade não encontrada com ID: " + id);
+        }
     }
+
     @Transactional
     public void deleteAll(String reason, User user) {
-        List<Opportunity> allOpportunities = opportunityRepository.findAllActive();
-        for (Opportunity opportunity : allOpportunities) {
-            opportunity.setDeleted(true);
-            opportunity.setDeletionReason(reason);
-            opportunity.setDeletedAt(java.time.LocalDateTime.now());
-            opportunity.setDeletedBy(user);
-        }
-        opportunityRepository.saveAll(allOpportunities);
+        LocalDateTime now = LocalDateTime.now();
+        opportunityRepository.softDeleteAllActive(reason, now, user);
     }
 
     @Transactional
     public void deleteBulk(List<UUID> ids, String reason, User user) {
-        List<Opportunity> opportunities = opportunityRepository.findAllById(ids);
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        for (Opportunity opportunity : opportunities) {
-            opportunity.setDeleted(true);
-            opportunity.setDeletionReason(reason);
-            opportunity.setDeletedAt(now);
-            opportunity.setDeletedBy(user);
-            opportunityRepository.save(opportunity);
+        if (ids == null || ids.isEmpty()) {
+            return;
         }
+        LocalDateTime now = LocalDateTime.now();
+        opportunityRepository.softDeleteByIds(ids, reason, now, user);
     }
 } 

@@ -400,6 +400,16 @@ public class StandardReportLayoutService {
                 backgroundCanvas.release();
 
                 PdfCanvas footerCanvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdfDoc);
+                if (config.isShowFooterContentSeparator()) {
+                    float separatorY = Math.max(46f, config.getBottomMargin() - 12f);
+                    footerCanvas.saveState();
+                    footerCanvas.setStrokeColor(DeviceRgb.BLACK);
+                    footerCanvas.setLineWidth(0.7f);
+                    footerCanvas.moveTo(config.getLeftMargin(), separatorY);
+                    footerCanvas.lineTo(pageWidth - config.getRightMargin(), separatorY);
+                    footerCanvas.stroke();
+                    footerCanvas.restoreState();
+                }
                 Canvas canvasLayout = new Canvas(footerCanvas, pageSize);
                 service.addFooter(canvasLayout, pageSize, company, config, pdfDoc);
                 canvasLayout.close();

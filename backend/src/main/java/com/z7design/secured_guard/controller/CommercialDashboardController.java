@@ -56,14 +56,36 @@ public class CommercialDashboardController {
                     return "SUPER_ADMIN".equals(role) || "ADMIN".equals(role) || "GESTOR".equals(role);
                 });
         if (!hasGestorRole) {
-            User currentUser = authenticationService.getCurrentUser(auth);
-            userId = currentUser.getId();
+            try {
+                User currentUser = authenticationService.getCurrentUser(auth);
+                if (currentUser != null) {
+                    userId = currentUser.getId();
+                }
+            } catch (Exception e) {
+                log.warn("Não foi possível resolver usuário atual para filtro de KPIs: {}", e.getMessage());
+            }
         }
 
         log.info("GET /api/commercial-dashboard/kpis - userId={}, startDate={}, endDate={}", userId, startDate, endDate);
 
-        CommercialKpisDTO kpis = commercialDashboardService.getKpis(userId, startDate, endDate);
-        return ResponseEntity.ok(kpis);
+        try {
+            CommercialKpisDTO kpis = commercialDashboardService.getKpis(userId, startDate, endDate);
+            return ResponseEntity.ok(kpis);
+        } catch (Exception e) {
+            log.error("Falha em /kpis (retornando vazio): {}", e.getMessage(), e);
+            return ResponseEntity.ok(CommercialKpisDTO.builder()
+                    .leadsRecebidos(0).leadsQualificados(0).propostasEnviadas(0).propostasAprovadas(0)
+                    .taxaConversao(0).ticketMedio(java.math.BigDecimal.ZERO)
+                    .receitaContratada(java.math.BigDecimal.ZERO).tempoMedioFechamentoDias(0)
+                    .contratosAtivos(0)
+                    .leadsPorMes(java.util.Collections.emptyMap())
+                    .receitaPorMes(java.util.Collections.emptyMap())
+                    .conversaoPorMes(java.util.Collections.emptyMap())
+                    .funilVendas(java.util.Collections.emptyMap())
+                    .periodo(startDate + " a " + endDate)
+                    .contratosVencendo(0).propostasEnviadasReal(0).propostasRetornadas(0)
+                    .build());
+        }
     }
 
     @GetMapping("/team-kpis")
@@ -74,7 +96,23 @@ public class CommercialDashboardController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         if (endDate == null) endDate = LocalDate.now();
         if (startDate == null) startDate = endDate.minusMonths(12).withDayOfMonth(1);
-        return ResponseEntity.ok(commercialDashboardService.getTeamKpis(startDate, endDate));
+        try {
+            return ResponseEntity.ok(commercialDashboardService.getTeamKpis(startDate, endDate));
+        } catch (Exception e) {
+            log.error("Falha em /team-kpis (retornando vazio): {}", e.getMessage(), e);
+            return ResponseEntity.ok(TeamKpisDTO.builder()
+                    .receitaTotal(java.math.BigDecimal.ZERO)
+                    .totalLeads(0).totalPropostas(0).propostasAprovadas(0)
+                    .contratosGanhos(0).contratosAtivos(0)
+                    .taxaConversaoGeral(0).ticketMedioGeral(java.math.BigDecimal.ZERO)
+                    .leadsPorVendedor(java.util.Collections.emptyMap())
+                    .conversaoPorVendedor(java.util.Collections.emptyMap())
+                    .receitaPorVendedor(java.util.Collections.emptyMap())
+                    .pipelinePorEtapa(java.util.Collections.emptyMap())
+                    .receitaPorMes(java.util.Collections.emptyMap())
+                    .periodo(startDate + " a " + endDate)
+                    .build());
+        }
     }
 
     @GetMapping("/ranking")

@@ -322,7 +322,7 @@ public class LeadService {
         lead.setPhone(leadDTO.getPhone());
         lead.setCompany(leadDTO.getCompany());
         lead.setPosition(leadDTO.getPosition());
-        lead.setSource(leadDTO.getSource());
+        lead.setSource(leadDTO.getSource() != null ? leadDTO.getSource() : LeadSource.OTHER);
         lead.setStatus(LeadStatus.NEW);
         // Mapear description para notes se notes estiver vazio
         if (leadDTO.getNotes() != null && !leadDTO.getNotes().isEmpty()) {
@@ -432,13 +432,18 @@ public class LeadService {
                  leadDTO.getName(), leadDTO.getStatus(), leadDTO.getAssignedToId());
         
         Lead lead = findById(id);
-        lead.setName(leadDTO.getName());
-        lead.setEmail(leadDTO.getEmail());
-        lead.setPhone(leadDTO.getPhone());
-        lead.setCompany(leadDTO.getCompany());
-        lead.setPosition(leadDTO.getPosition());
-        lead.setSource(leadDTO.getSource());
-        lead.setNextFollowUp(leadDTO.getNextFollowUp());
+
+        // ⚠️ UPDATE PARCIAL: só sobrescreve campos que vieram no payload (non-null).
+        // Antes, campos ausentes (ex.: { source: "WEBSITE" }) eram gravados como NULL,
+        // violando colunas NOT NULL (name) e gerando HTTP 500 no Kanban. Também evita
+        // resetar status/source para valores padrão em updates parciais.
+        if (leadDTO.getName() != null) lead.setName(leadDTO.getName());
+        if (leadDTO.getEmail() != null) lead.setEmail(leadDTO.getEmail());
+        if (leadDTO.getPhone() != null) lead.setPhone(leadDTO.getPhone());
+        if (leadDTO.getCompany() != null) lead.setCompany(leadDTO.getCompany());
+        if (leadDTO.getPosition() != null) lead.setPosition(leadDTO.getPosition());
+        if (leadDTO.getSource() != null) lead.setSource(leadDTO.getSource());
+        if (leadDTO.getNextFollowUp() != null) lead.setNextFollowUp(leadDTO.getNextFollowUp());
         
         // Atualizar notes se description foi fornecido
         if (leadDTO.getNotes() != null && !leadDTO.getNotes().isEmpty()) {
@@ -461,21 +466,9 @@ public class LeadService {
             log.warn("⚠️ Status não fornecido no DTO - mantendo status existente: {}", lead.getStatus());
         }
         
-        // Atualizar assignedTo baseado no assignedToId fornecido
-        // IMPORTANTE: 
-        // - Se assignedToId for fornecido e válido (UUID), atualizar
-        // - Se assignedToId for null (enviado explicitamente), remover assignedTo
-        // - Se assignedToId não for fornecido (campo ausente no JSON), manter o valor existente
-        // 
-        // Como o Jackson não distingue facilmente entre "campo ausente" e "campo null",
-        // vamos processar sempre que o campo estiver presente no JSON.
-        // O frontend sempre envia assignedToId no updateData, então vamos processar sempre.
-        
-        // Verificar se assignedToId foi fornecido
-        // Se for null, significa que o frontend enviou explicitamente null para remover
-        // Se for um UUID válido, atualizar
-        // Se for string vazia (não deve acontecer com UUID, mas vamos tratar), remover
-        
+        // Atualizar assignedTo (update parcial):
+        // - Se assignedToId vier válido (UUID), atualizar o responsável
+        // - Se o campo não vier no payload (null), manter o responsável atual
         UUID assignedToIdFromDTO = leadDTO.getAssignedToId();
         
         if (assignedToIdFromDTO != null) {
@@ -497,12 +490,11 @@ public class LeadService {
                 // Não alterar o assignedTo se houver erro
             }
         } else {
-            // assignedToId é null - pode ser que foi enviado explicitamente para remover
-            // ou pode ser que não foi enviado.
-            // Como o frontend sempre envia assignedToId no updateData (mesmo que seja o valor existente),
-            // se chegou aqui como null, significa que o frontend enviou null explicitamente para remover
-            log.info("🔄 AssignedToId é null - removendo assignedTo (enviado explicitamente)");
-            lead.setAssignedTo(null);
+            // assignedToId não veio no payload (campo ausente).
+            // Update parcial: manter o responsável atual em vez de removê-lo.
+            // (Antes isso zerava o assignedTo em todo update sem assignedToId — ex.:
+            //  Leads.tsx não envia o campo e o Kanban envia só {source}.)
+            log.info("🔄 AssignedToId não informado - mantendo assignedTo atual");
         }
 
         Lead savedLead = leadRepository.save(lead);

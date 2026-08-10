@@ -15,8 +15,10 @@ import com.z7design.secured_guard.model.Contract;
 import com.z7design.secured_guard.model.Unit;
 import com.z7design.secured_guard.model.Subcategoria;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.repository.SubcategoriaRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -43,6 +45,7 @@ public class InvoiceService {
     private final UnitRepository unitRepository;
     private final SubcategoriaRepository subcategoriaRepository;
     private final EmployeeRepository employeeRepository;
+    private final UserRepository userRepository;
     
     @Transactional(readOnly = true)
     public List<Invoice> findAll() {
@@ -170,6 +173,13 @@ public class InvoiceService {
         }
         return invoiceRepository.save(invoice);
     }
+
+    public void assignCreatedByIfNew(Invoice invoice, UUID userId) {
+        if (invoice.getId() != null || userId == null || invoice.getCreatedBy() != null) {
+            return;
+        }
+        userRepository.findById(userId).ifPresent(invoice::setCreatedBy);
+    }
     
     public Invoice create(InvoiceDTO invoiceDTO) {
         Invoice invoice = new Invoice();
@@ -269,6 +279,15 @@ public class InvoiceService {
                 invoice.getEmployee().getName(); // Força inicialização
             } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
                 invoice.setEmployee(null);
+            }
+        }
+
+        // Inicializar CreatedBy
+        if (invoice.getCreatedBy() != null) {
+            try {
+                invoice.getCreatedBy().getName();
+            } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                invoice.setCreatedBy(null);
             }
         }
     }
@@ -486,12 +505,39 @@ public class InvoiceService {
             log.debug("Campos básicos definidos");
             
             // Relacionamentos
+            Subcategoria subcategoria = null;
+            if (dto.getSubcategoriaId() != null) {
+                log.debug("Processando subcategoria: {}", dto.getSubcategoriaId());
+                subcategoria = subcategoriaRepository.findById(dto.getSubcategoriaId())
+                        .orElseThrow(() -> new RuntimeException("Subcategoria não encontrada: " + dto.getSubcategoriaId()));
+                invoice.setSubcategoria(subcategoria);
+                if (Boolean.TRUE.equals(subcategoria.getRequerVinculoFuncionario()) && dto.getEmployeeId() == null) {
+                    throw new IllegalArgumentException(
+                            "A conta \"" + subcategoria.getNome()
+                                    + "\" exige informar o funcionário beneficiário do pagamento.");
+                }
+            } else {
+                invoice.setSubcategoria(null);
+            }
+
+            boolean requiresEmployee = subcategoria != null
+                    && Boolean.TRUE.equals(subcategoria.getRequerVinculoFuncionario());
+            if (subcategoria == null && invoice.getSubcategoria() != null) {
+                requiresEmployee = Boolean.TRUE.equals(invoice.getSubcategoria().getRequerVinculoFuncionario());
+            }
+
             if (dto.getSupplierId() != null) {
                 log.debug("Processando fornecedor: {}", dto.getSupplierId());
                 Supplier supplier = supplierRepository.findById(dto.getSupplierId())
                         .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado: " + dto.getSupplierId()));
                 invoice.setSupplier(supplier);
                 log.debug("Fornecedor definido: {}", supplier.getName());
+            } else if (requiresEmployee) {
+                invoice.setSupplier(null);
+            }
+
+            if (!requiresEmployee && dto.getSupplierId() == null && invoice.getSupplier() == null) {
+                throw new IllegalArgumentException("Fornecedor é obrigatório para contas que não são de Pessoal / RH.");
             }
 
             if (dto.getClientId() != null) {
@@ -521,20 +567,6 @@ public class InvoiceService {
                     log.error("Erro ao buscar unidade {}: {}", dto.getUnitId(), e.getMessage());
                     throw new RuntimeException("Erro ao processar unidade: " + e.getMessage(), e);
                 }
-            }
-
-            if (dto.getSubcategoriaId() != null) {
-                log.debug("Processando subcategoria: {}", dto.getSubcategoriaId());
-                Subcategoria subcategoria = subcategoriaRepository.findById(dto.getSubcategoriaId())
-                        .orElseThrow(() -> new RuntimeException("Subcategoria não encontrada: " + dto.getSubcategoriaId()));
-                invoice.setSubcategoria(subcategoria);
-                if (Boolean.TRUE.equals(subcategoria.getRequerVinculoFuncionario()) && dto.getEmployeeId() == null) {
-                    throw new IllegalArgumentException(
-                            "A conta \"" + subcategoria.getNome()
-                                    + "\" exige informar o funcionário beneficiário do pagamento.");
-                }
-            } else {
-                invoice.setSubcategoria(null);
             }
 
             if (dto.getEmployeeId() != null) {

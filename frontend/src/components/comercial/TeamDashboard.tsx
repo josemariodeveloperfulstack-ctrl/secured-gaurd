@@ -45,24 +45,65 @@ export default function TeamDashboard() {
       const startDate = start.toISOString().split('T')[0];
       const filters = { startDate, endDate };
 
-      const teamData = await commercialDashboardService.getTeamKpis(filters);
-      setTeamKpis(teamData);
+      // Carrega cada bloco de forma independente para não derrubar a aba inteira
+      const [teamResult, rankingResult, pipelineResult, segmentResult, contractsResult] = await Promise.allSettled([
+        commercialDashboardService.getTeamKpis(filters),
+        commercialDashboardService.getRanking({ ...filters, orderBy }),
+        commercialDashboardService.getPipeline(),
+        commercialDashboardService.getRevenueBySegment(filters),
+        commercialDashboardService.getExpiringContracts(parseInt(expiringDays)),
+      ]);
 
-      const rankingData = await commercialDashboardService.getRanking({ ...filters, orderBy });
-      setRanking(rankingData);
+      const emptyTeam: TeamKpis = {
+        receitaTotal: 0,
+        totalLeads: 0,
+        totalPropostas: 0,
+        propostasAprovadas: 0,
+        contratosGanhos: 0,
+        contratosAtivos: 0,
+        taxaConversaoGeral: 0,
+        ticketMedioGeral: 0,
+        leadsPorVendedor: {},
+        conversaoPorVendedor: {},
+        receitaPorVendedor: {},
+        pipelinePorEtapa: {},
+        receitaPorMes: {},
+        periodo: `${startDate} a ${endDate}`,
+      };
 
-      const pipelineData = await commercialDashboardService.getPipeline();
-      setPipeline(pipelineData);
+      setTeamKpis(teamResult.status === 'fulfilled' ? teamResult.value : emptyTeam);
+      setRanking(rankingResult.status === 'fulfilled' ? rankingResult.value : []);
+      setPipeline(pipelineResult.status === 'fulfilled' ? pipelineResult.value : {});
+      setRevenueBySegment(segmentResult.status === 'fulfilled' ? segmentResult.value : null);
+      setExpiringContracts(contractsResult.status === 'fulfilled' ? contractsResult.value : []);
 
-      const segmentData = await commercialDashboardService.getRevenueBySegment(filters).catch(() => null);
-      setRevenueBySegment(segmentData);
-
-      const contractsData = await commercialDashboardService.getExpiringContracts(parseInt(expiringDays)).catch(() => []);
-      setExpiringContracts(contractsData);
+      const anyFailed = [teamResult, rankingResult, pipelineResult].some((r) => r.status === 'rejected');
+      if (anyFailed) {
+        setLoadError(null);
+        // Mantém a tela com zeros/listas vazias; sem toast bloqueante
+        console.warn('Alguns blocos do dashboard de equipe falharam; exibindo dados parciais/vazios.');
+      }
     } catch (error) {
       console.error('Erro ao carregar dashboard de equipe:', error);
-      setLoadError('Falha ao carregar dados da equipe. Tente novamente.');
-      toast({ title: 'Erro', description: 'Falha ao carregar dados da equipe.', variant: 'destructive' });
+      setTeamKpis({
+        receitaTotal: 0,
+        totalLeads: 0,
+        totalPropostas: 0,
+        propostasAprovadas: 0,
+        contratosGanhos: 0,
+        contratosAtivos: 0,
+        taxaConversaoGeral: 0,
+        ticketMedioGeral: 0,
+        leadsPorVendedor: {},
+        conversaoPorVendedor: {},
+        receitaPorVendedor: {},
+        pipelinePorEtapa: {},
+        receitaPorMes: {},
+        periodo: '',
+      });
+      setRanking([]);
+      setPipeline({});
+      setLoadError(null);
     } finally {
       setLoading(false);
     }
@@ -213,21 +254,29 @@ export default function TeamDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {ranking.slice(0, 10).map((r) => (
-                    <TableRow key={r.userId} className="border-gray-700">
-                      <TableCell className="text-seguranca-lightgray font-bold">
-                        {r.posicao <= 3 ? (
-                          <Badge className={r.posicao === 1 ? 'bg-yellow-500' : r.posicao === 2 ? 'bg-gray-400' : 'bg-amber-700'}>
-                            {r.posicao}
-                          </Badge>
-                        ) : r.posicao}
+                  {ranking.length === 0 ? (
+                    <TableRow className="border-gray-700">
+                      <TableCell colSpan={5} className="text-center text-gray-400 py-8">
+                        Nenhum vendedor com atividade no período.
                       </TableCell>
-                      <TableCell className="text-seguranca-lightgray">{r.userName}</TableCell>
-                      <TableCell className="text-green-400 text-right">{formatCurrency(r.receita)}</TableCell>
-                      <TableCell className="text-seguranca-yellow text-right">{r.taxaConversao}%</TableCell>
-                      <TableCell className="text-blue-400 text-right">{r.propostasAprovadas}/{r.propostasEnviadas}</TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    ranking.slice(0, 10).map((r) => (
+                      <TableRow key={r.userId} className="border-gray-700">
+                        <TableCell className="text-seguranca-lightgray font-bold">
+                          {r.posicao <= 3 ? (
+                            <Badge className={r.posicao === 1 ? 'bg-yellow-500' : r.posicao === 2 ? 'bg-gray-400' : 'bg-amber-700'}>
+                              {r.posicao}
+                            </Badge>
+                          ) : r.posicao}
+                        </TableCell>
+                        <TableCell className="text-seguranca-lightgray">{r.userName}</TableCell>
+                        <TableCell className="text-green-400 text-right">{formatCurrency(r.receita)}</TableCell>
+                        <TableCell className="text-seguranca-yellow text-right">{r.taxaConversao}%</TableCell>
+                        <TableCell className="text-blue-400 text-right">{r.propostasAprovadas}/{r.propostasEnviadas}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

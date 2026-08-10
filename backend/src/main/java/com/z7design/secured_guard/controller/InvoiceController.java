@@ -4,6 +4,7 @@ import com.z7design.secured_guard.dto.InvoiceDTO;
 import com.z7design.secured_guard.dto.ClientDTO;
 import com.z7design.secured_guard.dto.ClientSelectDTO;
 import com.z7design.secured_guard.model.Invoice;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.ExpenseStatus;
 import com.z7design.secured_guard.model.enums.ExpenseType;
 import com.z7design.secured_guard.model.enums.ClientStatus;
@@ -21,6 +22,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -220,7 +222,7 @@ public class InvoiceController {
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<InvoiceDTO> create(@Valid @RequestBody InvoiceDTO invoiceDTO) {
+    public ResponseEntity<InvoiceDTO> create(@Valid @RequestBody InvoiceDTO invoiceDTO, Authentication authentication) {
         try {
             log.info("POST /api/invoices - Criando nova fatura");
             log.info("Dados recebidos: {}", invoiceDTO);
@@ -228,6 +230,7 @@ public class InvoiceController {
             // Criar nova fatura e mapear dados do DTO
             Invoice invoice = new Invoice();
             invoiceService.updateInvoiceFromDTO(invoice, invoiceDTO);
+            invoiceService.assignCreatedByIfNew(invoice, resolveUserId(authentication));
             
             // Salvar a fatura
             Invoice saved = invoiceService.save(invoice);
@@ -635,5 +638,16 @@ public class InvoiceController {
             log.error("Erro ao fazer debug de centros de custo", e);
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    private UUID resolveUserId(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof User user && user.getId() != null) {
+            return user.getId();
+        }
+        return null;
     }
 } 

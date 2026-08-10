@@ -37,6 +37,11 @@ public class AccountsReceivable {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "workSchedules"})
     private WorkPost workPost;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subcategoria_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Subcategoria subcategoria;
+    
     @NotBlank(message = "Número da fatura é obrigatório")
     @Size(max = 100, message = "Número da fatura deve ter no máximo 100 caracteres")
     @Column(name = "invoice_number", nullable = false)
@@ -154,6 +159,14 @@ public class AccountsReceivable {
     
     public void setWorkPost(WorkPost workPost) {
         this.workPost = workPost;
+    }
+    
+    public Subcategoria getSubcategoria() {
+        return subcategoria;
+    }
+    
+    public void setSubcategoria(Subcategoria subcategoria) {
+        this.subcategoria = subcategoria;
     }
     
     public String getInvoiceNumber() {

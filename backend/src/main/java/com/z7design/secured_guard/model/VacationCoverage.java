@@ -30,12 +30,12 @@ public class VacationCoverage {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "vacation_id", nullable = false)
     private Vacation vacation;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "substitute_employee_id", nullable = false)
     @NotFound(action = NotFoundAction.IGNORE)
     private Employee substituteEmployee;
@@ -46,7 +46,7 @@ public class VacationCoverage {
     @Column(name = "coverage_end_date", nullable = false)
     private LocalDate coverageEndDate;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "location_id")
     private WorkPost location;
@@ -66,7 +66,7 @@ public class VacationCoverage {
     @Builder.Default
     private Boolean isConfirmed = false;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "confirmed_by")
     private User confirmedBy;

@@ -27,6 +27,7 @@ export interface Pagamento {
 
 export interface AgendamentoPagamento {
   id: string;
+  accountsReceivableId?: string;
   pagamentoId: string;
   dataAgendamento: string;
   dataExecucao?: string;
@@ -34,6 +35,11 @@ export interface AgendamentoPagamento {
   observacoes?: string;
   alertasEnviados: boolean;
   createdAt: string;
+  subcategoriaId?: string;
+  subcategoriaNome?: string;
+  subcategoriaCodigo?: string;
+  categoriaPaiNome?: string;
+  categoriaPaiCodigo?: string;
 }
 
 export interface Cliente {
@@ -61,6 +67,7 @@ export interface CreatePagamentoRequest {
   centroCusto?: string;
   agendarPagamento?: boolean;
   dataAgendamento?: string;
+  subcategoriaId?: string;
 }
 
 export interface UpdatePagamentoRequest extends CreatePagamentoRequest {
@@ -251,12 +258,15 @@ class PagamentosService {
 
   // ===== AGENDAMENTO DE PAGAMENTOS =====
 
-  async agendarPagamento(pagamentoId: string, dataAgendamento: string, observacoes?: string): Promise<AgendamentoPagamento> {
+  async agendarPagamento(pagamentoId: string, dataAgendamento: string, observacoes?: string, subcategoriaId?: string): Promise<AgendamentoPagamento> {
     try {
+      // accountsReceivableId = conta a receber de origem: o backend herda
+      // automaticamente a subcategoria (e demais dados) dessa conta no agendamento.
       const response = await axios.post(`${API_BASE_URL}/scheduled-payments`, {
-        paymentId: pagamentoId,
+        accountsReceivableId: pagamentoId,
         scheduledDate: dataAgendamento,
-        notes: observacoes
+        notes: observacoes,
+        subcategoriaId: subcategoriaId || null
       }, {
         headers: this.getAuthHeaders()
       });

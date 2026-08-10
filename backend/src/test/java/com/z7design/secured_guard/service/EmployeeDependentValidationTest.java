@@ -75,24 +75,25 @@ class EmployeeDependentValidationTest {
     @Test
     void employeeValidation_rejectsDuplicateCpf() {
         EmployeeDTO dto = baseEmployeeDto();
-        when(employeeRepository.existsByNormalizedDocument("52998224725")).thenReturn(true);
+        // Cadastro novo (excludeId null): bloqueia quando existe funcionário ATIVO (não demitido) com o CPF
+        when(employeeRepository.existsByNormalizedDocumentAndNotTerminated("52998224725")).thenReturn(true);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, null, null));
 
-        assertEquals("CPF já cadastrado para outro funcionário", ex.getMessage());
+        assertEquals("CPF já cadastrado para funcionário ativo no sistema", ex.getMessage());
     }
 
     @Test
     void employeeValidation_rejectsCpfAlreadyUsedByDependent() {
         EmployeeDTO dto = baseEmployeeDto();
-        when(employeeRepository.existsByNormalizedDocument("52998224725")).thenReturn(false);
+        // Sem funcionário ativo com o CPF (não stubado => false) e CPF já usado por dependente
         when(dependentRepository.findIdsByCpfDigitsNormalized("52998224725")).thenReturn(List.of(UUID.randomUUID()));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, null, null));
 
-        assertEquals("CPF já cadastrado no sistema", ex.getMessage());
+        assertEquals("CPF já cadastrado como dependente no sistema", ex.getMessage());
     }
 
     @Test

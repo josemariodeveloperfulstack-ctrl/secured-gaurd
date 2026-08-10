@@ -13,11 +13,13 @@ import com.z7design.secured_guard.model.AccountsReceivable;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.ScheduledPayment;
+import com.z7design.secured_guard.model.Subcategoria;
 import com.z7design.secured_guard.model.enums.ReceivableStatus;
 import com.z7design.secured_guard.model.enums.ScheduledPaymentStatus;
 import com.z7design.secured_guard.repository.AccountsReceivableRepository;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.ScheduledPaymentRepository;
+import com.z7design.secured_guard.repository.SubcategoriaRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
@@ -48,9 +50,11 @@ public class PaymentReportService {
 
     private final AccountsReceivableRepository accountsReceivableRepository;
     private final ScheduledPaymentRepository scheduledPaymentRepository;
+    private final ScheduledPaymentService scheduledPaymentService;
     private final JasperReportService jasperReportService;
     private final StandardReportLayoutService standardReportLayoutService;
     private final CompanyRepository companyRepository;
+    private final SubcategoriaRepository subcategoriaRepository;
     private final UnitRepository unitRepository;
 
     /**
@@ -67,25 +71,26 @@ public class PaymentReportService {
             String unitFilter,
             List<String> selectedIds,
             String reportSegment,
-            String sortDir) throws IOException {
+            String sortDir,
+            UUID subcategoriaId) throws IOException {
         String normalizedSegment = normalizeReceivableReportSegment(reportSegment);
         log.info(
-                "Gerando relatório PDF de contas a receber com layout padrão - Período: {} a {}, Cliente: {}, Empresa/Filial: {}, Status: {}, Segmento: {}, Categoria: {}, Método: {}, Valor: {} a {}, IDs: {}",
+                "Gerando relatório PDF de contas a receber com layout padrão - Período: {} a {}, Cliente: {}, Empresa/Filial: {}, Status: {}, Segmento: {}, Categoria: {}, Método: {}, Valor: {} a {}, IDs: {}, Subcategoria: {}",
                 startDate, endDate, clientFilter, unitFilter, statusFilter, normalizedSegment, categoryFilter, paymentMethodFilter,
-                amountMin, amountMax, selectedIds);
+                amountMin, amountMax, selectedIds, subcategoriaId);
 
         try {
             // Buscar dados com filtros
             List<AccountsReceivable> accounts = getAccountsReceivableFiltered(
                     startDate, endDate, clientFilter, unitFilter, statusFilter, categoryFilter,
-                    paymentMethodFilter, amountMin, amountMax, selectedIds, normalizedSegment, sortDir);
+                    paymentMethodFilter, amountMin, amountMax, selectedIds, normalizedSegment, sortDir, subcategoriaId);
 
             log.info("Dados obtidos: {} contas a receber", accounts.size());
 
             // Usar iText com layout padrão
             return generateAccountsReceivableReportPDFWithIText(
                     accounts, startDate, endDate, clientFilter, unitFilter, statusFilter,
-                    categoryFilter, paymentMethodFilter, amountMin, amountMax, normalizedSegment);
+                    categoryFilter, paymentMethodFilter, amountMin, amountMax, normalizedSegment, subcategoriaId);
 
         } catch (Exception e) {
             log.error("Erro ao gerar relatório PDF de contas a receber", e);
@@ -106,7 +111,8 @@ public class PaymentReportService {
             String paymentMethodFilter,
             BigDecimal amountMin,
             BigDecimal amountMax,
-            String reportSegment) throws IOException {
+            String reportSegment,
+            UUID subcategoriaId) throws IOException {
         log.info("Gerando relatório PDF de contas a receber com iText - {} contas", accounts.size());
 
         // Determinar companyId - usar primeira empresa ativa como fallback
@@ -199,6 +205,23 @@ public class PaymentReportService {
                     document.add(new Paragraph("Método de Pagamento: " + paymentMethodFilter).setFontSize(10)
                             .setMarginBottom(2));
                 }
+                if (subcategoriaId != null) {
+                    String subcategoriaDisplay = subcategoriaId.toString();
+                    try {
+                        Optional<Subcategoria> subOpt = subcategoriaRepository.findById(subcategoriaId);
+                        if (subOpt.isPresent()) {
+                            Subcategoria sub = subOpt.get();
+                            String nome = sub.getNome();
+                            String codigo = sub.getCodigo();
+                            subcategoriaDisplay = (codigo != null && !codigo.isBlank() ? codigo + " - " : "") + nome;
+                        }
+                    } catch (Exception e) {
+                        log.warn("Erro ao resolver subcategoria {} para exibição no relatório: {}", subcategoriaId,
+                                e.getMessage());
+                    }
+                    document.add(new Paragraph("Plano de Contas: " + subcategoriaDisplay).setFontSize(10)
+                            .setMarginBottom(2));
+                }
                 if (amountMin != null || amountMax != null) {
                     String amountRange = "Valor: ";
                     if (amountMin != null)
@@ -242,11 +265,12 @@ public class PaymentReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(9).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Cliente"));
                 table.addHeaderCell(createHeaderCell("Nº Fatura"));
+                table.addHeaderCell(createHeaderCell("Conta"));
                 table.addHeaderCell(createHeaderCell("Emissão"));
                 table.addHeaderCell(createHeaderCell("Vencimento"));
                 table.addHeaderCell(createHeaderCell("Valor"));
@@ -259,6 +283,7 @@ public class PaymentReportService {
                 for (AccountsReceivable account : accounts) {
                     table.addCell(createCell(account.getClient() != null ? account.getClient().getName() : ""));
                     table.addCell(createCell(account.getInvoiceNumber() != null ? account.getInvoiceNumber() : ""));
+                    table.addCell(createCell(getContaPlanoDeContas(account)));
                     table.addCell(createCell(
                             account.getIssueDate() != null ? account.getIssueDate().format(dateFormatter) : ""));
                     table.addCell(
@@ -291,6 +316,23 @@ public class PaymentReportService {
         byte[] result = baos.toByteArray();
         log.info("PDF de contas a receber gerado com sucesso, tamanho: {} bytes", result.length);
         return result;
+    }
+
+    /**
+     * Obtém a conta do plano de contas vinculada à conta a receber (ex.: código -
+     * nome), de forma segura contra lazy loading.
+     */
+    private String getContaPlanoDeContas(AccountsReceivable account) {
+        try {
+            if (account.getSubcategoria() != null) {
+                String codigo = account.getSubcategoria().getCodigo();
+                String nome = account.getSubcategoria().getNome();
+                return (codigo != null ? codigo : "") + " - " + (nome != null ? nome : "");
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao acessar subcategoria da conta a receber {}: {}", account.getId(), e.getMessage());
+        }
+        return "Não informado";
     }
 
     private String getStatusLabel(ReceivableStatus status) {
@@ -473,10 +515,11 @@ public class PaymentReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Cliente"));
+                table.addHeaderCell(createHeaderCell("Conta"));
                 table.addHeaderCell(createHeaderCell("Data Agendada"));
                 table.addHeaderCell(createHeaderCell("Valor"));
                 table.addHeaderCell(createHeaderCell("Status"));
@@ -488,6 +531,7 @@ public class PaymentReportService {
                 DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
                 for (ScheduledPayment payment : payments) {
                     table.addCell(createCell(payment.getClient() != null ? payment.getClient().getName() : ""));
+                    table.addCell(createCell(getContaPlanoDeContas(payment)));
                     table.addCell(createCell(
                             payment.getScheduledDate() != null ? payment.getScheduledDate().format(dateFormatter)
                                     : ""));
@@ -533,6 +577,28 @@ public class PaymentReportService {
         byte[] result = baos.toByteArray();
         log.info("PDF de pagamentos agendados gerado com sucesso, tamanho: {} bytes", result.length);
         return result;
+    }
+
+    private String getContaPlanoDeContas(ScheduledPayment payment) {
+        try {
+            if (payment == null || payment.getSubcategoria() == null) {
+                return "Não informado";
+            }
+            Subcategoria sub = payment.getSubcategoria();
+            String codigo = sub.getCodigo();
+            String nome = sub.getNome();
+            if (codigo != null && !codigo.isBlank() && nome != null && !nome.isBlank()) {
+                return codigo + " - " + nome;
+            }
+            if (nome != null && !nome.isBlank()) {
+                return nome;
+            }
+            return "Não informado";
+        } catch (Exception e) {
+            log.warn("Erro ao resolver conta do Plano de Contas do pagamento agendado {}: {}",
+                    payment != null && payment.getId() != null ? payment.getId() : "?", e.getMessage());
+            return "Não informado";
+        }
     }
 
     private String getPaymentStatusLabel(ScheduledPaymentStatus status) {
@@ -640,7 +706,8 @@ public class PaymentReportService {
             BigDecimal amountMax,
             List<String> selectedIds,
             String reportSegment,
-            String sortDir) {
+            String sortDir,
+            UUID subcategoriaId) {
         List<AccountsReceivable> accounts = accountsReceivableRepository.findAll();
         log.info("Encontradas {} contas a receber no banco de dados", accounts.size());
 
@@ -658,6 +725,8 @@ public class PaymentReportService {
                 .filter(account -> paymentMethodFilter == null || paymentMethodFilter.isEmpty()
                         || paymentMethodFilter.equalsIgnoreCase("ALL") ||
                         account.getPaymentMethod().toString().equalsIgnoreCase(paymentMethodFilter))
+                .filter(account -> subcategoriaId == null ||
+                        (account.getSubcategoria() != null && account.getSubcategoria().getId().equals(subcategoriaId)))
                 .filter(account -> amountMin == null || account.getAmount().compareTo(amountMin) >= 0)
                 .filter(account -> amountMax == null || account.getAmount().compareTo(amountMax) <= 0)
                 .filter(account -> selectedIds == null || selectedIds.isEmpty() ||
@@ -726,6 +795,9 @@ public class PaymentReportService {
             log.warn("Nenhum UUID válido após normalizar a lista de exclusão");
             return;
         }
+
+        // Cancelar automaticamente os agendamentos vinculados às contas excluídas
+        uuids.forEach(scheduledPaymentService::cancelByAccountsReceivableId);
 
         int removed = accountsReceivableRepository.deleteByIds(uuids);
         log.info("Exclusão em massa concluída: {} registro(s) removido(s) para {} id(s) solicitado(s)",

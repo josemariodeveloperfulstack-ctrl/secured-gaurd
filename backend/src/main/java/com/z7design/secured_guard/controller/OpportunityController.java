@@ -119,6 +119,9 @@ public class OpportunityController {
             User user = resolveCurrentUserManaged();
             opportunityService.delete(UUID.fromString(id), reason, user);
             return ResponseEntity.noContent().build();
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(java.util.Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Erro ao excluir oportunidade {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -133,6 +136,9 @@ public class OpportunityController {
             User user = resolveCurrentUserManaged();
             opportunityService.deleteAll(reason, user);
             return ResponseEntity.noContent().build();
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(java.util.Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Erro ao excluir todas as oportunidades: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -159,6 +165,9 @@ public class OpportunityController {
             User user = resolveCurrentUserManaged();
             opportunityService.deleteBulk(ids, reason, user);
             return ResponseEntity.noContent().build();
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(java.util.Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Erro ao excluir oportunidades em massa (ids={}): {}", payload.get("ids"), e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -193,14 +202,25 @@ public class OpportunityController {
 
     /**
      * Sempre recarrega o usuário no contexto de persistência (mesmo padrão do LeadController).
-     * O principal JWT é um UserDetails/User possivelmente detached — usar direto em saveAll
-     * pode causar falha 500 em exclusões em massa.
+     * O principal JWT é o próprio User (detached) — resolve-se primeiro pelo ID (mais estável
+     * que o username, que pode divergir após alterações/reset de banco) e recarrega a entidade.
      */
     private User resolveCurrentUserManaged() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null || auth.getName().isBlank()) {
+        if (auth == null || auth.getPrincipal() == null) {
             throw new ResourceNotFoundException("Usuário não autenticado");
         }
-        return opportunityService.findUserByUsername(auth.getName());
+        if (auth.getPrincipal() instanceof User principal) {
+            if (principal.getId() != null) {
+                return opportunityService.findUserById(principal.getId());
+            }
+            if (principal.getUsername() != null && !principal.getUsername().isBlank()) {
+                return opportunityService.findUserByUsername(principal.getUsername());
+            }
+        }
+        if (auth.getName() != null && !auth.getName().isBlank()) {
+            return opportunityService.findUserByUsername(auth.getName());
+        }
+        throw new ResourceNotFoundException("Usuário não autenticado");
     }
 } 

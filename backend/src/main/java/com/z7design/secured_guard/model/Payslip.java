@@ -46,6 +46,9 @@ public class Payslip {
     @Column(name = "work_post_name", length = 150)
     private String workPostName;
     
+    @Column(name = "conta_corrente", length = 50)
+    private String contaCorrente;
+    
     @Column(nullable = false)
     private Integer month;
     

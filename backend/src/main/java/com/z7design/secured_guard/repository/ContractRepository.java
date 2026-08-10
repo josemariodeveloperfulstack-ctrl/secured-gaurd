@@ -86,11 +86,16 @@ public interface ContractRepository extends JpaRepository<Contract, java.util.UU
     List<Contract> findActiveContractsExpiringBetween(@Param("startDate") LocalDate startDate, 
                                                       @Param("endDate") LocalDate endDate);
 
-    // Contar contratos ativos que vencem em um período (opcionalmente filtrado por responsável comercial)
-    @Query("SELECT COUNT(c) FROM Contract c WHERE c.status = 'ACTIVE' AND c.endDate IS NOT NULL AND c.endDate BETWEEN :startDate AND :endDate AND (:responsibleCommercialId IS NULL OR c.responsibleCommercial.id = :responsibleCommercialId)")
-    long countActiveContractsExpiringBetween(@Param("startDate") LocalDate startDate, 
-                                            @Param("endDate") LocalDate endDate, 
-                                            @Param("responsibleCommercialId") java.util.UUID responsibleCommercialId);
+    // Contar contratos ativos que vencem em um período
+    @Query("SELECT COUNT(c) FROM Contract c WHERE c.status = 'ACTIVE' AND c.endDate IS NOT NULL AND c.endDate BETWEEN :startDate AND :endDate")
+    long countActiveContractsExpiringBetween(@Param("startDate") LocalDate startDate,
+                                            @Param("endDate") LocalDate endDate);
+
+    // Contar contratos ativos que vencem em um período, filtrados por responsável comercial
+    @Query("SELECT COUNT(c) FROM Contract c WHERE c.status = 'ACTIVE' AND c.endDate IS NOT NULL AND c.endDate BETWEEN :startDate AND :endDate AND c.responsibleCommercial.id = :responsibleCommercialId")
+    long countActiveContractsExpiringBetweenForUser(@Param("startDate") LocalDate startDate,
+                                                    @Param("endDate") LocalDate endDate,
+                                                    @Param("responsibleCommercialId") java.util.UUID responsibleCommercialId);
 
     // Contar contratos ativos por responsável comercial
     @Query("SELECT COUNT(c) FROM Contract c WHERE c.status = :status AND c.responsibleCommercial.id = :userId")

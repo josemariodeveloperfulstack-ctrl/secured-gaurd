@@ -53,10 +53,10 @@ public class Opportunity {
     @Column(name = "close_date")
     private LocalDateTime closeDate;
 
-    @OneToMany(mappedBy = "opportunity", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "opportunity", cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     private List<Task> tasks;
 
-    @OneToMany(mappedBy = "opportunity", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "opportunity", cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     private List<InteractionHistory> interactionHistories;
 
     @Column(name = "created_at", nullable = false, updatable = false)

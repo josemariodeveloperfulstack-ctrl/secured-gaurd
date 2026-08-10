@@ -26,8 +26,8 @@ import {
   Trash2,
   Eye
 } from 'lucide-react';
-import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
 import { SupplierFormModal } from '@/components/estoque/SupplierFormModal';
+import StockFuncionariosContent from '@/components/stock/StockFuncionariosContent';
 
 export default function Estoque() {
   const { toast } = useToast();
@@ -443,6 +443,7 @@ export default function Estoque() {
             <TabsTrigger value="produtos">Produtos</TabsTrigger>
             <TabsTrigger value="transferencias">Transferências</TabsTrigger>
             <TabsTrigger value="entregas">Entregas</TabsTrigger>
+            <TabsTrigger value="funcionarios">Funcionários</TabsTrigger>
           </TabsList>
 
           <TabsContent value="produtos">
@@ -635,9 +636,12 @@ export default function Estoque() {
             </Card>
           </TabsContent>
           <TabsContent value="entregas" className="mt-6">
-          <DeliveryManagement />
-        </TabsContent>
-      </Tabs>
+            <DeliveryManagement />
+          </TabsContent>
+          <TabsContent value="funcionarios" className="mt-6">
+            <StockFuncionariosContent />
+          </TabsContent>
+        </Tabs>
 
 
         {/* Modais */}

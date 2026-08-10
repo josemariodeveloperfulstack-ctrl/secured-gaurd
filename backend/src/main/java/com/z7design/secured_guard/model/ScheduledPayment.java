@@ -10,6 +10,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
@@ -63,6 +65,18 @@ public class ScheduledPayment {
     @Size(max = 100, message = "Número da fatura deve ter no máximo 100 caracteres")
     @Column(name = "invoice_number")
     private String invoiceNumber;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JoinColumn(name = "accounts_receivable_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private AccountsReceivable accountsReceivable;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JoinColumn(name = "subcategoria_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Subcategoria subcategoria;
     
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

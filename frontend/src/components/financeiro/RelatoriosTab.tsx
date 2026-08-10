@@ -33,7 +33,7 @@ import {
 import { format, subDays, subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ReportGenerator, ReportData, ReportType, ReportFilters, REPORT_CONFIGS, sortContasAReceberByVencimento } from '@/utils/reportGenerator';
-import { contasAPagarService } from '@/services/contasAPagarService';
+import { contasAPagarService, formatContaPlanoDeContas } from '@/services/contasAPagarService';
 import { contasAReceberService } from '@/services/contasAReceberService';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -268,6 +268,7 @@ const RelatoriosTab: React.FC = () => {
     const rows = contas.map(conta => [
       conta.companySigla || conta.empresa || 'N/A',
       conta.descricao,
+      formatContaPlanoDeContas(conta) || '-',
       conta.fornecedor || 'Não informado',
       ReportGenerator.formatCurrency(conta.valor),
       format(conta.vencimento, 'dd/MM/yyyy', { locale: ptBR }),
@@ -308,6 +309,7 @@ const RelatoriosTab: React.FC = () => {
     const rows = contas.map(conta => [
       conta.id,
       conta.descricao,
+      formatContaPlanoDeContas(conta) || '-',
       conta.cliente || 'Não informado',
       ReportGenerator.formatCurrency(conta.valor),
       format(conta.vencimento, 'dd/MM/yyyy', { locale: ptBR }),

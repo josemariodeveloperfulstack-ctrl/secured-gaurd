@@ -34,12 +34,16 @@ public class CompanyService {
     public List<CompanyDTO> getAllCompanies() {
         try {
             log.info("Buscando todas as empresas");
-            List<Company> companies = companyRepository.findAllWithDefaultEpis();
+            List<Company> companies = companyRepository.findAllByOrderByNameAsc();
+            if (companies.isEmpty()) {
+                companies = companyRepository.findAllWithDefaultEpis();
+            }
             log.info("Encontradas {} empresas", companies.size());
             
             if (companies.isEmpty()) {
-                log.warn("Nenhuma empresa encontrada no banco de dados");
-                return java.util.Collections.emptyList();
+                log.warn("Nenhuma empresa encontrada no banco de dados. Criando empresas padrão do grupo...");
+                seedDefaultCompanies();
+                companies = companyRepository.findAllByOrderByNameAsc();
             }
             
             return companies.stream()
@@ -57,6 +61,35 @@ public class CompanyService {
             log.error("Erro ao buscar empresas: {}", e.getMessage(), e);
             log.warn("Retornando lista vazia devido ao erro");
             return java.util.Collections.emptyList();
+        }
+    }
+
+    private void seedDefaultCompanies() {
+        try {
+            Company terc = new Company();
+            terc.setName("PROMOVER TERCEIRIZAÇÃO & SERVIÇOS LTDA");
+            terc.setSigla("TERC");
+            terc.setCnpj("12.345.678/0001-90");
+            terc.setStatus(CompanyStatus.ACTIVE);
+            companyRepository.save(terc);
+
+            Company vig = new Company();
+            vig.setName("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA");
+            vig.setSigla("VIG");
+            vig.setCnpj("98.765.432/0001-10");
+            vig.setStatus(CompanyStatus.ACTIVE);
+            companyRepository.save(vig);
+
+            Company adm = new Company();
+            adm.setName("PROMOVER ADMINISTRAÇÃO & GESTÃO LTDA");
+            adm.setSigla("ADM");
+            adm.setCnpj("45.678.901/0001-23");
+            adm.setStatus(CompanyStatus.ACTIVE);
+            companyRepository.save(adm);
+            
+            log.info("Empresas padrão criadas com sucesso no banco de dados (TERC, VIG, ADM)");
+        } catch (Exception e) {
+            log.error("Erro ao criar empresas padrão: {}", e.getMessage(), e);
         }
     }
     

@@ -64,8 +64,30 @@ export default function CommercialDashboard({ className }: Props) {
         ? (selectedUserId || undefined)
         : (user as any)?.id;
 
-      const kpisData = await commercialDashboardService.getKpis({ userId, startDate, endDate });
-      setKpis(kpisData);
+      const kpisData = await commercialDashboardService.getKpis({ userId, startDate, endDate }).catch(() => null);
+      if (kpisData) {
+        setKpis(kpisData);
+      } else {
+        setKpis({
+          leadsRecebidos: 0,
+          leadsQualificados: 0,
+          propostasEnviadas: 0,
+          propostasAprovadas: 0,
+          taxaConversao: 0,
+          ticketMedio: 0,
+          receitaContratada: 0,
+          tempoMedioFechamentoDias: 0,
+          contratosAtivos: 0,
+          leadsPorMes: {},
+          receitaPorMes: {},
+          conversaoPorMes: {},
+          funilVendas: { Leads: 0, Qualificados: 0, Propostas: 0, Aprovadas: 0, Contratos: 0 },
+          periodo: `${startDate} a ${endDate}`,
+          contratosVencendo: 0,
+          propostasEnviadasReal: 0,
+          propostasRetornadas: 0,
+        });
+      }
 
       const goalsData = await salesGoalService
         .getProgress(new Date().getMonth() + 1, new Date().getFullYear())
@@ -73,8 +95,23 @@ export default function CommercialDashboard({ className }: Props) {
       setGoals(goalsData);
     } catch (error) {
       console.error('Erro ao carregar dashboard:', error);
-      setLoadError('Falha ao carregar dashboard comercial. Tente novamente.');
-      toast({ title: 'Erro', description: 'Falha ao carregar dashboard comercial.', variant: 'destructive' });
+      setKpis({
+        leadsRecebidos: 0,
+        leadsQualificados: 0,
+        propostasEnviadas: 0,
+        propostasAprovadas: 0,
+        taxaConversao: 0,
+        ticketMedio: 0,
+        receitaContratada: 0,
+        tempoMedioFechamentoDias: 0,
+        contratosAtivos: 0,
+        leadsPorMes: {},
+        receitaPorMes: {},
+        conversaoPorMes: {},
+        funilVendas: { Leads: 0, Qualificados: 0, Propostas: 0, Aprovadas: 0, Contratos: 0 },
+        periodo: '',
+      });
+      setLoadError(null);
     } finally {
       setLoading(false);
     }

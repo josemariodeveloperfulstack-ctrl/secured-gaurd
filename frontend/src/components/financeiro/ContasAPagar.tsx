@@ -14,7 +14,6 @@ import { ContasAPagarDashboard } from './ContasAPagarDashboard';
 import { ContasAPagarFormModal } from './ContasAPagarFormModal';
 import { ContasAPagarViewModal } from './ContasAPagarViewModal';
 import { ContaAPagar } from './ContasAPagarFormModal';
-import { contasAPagarService } from '@/services/contasAPagarService';
 import { useToast } from '@/hooks/use-toast';
 import { format, isAfter, isBefore, addDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';

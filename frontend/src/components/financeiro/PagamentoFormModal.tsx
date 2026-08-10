@@ -14,12 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle, Clock, CheckCircle, CalendarDays } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlertTriangle, Clock, CheckCircle, CalendarDays, FolderTree } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { pagamentosService, Pagamento, CreatePagamentoRequest, UpdatePagamentoRequest } from '@/services/pagamentosService';
-import { Supplier, contasAPagarService } from '@/services/contasAPagarService';
+import { Supplier, CategoriaPai, Subcategoria, contasAPagarService } from '@/services/contasAPagarService';
 import SupplierFormModal from '@/components/estoque/SupplierFormModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { formatCurrency as formatCurrencyBRL } from '@/utils/formatters';
@@ -44,6 +45,7 @@ interface FormData {
   centroCusto: string;
   agendarPagamento: boolean;
   dataAgendamento: Date | undefined;
+  subcategoriaId: string;
 }
 
 export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
@@ -59,6 +61,10 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
   const [categories, setCategories] = useState<string[]>(['FORNECEDOR','SERVICO','EQUIPAMENTO','IMPOSTO','OUTROS']);
   const [newCategoryModalOpen, setNewCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  // Plano de Contas state
+  const [categoriasPai, setCategoriasPai] = useState<CategoriaPai[]>([]);
+  const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
+  const [selectedCategoriaPaiId, setSelectedCategoriaPaiId] = useState<string>('');
   const [formData, setFormData] = useState<FormData>({
     fornecedorId: '',
     descricao: '',
@@ -70,7 +76,8 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
     numeroDocumento: '',
     centroCusto: '',
     agendarPagamento: false,
-    dataAgendamento: undefined
+    dataAgendamento: undefined,
+    subcategoriaId: ''
   });
 
   const isEditMode = !!pagamento;
@@ -91,8 +98,10 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
           numeroDocumento: pagamento.numeroDocumento || '',
           centroCusto: pagamento.centroCusto || '',
           agendarPagamento: !!pagamento.agendamento,
-          dataAgendamento: pagamento.agendamento ? new Date(pagamento.agendamento.dataAgendamento) : undefined
+          dataAgendamento: pagamento.agendamento ? new Date(pagamento.agendamento.dataAgendamento) : undefined,
+          subcategoriaId: pagamento.agendamento?.subcategoriaId || ''
         });
+        setSelectedCategoriaPaiId('');
       } else {
         // Modo criação
         setFormData({
@@ -106,11 +115,39 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
           numeroDocumento: '',
           centroCusto: '',
           agendarPagamento: false,
-          dataAgendamento: undefined
+          dataAgendamento: undefined,
+          subcategoriaId: ''
         });
+        setSelectedCategoriaPaiId('');
       }
     }
   }, [isOpen, pagamento]);
+
+  // Carregar Plano de Contas quando o modal abrir
+  useEffect(() => {
+    if (isOpen) {
+      contasAPagarService.getCategoriasPai()
+        .then(data => setCategoriasPai(Array.isArray(data) ? data : []))
+        .catch(() => setCategoriasPai([]));
+
+      contasAPagarService.getSubcategorias()
+        .then(data => setSubcategorias(Array.isArray(data) ? data : []))
+        .catch(() => setSubcategorias([]));
+    }
+  }, [isOpen]);
+
+  // Restaurar Plano de Contas quando subcategorias carregarem (edição)
+  useEffect(() => {
+    if (!isOpen || !pagamento || !formData.subcategoriaId || subcategorias.length === 0) return;
+    const sub = subcategorias.find((s) => s.id === formData.subcategoriaId);
+    if (sub && !selectedCategoriaPaiId) {
+      setSelectedCategoriaPaiId(sub.categoriaPaiId);
+    }
+  }, [isOpen, pagamento, formData.subcategoriaId, subcategorias, selectedCategoriaPaiId]);
+
+  const filteredSubcategorias = selectedCategoriaPaiId
+    ? subcategorias.filter((s) => s.categoriaPaiId === selectedCategoriaPaiId)
+    : [];
 
   const handleInputChange = (field: keyof FormData, value: any) => {
     setFormData(prev => ({
@@ -209,7 +246,8 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
         numeroDocumento: formData.numeroDocumento,
         centroCusto: formData.centroCusto,
         agendarPagamento: formData.agendarPagamento,
-        dataAgendamento: formData.dataAgendamento?.toISOString().split('T')[0]
+        dataAgendamento: formData.dataAgendamento?.toISOString().split('T')[0],
+        subcategoriaId: formData.subcategoriaId || undefined
       };
 
       if (isEditMode) {
@@ -482,6 +520,88 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
                     Alertas de vencimento serão enviados 3 dias antes da data de vencimento.
                   </AlertDescription>
                 </Alert>
+
+                {/* Plano de Contas */}
+                <div className="space-y-3 rounded-lg border border-seguranca-yellow/30 bg-black/20 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="flex items-center gap-2 text-seguranca-yellow">
+                      <FolderTree className="h-4 w-4" />
+                      Plano de Contas
+                    </Label>
+                    <Link
+                      to="/plano-contas"
+                      className="text-xs text-seguranca-yellow underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Gerenciar plano de contas
+                    </Link>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    A conta contábil da fatura é herdada automaticamente no agendamento.
+                    Use os campos abaixo para escolher manualmente uma conta diferente.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Categoria</Label>
+                      <Select
+                        value={selectedCategoriaPaiId || 'none'}
+                        onValueChange={(value) => {
+                          setSelectedCategoriaPaiId(value === 'none' ? '' : value);
+                          handleInputChange('subcategoriaId', '');
+                        }}
+                      >
+                        <SelectTrigger className="bg-white border border-gray-300 text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                          <SelectValue placeholder="Selecione a categoria do plano" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" className="text-gray-400">Nenhuma</SelectItem>
+                          {categoriasPai.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.codigo} - {cat.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {categoriasPai.length === 0 && (
+                        <p className="text-xs text-amber-500">
+                          Nenhuma categoria cadastrada. Cadastre em Plano de Contas.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-500">Conta / Subcategoria</Label>
+                      <Select
+                        value={formData.subcategoriaId || 'none'}
+                        onValueChange={(value) => {
+                          if (value === 'none') {
+                            handleInputChange('subcategoriaId', '');
+                            return;
+                          }
+                          handleInputChange('subcategoriaId', value);
+                        }}
+                        disabled={!selectedCategoriaPaiId}
+                      >
+                        <SelectTrigger className="bg-white border border-gray-300 text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                          <SelectValue placeholder="Selecione a conta contábil" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" className="text-gray-400">Nenhuma</SelectItem>
+                          {filteredSubcategorias.map((sub) => (
+                            <SelectItem key={sub.id} value={sub.id}>
+                              {sub.codigo} - {sub.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {!selectedCategoriaPaiId && (
+                        <p className="text-xs text-gray-400">Selecione a categoria do plano para listar as contas.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

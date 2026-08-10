@@ -36,6 +36,7 @@ import StockReportsContent from '@/components/stock/StockReportsContent';
 import ShelfManagement from '@/components/stock/ShelfManagement';
 import StockRequisitionsPanel from '@/components/stock/StockRequisitionsPanel';
 import { FichasEntregaEPIContent } from '@/components/epi/FichasEntregaEPIContent';
+import StockFuncionariosContent from '@/components/stock/StockFuncionariosContent';
 
 const EstoqueSimplificado: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -388,6 +389,10 @@ const EstoqueSimplificado: React.FC = () => {
               <HardHat className="h-4 w-4 mr-2" />
               Fichas de EPI
             </TabsTrigger>
+            <TabsTrigger value="funcionarios" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
+              <Users className="h-4 w-4 mr-2" />
+              Funcionários
+            </TabsTrigger>
             <TabsTrigger value="alerts" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               <Bell className="h-4 w-4 mr-2" />
               Alertas ({Array.isArray(activeAlerts) ? activeAlerts.length : 0})
@@ -432,6 +437,10 @@ const EstoqueSimplificado: React.FC = () => {
 
           <TabsContent value="fichas-epi" className="mt-6">
             <FichasEntregaEPIContent />
+          </TabsContent>
+
+          <TabsContent value="funcionarios" className="mt-6">
+            <StockFuncionariosContent />
           </TabsContent>
 
           <TabsContent value="alerts" className="mt-6">

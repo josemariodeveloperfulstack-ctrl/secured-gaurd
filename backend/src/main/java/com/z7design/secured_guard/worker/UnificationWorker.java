@@ -262,44 +262,51 @@ public class UnificationWorker {
             log.debug("   Valor - Payslip: {} vs Receipt: {} -> Match: {}", 
                 payslip.getNetValue(), receipt.getNetSalary(), valueMatches);
             
-            // 3. VERIFICAR CONTA CORRENTE (COMENTADO - para uso futuro quando holerite tiver conta corrente)
-            /*
-            // Quando o holerite tiver o campo contaCorrente, descomentar este código:
-            if (payslip.getContaCorrente() != null && receipt.getCreditedAccount() != null) {
-                String payslipAccount = normalizeAccount(payslip.getContaCorrente());
-                String receiptAccount = normalizeAccount(receipt.getCreditedAccount());
-                accountMatches = payslipAccount.equals(receiptAccount);
-                log.debug("   Conta Corrente - Payslip: '{}' vs Receipt: '{}' -> Match: {}", 
-                    payslipAccount, receiptAccount, accountMatches);
+            // 3. VERIFICAR CONTA CORRENTE (regra obrigatória para unificar)
+            // Prioridade da conta do holerite: campo contaCorrente do próprio holerite.
+            // Se o holerite não tiver conta extraída do PDF, usar o cadastro (tabela employees).
+            String payslipAccountSource = null;
+            if (payslip.getContaCorrente() != null && !payslip.getContaCorrente().isBlank()) {
+                payslipAccountSource = normalizeAccount(payslip.getContaCorrente());
+            } else if (employee != null && employee.getContaCorrente() != null
+                    && !employee.getContaCorrente().isBlank()) {
+                payslipAccountSource = normalizeAccount(employee.getContaCorrente());
+                log.debug("   Conta corrente do holerite não extraída, usando cadastro employees: '{}'",
+                        employee.getContaCorrente());
             }
-            */
-            
-            // 4. VERIFICAR CONTA CORRENTE USANDO TABELA EMPLOYEES (quando não tiver no holerite)
-            // Se não encontrou match de conta corrente no holerite, buscar na tabela employees
-            if (employee != null && employee.getContaCorrente() != null && receipt.getCreditedAccount() != null) {
-                String employeeAccount = normalizeAccount(employee.getContaCorrente());
+
+            if (payslipAccountSource != null && receipt.getCreditedAccount() != null) {
                 String receiptAccount = normalizeAccount(receipt.getCreditedAccount());
-                accountMatches = employeeAccount.equals(receiptAccount);
-                
+                accountMatches = payslipAccountSource.equals(receiptAccount);
+
                 if (accountMatches) {
-                    log.info("✅ Conta corrente corresponde (via tabela employees): '{}' = '{}'", 
-                        employeeAccount, receiptAccount);
+                    log.info("✅ Conta corrente corresponde: '{}' = '{}' (origem: {})",
+                            payslipAccountSource, receiptAccount,
+                            payslip.getContaCorrente() != null ? "holerite" : "employees");
                 } else {
-                    log.debug("   Conta Corrente (via employees) - Employee: '{}' vs Receipt: '{}' -> Match: {}", 
-                        employeeAccount, receiptAccount, accountMatches);
+                    log.debug("   Conta Corrente - Payslip: '{}' vs Receipt: '{}' -> NÃO corresponde",
+                            payslipAccountSource, receiptAccount);
                 }
+            } else if (receipt.getCreditedAccount() != null) {
+                log.debug("   Conta corrente do holerite não identificada (nem no PDF nem no cadastro) - "
+                        + "receipt tem conta creditada '{}', sem verificação possível", receipt.getCreditedAccount());
             }
             
-            // REGRA A: Match perfeito (Nome + Valor + Conta Corrente se disponível)
+            // REGRA A: Match perfeito (Nome + Valor + Conta Corrente obrigatória)
             if (nameMatches && valueMatches) {
-                // Se conta corrente foi verificada e não corresponde, não fazer match
+                // REGRA DE NEGÓCIO: A conta corrente é OBRIGATÓRIA para unificar.
+                // Se o holerite (ou cadastro) tem conta e o comprovante tem conta creditada,
+                // elas DEVEM ser iguais. Apenas quando o comprovante não expõe conta
+                // creditada (não verificável) o match segue por Nome + Valor.
                 if (accountMatches || (!accountMatches && receipt.getCreditedAccount() == null)) {
                     log.info("✅ Match encontrado - Payslip: {}, Receipt: {} (Nome: {}, Valor: {}, Conta: {})", 
                         payslip.getId(), receipt.getId(), nameMatches, valueMatches, 
                         accountMatches ? "✅" : "N/A");
                     return Optional.of(receipt);
                 } else {
-                    log.debug("   Match parcial - Nome e Valor OK, mas Conta Corrente não corresponde");
+                    log.warn("🚫 Match bloqueado - Nome e Valor OK, mas Conta Corrente não corresponde "
+                            + "(payslip: '{}', receipt creditada: '{}')",
+                            payslipAccountSource, receipt.getCreditedAccount());
                 }
             }
             
@@ -312,14 +319,28 @@ public class UnificationWorker {
                 if (receiptCpf.isEmpty() && employee != null && employee.getDocument() != null) {
                     String employeeCpf = normalizeCpf(employee.getDocument());
                     if (payslipCpf.equals(employeeCpf) && valueMatches) {
-                        log.info("✅ Match por CPF (via employees) + Valor - Payslip: {}, Receipt: {}", 
-                            payslip.getId(), receipt.getId());
-                        return Optional.of(receipt);
+                        // REGRA DE NEGÓCIO: conta corrente obrigatória também neste caminho
+                        if (accountMatches || (!accountMatches && receipt.getCreditedAccount() == null)) {
+                            log.info("✅ Match por CPF (via employees) + Valor - Payslip: {}, Receipt: {}", 
+                                payslip.getId(), receipt.getId());
+                            return Optional.of(receipt);
+                        } else {
+                            log.warn("🚫 Match por CPF (via employees) bloqueado - Conta Corrente não corresponde "
+                                    + "(payslip: '{}', receipt creditada: '{}')",
+                                    payslipAccountSource, receipt.getCreditedAccount());
+                        }
                     }
                 } else if (payslipCpf.equals(receiptCpf) && valueMatches) {
-                    log.info("✅ Match por CPF + Valor - Payslip: {}, Receipt: {}", 
-                        payslip.getId(), receipt.getId());
-                    return Optional.of(receipt);
+                    // REGRA DE NEGÓCIO: conta corrente obrigatória também neste caminho
+                    if (accountMatches || (!accountMatches && receipt.getCreditedAccount() == null)) {
+                        log.info("✅ Match por CPF + Valor - Payslip: {}, Receipt: {}", 
+                            payslip.getId(), receipt.getId());
+                        return Optional.of(receipt);
+                    } else {
+                        log.warn("🚫 Match por CPF+Valor bloqueado - Conta Corrente não corresponde "
+                                + "(payslip: '{}', receipt creditada: '{}')",
+                                payslipAccountSource, receipt.getCreditedAccount());
+                    }
                 }
             }
         }

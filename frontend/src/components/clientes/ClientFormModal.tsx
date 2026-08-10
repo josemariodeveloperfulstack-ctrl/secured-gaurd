@@ -14,7 +14,7 @@ import {
 import { Client, ClientFormData, ClientStatus } from '@/types/client';
 import { clientService } from '@/services/clientService';
 import { workPostService, WorkPost } from '@/services/workPostService';
-import { companyService } from '@/services/companyService';
+import { companyService, DEFAULT_GROUP_COMPANIES } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import WorkPostFormModal from '@/components/postos/WorkPostFormModal';
 import WorkPostDeleteDialog from '@/components/postos/WorkPostDeleteDialog';
@@ -268,13 +268,14 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     const loadCompanies = async () => {
       try {
         const data = await companyService.getAllCompanies();
-        const ordered = [...data].sort((a, b) =>
+        const list = Array.isArray(data) && data.length > 0 ? data : DEFAULT_GROUP_COMPANIES;
+        const ordered = [...list].sort((a, b) =>
           `${a.sigla || a.name || ''}`.localeCompare(`${b.sigla || b.name || ''}`, 'pt-BR', { sensitivity: 'base' })
         );
         setCompanies(ordered);
       } catch (error) {
         console.error('Erro ao carregar empresas para o cliente:', error);
-        setCompanies([]);
+        setCompanies(DEFAULT_GROUP_COMPANIES);
       }
     };
 

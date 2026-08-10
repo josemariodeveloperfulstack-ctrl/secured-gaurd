@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -49,6 +50,9 @@ public interface ScheduledPaymentRepository extends JpaRepository<ScheduledPayme
     
     // Buscar por número da fatura
     List<ScheduledPayment> findByInvoiceNumberContainingIgnoreCase(String invoiceNumber);
+    
+    // Buscar por conta a receber de origem
+    Optional<ScheduledPayment> findByAccountsReceivableId(UUID accountsReceivableId);
     
     // Buscar pagamentos agendados ordenados por data
     Page<ScheduledPayment> findByStatusOrderByScheduledDateAsc(ScheduledPaymentStatus status, Pageable pageable);
