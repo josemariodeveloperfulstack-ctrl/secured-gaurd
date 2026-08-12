@@ -423,6 +423,17 @@ const ProfissionaisSST: React.FC = () => {
                               src={stampSrc(p.stampImageUrl) || ''}
                               alt={`Carimbo de ${p.name}`}
                               className="h-12 max-w-[120px] object-contain rounded border border-gray-600 bg-white/5 p-1"
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                target.onerror = null;
+                                target.style.display = 'none';
+                                if (target.parentElement && !target.parentElement.querySelector('.stamp-fallback')) {
+                                  const fallback = document.createElement('span');
+                                  fallback.className = 'stamp-fallback text-xs text-amber-400';
+                                  fallback.innerText = 'Sem carimbo (Reenviar)';
+                                  target.parentElement.appendChild(fallback);
+                                }
+                              }}
                             />
                           ) : (
                             <span className="text-xs text-amber-400">Sem carimbo</span>
@@ -598,6 +609,11 @@ const ProfissionaisSST: React.FC = () => {
                       src={stampSrc(form.stampImageUrl) || ''}
                       alt="Pré-visualização do carimbo"
                       className="max-h-28 max-w-xs object-contain"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.onerror = null;
+                        target.style.display = 'none';
+                      }}
                     />
                     <div className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
                       <CheckCircle2 className="h-3 w-3" /> Carimbo pronto para uso
