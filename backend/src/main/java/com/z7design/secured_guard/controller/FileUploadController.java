@@ -305,21 +305,8 @@ public class FileUploadController {
             }
             String uniqueFilename = UUID.randomUUID().toString() + "." + fileExtension;
 
-            log.info("📝 Nome único gerado: {}", uniqueFilename);
-
-            // Criar diretório se não existir (usar caminho absoluto)
-            Path uploadPath = Paths.get(uploadDir, "companies", "logos").toAbsolutePath().normalize();
-            log.info("📁 Caminho de upload: {}", uploadPath);
-
-            Files.createDirectories(uploadPath);
-            log.info("✅ Diretório verificado/criado: {}", uploadPath);
-
-            // Salvar arquivo
-            Path filePath = uploadPath.resolve(uniqueFilename);
-            log.info("💾 Salvando arquivo em: {}", filePath);
-
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-            savePersistentLogoBackup(filePath, uniqueFilename);
+            // Salvar arquivo usando estratégia resiliente com fallback
+            Path filePath = saveLogoFile(file, uniqueFilename);
 
             // Verificar se o arquivo foi salvo corretamente
             if (!Files.exists(filePath)) {
@@ -331,8 +318,6 @@ public class FileUploadController {
             log.info("✅ Arquivo salvo com sucesso: {} ({} bytes)", filePath, Files.size(filePath));
 
             // Retornar informações do arquivo
-            // IMPORTANTE: Retornar apenas o caminho relativo (sem host/porta)
-            // O frontend construirá a URL completa quando necessário para exibição
             String relativeUrl = "/api/uploads/companies/logos/" + uniqueFilename;
 
             Map<String, String> response = new HashMap<>();
@@ -341,7 +326,7 @@ public class FileUploadController {
             response.put("path", "companies/logos/" + uniqueFilename);
             response.put("size", String.valueOf(file.getSize()));
             response.put("contentType", contentType);
-            response.put("url", relativeUrl); // Caminho relativo: /api/uploads/companies/logos/{filename}
+            response.put("url", relativeUrl);
 
             log.info("✅ Upload concluído com sucesso. URL relativa: {}", relativeUrl);
             log.info("📁 Arquivo salvo em: {}", filePath.toAbsolutePath());
@@ -525,6 +510,48 @@ public class FileUploadController {
         return false;
     }
 
+    private Path saveLogoFile(MultipartFile file, String uniqueFilename) throws IOException {
+        Path uploadPath = Paths.get(uploadDir, "companies", "logos").toAbsolutePath().normalize();
+        Path filePath = uploadPath.resolve(uniqueFilename);
+        try {
+            Files.createDirectories(uploadPath);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            savePersistentLogoBackup(filePath, uniqueFilename);
+            return filePath;
+        } catch (Exception e) {
+            log.warn("⚠️ Não foi possível salvar logo no caminho primário ({}): {}. Salvando no backup...", filePath, e.getMessage());
+            Path backupPath = getPersistentLogoBackupPath(uniqueFilename);
+            if (backupPath != null) {
+                Files.createDirectories(backupPath.getParent());
+                Files.copy(file.getInputStream(), backupPath, StandardCopyOption.REPLACE_EXISTING);
+                log.info("✅ Logo salvo com sucesso no caminho de backup: {}", backupPath);
+                return backupPath;
+            }
+            throw new IOException("Falha ao salvar logo: " + e.getMessage(), e);
+        }
+    }
+
+    private Path saveStampFile(MultipartFile file, String uniqueFilename) throws IOException {
+        Path uploadPath = Paths.get(uploadDir, "safety-engineers", "stamps").toAbsolutePath().normalize();
+        Path filePath = uploadPath.resolve(uniqueFilename);
+        try {
+            Files.createDirectories(uploadPath);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            savePersistentStampBackup(filePath, uniqueFilename);
+            return filePath;
+        } catch (Exception e) {
+            log.warn("⚠️ Não foi possível salvar carimbo no caminho primário ({}): {}. Salvando no backup...", filePath, e.getMessage());
+            Path backupPath = getPersistentStampBackupPath(uniqueFilename);
+            if (backupPath != null) {
+                Files.createDirectories(backupPath.getParent());
+                Files.copy(file.getInputStream(), backupPath, StandardCopyOption.REPLACE_EXISTING);
+                log.info("✅ Carimbo salvo com sucesso no caminho de backup: {}", backupPath);
+                return backupPath;
+            }
+            throw new IOException("Falha ao salvar carimbo: " + e.getMessage(), e);
+        }
+    }
+
     @PostMapping("/safety-engineers/stamps")
     @Operation(summary = "Upload de carimbo do engenheiro de segurança", description = "Faz upload de carimbo do engenheiro de segurança (PNG, JPG, JPEG)")
     @ApiResponses(value = {
@@ -569,19 +596,8 @@ public class FileUploadController {
             }
             String uniqueFilename = UUID.randomUUID().toString() + "." + fileExtension;
 
-            log.info("📝 Nome único gerado: {}", uniqueFilename);
-
-            Path uploadPath = Paths.get(uploadDir, "safety-engineers", "stamps").toAbsolutePath().normalize();
-            log.info("📁 Caminho de upload: {}", uploadPath);
-
-            Files.createDirectories(uploadPath);
-            log.info("✅ Diretório verificado/criado: {}", uploadPath);
-
-            Path filePath = uploadPath.resolve(uniqueFilename);
-            log.info("💾 Salvando arquivo em: {}", filePath);
-
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-            savePersistentStampBackup(filePath, uniqueFilename);
+            // Salvar arquivo usando estratégia resiliente com fallback
+            Path filePath = saveStampFile(file, uniqueFilename);
 
             if (!Files.exists(filePath)) {
                 log.error("❌ Arquivo não foi salvo corretamente: {}", filePath);
