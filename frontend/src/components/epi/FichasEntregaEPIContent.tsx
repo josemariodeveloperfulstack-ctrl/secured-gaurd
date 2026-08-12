@@ -700,19 +700,19 @@ export const FichasEntregaEPIContent: React.FC = () => {
         </AlertDialog>
         {/* Modal de Geração de Ficha de EPI Manual (PDF) */}
         <Dialog open={manualBlankPdfModalOpen} onOpenChange={setManualBlankPdfModalOpen}>
-          <DialogContent className="max-w-2xl bg-seguranca-graphite border-gray-700 text-white">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-seguranca-yellow flex items-center gap-2">
-                <FileDown className="h-5 w-5 text-seguranca-yellow" />
-                Gerar Ficha de Entrega de EPI em Branco (PDF)
+          <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 bg-seguranca-graphite border-gray-700 text-white rounded-xl">
+            <DialogHeader className="space-y-1 text-left">
+              <DialogTitle className="text-lg sm:text-xl font-bold text-seguranca-yellow flex items-center gap-2 pr-6">
+                <FileDown className="h-5 w-5 text-seguranca-yellow shrink-0" />
+                <span>Gerar Ficha de Entrega de EPI em Branco (PDF)</span>
               </DialogTitle>
-              <DialogDescription className="text-gray-300 text-sm">
+              <DialogDescription className="text-gray-300 text-xs sm:text-sm">
                 Selecione a empresa para gerar a ficha oficial de entrega de EPI em PDF para impressão e preenchimento manual no papel.
               </DialogDescription>
             </DialogHeader>
 
             <div className="py-2">
-              <FichaEntregaEPIManualForm />
+              <FichaEntregaEPIManualForm hideHeader={true} />
             </div>
           </DialogContent>
         </Dialog>
