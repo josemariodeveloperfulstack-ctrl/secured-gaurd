@@ -264,7 +264,7 @@ public class FileUploadController {
             @ApiResponse(responseCode = "403", description = "Acesso negado"),
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'ADMINISTRADOR', 'ROLE_RH', 'RH', 'ROLE_GESTOR', 'GESTOR', 'ROLE_COMERCIAL', 'COMERCIAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'DEPARTAMENTO_PESSOAL')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'ADMINISTRADOR', 'ROLE_RH', 'RH', 'ROLE_GESTOR', 'GESTOR', 'ROLE_COMERCIAL', 'COMERCIAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'DEPARTAMENTO_PESSOAL', 'ROLE_USER', 'USER', 'ROLE_SUPERVISOR', 'SUPERVISOR', 'ROLE_OPERACIONAL', 'OPERACIONAL', 'ROLE_SST', 'SST', 'ROLE_ENGENHEIRO_SEGURANCA', 'ENGENHEIRO_SEGURANCA', 'ROLE_TECNICO_SEGURANCA', 'TECNICO_SEGURANCA', 'ROLE_COLABORADOR', 'COLABORADOR')")
     public ResponseEntity<Map<String, String>> uploadCompanyLogo(
             @Parameter(description = "Arquivo do logo (PNG, JPG, JPEG)") @RequestParam("file") MultipartFile file) {
 
@@ -533,7 +533,7 @@ public class FileUploadController {
             @ApiResponse(responseCode = "403", description = "Acesso negado"),
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'ADMINISTRADOR', 'ROLE_RH', 'RH', 'ROLE_GESTOR', 'GESTOR', 'ROLE_COMERCIAL', 'COMERCIAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'DEPARTAMENTO_PESSOAL')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'ADMINISTRADOR', 'ROLE_RH', 'RH', 'ROLE_GESTOR', 'GESTOR', 'ROLE_COMERCIAL', 'COMERCIAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'DEPARTAMENTO_PESSOAL', 'ROLE_USER', 'USER', 'ROLE_SUPERVISOR', 'SUPERVISOR', 'ROLE_OPERACIONAL', 'OPERACIONAL', 'ROLE_SST', 'SST', 'ROLE_ENGENHEIRO_SEGURANCA', 'ENGENHEIRO_SEGURANCA', 'ROLE_TECNICO_SEGURANCA', 'TECNICO_SEGURANCA', 'ROLE_COLABORADOR', 'COLABORADOR')")
     public ResponseEntity<Map<String, String>> uploadSafetyEngineerStamp(
             @Parameter(description = "Arquivo do carimbo (PNG, JPG, JPEG)") @RequestParam("file") MultipartFile file) {
         try {
@@ -564,6 +564,9 @@ public class FileUploadController {
             String rawName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "stamp.png";
             String originalFilename = StringUtils.cleanPath(rawName);
             String fileExtension = getFileExtension(originalFilename);
+            if (fileExtension == null || fileExtension.isBlank()) {
+                fileExtension = (contentType != null && contentType.contains("png")) ? "png" : "jpg";
+            }
             String uniqueFilename = UUID.randomUUID().toString() + "." + fileExtension;
 
             log.info("📝 Nome único gerado: {}", uniqueFilename);
