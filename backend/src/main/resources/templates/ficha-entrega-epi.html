@@ -281,7 +281,7 @@
         <tr th:each="epi, iterStat : ${epis}">
           <td style="text-align: center;" th:text="${iterStat.count}">1</td>
           <td th:text="${epi.nome}">-</td>
-          <td style="text-align: center;" th:text="${epi.quantidade}">-</td>
+          <td style="text-align: center;" th:text="${epi.sizeNumber} ?: (${epi.tamanho} ?: '-')">-</td>
           <td style="text-align: center;" th:text="${epi.ca} ?: '-'">-</td>
           <td style="text-align: center;" th:text="${epi.validade} ?: '-'">-</td>
           <td style="text-align: center;" th:text="${dataEntrega}">-</td>

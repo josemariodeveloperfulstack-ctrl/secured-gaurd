@@ -13,6 +13,7 @@ public class EPIDeliveryFormItemDTO {
     private LocalDate validityDate;
     private String uniformType;
     private String uniformPiece;
+    private String sizeNumber;
     private String observations;
     private UUID stockItemId;
     private LocalDate substitutedDate;
@@ -151,5 +152,13 @@ public class EPIDeliveryFormItemDTO {
 
     public void setConfirmedAt(LocalDateTime confirmedAt) {
         this.confirmedAt = confirmedAt;
+    }
+
+    public String getSizeNumber() {
+        return sizeNumber;
+    }
+
+    public void setSizeNumber(String sizeNumber) {
+        this.sizeNumber = sizeNumber;
     }
 }

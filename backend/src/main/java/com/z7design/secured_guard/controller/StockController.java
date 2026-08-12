@@ -77,12 +77,13 @@ public class StockController {
             @Parameter(description = "Status ativo") @RequestParam(value = "active", required = false) Boolean active,
             @Parameter(description = "ID da unidade") @RequestParam(value = "unitId", required = false) UUID unitId,
             @Parameter(description = "Apenas itens com baixo estoque") @RequestParam(value = "lowStock", required = false) Boolean lowStock,
+            @Parameter(description = "Apenas itens sem estoque (zerados)") @RequestParam(value = "outOfStock", required = false) Boolean outOfStock,
             @Parameter(description = "Termo de busca") @RequestParam(value = "searchTerm", required = false) String searchTerm,
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
 
         log.info("GET /api/stock/items/search - Buscando itens com filtros");
         Page<StockItemDTO> items = stockService.getItemsWithFilters(
-                category, active, unitId, lowStock, searchTerm, pageable);
+                category, active, unitId, lowStock, outOfStock, searchTerm, pageable);
         return ResponseEntity.ok(items);
     }
 
@@ -519,6 +520,17 @@ public class StockController {
         return ResponseEntity.ok()
                 .header("Content-Type", "application/pdf")
                 .header("Content-Disposition", "attachment; filename=estoque-baixo.pdf")
+                .body(pdf);
+    }
+
+    @GetMapping("/reports/out-of-stock/pdf")
+    @Operation(summary = "Gerar PDF de itens sem estoque (zerados)")
+    public ResponseEntity<byte[]> getOutOfStockReportPDF(@RequestParam("companyId") UUID companyId) throws IOException {
+        log.info("GET /api/stock/reports/out-of-stock/pdf - Gerando relatório PDF de itens zerados");
+        byte[] pdf = stockReportService.generateOutOfStockPDFReport(companyId);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=estoque-zerado.pdf")
                 .body(pdf);
     }
 

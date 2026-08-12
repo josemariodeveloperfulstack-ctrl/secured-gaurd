@@ -147,18 +147,25 @@ public class StockService {
             Boolean active,
             UUID unitId,
             Boolean lowStock,
+            Boolean outOfStock,
             String searchTerm,
             Pageable pageable) {
 
-        log.info("Buscando itens com filtros - Categoria: {}, Ativo: {}, Baixo estoque: {}",
-                category, active, lowStock);
+        log.info("Buscando itens com filtros - Categoria: {}, Ativo: {}, Baixo estoque: {}, Sem estoque: {}",
+                category, active, lowStock, outOfStock);
 
-        Page<StockItem> page = stockItemRepository.findByFilters(category, active, unitId, lowStock, searchTerm, pageable);
+        Page<StockItem> page = stockItemRepository.findByFilters(category, active, unitId, lowStock, outOfStock, searchTerm, pageable);
         List<StockItemDTO> content = mapItemsWithLocations(page.getContent());
         // Reaplica filtro de baixo estoque após reconciliar quantidades
         if (Boolean.TRUE.equals(lowStock)) {
             content = content.stream()
                     .filter(d -> Boolean.TRUE.equals(d.getIsLowStock()))
+                    .collect(Collectors.toList());
+            return new PageImpl<>(content, pageable, content.size());
+        }
+        if (Boolean.TRUE.equals(outOfStock)) {
+            content = content.stream()
+                    .filter(d -> d.getCurrentQuantity() != null && d.getCurrentQuantity() <= 0)
                     .collect(Collectors.toList());
             return new PageImpl<>(content, pageable, content.size());
         }
@@ -1334,6 +1341,12 @@ public class StockService {
     public List<StockItemDTO> getLowStockItems() {
         return mapItemsWithLocations(stockItemRepository.findByActiveTrue()).stream()
                 .filter(i -> Boolean.TRUE.equals(i.getIsLowStock()))
+                .collect(Collectors.toList());
+    }
+
+    public List<StockItemDTO> getOutOfStockItems() {
+        return mapItemsWithLocations(stockItemRepository.findByActiveTrue()).stream()
+                .filter(i -> i.getCurrentQuantity() == null || i.getCurrentQuantity() <= 0)
                 .collect(Collectors.toList());
     }
 

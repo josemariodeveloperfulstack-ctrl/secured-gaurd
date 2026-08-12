@@ -44,8 +44,8 @@ public class Company {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Size(max = 18, message = "CNPJ must not exceed 18 characters")
-    @Column(length = 18, unique = true)
+    @Size(max = 30, message = "CNPJ must not exceed 30 characters")
+    @Column(length = 30, unique = true)
     private String cnpj;
 
     @Size(max = 255, message = "Address must not exceed 255 characters")
@@ -77,12 +77,12 @@ public class Company {
     @Column(length = 2)
     private String state;
 
-    @Size(max = 10, message = "Zip code must not exceed 10 characters")
-    @Column(name = "zip_code", length = 10)
+    @Size(max = 20, message = "Zip code must not exceed 20 characters")
+    @Column(name = "zip_code", length = 20)
     private String zipCode;
 
-    @Size(max = 20, message = "Phone must not exceed 20 characters")
-    @Column(length = 20)
+    @Size(max = 30, message = "Phone must not exceed 30 characters")
+    @Column(length = 30)
     private String phone;
 
     @Email(message = "Invalid email format")

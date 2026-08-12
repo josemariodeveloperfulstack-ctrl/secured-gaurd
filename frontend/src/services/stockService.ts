@@ -42,13 +42,30 @@ export function normalizeStockItem(raw: Record<string, unknown>): StockItem {
   const uc = raw.unitCost ?? raw.unit_cost;
   const puc = raw.previousUnitCost ?? raw.previous_unit_cost;
   const base = raw as unknown as StockItem;
-  const nameStr = typeof raw.name === 'string' ? raw.name : '';
-  const fullNameStr =
+  const nameStr = typeof raw.name === 'string' ? raw.name.trim() : '';
+  const sizeStr = typeof raw.sizeVariation === 'string' ? raw.sizeVariation.trim() : '';
+  const rawFn =
     typeof fn === 'string' && fn.trim() !== ''
-      ? fn
+      ? fn.trim()
       : typeof base.fullName === 'string' && base.fullName
-        ? base.fullName
+        ? base.fullName.trim()
         : nameStr;
+
+  const fullNameStr = (() => {
+    if (!rawFn) return nameStr;
+    if (sizeStr) {
+      const fnLower = rawFn.toLowerCase();
+      const szLower = sizeStr.toLowerCase();
+      const dupPattern = ` - ${szLower} - ${szLower}`;
+      if (fnLower.endsWith(dupPattern)) {
+        return rawFn.substring(0, rawFn.length - (sizeStr.length + 3));
+      }
+      if (nameStr.toLowerCase().endsWith(szLower) && fnLower.endsWith(` - ${szLower}`)) {
+        return nameStr;
+      }
+    }
+    return rawFn;
+  })();
   let locations = base.locations;
   const locRaw = raw.locations;
   if (Array.isArray(locRaw) && locRaw.length > 0) {
@@ -570,6 +587,18 @@ export const stockService = {
       this.handleFileDownload(response.data, 'estoque-baixo.pdf');
     } catch (error) {
       console.error('Erro ao baixar PDF de estoque baixo:', error);
+      throw new Error('Falha ao baixar relatório');
+    }
+  },
+
+  async downloadOutOfStockPDF(companyId: string): Promise<void> {
+    try {
+      const response = await api.get(`/api/stock/reports/out-of-stock/pdf?companyId=${companyId}`, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, 'estoque-zerado.pdf');
+    } catch (error) {
+      console.error('Erro ao baixar PDF de estoque zerado:', error);
       throw new Error('Falha ao baixar relatório');
     }
   },

@@ -18,6 +18,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -56,6 +58,7 @@ import java.util.HashMap;
 @RestController
 @RequestMapping("/api/employees")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Funcionários", description = "Endpoints para gestão de funcionários")
 public class EmployeeController {
 
@@ -1403,12 +1406,12 @@ public class EmployeeController {
             }
 
         } catch (Exception e) {
-            System.err.println("❌ importEmployeesCustom - Erro: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of(
+            String errorMsg = e.getMessage() != null && !e.getMessage().isBlank() ? e.getMessage() : e.getClass().getSimpleName();
+            log.error("❌ importEmployeesCustom - Erro: {}", errorMsg, e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
                     "success", false,
-                    "message", "Erro ao processar importação: " + e.getMessage(),
-                    "errors", List.of(e.getMessage())));
+                    "message", "Erro ao processar importação: " + errorMsg,
+                    "errors", List.of(errorMsg)));
         }
     }
 }

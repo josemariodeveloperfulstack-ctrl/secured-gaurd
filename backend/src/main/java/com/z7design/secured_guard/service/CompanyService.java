@@ -198,11 +198,10 @@ public class CompanyService {
             }
         }
         
-        // Atualizar campos
-        existingCompany.setName(dto.getName());
-        existingCompany.setSigla(dto.getSigla());
+        existingCompany.setName(dto.getName() != null ? dto.getName().trim() : null);
+        existingCompany.setSigla(dto.getSigla() != null ? dto.getSigla().trim() : null);
         existingCompany.setDescription(dto.getDescription());
-        existingCompany.setCnpj(dto.getCnpj());
+        existingCompany.setCnpj(dto.getCnpj() != null ? dto.getCnpj().trim() : null);
         existingCompany.setAddress(dto.getAddress());
         existingCompany.setEnderecoRua(dto.getEnderecoRua());
         existingCompany.setEnderecoNumero(dto.getEnderecoNumero());
@@ -210,11 +209,12 @@ public class CompanyService {
         existingCompany.setEnderecoBairro(dto.getEnderecoBairro());
         existingCompany.setCity(dto.getCity());
         existingCompany.setState(dto.getState());
-        existingCompany.setZipCode(dto.getZipCode());
-        existingCompany.setPhone(dto.getPhone());
-        existingCompany.setEmail(dto.getEmail());
-        existingCompany.setWebsite(dto.getWebsite());
-        existingCompany.setLogoUrl(dto.getLogoUrl());
+        existingCompany.setZipCode(dto.getZipCode() != null ? dto.getZipCode().trim() : null);
+        existingCompany.setPhone(dto.getPhone() != null ? dto.getPhone().trim() : null);
+        existingCompany.setEmail(dto.getEmail() != null ? dto.getEmail().trim() : null);
+        if (dto.getLogoUrl() != null && !dto.getLogoUrl().isBlank()) {
+            existingCompany.setLogoUrl(dto.getLogoUrl().trim());
+        }
         existingCompany.setStatus(dto.getStatus());
         
         existingCompany = companyRepository.save(existingCompany);

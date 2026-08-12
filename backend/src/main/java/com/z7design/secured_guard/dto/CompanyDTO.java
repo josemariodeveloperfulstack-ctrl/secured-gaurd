@@ -35,7 +35,7 @@ public class CompanyDTO {
     
     private String description;
     
-    @Size(max = 18, message = "CNPJ must not exceed 18 characters")
+    @Size(max = 30, message = "CNPJ must not exceed 30 characters")
     private String cnpj;
     
     @Size(max = 255, message = "Address must not exceed 255 characters")
@@ -60,10 +60,10 @@ public class CompanyDTO {
     @Size(max = 2, message = "State must not exceed 2 characters")
     private String state;
     
-    @Size(max = 10, message = "Zip code must not exceed 10 characters")
+    @Size(max = 20, message = "Zip code must not exceed 20 characters")
     private String zipCode;
     
-    @Size(max = 20, message = "Phone must not exceed 20 characters")
+    @Size(max = 30, message = "Phone must not exceed 30 characters")
     private String phone;
     
     @Email(message = "Invalid email format")

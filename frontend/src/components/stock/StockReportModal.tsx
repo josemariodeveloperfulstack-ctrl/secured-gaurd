@@ -446,15 +446,50 @@ const StockReportModal: React.FC<StockReportModalProps> = ({ isOpen, onClose }) 
                     />
                   </div>
 
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm text-white">Incluir zerados</p>
-                      <p className="text-[11px] text-gray-500">Útil para achar faltantes na prateleira</p>
-                    </div>
-                    <Switch
-                      checked={filters.includeZeroStock}
-                      onCheckedChange={(v) => setFilters({ ...filters, includeZeroStock: v })}
-                    />
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium text-white">Filtro de Quantidade / Estoque Zerado</Label>
+                    <Select
+                      value={
+                        filters.onlyZeroStock || filters.zeroStockFilter === 'zero'
+                          ? 'zero'
+                          : filters.zeroStockFilter === 'non_zero' || !filters.includeZeroStock
+                            ? 'non_zero'
+                            : 'all'
+                      }
+                      onValueChange={(v) => {
+                        if (v === 'zero') {
+                          setFilters({
+                            ...filters,
+                            zeroStockFilter: 'zero',
+                            onlyZeroStock: true,
+                            includeZeroStock: true,
+                          });
+                        } else if (v === 'non_zero') {
+                          setFilters({
+                            ...filters,
+                            zeroStockFilter: 'non_zero',
+                            onlyZeroStock: false,
+                            includeZeroStock: false,
+                          });
+                        } else {
+                          setFilters({
+                            ...filters,
+                            zeroStockFilter: 'all',
+                            onlyZeroStock: false,
+                            includeZeroStock: true,
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-white">
+                        <SelectValue placeholder="Selecione o filtro de zerados" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600 text-white">
+                        <SelectItem value="all">Todos os itens (com e sem estoque)</SelectItem>
+                        <SelectItem value="zero">Somente itens ZERADOS (quantidade = 0)</SelectItem>
+                        <SelectItem value="non_zero">Somente itens COM ESTOQUE (quantidade &gt; 0)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="flex items-center justify-between gap-3">

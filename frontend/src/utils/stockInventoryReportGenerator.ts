@@ -11,12 +11,18 @@ export type StockReportType = 'by_items' | 'physical_check' | 'by_location' | 'c
 export type StockReportSortBy = 'alphabetical' | 'last_registered' | 'last_movement';
 export type StockReportExportFormat = 'pdf' | 'excel';
 
+export type StockReportZeroFilter = 'all' | 'zero' | 'non_zero';
+
 export interface StockReportFilters {
   sortBy: StockReportSortBy;
   category?: StockCategory | 'all';
   shelfId?: string;
   onlyActive: boolean;
   includeZeroStock: boolean;
+  /** Filtro de estoque zerado: 'all' (Todos), 'zero' (Somente zerados), 'non_zero' (Somente com estoque) */
+  zeroStockFilter?: StockReportZeroFilter;
+  /** Atalho para filtrar apenas itens zerados */
+  onlyZeroStock?: boolean;
   onlyLowStock: boolean;
   /** Agrupa a conferência física por localização (prateleira) para caminhar o almoxarifado. */
   groupByLocation: boolean;
@@ -120,8 +126,20 @@ export function buildLastMovementMap(movements: StockMovement[]): Map<string, st
 
 function itemPassesFilters(item: StockItem, filters: StockReportFilters): boolean {
   if (filters.onlyActive && item.active === false) return false;
-  if (!filters.includeZeroStock && (item.currentQuantity ?? 0) <= 0) return false;
-  if (filters.onlyLowStock && !item.isLowStock && (item.currentQuantity ?? 0) > (item.minimumQuantity ?? 0)) {
+
+  const qty = item.currentQuantity ?? 0;
+
+  if (filters.onlyZeroStock) {
+    if (qty > 0) return false;
+  } else if (filters.zeroStockFilter === 'zero') {
+    if (qty > 0) return false;
+  } else if (filters.zeroStockFilter === 'non_zero') {
+    if (qty <= 0) return false;
+  } else if (!filters.includeZeroStock) {
+    if (qty <= 0) return false;
+  }
+
+  if (filters.onlyLowStock && !item.isLowStock && qty > (item.minimumQuantity ?? 0)) {
     return false;
   }
   if (filters.category && filters.category !== 'all' && item.category !== filters.category) return false;
@@ -137,11 +155,29 @@ function toRow(item: StockItem, lastMovementAt?: string): StockReportRow {
     ? item.locations.reduce((sum, loc) => sum + (Number(loc.quantity) || 0), 0)
     : 0;
   const qty = locSum > 0 ? locSum : (item.currentQuantity ?? 0);
+  const rawName = (item.name || '').trim();
+  const rawSize = (item.sizeVariation || '').trim();
+
+  let subItem = rawSize || '—';
+  if (rawSize && rawName) {
+    const nLower = rawName.toLowerCase();
+    const sLower = rawSize.toLowerCase();
+    if (
+      nLower.endsWith(sLower) ||
+      nLower.endsWith(` ${sLower}`) ||
+      nLower.endsWith(`-${sLower}`) ||
+      nLower.endsWith(` - ${sLower}`) ||
+      nLower.endsWith(` (${sLower})`)
+    ) {
+      subItem = '—';
+    }
+  }
+
   return {
     id: item.id,
     code: item.code || '—',
-    itemName: (item.name || '').trim() || '—',
-    subItem: (item.sizeVariation || '').trim() || '—',
+    itemName: rawName || '—',
+    subItem,
     category: categoryLabel(item.category),
     location: formatLocation(item.locations),
     quantity: qty,

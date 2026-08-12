@@ -9,6 +9,8 @@ export interface EPIDeliveryFormItem {
   validityDate?: string;
   uniformType?: string;
   uniformPiece?: string;
+  /** Número / Tamanho do EPI (coluna Nº no PDF: ex. 44, 42, M, G, GG) */
+  sizeNumber?: string;
   observations?: string;
   stockItemId?: string; // ID do item no estoque para baixa automática
   /** Data da substituição — coluna SUBSTITUÍDO no PDF */

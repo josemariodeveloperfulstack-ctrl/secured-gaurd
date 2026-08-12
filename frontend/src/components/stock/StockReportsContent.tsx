@@ -618,6 +618,8 @@ const StockReportsContent: React.FC = () => {
         await stockService.downloadConsolidatedStockPDF(currentEmpresa.id, startDateISO, endDateISO);
       } else if (reportType === 'low-stock') {
         await stockService.downloadLowStockPDF(currentEmpresa.id);
+      } else if (reportType === 'out-of-stock') {
+        await stockService.downloadOutOfStockPDF(currentEmpresa.id);
       } else if (reportType === 'movements') {
         await stockService.downloadMovementsPDF(currentEmpresa.id, startDateISO, endDateISO);
       } else if (reportType === 'physical-inventory') {

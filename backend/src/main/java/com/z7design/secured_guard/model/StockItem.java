@@ -103,11 +103,25 @@ public class StockItem {
         }
     }
 
-    // Método para obter nome completo do item
+    // Método para obter nome completo do item sem duplicação de tamanho
     public String getFullName() {
-        if (sizeVariation != null && !sizeVariation.trim().isEmpty()) {
-            return name + " - " + sizeVariation;
+        if (name == null || name.trim().isEmpty()) {
+            return "";
         }
-        return name;
+        String trimmedName = name.trim();
+        if (sizeVariation != null && !sizeVariation.trim().isEmpty()) {
+            String trimmedSize = sizeVariation.trim();
+            String nameLower = trimmedName.toLowerCase();
+            String sizeLower = trimmedSize.toLowerCase();
+            if (nameLower.endsWith(sizeLower) ||
+                nameLower.endsWith(" " + sizeLower) ||
+                nameLower.endsWith("-" + sizeLower) ||
+                nameLower.endsWith(" - " + sizeLower) ||
+                nameLower.endsWith(" (" + sizeLower + ")")) {
+                return trimmedName;
+            }
+            return trimmedName + " - " + trimmedSize;
+        }
+        return trimmedName;
     }
 }

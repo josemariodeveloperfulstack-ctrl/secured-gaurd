@@ -23,6 +23,7 @@ import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EPIDeliveryFormRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.StockItemRepository;
 import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
@@ -55,6 +56,7 @@ public class EPIDeliveryStandardPdfService {
         private final EmployeeRepository employeeRepository;
         private final CompanyRepository companyRepository;
         private final EPIDeliveryFormRepository epiDeliveryFormRepository;
+        private final StockItemRepository stockItemRepository;
         private final StandardReportLayoutService standardReportLayoutService;
         private final ExcelReportLayoutService excelReportLayoutService;
         private final EmployeeDocumentDateResolver documentDateResolver;
@@ -332,11 +334,10 @@ public class EPIDeliveryStandardPdfService {
 
                         String deliveryStr = formatDate(form.getDeliveryDate());
                         List<EpiMovementRow> movements = buildMovementRows(form);
-                        int itemIdx = 1;
                         for (EpiMovementRow movement : movements) {
                                 epiTable.addCell(createEpiDataCell(
                                                 movement.epiName() != null ? movement.epiName().toUpperCase() : ""));
-                                epiTable.addCell(createEpiDataCell(String.valueOf(itemIdx++)));
+                                epiTable.addCell(createEpiDataCell(movement.sizeNumber() != null ? movement.sizeNumber() : ""));
                                 epiTable.addCell(createEpiDataCell(movement.ca() != null ? movement.ca() : ""));
                                 epiTable.addCell(createEpiDataCell(String.valueOf(movement.quantity())));
                                 epiTable.addCell(createEpiDataCell(formatDate(movement.deliveryDate())));
@@ -727,6 +728,7 @@ public class EPIDeliveryStandardPdfService {
          */
         private record EpiMovementRow(
                         String epiName,
+                        String sizeNumber,
                         String ca,
                         int quantity,
                         LocalDate deliveryDate,
@@ -802,8 +804,11 @@ public class EPIDeliveryStandardPdfService {
                                 }
                         }
 
+                        String sizeNum = resolveDisplaySizeNumber(item);
+
                         rows.add(new EpiMovementRow(
                                         item.getEpiName(),
+                                        sizeNum,
                                         item.getCa(),
                                         qty,
                                         deliveryDate,
@@ -811,5 +816,65 @@ public class EPIDeliveryStandardPdfService {
                                         substitutionReason,
                                         item.getSignatureBase64()));
                 }
+        }
+
+        private String resolveDisplaySizeNumber(EPIDeliveryFormItem item) {
+                if (item == null) return "";
+
+                String sizeNum = item.getSizeNumber();
+                if (sizeNum != null && !sizeNum.isBlank() && !isRowIndex(sizeNum)) {
+                        return sizeNum.trim();
+                }
+
+                if (item.getStockItemId() != null) {
+                        try {
+                                var stockOpt = stockItemRepository.findById(item.getStockItemId());
+                                if (stockOpt.isPresent() && stockOpt.get().getSizeVariation() != null
+                                                && !stockOpt.get().getSizeVariation().isBlank()) {
+                                        return stockOpt.get().getSizeVariation().trim();
+                                }
+                        } catch (Exception e) {
+                                log.debug("Erro ao consultar stockItem no PDF: {}", e.getMessage());
+                        }
+                }
+
+                if (item.getUniformPiece() != null && !item.getUniformPiece().isBlank()) {
+                        return item.getUniformPiece().trim();
+                }
+
+                if (item.getEpiName() != null && !item.getEpiName().isBlank()) {
+                        String extracted = extractSizeFromEpiName(item.getEpiName());
+                        if (extracted != null && !extracted.isBlank()) {
+                                return extracted;
+                        }
+                }
+
+                if (sizeNum != null && !sizeNum.isBlank()) {
+                        return sizeNum.trim();
+                }
+
+                return "";
+        }
+
+        private boolean isRowIndex(String val) {
+                if (val == null) return false;
+                try {
+                        int n = Integer.parseInt(val.trim());
+                        return n >= 1 && n <= 30;
+                } catch (NumberFormatException e) {
+                        return false;
+                }
+        }
+
+        private String extractSizeFromEpiName(String name) {
+                if (name == null) return null;
+                String trimmed = name.trim();
+                java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                                "(?i)\\b(PP|P|M|G|GG|XG|XGG|EG|EGG|EXG|3[3-9]|4[0-9]|5[0-0])\\b$");
+                java.util.regex.Matcher matcher = pattern.matcher(trimmed);
+                if (matcher.find()) {
+                        return matcher.group(1).toUpperCase();
+                }
+                return null;
         }
 }

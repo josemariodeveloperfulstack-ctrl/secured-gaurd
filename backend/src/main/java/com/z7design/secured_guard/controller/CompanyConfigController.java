@@ -26,6 +26,7 @@ public class CompanyConfigController {
 
     private final CompanyConfigService companyConfigService;
     private final ClientContractStandardPdfService contractPdfService;
+    private final FileUploadController fileUploadController;
 
     /**
      * Busca a configuração ativa da empresa
@@ -143,12 +144,16 @@ public class CompanyConfigController {
             @PathVariable UUID id,
             @RequestParam("file") MultipartFile file) {
         
-        log.info("POST /api/company-config/{}/logo - Upload de logo", id);
+        log.info("POST /api/company-config/{}/logo - Upload real de logo", id);
         
-        // TODO: Implementar upload real
-        // Por enquanto, retornar uma URL de exemplo
-        String logoUrl = "https://example.com/logos/" + file.getOriginalFilename();
-        
-        return ResponseEntity.ok(logoUrl);
+        var uploadResult = fileUploadController.uploadCompanyLogo(file);
+        if (uploadResult.getStatusCode().is2xxSuccessful() && uploadResult.getBody() != null) {
+            String logoUrl = uploadResult.getBody().get("url");
+            if (logoUrl != null) {
+                companyConfigService.updateLogoUrl(id, logoUrl);
+                return ResponseEntity.ok(logoUrl);
+            }
+        }
+        return ResponseEntity.status(uploadResult.getStatusCode()).body("Erro ao processar upload de logo");
     }
 }

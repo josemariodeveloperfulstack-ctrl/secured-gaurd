@@ -157,6 +157,24 @@ public class CompanyConfigService {
         config.setActive(true);
     }
 
+    public void updateLogoUrl(UUID configOrCompanyId, String logoUrl) {
+        if (configOrCompanyId == null || logoUrl == null || logoUrl.isBlank()) {
+            return;
+        }
+        companyRepository.findById(configOrCompanyId).ifPresent(company -> {
+            company.setLogoUrl(logoUrl);
+            companyRepository.save(company);
+        });
+        companyConfigRepository.findFirstByCompanyIdOrderByUpdatedAtDesc(configOrCompanyId).ifPresent(config -> {
+            config.setLogoUrl(logoUrl);
+            companyConfigRepository.save(config);
+        });
+        companyConfigRepository.findFirstByIdOrderByCreatedAtDesc(configOrCompanyId).ifPresent(config -> {
+            config.setLogoUrl(logoUrl);
+            companyConfigRepository.save(config);
+        });
+    }
+
     private static boolean nonBlank(String s) {
         return s != null && !s.trim().isEmpty();
     }

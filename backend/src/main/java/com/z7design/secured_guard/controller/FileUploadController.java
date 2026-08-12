@@ -315,6 +315,7 @@ public class FileUploadController {
             log.info("💾 Salvando arquivo em: {}", filePath);
 
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            savePersistentLogoBackup(filePath, uniqueFilename);
 
             // Verificar se o arquivo foi salvo corretamente
             if (!Files.exists(filePath)) {
@@ -456,7 +457,15 @@ public class FileUploadController {
             if (!filePath.startsWith(basePath)) {
                 return ResponseEntity.notFound().build();
             }
+            if (!Files.exists(filePath)) {
+                restoreFromPersistentBackup(filePath, filename);
+            }
             Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                if (restoreFromPersistentBackup(filePath, filename)) {
+                    resource = new UrlResource(filePath.toUri());
+                }
+            }
             if (!resource.exists() || !resource.isReadable()) {
                 return ResponseEntity.notFound().build();
             }
@@ -474,6 +483,42 @@ public class FileUploadController {
             log.debug("Logo não encontrado ou erro ao ler: {}", filename);
             return ResponseEntity.notFound().build();
         }
+    }
+
+    private Path getPersistentLogoBackupPath(String filename) {
+        String homeDir = System.getProperty("user.home");
+        if (homeDir == null || homeDir.isBlank()) {
+            return null;
+        }
+        return Paths.get(homeDir, ".secured_guard", "uploads", "companies", "logos", filename).toAbsolutePath().normalize();
+    }
+
+    private void savePersistentLogoBackup(Path sourcePath, String filename) {
+        try {
+            Path backupPath = getPersistentLogoBackupPath(filename);
+            if (backupPath != null) {
+                Files.createDirectories(backupPath.getParent());
+                Files.copy(sourcePath, backupPath, StandardCopyOption.REPLACE_EXISTING);
+                log.info("💾 Cópia de backup persistente salva em: {}", backupPath);
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Não foi possível salvar backup persistente do logo: {}", e.getMessage());
+        }
+    }
+
+    private boolean restoreFromPersistentBackup(Path targetFilePath, String filename) {
+        try {
+            Path backupPath = getPersistentLogoBackupPath(filename);
+            if (backupPath != null && Files.exists(backupPath)) {
+                Files.createDirectories(targetFilePath.getParent());
+                Files.copy(backupPath, targetFilePath, StandardCopyOption.REPLACE_EXISTING);
+                log.info("🔄 Logo restaurado automaticamente do backup persistente: {}", backupPath);
+                return true;
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Não foi possível restaurar logo do backup persistente: {}", e.getMessage());
+        }
+        return false;
     }
 
     @PostMapping("/safety-engineers/stamps")
@@ -511,7 +556,8 @@ public class FileUploadController {
                         .body(Map.of("error", "Arquivo muito grande. Máximo 5MB"));
             }
 
-            String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
+            String rawName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "stamp.png";
+            String originalFilename = StringUtils.cleanPath(rawName);
             String fileExtension = getFileExtension(originalFilename);
             String uniqueFilename = UUID.randomUUID().toString() + "." + fileExtension;
 
@@ -527,6 +573,7 @@ public class FileUploadController {
             log.info("💾 Salvando arquivo em: {}", filePath);
 
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            savePersistentStampBackup(filePath, uniqueFilename);
 
             if (!Files.exists(filePath)) {
                 log.error("❌ Arquivo não foi salvo corretamente: {}", filePath);
@@ -575,7 +622,15 @@ public class FileUploadController {
             if (!filePath.startsWith(basePath)) {
                 return ResponseEntity.notFound().build();
             }
+            if (!Files.exists(filePath)) {
+                restoreStampFromPersistentBackup(filePath, filename);
+            }
             Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                if (restoreStampFromPersistentBackup(filePath, filename)) {
+                    resource = new UrlResource(filePath.toUri());
+                }
+            }
             if (!resource.exists() || !resource.isReadable()) {
                 return ResponseEntity.notFound().build();
             }
@@ -593,6 +648,42 @@ public class FileUploadController {
             log.debug("Carimbo não encontrado ou erro ao ler: {}", filename);
             return ResponseEntity.notFound().build();
         }
+    }
+
+    private Path getPersistentStampBackupPath(String filename) {
+        String homeDir = System.getProperty("user.home");
+        if (homeDir == null || homeDir.isBlank()) {
+            return null;
+        }
+        return Paths.get(homeDir, ".secured_guard", "uploads", "safety-engineers", "stamps", filename).toAbsolutePath().normalize();
+    }
+
+    private void savePersistentStampBackup(Path sourcePath, String filename) {
+        try {
+            Path backupPath = getPersistentStampBackupPath(filename);
+            if (backupPath != null) {
+                Files.createDirectories(backupPath.getParent());
+                Files.copy(sourcePath, backupPath, StandardCopyOption.REPLACE_EXISTING);
+                log.info("💾 Cópia de backup persistente do carimbo salva em: {}", backupPath);
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Não foi possível salvar backup persistente do carimbo: {}", e.getMessage());
+        }
+    }
+
+    private boolean restoreStampFromPersistentBackup(Path targetFilePath, String filename) {
+        try {
+            Path backupPath = getPersistentStampBackupPath(filename);
+            if (backupPath != null && Files.exists(backupPath)) {
+                Files.createDirectories(targetFilePath.getParent());
+                Files.copy(backupPath, targetFilePath, StandardCopyOption.REPLACE_EXISTING);
+                log.info("🔄 Carimbo restaurado do backup persistente: {}", backupPath);
+                return true;
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Não foi possível restaurar carimbo do backup persistente: {}", e.getMessage());
+        }
+        return false;
     }
 
     // Métodos auxiliares

@@ -71,6 +71,7 @@ interface FichaEntregaEPIFormProps {
 const emptyEpiRow = () => ({
   id: '',
   nome: '',
+  tamanho: '',
   quantidade: '1',
   ca: '',
   caName: '',
@@ -138,6 +139,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
           setEpis(ficha.items.map(item => ({
             id: item.id || '',
             nome: item.epiName,
+            tamanho: item.sizeNumber || '',
             quantidade: String(item.quantity),
             ca: item.ca || '',
             caName: item.caName || '',
@@ -635,6 +637,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
     source.map(epi => ({
       id: epi.id || undefined,
       epiName: epi.nome,
+      sizeNumber: epi.tamanho || undefined,
       quantity: Math.max(1, parseInt(String(epi.quantidade).trim(), 10) || 1),
       ca: epi.ca || undefined,
       caName: epi.caName || undefined,
@@ -1518,6 +1521,9 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                               }
                               handleEpiChange(idx, 'stockItemId', value);
                               const selected = stockItems.find((i) => i.id === value);
+                              if (selected?.sizeVariation && !epi.tamanho) {
+                                handleEpiChange(idx, 'tamanho', selected.sizeVariation);
+                              }
                               const qty = Number(selected?.currentQuantity) || 0;
                               if (selected && qty <= 0) {
                                 toast({
@@ -1590,6 +1596,10 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                                         value={option}
                                         onSelect={() => {
                                           handleEpiChange(idx, 'nome', option);
+                                          const match = option?.trim().match(/\b(PP|P|M|G|GG|XG|XGG|EG|EGG|EXG|3[3-9]|4[0-9]|5[0-0])\b$/i);
+                                          if (match && !epi.tamanho) {
+                                            handleEpiChange(idx, 'tamanho', match[1].toUpperCase());
+                                          }
                                           // Limpar campos de uniforme se mudar o EPI
                                           if (option !== 'Uniforme de Trabalho') {
                                             handleEpiChange(idx, 'uniformeTipo', '');
@@ -1616,6 +1626,16 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                         {/* Campos padrão quando NÃO é Uniforme de Trabalho */}
                         {epi.nome !== 'Uniforme de Trabalho' && (
                           <>
+                            <div className="space-y-2">
+                              <Label>Nº / Tamanho</Label>
+                              <Input
+                                value={epi.tamanho || ''}
+                                onChange={(e) => handleEpiChange(idx, 'tamanho', e.target.value)}
+                                placeholder="Ex.: 44, 42, M, G..."
+                                className="bg-background"
+                              />
+                            </div>
+
                             <div className="space-y-2">
                               <Label>Quantidade</Label>
                               <Input
@@ -1722,6 +1742,16 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                             {/* Campos comuns para uniforme */}
                             {epi.uniformeTipo && (
                               <>
+                                <div className="space-y-2">
+                                  <Label>Nº / Tamanho</Label>
+                                  <Input
+                                    value={epi.tamanho || ''}
+                                    onChange={(e) => handleEpiChange(idx, 'tamanho', e.target.value)}
+                                    placeholder="Ex.: 44, 42, M, G, GG..."
+                                    className="bg-background"
+                                  />
+                                </div>
+
                                 <div className="space-y-2">
                                   <Label>Quantidade</Label>
                                   <Input

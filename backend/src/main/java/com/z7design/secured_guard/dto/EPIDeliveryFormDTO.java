@@ -308,6 +308,7 @@ public class EPIDeliveryFormDTO {
                                                 itemDto.setValidityDate(item.getValidityDate());
                                                 itemDto.setUniformType(item.getUniformType());
                                                 itemDto.setUniformPiece(item.getUniformPiece());
+                                                itemDto.setSizeNumber(item.getSizeNumber());
                                                 itemDto.setObservations(item.getObservations());
                                                 itemDto.setStockItemId(item.getStockItemId());
                                                 itemDto.setSubstitutedDate(item.getSubstitutedDate());

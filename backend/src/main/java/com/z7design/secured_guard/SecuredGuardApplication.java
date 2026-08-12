@@ -33,6 +33,21 @@ public class SecuredGuardApplication {
     }
 
     public static void main(String[] args) {
+        String dsUrl = System.getenv("SPRING_DATASOURCE_URL");
+        if (dsUrl == null || dsUrl.trim().isEmpty()) {
+            if (System.getProperty("spring.datasource.url") == null) {
+                System.setProperty("spring.datasource.url", "jdbc:postgresql://localhost:5432/secured_guard_test");
+            }
+            if (System.getProperty("spring.datasource.username") == null) {
+                System.setProperty("spring.datasource.username", "postgres");
+            }
+            if (System.getProperty("spring.datasource.password") == null) {
+                System.setProperty("spring.datasource.password", "1234567");
+            }
+            if (System.getProperty("spring.datasource.driver-class-name") == null) {
+                System.setProperty("spring.datasource.driver-class-name", "org.postgresql.Driver");
+            }
+        }
         SpringApplication.run(SecuredGuardApplication.class, args);
     }
 }

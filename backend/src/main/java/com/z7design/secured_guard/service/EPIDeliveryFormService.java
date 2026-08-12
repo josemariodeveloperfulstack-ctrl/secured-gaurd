@@ -162,6 +162,7 @@ public class EPIDeliveryFormService {
                         .uniformPiece(itemDto.getUniformPiece())
                         .observations(itemDto.getObservations())
                         .stockItemId(itemDto.getStockItemId())
+                        .sizeNumber(resolveSizeNumber(itemDto.getSizeNumber(), itemDto.getStockItemId(), itemDto.getEpiName()))
                         .substitutedDate(itemDto.getSubstitutedDate())
                         .replacementReason(itemDto.getReplacementReason())
                         .build();
@@ -240,6 +241,7 @@ public class EPIDeliveryFormService {
                         .uniformPiece(itemDto.getUniformPiece())
                         .observations(itemDto.getObservations())
                         .stockItemId(itemDto.getStockItemId())
+                        .sizeNumber(resolveSizeNumber(itemDto.getSizeNumber(), itemDto.getStockItemId(), itemDto.getEpiName()))
                         .substitutedDate(itemDto.getSubstitutedDate())
                         .replacementReason(itemDto.getReplacementReason())
                         .build();
@@ -1340,5 +1342,28 @@ public class EPIDeliveryFormService {
         } catch (Exception e) {
             log.warn("⚠️ Não foi possível registrar histórico de EPI para funcionário {}: {}", employeeId, e.getMessage());
         }
+    }
+
+    private String resolveSizeNumber(String sizeNumber, UUID stockItemId, String epiName) {
+        if (sizeNumber != null && !sizeNumber.isBlank()) {
+            return sizeNumber.trim();
+        }
+        if (stockItemId != null) {
+            String fromStock = stockItemRepository.findById(stockItemId)
+                    .map(si -> si.getSizeVariation())
+                    .orElse(null);
+            if (fromStock != null && !fromStock.isBlank()) {
+                return fromStock.trim();
+            }
+        }
+        if (epiName != null && !epiName.isBlank()) {
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                    "(?i)\\b(PP|P|M|G|GG|XG|XGG|EG|EGG|EXG|3[3-9]|4[0-9]|5[0-0])\\b$");
+            java.util.regex.Matcher matcher = pattern.matcher(epiName.trim());
+            if (matcher.find()) {
+                return matcher.group(1).toUpperCase();
+            }
+        }
+        return null;
     }
 }

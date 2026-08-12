@@ -1148,57 +1148,54 @@ public class StandardReportLayoutService {
             return logoUrl;
         }
 
-        // Se começa com /api/uploads/companies/logos/, remover o prefixo
+        Path resolvedPath;
         if (logoUrl.startsWith("/api/uploads/companies/logos/")) {
             String filename = logoUrl.replace("/api/uploads/companies/logos/", "");
-            Path logoDir = Paths.get(uploadDir, "companies", "logos");
-            return logoDir.resolve(filename).toAbsolutePath().toString();
-        }
-
-        // Se começa com api/uploads/companies/logos/ sem barra inicial
-        if (logoUrl.startsWith("api/uploads/companies/logos/")) {
+            resolvedPath = Paths.get(uploadDir, "companies", "logos").resolve(filename).toAbsolutePath();
+        } else if (logoUrl.startsWith("api/uploads/companies/logos/")) {
             String filename = logoUrl.replace("api/uploads/companies/logos/", "");
-            Path logoDir = Paths.get(uploadDir, "companies", "logos");
-            return logoDir.resolve(filename).toAbsolutePath().toString();
-        }
-
-        // Se começa com /uploads/companies/logos/, remover o prefixo
-        if (logoUrl.startsWith("/uploads/companies/logos/")) {
+            resolvedPath = Paths.get(uploadDir, "companies", "logos").resolve(filename).toAbsolutePath();
+        } else if (logoUrl.startsWith("/uploads/companies/logos/")) {
             String filename = logoUrl.replace("/uploads/companies/logos/", "");
-            Path logoDir = Paths.get(uploadDir, "companies", "logos");
-            return logoDir.resolve(filename).toAbsolutePath().toString();
-        }
-
-        // Se começa com uploads/companies/logos/ sem barra inicial
-        if (logoUrl.startsWith("uploads/companies/logos/")) {
+            resolvedPath = Paths.get(uploadDir, "companies", "logos").resolve(filename).toAbsolutePath();
+        } else if (logoUrl.startsWith("uploads/companies/logos/")) {
             String filename = logoUrl.replace("uploads/companies/logos/", "");
-            Path logoDir = Paths.get(uploadDir, "companies", "logos");
-            return logoDir.resolve(filename).toAbsolutePath().toString();
-        }
-
-        // Se começa com /uploads/, remover o prefixo
-        if (logoUrl.startsWith("/uploads/")) {
+            resolvedPath = Paths.get(uploadDir, "companies", "logos").resolve(filename).toAbsolutePath();
+        } else if (logoUrl.startsWith("/uploads/")) {
             String relativePath = logoUrl.replace("/uploads/", "");
-            Path logoPath = Paths.get(uploadDir, relativePath);
-            return logoPath.toAbsolutePath().toString();
-        }
-
-        // Se começa com uploads/ sem barra inicial
-        if (logoUrl.startsWith("uploads/")) {
+            resolvedPath = Paths.get(uploadDir, relativePath).toAbsolutePath();
+        } else if (logoUrl.startsWith("uploads/")) {
             String relativePath = logoUrl.replace("uploads/", "");
-            Path logoPath = Paths.get(uploadDir, relativePath);
-            return logoPath.toAbsolutePath().toString();
+            resolvedPath = Paths.get(uploadDir, relativePath).toAbsolutePath();
+        } else if (!logoUrl.contains("/")) {
+            resolvedPath = Paths.get(uploadDir, "companies", "logos").resolve(logoUrl).toAbsolutePath();
+        } else {
+            resolvedPath = Paths.get(uploadDir, logoUrl).toAbsolutePath();
         }
 
-        // Se é apenas o nome do arquivo, construir caminho completo
-        if (!logoUrl.contains("/")) {
-            Path logoDir = Paths.get(uploadDir, "companies", "logos");
-            return logoDir.resolve(logoUrl).toAbsolutePath().toString();
+        if (!Files.exists(resolvedPath)) {
+            restoreFromPersistentBackup(resolvedPath);
         }
 
-        // Caso contrário, assumir que é um caminho relativo
-        Path logoPath = Paths.get(uploadDir, logoUrl);
-        return logoPath.toAbsolutePath().toString();
+        return resolvedPath.toString();
+    }
+
+    private void restoreFromPersistentBackup(Path targetPath) {
+        if (targetPath == null) return;
+        try {
+            String filename = targetPath.getFileName().toString();
+            String homeDir = System.getProperty("user.home");
+            if (homeDir != null && !homeDir.isBlank()) {
+                Path backupPath = Paths.get(homeDir, ".secured_guard", "uploads", "companies", "logos", filename);
+                if (Files.exists(backupPath)) {
+                    Files.createDirectories(targetPath.getParent());
+                    Files.copy(backupPath, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    log.info("🔄 Logo restaurado do backup persistente no StandardReportLayoutService: {}", backupPath);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Não foi possível restaurar logo do backup persistente no StandardReportLayoutService: {}", e.getMessage());
+        }
     }
 
     /**

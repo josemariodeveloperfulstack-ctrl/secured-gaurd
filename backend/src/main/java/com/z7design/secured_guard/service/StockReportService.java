@@ -60,6 +60,29 @@ public class StockReportService {
         return baos.toByteArray();
     }
 
+    public byte[] generateOutOfStockPDFReport(UUID companyId) throws IOException {
+        log.info("Gerando relatório de itens sem estoque (zerados) para empresa: {}", companyId);
+
+        List<StockItemDTO> outOfStockItems = stockService.getOutOfStockItems();
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(baos);
+
+        ReportLayoutConfig config = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("RELATÓRIO DE ITENS SEM ESTOQUE (ZERADOS)")
+                .landscape(false)
+                .build();
+
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer, config);
+        Document document = docWithPdf.getDocument();
+
+        addOutOfStockTable(document, outOfStockItems);
+
+        document.close();
+        return baos.toByteArray();
+    }
+
     public byte[] generateGeneralStockPDFReport(UUID companyId, StockCategory category) throws IOException {
         log.info("Gerando relatório geral de estoque para empresa: {}", companyId);
 
@@ -249,6 +272,14 @@ public class StockReportService {
         return baos.toByteArray();
     }
 
+    private String formatItemDisplayName(StockItemDTO item) {
+        if (item == null) return "-";
+        if (item.getFullName() != null && !item.getFullName().isBlank()) {
+            return item.getFullName();
+        }
+        return item.getName() != null ? item.getName() : "-";
+    }
+
     private void addLowStockTable(Document document, List<StockItemDTO> items) {
         if (items == null || items.isEmpty()) {
             document.add(new Paragraph("Nenhum item em estoque baixo.").setItalic());
@@ -266,10 +297,37 @@ public class StockReportService {
 
         for (StockItemDTO item : items) {
             table.addCell(layoutService.createDataCell(item.getCode()));
-            table.addCell(layoutService.createDataCell(item.getName()));
+            table.addCell(layoutService.createDataCell(formatItemDisplayName(item)));
             table.addCell(layoutService.createDataCell(String.valueOf(item.getMinimumQuantity())));
             table.addCell(layoutService.createDataCell(String.valueOf(item.getCurrentQuantity())));
             table.addCell(layoutService.createDataCell("Crítico")
+                    .setFontColor(com.itextpdf.kernel.colors.ColorConstants.RED));
+        }
+
+        document.add(table);
+    }
+
+    private void addOutOfStockTable(Document document, List<StockItemDTO> items) {
+        if (items == null || items.isEmpty()) {
+            document.add(new Paragraph("Nenhum item zerado no estoque.").setItalic());
+            return;
+        }
+        Table table = new Table(UnitValue.createPercentArray(new float[] { 15, 35, 15, 15, 20 }))
+                .useAllAvailableWidth()
+                .setMarginTop(20);
+
+        table.addHeaderCell(layoutService.createHeaderCell("Código"));
+        table.addHeaderCell(layoutService.createHeaderCell("Item"));
+        table.addHeaderCell(layoutService.createHeaderCell("Mínimo"));
+        table.addHeaderCell(layoutService.createHeaderCell("Atual"));
+        table.addHeaderCell(layoutService.createHeaderCell("Status"));
+
+        for (StockItemDTO item : items) {
+            table.addCell(layoutService.createDataCell(item.getCode()));
+            table.addCell(layoutService.createDataCell(formatItemDisplayName(item)));
+            table.addCell(layoutService.createDataCell(String.valueOf(item.getMinimumQuantity())));
+            table.addCell(layoutService.createDataCell(String.valueOf(item.getCurrentQuantity())));
+            table.addCell(layoutService.createDataCell("Sem Estoque")
                     .setFontColor(com.itextpdf.kernel.colors.ColorConstants.RED));
         }
 
@@ -347,7 +405,7 @@ public class StockReportService {
 
         for (StockItemDTO item : items) {
             table.addCell(layoutService.createDataCell(item.getCode()));
-            table.addCell(layoutService.createDataCell(item.getName()));
+            table.addCell(layoutService.createDataCell(formatItemDisplayName(item)));
             table.addCell(
                     layoutService.createDataCell(item.getCategory() != null ? item.getCategory().toString() : "N/A"));
             table.addCell(layoutService.createDataCell(String.valueOf(item.getCurrentQuantity())));

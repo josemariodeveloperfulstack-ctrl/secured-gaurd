@@ -58,6 +58,9 @@ public class EPIDeliveryFormItem {
     @Column(name = "uniform_piece", length = 50)
     private String uniformPiece; // CALCA, CAMISA, etc.
 
+    @Column(name = "size_number", length = 50)
+    private String sizeNumber; // Número/Tamanho do EPI (ex: 44, 42, M, G, GG)
+
     @Column(columnDefinition = "TEXT")
     private String observations;
 

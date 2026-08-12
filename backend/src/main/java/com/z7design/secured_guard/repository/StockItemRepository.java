@@ -47,12 +47,13 @@ public interface StockItemRepository extends JpaRepository<StockItem, UUID> {
     // Buscar por unidade
     List<StockItem> findByUnitId(UUID unitId);
 
-    // Busca com filtros múltiplos
+    // Busca com filtros múltiplos (incluindo filtro de estoque zerado)
     @Query("SELECT si FROM StockItem si WHERE " +
            "(:category IS NULL OR si.category = :category) AND " +
            "(:active IS NULL OR si.active = :active) AND " +
            "(:unitId IS NULL OR si.unit.id = :unitId) AND " +
            "(:lowStock IS NULL OR (:lowStock = true AND si.currentQuantity <= si.minimumQuantity) OR (:lowStock = false)) AND " +
+           "(:outOfStock IS NULL OR (:outOfStock = true AND si.currentQuantity <= 0) OR (:outOfStock = false AND si.currentQuantity > 0)) AND " +
            "(:searchTerm IS NULL OR " +
            "si.name LIKE %:searchTerm% OR " +
            "si.code LIKE %:searchTerm% OR " +
@@ -63,6 +64,7 @@ public interface StockItemRepository extends JpaRepository<StockItem, UUID> {
             @Param("active") Boolean active,
             @Param("unitId") UUID unitId,
             @Param("lowStock") Boolean lowStock,
+            @Param("outOfStock") Boolean outOfStock,
             @Param("searchTerm") String searchTerm,
             Pageable pageable
     );

@@ -640,6 +640,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>EPI</TableHead>
+                          <TableHead>Nº</TableHead>
                           <TableHead>Quantidade</TableHead>
                           <TableHead>CA</TableHead>
                           <TableHead>Validade</TableHead>
@@ -650,6 +651,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
                         {selectedFicha.items?.map((item, idx) => (
                           <TableRow key={idx}>
                             <TableCell className="font-medium">{item.epiName}</TableCell>
+                            <TableCell>{item.sizeNumber || item.uniformPiece || '-'}</TableCell>
                             <TableCell>{item.quantity}</TableCell>
                             <TableCell>{item.ca || '-'}</TableCell>
                             <TableCell>

@@ -190,10 +190,26 @@ export const StockInventoryReportPrintable: React.FC<StockInventoryReportPrintab
               );
             }
 
-            const itemLabel =
-              row.subItem && row.subItem !== '—'
-                ? `${row.itemName} — ${row.subItem}`
-                : row.itemName;
+            const cleanItemName = (name: string, sub: string) => {
+              if (!name) return '—';
+              const n = name.trim();
+              if (!sub || sub === '—') return n;
+              const s = sub.trim();
+              const nLower = n.toLowerCase();
+              const sLower = s.toLowerCase();
+              if (
+                nLower.endsWith(sLower) ||
+                nLower.endsWith(` ${sLower}`) ||
+                nLower.endsWith(`-${sLower}`) ||
+                nLower.endsWith(` - ${sLower}`) ||
+                nLower.endsWith(` (${sLower})`)
+              ) {
+                return n;
+              }
+              return `${n} — ${s}`;
+            };
+
+            const itemLabel = cleanItemName(row.itemName, row.subItem);
 
             return (
               <tr key={row.id || `r-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>

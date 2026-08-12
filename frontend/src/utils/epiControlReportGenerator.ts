@@ -7,11 +7,22 @@ class EPIControlReportGenerator {
     return new Date(dateString).toLocaleDateString('pt-BR');
   }
 
+  private resolveEquipmentSizeNumber(equipmentName: string, equipmentNumber?: string): string {
+    if (equipmentNumber && !/^\d{1,2}$/.test(equipmentNumber.trim())) {
+      return equipmentNumber.trim();
+    }
+    const match = equipmentName?.trim().match(/\b(PP|P|M|G|GG|XG|XGG|EG|EGG|EXG|3[3-9]|4[0-9]|5[0-0])\b$/i);
+    if (match) {
+      return match[1].toUpperCase();
+    }
+    return equipmentNumber && equipmentNumber.trim() ? equipmentNumber.trim() : '';
+  }
+
   private createHTMLContent(record: EPIControlRecord): string {
     const equipmentRows = record.equipmentItems.map((item, index) => `
       <tr>
         <td style="border: 1px solid #000; padding: 8px; text-align: left;">${item.equipmentName}</td>
-        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.equipmentNumber}</td>
+        <td style="border: 1px solid #000; padding: 8px; text-align: center;">${this.resolveEquipmentSizeNumber(item.equipmentName, item.equipmentNumber)}</td>
         <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.ca}</td>
         <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.quantity}</td>
         <td style="border: 1px solid #000; padding: 8px; text-align: center;">${this.formatDate(item.deliveryDate)}</td>

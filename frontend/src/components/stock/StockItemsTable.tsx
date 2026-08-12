@@ -116,7 +116,8 @@ const StockItemsTable: React.FC<StockItemsTableProps> = ({
       const matchesLowStock =
         lowStockFilter === 'all' ||
         (lowStockFilter === 'true' && item.isLowStock) ||
-        (lowStockFilter === 'false' && !item.isLowStock);
+        (lowStockFilter === 'zero' && (item.currentQuantity ?? 0) <= 0) ||
+        (lowStockFilter === 'false' && !item.isLowStock && (item.currentQuantity ?? 0) > 0);
 
       return matchesSearch && matchesCategory && matchesLowStock;
     });
@@ -270,6 +271,7 @@ const StockItemsTable: React.FC<StockItemsTableProps> = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os itens</SelectItem>
+                  <SelectItem value="zero">Estoque zerado (Sem estoque)</SelectItem>
                   <SelectItem value="true">Baixo estoque</SelectItem>
                   <SelectItem value="false">Estoque normal</SelectItem>
                 </SelectContent>
