@@ -296,9 +296,13 @@ public class FileUploadController {
                         .body(Map.of("error", "Arquivo muito grande. Máximo 5MB"));
             }
 
-            // Gerar nome único para o arquivo
-            String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
+            // Gerar nome único para o arquivo (tratamento nulo-seguro de nome de arquivo)
+            String rawName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "logo.png";
+            String originalFilename = StringUtils.cleanPath(rawName);
             String fileExtension = getFileExtension(originalFilename);
+            if (fileExtension == null || fileExtension.isBlank()) {
+                fileExtension = (contentType != null && contentType.contains("png")) ? "png" : "jpg";
+            }
             String uniqueFilename = UUID.randomUUID().toString() + "." + fileExtension;
 
             log.info("📝 Nome único gerado: {}", uniqueFilename);
@@ -712,8 +716,11 @@ public class FileUploadController {
 
     private String getFileExtension(String filename) {
         if (filename != null && filename.contains(".")) {
-            return filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
+            String ext = filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
+            if (!ext.isBlank()) {
+                return ext;
+            }
         }
-        return "";
+        return "png";
     }
 }
