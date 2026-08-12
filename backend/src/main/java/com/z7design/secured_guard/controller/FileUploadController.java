@@ -264,7 +264,7 @@ public class FileUploadController {
             @ApiResponse(responseCode = "403", description = "Acesso negado"),
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'ADMINISTRADOR', 'ROLE_RH', 'RH', 'ROLE_GESTOR', 'GESTOR', 'ROLE_COMERCIAL', 'COMERCIAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<Map<String, String>> uploadCompanyLogo(
             @Parameter(description = "Arquivo do logo (PNG, JPG, JPEG)") @RequestParam("file") MultipartFile file) {
 
@@ -529,6 +529,7 @@ public class FileUploadController {
             @ApiResponse(responseCode = "403", description = "Acesso negado"),
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'ADMINISTRADOR', 'ROLE_RH', 'RH', 'ROLE_GESTOR', 'GESTOR', 'ROLE_COMERCIAL', 'COMERCIAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<Map<String, String>> uploadSafetyEngineerStamp(
             @Parameter(description = "Arquivo do carimbo (PNG, JPG, JPEG)") @RequestParam("file") MultipartFile file) {
         try {

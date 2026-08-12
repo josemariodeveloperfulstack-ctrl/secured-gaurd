@@ -219,11 +219,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({ open, onOpen
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await api.post('/api/uploads/companies/logo', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      const response = await api.post('/api/uploads/companies/logo', formData);
 
       // Backend retorna: /api/uploads/companies/logos/{filename}
       const logoUrl = response.data.url;

@@ -65,7 +65,8 @@ public class WebConfig implements WebMvcConfigurer {
                 // Adicionar headers CORS para arquivos estáticos
                 if (request.getRequestURI().startsWith("/uploads/") ||
                         request.getRequestURI().startsWith("/holerites/") ||
-                        request.getRequestURI().startsWith("/api/uploads/companies/logos/")) {
+                        request.getRequestURI().startsWith("/api/uploads/companies/logos/") ||
+                        request.getRequestURI().startsWith("/api/uploads/safety-engineers/stamps/")) {
                     response.setHeader("Access-Control-Allow-Origin", "*");
                     response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
                     response.setHeader("Access-Control-Allow-Headers", "*");

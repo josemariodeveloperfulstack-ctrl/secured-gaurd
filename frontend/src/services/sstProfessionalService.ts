@@ -75,9 +75,7 @@ export const sstProfessionalService = {
   async uploadStamp(file: File): Promise<{ url: string; filename: string }> {
     const formData = new FormData();
     formData.append('file', file);
-    const { data } = await api.post('/api/uploads/safety-engineers/stamps', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const { data } = await api.post('/api/uploads/safety-engineers/stamps', formData);
     return data;
   },
 

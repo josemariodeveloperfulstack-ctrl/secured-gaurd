@@ -74,8 +74,11 @@ echo "✅ Firewall configurado"
 echo ""
 echo "4️⃣ Criando estrutura de diretórios..."
 mkdir -p /var/www/secured_guard/ci/{postgres_data,redis_data,uploads,logs,whatsapp_sessions,backups}
+mkdir -p /var/www/secured_guard/ci/uploads/companies/logos
+mkdir -p /var/www/secured_guard/ci/uploads/safety-engineers/stamps
 mkdir -p /root/secured_guard
 chmod -R 755 /var/www/secured_guard
+chmod -R 777 /var/www/secured_guard/ci/uploads
 chmod -R 755 /root/secured_guard
 echo "✅ Diretórios criados"
 

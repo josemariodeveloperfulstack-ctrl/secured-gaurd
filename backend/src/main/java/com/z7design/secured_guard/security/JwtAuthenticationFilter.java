@@ -38,6 +38,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Pular filtro para recursos estáticos públicos (logos, uploads, etc)
         if (path.startsWith("/api/uploads/companies/logos/") ||
+                path.startsWith("/api/uploads/safety-engineers/stamps/") ||
                 path.startsWith("/uploads/") ||
                 path.startsWith("/holerites/") ||
                 path.startsWith("/api/auth/") ||
