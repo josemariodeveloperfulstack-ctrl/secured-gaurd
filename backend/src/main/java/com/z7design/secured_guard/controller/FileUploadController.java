@@ -54,7 +54,7 @@ public class FileUploadController {
 
         try {
             // Validar arquivo
-            if (file.isEmpty()) {
+            if (file == null || file.isEmpty()) {
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "Arquivo não pode estar vazio"));
             }
@@ -269,15 +269,15 @@ public class FileUploadController {
             @Parameter(description = "Arquivo do logo (PNG, JPG, JPEG)") @RequestParam("file") MultipartFile file) {
 
         try {
-            log.info("📤 Iniciando upload de logo da empresa - Nome original: {}, Tamanho: {} bytes",
-                    file.getOriginalFilename(), file.getSize());
-
             // Validar arquivo
-            if (file.isEmpty()) {
-                log.warn("❌ Arquivo vazio recebido");
+            if (file == null || file.isEmpty()) {
+                log.warn("❌ Arquivo nulo ou vazio recebido");
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "Arquivo não pode estar vazio"));
             }
+
+            log.info("📤 Iniciando upload de logo da empresa - Nome original: {}, Tamanho: {} bytes",
+                    file.getOriginalFilename(), file.getSize());
 
             // Validar tipo de arquivo (apenas imagens: JPG, JPEG, PNG)
             String contentType = file.getContentType();
@@ -532,14 +532,14 @@ public class FileUploadController {
     public ResponseEntity<Map<String, String>> uploadSafetyEngineerStamp(
             @Parameter(description = "Arquivo do carimbo (PNG, JPG, JPEG)") @RequestParam("file") MultipartFile file) {
         try {
-            log.info("📤 Iniciando upload de carimbo do engenheiro de segurança - Nome original: {}, Tamanho: {} bytes",
-                    file.getOriginalFilename(), file.getSize());
-
-            if (file.isEmpty()) {
-                log.warn("❌ Arquivo vazio recebido");
+            if (file == null || file.isEmpty()) {
+                log.warn("❌ Arquivo nulo ou vazio recebido");
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "Arquivo não pode estar vazio"));
             }
+
+            log.info("📤 Iniciando upload de carimbo do engenheiro de segurança - Nome original: {}, Tamanho: {} bytes",
+                    file.getOriginalFilename(), file.getSize());
 
             String contentType = file.getContentType();
             log.info("📄 Content-Type recebido: {}", contentType);
