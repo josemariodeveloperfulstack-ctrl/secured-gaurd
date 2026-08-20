@@ -796,13 +796,13 @@ export const employeeService = {
    */
   async searchSimpleEmployees(query: string): Promise<SimpleEmployee[]> {
     try {
-      const response = await api.get(`/api/employees/search/simple?q=${encodeURIComponent(query)}`);
-      const raw = response.data;
-      if (Array.isArray(raw)) return raw;
-      if (raw && typeof raw === 'object' && Array.isArray((raw as { content?: unknown }).content)) {
-        return (raw as { content: SimpleEmployee[] }).content;
+      const q = (query || '').trim();
+      if (!q) {
+        const basicList = await this.getSimpleEmployees();
+        if (basicList && basicList.length > 0) return basicList;
       }
-      return [];
+      const employees = await this.getAllEmployees({ searchTerm: q }, 0, 50);
+      return employees.map(employeeToSimpleEmployee);
     } catch (error) {
       console.error('Erro ao buscar funcionários simplificados:', error);
       return [];
