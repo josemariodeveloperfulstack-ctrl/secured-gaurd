@@ -98,6 +98,9 @@ public class FirearmAcautelamento {
     @Column(name = "term_date")
     private LocalDate termDate; // Data do Termo
 
+    @Column(name = "observations", columnDefinition = "TEXT")
+    private String observations;
+
     // Foto Opcional
     @Column(name = "photo_base64", columnDefinition = "TEXT")
     private String photoBase64;
