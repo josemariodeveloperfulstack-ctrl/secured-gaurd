@@ -24,7 +24,8 @@ import {
   ShieldCheck, 
   MapPin, 
   Calendar,
-  Download
+  Download,
+  Building2
 } from 'lucide-react';
 import { EquipmentCautela, equipmentCautelaService } from '@/services/equipmentCautelaService';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
@@ -51,7 +52,8 @@ export const EquipmentCautelaFormModal: React.FC<EquipmentCautelaFormModalProps>
   const [funcionarios, setFuncionarios] = useState<any[]>([]);
   const [postos, setPostos] = useState<any[]>([]);
 
-  // 1. Dados do Colaborador
+  // Empresa e Colaborador
+  const [companyName, setCompanyName] = useState<string>('SECURED GUARD SEGURANÇA PRIVADA');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [employeeName, setEmployeeName] = useState<string>('');
   const [registration, setRegistration] = useState<string>('');
@@ -145,7 +147,7 @@ export const EquipmentCautelaFormModal: React.FC<EquipmentCautelaFormModalProps>
       const almSig = almoxarifeCanvasRef.current?.toDataURL('image/png');
 
       const payload: EquipmentCautela = {
-        companyName: 'SECURED GUARD SEGURANÇA PRIVADA',
+        companyName: companyName.trim() || 'SECURED GUARD SEGURANÇA PRIVADA',
         employeeName: employeeName.trim(),
         registration: registration.trim() || undefined,
         cpf: cpf.trim() || undefined,
@@ -230,6 +232,7 @@ export const EquipmentCautelaFormModal: React.FC<EquipmentCautelaFormModalProps>
         });
 
       if (initialData) {
+        setCompanyName(initialData.companyName || 'SECURED GUARD SEGURANÇA PRIVADA');
         setEmployeeName(initialData.employeeName || '');
         setRegistration(initialData.registration || '');
         setCpf(initialData.cpf || '');
@@ -256,6 +259,7 @@ export const EquipmentCautelaFormModal: React.FC<EquipmentCautelaFormModalProps>
         setObservations(initialData.observations || '');
         setAlmoxarifeName(initialData.almoxarifeName || '');
       } else {
+        setCompanyName('SECURED GUARD SEGURANÇA PRIVADA');
         setSelectedEmployeeId('');
         setEmployeeName('');
         setRegistration('');
@@ -434,7 +438,7 @@ export const EquipmentCautelaFormModal: React.FC<EquipmentCautelaFormModalProps>
       const almoxarifeSig = almoxarifeCanvasRef.current?.toDataURL('image/png') || initialData?.almoxarifeSignatureBase64;
 
       const payload: EquipmentCautela = {
-        companyName: 'SECURED GUARD SEGURANÇA PRIVADA',
+        companyName: companyName.trim() || 'SECURED GUARD SEGURANÇA PRIVADA',
         employeeName: employeeName.trim(),
         registration: registration.trim() || undefined,
         cpf: cpf.trim() || undefined,
@@ -586,6 +590,19 @@ export const EquipmentCautelaFormModal: React.FC<EquipmentCautelaFormModalProps>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+              {/* Empresa Emissora */}
+              <div className="space-y-1 sm:col-span-3">
+                <Label className="text-xs text-gray-300 flex items-center gap-1">
+                  <Building2 className="w-3 h-3 text-seguranca-yellow" /> Empresa Emissora (Razão Social)
+                </Label>
+                <Input
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Ex: SECURED GUARD SEGURANÇA PRIVADA"
+                  className="bg-slate-900 border-slate-700 text-white text-sm h-9 font-medium"
+                />
+              </div>
+
               {/* Seleção de Funcionário */}
               <div className="space-y-1 sm:col-span-2">
                 <Label className="text-xs text-gray-300 flex items-center gap-1">

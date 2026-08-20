@@ -13,6 +13,7 @@ import {
   Download, 
   Eye, 
   Trash2, 
+  Pencil,
   Radio, 
   Flashlight, 
   ShieldCheck, 
@@ -95,6 +96,11 @@ export const EquipmentCautelaTab: React.FC = () => {
   const handleOpenView = (item: EquipmentCautela) => {
     setSelectedTermo(item);
     setShowViewModal(true);
+  };
+
+  const handleOpenEdit = (item: EquipmentCautela) => {
+    setSelectedTermo(item);
+    setShowFormModal(true);
   };
 
   const handleOpenNew = () => {
@@ -452,6 +458,15 @@ export const EquipmentCautelaTab: React.FC = () => {
                             title="Visualizar detalhes"
                           >
                             <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleOpenEdit(item)}
+                            className="h-8 text-blue-400 hover:text-blue-300 hover:bg-slate-800"
+                            title="Editar termo de cautela"
+                          >
+                            <Pencil className="w-4 h-4" />
                           </Button>
                           <Button
                             size="sm"
