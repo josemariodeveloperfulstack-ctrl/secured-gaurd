@@ -20,7 +20,7 @@
     <properties>
         <java.version>17</java.version>
         <jjwt.version>0.11.5</jjwt.version>
-        <lombok.version>1.18.38</lombok.version>
+        <lombok.version>1.18.34</lombok.version>
         <google.api.client.version>2.5.0</google.api.client.version>
         <openpdf.version>1.3.30</openpdf.version>
     </properties>
@@ -316,12 +316,6 @@
             <version>5.8.0</version>
         </dependency>
 
-        <!-- Redis for Streams -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
-
         <!-- WebFlux for async HTTP calls (Gemini API) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -468,16 +462,12 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <useIncrementalCompilation>false</useIncrementalCompilation>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                             <version>${lombok.version}</version>
-                        </path>
-                        <path>
-                            <groupId>org.mapstruct</groupId>
-                            <artifactId>mapstruct-processor</artifactId>
-                            <version>1.5.5.Final</version>
                         </path>
                     </annotationProcessorPaths>
                     <compilerArgs>
