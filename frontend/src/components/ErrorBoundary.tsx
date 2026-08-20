@@ -15,8 +15,23 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
+    // Auto-recuperação para falha de importação dinâmica (Vite dev server restart / perda de conexão)
+    if (error && typeof error.message === 'string' &&
+        (error.message.includes('Failed to fetch dynamically imported module') ||
+         error.message.includes('Importing a module script failed') ||
+         error.message.includes('ERR_CONNECTION_CLOSED'))) {
+      console.warn('🔄 ErrorBoundary: Detectada falha na importação dinâmica de módulo. Recarregando página...');
+      const storageKey = 'vite_dynamic_import_reload';
+      const lastReload = sessionStorage.getItem(storageKey);
+      const timeNow = Date.now();
+      if (!lastReload || timeNow - Number(lastReload) > 10000) {
+        sessionStorage.setItem(storageKey, String(timeNow));
+        window.location.reload();
+        return { hasError: false };
+      }
+    }
+
     // Ignorar erros de Suspense síncronos do React Router / React 18
-    // Mensagem típica: "A component suspended while responding to synchronous input..."
     if (error && typeof error.message === 'string' &&
         error.message.includes('A component suspended while responding to synchronous input')) {
       console.warn('ErrorBoundary: ignorando erro de Suspense síncrono:', error.message);
