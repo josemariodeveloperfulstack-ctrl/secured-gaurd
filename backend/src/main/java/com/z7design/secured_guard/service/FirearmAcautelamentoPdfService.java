@@ -173,7 +173,7 @@ public class FirearmAcautelamentoPdfService {
 
         String marcaCal = String.format("Marca: %s | Calibre: %s | Capacidade: %s tiros",
                 termo.getBrand() != null ? termo.getBrand() : "________",
-                termo.getCalibre() != null ? termo.getCalibre() : "________",
+                termo.getCaliber() != null ? termo.getCaliber() : "________",
                 termo.getShotCapacity() != null ? String.valueOf(termo.getShotCapacity()) : "____");
         table.addCell(createDataCell("• Marca / Calibre:", marcaCal));
 
