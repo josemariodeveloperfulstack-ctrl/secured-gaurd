@@ -175,12 +175,15 @@ export const messageService = {
   },
 
   async markSystemMessageAsRead(messageId: string): Promise<void> {
+    if (!messageId || messageId.startsWith('demo-') || messageId.startsWith('mock-')) {
+      return;
+    }
     try {
-      await api.put(`/api/v1/messages/${messageId}/read`, {}, {
+      await api.put(`/v1/messages/${messageId}/read`, {}, {
         headers: getAuthHeaders()
       });
     } catch (error) {
-      handleApiError(error, 'markSystemMessageAsRead');
+      console.warn('[MessageService] Não foi possível marcar mensagem como lida:', error);
     }
   },
 
