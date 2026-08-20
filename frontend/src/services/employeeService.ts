@@ -431,6 +431,14 @@ export const employeeService = {
   },
 
   /**
+   * Buscar funcionários por termo de busca (autocomplete a partir de 3 caracteres)
+   */
+  async searchEmployees(searchTerm: string): Promise<Employee[]> {
+    if (!searchTerm || searchTerm.trim().length < 3) return [];
+    return this.getAllEmployees({ searchTerm: searchTerm.trim() }, 0, 50);
+  },
+
+  /**
    * Carrega todos os funcionários para relatórios (API limita 500 por página).
    */
   async fetchAllEmployeesForReport(filters?: EmployeeFilters): Promise<Employee[]> {

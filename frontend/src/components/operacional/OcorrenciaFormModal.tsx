@@ -13,10 +13,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/axios';
 import { Occurrence } from '@/services/occurrenceService';
 import { employeeService, Employee } from '@/services/employeeService';
 import { occurrenceService } from '@/services/occurrenceService';
 import { workPostService, WorkPost } from '@/services/workPostService';
+import { operationalService } from '@/services/operationalService';
 import { 
   Loader2, 
   AlertTriangle, 
@@ -246,19 +248,29 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
 
     try {
       const full = await employeeService.getEmployeeById(emp.id);
-      const workPostId = full?.workPostId ?? full?.workPost?.id;
-      if (!workPostId) return;
+      const target = full || emp;
+      const workPostId = target?.workPostId ?? target?.workPost?.id;
+      
+      // Buscar o setor de trabalho designado na admissão
+      let workPostName: string | undefined =
+        target?.workPostName ||
+        target?.workPost?.name ||
+        (target as any)?.workSector ||
+        (target as any)?.sector ||
+        target?.departmentName ||
+        target?.department?.name ||
+        target?.unitName ||
+        target?.unit?.name ||
+        target?.positionName ||
+        target?.position?.name;
 
-      // 1) Nome diretamente do funcionário (quando o backend traz aninhado)
-      let workPostName: string | undefined = full?.workPost?.name;
-
-      // 2) Fallback: tentar na lista já carregada
-      if (!workPostName) {
+      // Fallback: tentar encontrar pelo ID do posto
+      if (!workPostName && workPostId) {
         workPostName = workPosts.find(p => p.id === workPostId)?.name;
       }
 
-      // 3) Fallback final: buscar diretamente no serviço e fazer upsert na lista local
-      if (!workPostName) {
+      // Fallback final: buscar no serviço de postos de trabalho
+      if (!workPostName && workPostId) {
         try {
           const wp = await workPostService.getWorkPostById(workPostId);
           if (wp?.name) {
@@ -270,15 +282,14 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
         }
       }
 
-      // Preenche o locationId mesmo sem nome (o Select resolverá o nome quando os postos terminarem de carregar)
       setFormData(prev => ({
         ...prev,
-        locationId: workPostId,
+        locationId: workPostId || prev.locationId || '',
         location: workPostName ?? prev.location ?? '',
       }));
       setErrors(prev => ({ ...prev, location: '' }));
     } catch {
-      // Ignorar; usuário pode selecionar posto manualmente
+      // Ignorar; usuário pode selecionar o posto manualmente se necessário
     }
   }, [workPosts]);
 
@@ -516,10 +527,61 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
       } else {
         await occurrenceService.createOccurrence(ocorrenciaData);
       }
-      toast({
-        title: 'Sucesso!',
-        description: ocorrencia ? 'Ocorrência atualizada com sucesso.' : 'Ocorrência criada com sucesso.',
-      });
+
+      // Se for a opção Atestado, vincula automaticamente criando o registro na Gestão de Atestados
+      if (formData.type === 'atestado') {
+        try {
+          let certDays = 1;
+          if (formData.startDate && formData.endDate) {
+            const start = new Date(formData.startDate);
+            const end = new Date(formData.endDate);
+            const diffTime = end.getTime() - start.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            if (diffDays > 0) certDays = diffDays;
+          }
+
+          let uploadedDocUrl = '';
+          if (file) {
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', file);
+            try {
+              const uploadRes = await api.post('/api/uploads/atestados', uploadFormData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+              });
+              uploadedDocUrl = uploadRes.data?.url || uploadRes.data?.fileUrl || '';
+            } catch (err) {
+              console.warn('Erro no upload de atestado:', err);
+            }
+          }
+
+          await operationalService.createAbsence({
+            employeeId: formData.employeeId!,
+            absenceDate: formData.startDate || formData.date || new Date().toISOString().split('T')[0],
+            absenceType: 'SICK_LEAVE',
+            reason: formData.reason || formData.description || 'Atestado gerado via Ocorrência',
+            medicalCertificateDays: certDays,
+            coverageWorkPostId: formData.locationId || undefined,
+            documentUrl: uploadedDocUrl || undefined
+          });
+
+          toast({
+            title: 'Ocorrência e Atestado Registrados!',
+            description: 'Ocorrência salva e atestado médico vinculado com sucesso à Gestão de Atestados.',
+          });
+        } catch (absError) {
+          console.warn('Ocorrência salva, mas erro ao registrar na Gestão de Atestados:', absError);
+          toast({
+            title: 'Sucesso!',
+            description: ocorrencia ? 'Ocorrência atualizada com sucesso.' : 'Ocorrência criada com sucesso.',
+          });
+        }
+      } else {
+        toast({
+          title: 'Sucesso!',
+          description: ocorrencia ? 'Ocorrência atualizada com sucesso.' : 'Ocorrência criada com sucesso.',
+        });
+      }
+
       onSave(ocorrenciaData);
       onOpenChange(false);
       setFile(null);
@@ -732,20 +794,32 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
                       ) : employeeSearchResults.length === 0 ? (
                         <div className="px-3 py-3 text-gray-400 text-sm">Nenhum funcionário encontrado</div>
                       ) : (
-                        employeeSearchResults.map((emp) => (
-                          <button
-                            key={emp.id}
-                            type="button"
-                            className="w-full text-left px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-red/20 rounded transition-colors text-sm"
-                            onClick={() => handleSelectEmployee(emp)}
-                          >
-                            {emp.name}
-                          </button>
-                        ))
+                        employeeSearchResults.map((emp) => {
+                          const empWorkPost = emp.workPostName || emp.workPost?.name || emp.departmentName || emp.department?.name;
+                          return (
+                            <button
+                              key={emp.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-red/20 rounded transition-colors text-sm flex flex-col"
+                              onClick={() => handleSelectEmployee(emp)}
+                            >
+                              <span className="font-medium text-white">{emp.name}</span>
+                              {empWorkPost && (
+                                <span className="text-xs text-emerald-400">Setor/Posto da Admissão: {empWorkPost}</span>
+                              )}
+                            </button>
+                          );
+                        })
                       )}
                     </div>
                   )}
                 </div>
+                {formData.employeeId && formData.location && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1.5 rounded-md">
+                    <MapPin className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span>Setor de Trabalho (Designado na Admissão): <strong className="text-emerald-300">{formData.location}</strong></span>
+                  </div>
+                )}
                 {errors.employeeId && <p className="text-red-500 text-sm">{errors.employeeId}</p>}
               </div>
 
