@@ -832,7 +832,13 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         STOCK_CREATE: true,
         STOCK_MANAGE: true,
         COMPANIES_READ: true,
+        // Almoxarifado / Estoque: apenas consulta de funcionários e relatórios (SEM permissão de edição)
+        EMPLOYEES_READ: true,
+        EMPLOYEES_WRITE: false,
+        EMPLOYEES_CREATE: false,
+        EMPLOYEES_DELETE: false,
         REPORTS_READ: true,
+        REPORTS_GENERATE: true,
         DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,

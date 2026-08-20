@@ -34,7 +34,8 @@ export const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  const hasLoadedRef = useRef(false);
+  const [showAlertBanner, setShowAlertBanner] = useState(false);
+  const hasInitialLoadedRef = useRef(false);
   const dragControls = useDragControls();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -57,26 +58,29 @@ export const NotificationBell: React.FC = () => {
     [systemMessages, activeMessageId]
   );
 
-  // Carregar mensagens quando abrir o dropdown (apenas uma vez)
+  // Carregar mensagens automaticamente ao acessar o sistema (na montagem do componente)
   useEffect(() => {
-    if (isOpen && systemMessages.length === 0 && !hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      loadMessages();
+    if (!hasInitialLoadedRef.current && localStorage.getItem('token')) {
+      hasInitialLoadedRef.current = true;
+      void loadMessages();
     }
-    if (!isOpen) {
-      hasLoadedRef.current = false;
-      setActiveMessageId(null); // Reset detail view when closing
-    }
-  }, [isOpen, systemMessages.length, loadMessages]);
+  }, [loadMessages]);
 
-  // Animação do sino quando há notificações não lidas
+  // Exibir banner de alerta chamando a atenção quando houver notificações não lidas ao acessar
   useEffect(() => {
-    if (unreadCount > 0) {
+    const hasDismissed = sessionStorage.getItem('dismissed_unread_alert');
+    if (unreadCount > 0 && !hasDismissed) {
+      setShowAlertBanner(true);
       setIsAnimating(true);
-      const timer = setTimeout(() => setIsAnimating(false), 2000);
-      return () => clearTimeout(timer);
+    } else if (unreadCount === 0) {
+      setShowAlertBanner(false);
     }
   }, [unreadCount]);
+
+  const handleDismissAlert = () => {
+    setShowAlertBanner(false);
+    sessionStorage.setItem('dismissed_unread_alert', 'true');
+  };
 
   const handleRefresh = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -121,25 +125,112 @@ export const NotificationBell: React.FC = () => {
 
   return (
     <div className="relative notification-popover-container">
+      {/* Botão do Sino com Animação Glow & Ping */}
       <Button
         variant="ghost"
         size="sm"
         onClick={handleToggle}
+        title={unreadCount > 0 ? `${unreadCount} notificações/mensagens não lidas` : 'Centro de Notificações'}
         className={cn(
-          "relative h-10 w-10 p-0 hover:bg-seguranca-graphite/50 text-seguranca-lightgray transition-all duration-200 bell-trigger-button",
-          isAnimating && "animate-pulse"
+          "relative h-10 w-10 p-0 hover:bg-seguranca-graphite/80 text-seguranca-lightgray transition-all duration-300 bell-trigger-button",
+          unreadCount > 0 && "ring-2 ring-seguranca-yellow/60 bg-seguranca-yellow/15 shadow-[0_0_15px_rgba(245,158,11,0.3)]"
         )}
       >
-        <Bell className={cn("h-5 w-5 transition-transform duration-200", isAnimating && "animate-bounce")} />
+        <Bell className={cn("h-5 w-5 transition-transform duration-300", unreadCount > 0 && "text-seguranca-yellow animate-bounce")} />
         {unreadCount > 0 && (
-          <Badge
-            variant="destructive"
-            className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-gradient-to-r from-red-500 to-red-600 shadow-lg animate-pulse"
-          >
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </Badge>
+          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <Badge
+              variant="destructive"
+              className="relative h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px] font-black bg-gradient-to-r from-red-500 to-red-600 shadow-md text-white border border-white/20"
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </Badge>
+          </span>
         )}
       </Button>
+
+      {/* Banner Flutuante de Alerta de Notificações Não Lidas (Chama a atenção ao acessar o sistema) */}
+      <AnimatePresence>
+        {showAlertBanner && unreadCount > 0 && !isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-20 right-4 sm:right-6 z-[10060] max-w-md w-[calc(100vw-2rem)] sm:w-96 bg-seguranca-black/95 border-2 border-seguranca-yellow rounded-xl shadow-[0_0_30px_rgba(245,158,11,0.4)] backdrop-blur-md p-4 text-seguranca-lightgray overflow-hidden"
+          >
+            {/* Faixa superior brilhante */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-seguranca-yellow via-amber-400 to-red-500 animate-pulse" />
+
+            <div className="flex items-start gap-3">
+              <div className="relative flex-shrink-0 mt-0.5">
+                <div className="p-2.5 rounded-full bg-seguranca-yellow/20 text-seguranca-yellow animate-bounce">
+                  <Bell className="h-6 w-6" />
+                </div>
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                </span>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-extrabold text-seguranca-yellow tracking-tight flex items-center gap-1.5">
+                    <span>Mensagens & Notificações</span>
+                    <Badge className="bg-red-500 text-white text-[10px] px-1.5 py-0 font-bold">
+                      {unreadCount}
+                    </Badge>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleDismissAlert}
+                    className="text-gray-400 hover:text-white p-1 rounded-md transition-colors"
+                    title="Fechar aviso"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-gray-200 mt-1 leading-relaxed">
+                  Olá, <strong className="text-white font-semibold">{user?.name || 'Usuário'}</strong>! Você possui{' '}
+                  <strong className="text-seguranca-yellow font-bold">
+                    {unreadCount} {unreadCount === 1 ? 'notificação ou mensagem não lida' : 'notificações ou mensagens não lidas'}
+                  </strong>{' '}
+                  aguardando sua atenção e resposta.
+                </p>
+
+                <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-800">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setShowAlertBanner(false);
+                      setIsOpen(true);
+                    }}
+                    className="h-8 text-xs bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-seguranca-black font-extrabold flex-1 shadow-md"
+                  >
+                    <Bell className="h-3.5 w-3.5 mr-1" />
+                    Visualizar Agora
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setShowAlertBanner(false);
+                      navigate('/gestao-mensagens');
+                    }}
+                    className="h-8 text-xs border-gray-700 text-gray-200 hover:text-white hover:bg-white/10"
+                  >
+                    <Mail className="h-3.5 w-3.5 mr-1" />
+                    Mensagens
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isOpen && (

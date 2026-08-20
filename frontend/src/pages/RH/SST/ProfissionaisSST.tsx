@@ -271,13 +271,13 @@ const ProfissionaisSST: React.FC = () => {
 
   const stampSrc = (url?: string) => {
     if (!url) return null;
-    if (url.startsWith('http')) return url;
+    if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:')) return url;
     const clean = url.startsWith('/') ? url.slice(1) : url;
     if (clean.startsWith('api/uploads/safety-engineers/stamps/')) {
       return '/' + clean;
     }
     if (clean.startsWith('uploads/safety-engineers/stamps/')) {
-      return '/' + clean;
+      return '/api/' + clean;
     }
     if (clean.startsWith('safety-engineers/stamps/')) {
       return STAMP_BASE_URL + clean.replace('safety-engineers/stamps/', '');

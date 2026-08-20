@@ -38,6 +38,8 @@ import com.z7design.secured_guard.dto.ReportLayoutConfig;
 @Slf4j
 public class AbsenceService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbsenceService.class);
+
     @Autowired
     private AbsenceRepository absenceRepository;
 

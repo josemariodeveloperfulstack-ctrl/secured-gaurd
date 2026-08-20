@@ -24,6 +24,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class WhatsAppTestConfig {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WhatsAppTestConfig.class);
+
     @Value("${whatsapp.test.mode:false}")
     private boolean testMode;
 

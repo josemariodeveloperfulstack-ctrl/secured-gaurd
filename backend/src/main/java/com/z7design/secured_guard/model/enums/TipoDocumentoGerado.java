@@ -21,6 +21,7 @@ public enum TipoDocumentoGerado {
     EQUIPMENT_RESPONSIBILITY_SPECIFIC("Termo de Responsabilidade Específico"),
     DAMAGE_FINES_RESPONSIBILITY("Termo de Responsabilidade por Danos e Multas"),
     BODY_CAM_RESPONSIBILITY("Termo de Responsabilidade e Uso de Body Cam"),
+    IMAGE_VOICE_NAME_AUTH("Termo de Autorização para Uso de Imagem, Voz e Nome"),
     SERVICE_PROVIDER_AWARENESS("Termo de Ciência do Prestador de Serviços"),
     VALE_GOLDEN_RULES("Regras de Ouro da Vale – Termo de Ciência"),
     TOXICOLOGICAL_TEST_AUTH("Autorização para Teste Toxicológico"),

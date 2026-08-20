@@ -131,6 +131,11 @@ public class SecurityConfig {
                                                                 "/swagger-ui.html")
                                                 .permitAll()
                                                 .requestMatchers("/api/v1/document-processing/**").authenticated()
+                                                .requestMatchers("/api/image-voice-name-auth/**")
+                                                .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "SUPER_ADMIN", "ADMIN",
+                                                                "ROLE_RH", "ROLE_HR", "RH", "HR",
+                                                                "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
+                                                                "EMPLOYEES_READ", "EMPLOYEES_WRITE")
                                                 // Arquivos públicos (imagens e uploads)
                                                 .requestMatchers("/uploads/**").permitAll()
                                                 // Logos de empresas - permitir acesso público (para exibição em

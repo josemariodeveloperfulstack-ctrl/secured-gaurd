@@ -21,16 +21,37 @@ export interface CreateContaAPagarRequest {
   notes?: string;
   centroCusto?: string;
   companySigla?: string;
+  workSector?: string;
+  unitName?: string;
 }
 
 export interface UpdateContaAPagarRequest extends Partial<CreateContaAPagarRequest> {
   id: string;
 }
 
+export interface CustomContasAPagarReportRequest {
+  startDate?: string;
+  endDate?: string;
+  dateField?: 'dueDate' | 'issueDate' | 'paymentDate';
+  status?: string;
+  type?: string;
+  supplierId?: string;
+  unitId?: string;
+  workSector?: string;
+  companySigla?: string;
+  subcategoriaId?: string;
+  employeeId?: string;
+  selectedColumns?: string[];
+  groupBy?: 'UNIT_SECTOR' | 'NONE';
+}
+
 export interface ContasAPagarFilters {
   status?: string;
   type?: string;
   supplierId?: string;
+  unitId?: string;
+  workSector?: string;
+  companySigla?: string;
   startDate?: string;
   endDate?: string;
   searchTerm?: string;
@@ -311,7 +332,13 @@ export const contasAPagarService = {
         categoriaPaiCodigo: invoice.categoriaPaiCodigo,
         employeeId: invoice.employeeId,
         employeeName: invoice.employeeName,
-        centroCusto: invoice.centroCusto
+        centroCusto: invoice.centroCusto,
+        unitId: invoice.unitId || (invoice.unit && invoice.unit.id) || undefined,
+        unitName: invoice.unitName || (invoice.unit && invoice.unit.name) || undefined,
+        workSector: invoice.workSector || undefined,
+        createdAt: parseDateFromBackend(invoice.createdAt),
+        createdById: invoice.createdById,
+        createdByName: invoice.createdByName,
       };
     });
   },
@@ -372,6 +399,9 @@ export const contasAPagarService = {
         employeeId: invoice.employeeId,
         employeeName: invoice.employeeName,
         centroCusto: invoice.centroCusto,
+        unitId: invoice.unitId,
+        unitName: invoice.unitName,
+        workSector: invoice.workSector,
         createdById: invoice.createdById,
         createdByName: invoice.createdByName,
     };
@@ -379,23 +409,27 @@ export const contasAPagarService = {
 
   // Criar nova conta
   async createContaAPagar(conta: Omit<ContaAPagar, 'id'>): Promise<ContaAPagar> {
-    // Buscar uma unidade padrão ou usar UUID padrão
-    let unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
+    let unitId = conta.unitId;
 
-    try {
-      const unitsResponse = await api.get('/api/units');
-      if (unitsResponse.data && unitsResponse.data.length > 0) {
-        unitId = unitsResponse.data[0].id;
+    if (!unitId) {
+      try {
+        const unitsResponse = await api.get('/api/units');
+        if (unitsResponse.data && unitsResponse.data.length > 0) {
+          unitId = unitsResponse.data[0].id;
+        } else {
+          unitId = '11111111-1111-1111-1111-111111111111';
+        }
+      } catch (error) {
+        console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
+        unitId = '11111111-1111-1111-1111-111111111111';
       }
-    } catch (error) {
-      console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
     }
 
     const requestData: CreateContaAPagarRequest = {
       description: conta.descricao,
-      supplierId: conta.fornecedorId || null, // Enviar null ao invés de string vazia
+      supplierId: conta.fornecedorId || null,
       unitId: unitId,
-      amount: Number(conta.valor) || 0, // Garantir que seja um número
+      amount: Number(conta.valor) || 0,
       type: conta.tipo,
       status: mapFrontendStatusToBackend(conta.status) as any,
       dueDate: formatDateForBackend(conta.vencimento) || '',
@@ -407,9 +441,9 @@ export const contasAPagarService = {
       employeeId: conta.employeeId || null,
       notes: conta.observacoes,
       centroCusto: conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto,
-      companySigla: conta.companySigla
+      companySigla: conta.companySigla,
+      workSector: conta.workSector || undefined
     };
-
 
     console.log('Dados da requisição:', requestData);
 
@@ -418,8 +452,6 @@ export const contasAPagarService = {
       return this.getContaAPagarById(response.data.id);
     } catch (error: any) {
       console.error('Erro detalhado ao criar conta a pagar:', error);
-      console.error('Response data:', error.response?.data);
-      console.error('Response status:', error.response?.status);
       throw error;
     }
   },
@@ -443,33 +475,29 @@ export const contasAPagarService = {
     if (conta.observacoes) requestData.notes = conta.observacoes;
     if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto;
     if (conta.companySigla !== undefined) requestData.companySigla = conta.companySigla;
-
-    // Se não há unitId, buscar uma unidade padrão
-    if (!requestData.unitId) {
-      try {
-        const unitsResponse = await api.get('/api/units');
-        if (unitsResponse.data && unitsResponse.data.length > 0) {
-          requestData.unitId = unitsResponse.data[0].id;
-        } else {
-          requestData.unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
-        }
-      } catch (error) {
-        console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
-        requestData.unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
-      }
-    }
-
-    console.log('Dados da requisição de atualização:', requestData);
-    console.log('ID da conta:', id);
+    if (conta.unitId !== undefined) requestData.unitId = conta.unitId;
+    if (conta.workSector !== undefined) requestData.workSector = conta.workSector;
 
     try {
       const response = await api.put(`/api/invoices/${id}`, requestData);
       return this.getContaAPagarById(response.data.id);
     } catch (error: any) {
-      console.error('Erro detalhado ao atualizar conta a pagar:', error);
-      console.error('Response data:', error.response?.data);
-      console.error('Response status:', error.response?.status);
-      console.error('Request data enviado:', requestData);
+      console.error('Erro ao atualizar conta a pagar:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gerar Relatório PDF Personalizado de Contas a Pagar
+   */
+  async generateCustomPdfReport(request: CustomContasAPagarReportRequest): Promise<Blob> {
+    try {
+      const response = await api.post('/api/reports/contas-a-pagar/custom-pdf', request, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao gerar relatório personalizado em PDF:', error);
       throw error;
     }
   },
@@ -960,7 +988,10 @@ export const contasAPagarService = {
       dataEmissao: parseDateFromBackend(invoice.issueDate),
       vencimento: parseDateFromBackend(invoice.dueDate) || new Date(),
       fornecedor: resolveFornecedorOuFuncionario(invoice),
-      fornecedorId: invoice.supplierId,
+      fornecedorId: invoice.supplierId ? String(invoice.supplierId) : '',
+      empresa: invoice.companyName || (invoice.company && invoice.company.name) || undefined,
+      empresaId: invoice.companyId || (invoice.company && invoice.company.id) || undefined,
+      companySigla: invoice.companySigla || (invoice.company && invoice.company.sigla) || undefined,
       descricao: invoice.description,
       tipo: invoice.type || 'VARIAVEL',
       valor: parseFloat(invoice.amount),
@@ -978,7 +1009,9 @@ export const contasAPagarService = {
       employeeId: invoice.employeeId,
       employeeName: invoice.employeeName,
       centroCusto: invoice.centroCusto,
-      companySigla: invoice.companySigla,
+      unitId: invoice.unitId || (invoice.unit && invoice.unit.id) || undefined,
+      unitName: invoice.unitName || (invoice.unit && invoice.unit.name) || undefined,
+      workSector: invoice.workSector || undefined,
       createdAt: parseDateFromBackend(invoice.createdAt),
       createdById: invoice.createdById,
       createdByName: invoice.createdByName,

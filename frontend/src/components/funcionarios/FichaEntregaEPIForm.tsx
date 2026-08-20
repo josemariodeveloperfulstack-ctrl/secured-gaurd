@@ -278,7 +278,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       console.warn('Não foi possível verificar histórico de EPI do funcionário:', error);
     }
     return {
-      dataEntrega: employeeAdmissionIsoDateOrToday(emp.hireDate),
+      dataEntrega: todayIsoDateLocal(),
       tipoEntrega: 'PRIMEIRA_ENTREGA' as EPIDeliveryType,
       hasPrior: false,
     };
@@ -450,7 +450,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
               setForm(prev => ({
                 ...prev,
                 employeeWorkSector: buildWorkSectorSnapshot(mappedEmp),
-                dataEntrega: defaults.dataEntrega,
+                dataEntrega: prev.dataEntrega || defaults.dataEntrega,
                 tipoEntrega: defaults.tipoEntrega,
               }));
             } else {
@@ -751,6 +751,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       }
 
       const formData = {
+        id: currentFichaId || undefined,
         employeeId: form.funcionarioId,
         companyId: form.empresaId,
         deliveryDate: form.dataEntrega,
@@ -821,6 +822,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       }
 
       const buildEpiFormData = () => ({
+        id: currentFichaId || undefined,
         employeeId: form.funcionarioId,
         companyId: form.empresaId,
         deliveryDate: form.dataEntrega,
@@ -918,6 +920,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
     setLoading(true);
     try {
       const formData = {
+        id: currentFichaId || undefined,
         employeeId: form.funcionarioId,
         companyId: form.empresaId,
         deliveryDate: form.dataEntrega,
@@ -1150,7 +1153,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                       funcionarioId: emp.id,
                       empresaId: cid || prev.empresaId,
                       employeeWorkSector: buildWorkSectorSnapshot(emp),
-                      dataEntrega: defaults.dataEntrega,
+                      dataEntrega: prev.dataEntrega || defaults.dataEntrega,
                       tipoEntrega: defaults.tipoEntrega,
                     }));
                   }}
@@ -1182,34 +1185,23 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                   onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
                   disabled={loadingData}
                 >
-                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
+                  <SelectTrigger className="h-11 bg-background border-2 border-gray-600 focus:border-seguranca-yellow">
+                    <SelectValue placeholder="Selecione a empresa" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando empresas...</div>
-                    ) : companies.length > 0 ? (
-                      companies.map(e => (
-                        <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                          {e.sigla ? `${e.sigla} - ${e.name}` : e.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhuma empresa encontrada</div>
-                    )}
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name} {company.sigla ? `(${company.sigla})` : ''}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {empresa && (
                   <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
                     <Building className="h-3.5 w-3.5 text-primary" />
                     <span className="text-xs font-semibold text-foreground">
-                      {empresa.sigla || empresa.tradeName || empresa.name}
+                      {empresa.name} {empresa.sigla ? `(${empresa.sigla})` : ''}
                     </span>
-                    {empresa.name && (
-                      <span className="text-[11px] text-muted-foreground">
-                        · Razão Social: {empresa.name}
-                      </span>
-                    )}
                     {empresa.cnpj && (
                       <span className="text-[11px] text-muted-foreground">
                         · CNPJ: {formatCNPJ(empresa.cnpj)}
@@ -1230,28 +1222,23 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                     <User className="h-4 w-4 text-primary" />
                     Dados do Funcionário
                   </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {funcionario.status === 'ACTIVE' ? 'Ativo' : funcionario.status || 'Ativo'}
+                  </Badge>
                 </div>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.name}
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
-                      </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome Completo</Label>
+                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                      {funcionario.name}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.positionName || '-'}
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                        {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">
@@ -1337,9 +1324,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                   max="9999-12-31"
                 />
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  {hasPriorEpiDelivery
-                    ? 'Entregas seguintes registram a data em que o item foi entregue (ex.: hoje). Itens anteriores permanecem no histórico da ficha.'
-                    : 'Na primeira entrega, a data padrão é a admissão do funcionário. Próximas entregas usarão a data real de cada item.'}
+                  Informe a data em que os EPIs estão sendo entregues. Todos os itens adicionados nesta entrega terão esta data registrada.
                 </p>
               </div>
 

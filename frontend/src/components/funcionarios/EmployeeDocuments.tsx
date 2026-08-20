@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Plus, Trash2, Download, Eye, Upload, Calendar, Hash, User, Loader2, AlertCircle } from 'lucide-react';
+import { FileText, Plus, Trash2, Download, Eye, Upload, Calendar, Hash, User, Loader2, AlertCircle, FolderOpen, FileCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -11,16 +11,21 @@ import type { Document, DocumentType } from '@/types/document';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import DocumentosGerarTab from './DocumentosGerarTab';
+import { cn } from '@/lib/utils';
 
 interface EmployeeDocumentsProps {
   employeeId: string;
   employeeName: string;
+  companyId?: string;
 }
 
 export const EmployeeDocuments: React.FC<EmployeeDocumentsProps> = ({
   employeeId,
-  employeeName
+  employeeName,
+  companyId
 }) => {
+  const [activeTab, setActiveTab] = useState<'cadastrados' | 'gerar'>('cadastrados');
   const [documents, setDocuments] = useState<Document[]>([]);
   const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,14 +164,17 @@ export const EmployeeDocuments: React.FC<EmployeeDocumentsProps> = ({
   const handleDownloadFile = async (documentId: string, fileName: string) => {
     try {
       const blob = await documentService.downloadFile(documentId);
-      const url = window.URL.createObjectURL(blob);
+      const fileBlob = blob.type ? blob : new Blob([blob], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(fileBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = fileName || 'documento';
+      a.download = fileName || 'documento.pdf';
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 2000);
     } catch (error) {
       console.error('Erro ao baixar arquivo:', error);
       toast({
@@ -180,9 +188,17 @@ export const EmployeeDocuments: React.FC<EmployeeDocumentsProps> = ({
   const handleViewFile = async (documentId: string) => {
     try {
       const blob = await documentService.downloadFile(documentId);
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      window.URL.revokeObjectURL(url);
+      const fileBlob = blob.type ? blob : new Blob([blob], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(fileBlob);
+      const newWin = window.open(url, '_blank');
+      if (!newWin) {
+        toast({
+          title: "Aviso",
+          description: "O navegador bloqueou a abertura do arquivo em nova aba. Verifique as permissões de pop-up.",
+          variant: "destructive"
+        });
+      }
+      setTimeout(() => window.URL.revokeObjectURL(url), 15000);
     } catch (error) {
       console.error('Erro ao visualizar arquivo:', error);
       toast({
@@ -211,15 +227,15 @@ export const EmployeeDocuments: React.FC<EmployeeDocumentsProps> = ({
   };
 
   const getStatusColor = (document: Document) => {
-    if (!document.expirationDate) return 'bg-gray-100 text-gray-800';
+    if (!document.expirationDate) return 'bg-slate-800 text-slate-300 border border-slate-700';
     
     const today = new Date();
     const expirationDate = new Date(document.expirationDate);
     const daysUntilExpiration = Math.ceil((expirationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     
-    if (daysUntilExpiration < 0) return 'bg-red-100 text-red-800';
-    if (daysUntilExpiration <= 30) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-green-100 text-green-800';
+    if (daysUntilExpiration < 0) return 'bg-red-500/20 text-red-400 border border-red-500/40';
+    if (daysUntilExpiration <= 30) return 'bg-amber-500/20 text-amber-400 border border-amber-500/40';
+    return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
   };
 
   const getStatusText = (document: Document) => {
@@ -234,6 +250,16 @@ export const EmployeeDocuments: React.FC<EmployeeDocumentsProps> = ({
     return 'Válido';
   };
 
+  const formatDateDisplay = (dateStr?: string | Date | null) => {
+    if (!dateStr) return '';
+    const s = String(dateStr).split('T')[0];
+    const parts = s.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return new Date(dateStr).toLocaleDateString('pt-BR');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-32">
@@ -244,237 +270,295 @@ export const EmployeeDocuments: React.FC<EmployeeDocumentsProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-seguranca-lightgray">
-            Documentos de {employeeName}
-          </h2>
-          <p className="text-seguranca-lightgray">
-            {documents.length} documento{documents.length !== 1 ? 's' : ''} cadastrado{documents.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <Button 
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-seguranca-yellow hover:bg-yellow-600 text-black"
+      {/* Sub-abas da Seção Documentos */}
+      <div className="flex items-center gap-2 border-b border-gray-700/80 pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab('cadastrados')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer",
+            activeTab === 'cadastrados'
+              ? "bg-seguranca-red text-white shadow-md"
+              : "bg-slate-800/80 text-slate-300 hover:bg-slate-700/80"
+          )}
         >
-          <Plus size={20} className="mr-2" />
-          Adicionar Documento
-        </Button>
+          <FolderOpen className="h-4 w-4" />
+          Documentos Anexados ({documents.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('gerar')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer",
+            activeTab === 'gerar'
+              ? "bg-purple-600 text-white shadow-md"
+              : "bg-slate-800/80 text-slate-300 hover:bg-slate-700/80"
+          )}
+        >
+          <FileCheck className="h-4 w-4" />
+          Gerar Documentos & Termos PDF
+        </button>
       </div>
 
-      {showAddForm && (
-        <Card className="bg-seguranca-graphite border-gray-600">
-          <CardHeader>
-            <CardTitle className="text-seguranca-lightgray">Novo Documento</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="type" className="text-seguranca-lightgray">Tipo de Documento *</Label>
-                <Select 
-                  value={newDocument.type} 
-                  onValueChange={(value) => setNewDocument({...newDocument, type: value as DocumentType})}
-                >
-                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {documentTypes.map((type) => (
-                      <SelectItem key={type} value={type} className="text-seguranca-lightgray">
-                        {getDocumentTypeLabel(type)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="number" className="text-seguranca-lightgray">Número *</Label>
-                <Input
-                  id="number"
-                  value={newDocument.number}
-                  onChange={(e) => setNewDocument({...newDocument, number: e.target.value})}
-                  placeholder="Número do documento"
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="issueDate" className="text-seguranca-lightgray">Data de Emissão *</Label>
-                <Input
-                  id="issueDate"
-                  type="date"
-                  value={newDocument.issueDate}
-                  onChange={(e) => setNewDocument({...newDocument, issueDate: e.target.value})}
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="expirationDate" className="text-seguranca-lightgray">Data de Expiração</Label>
-                <Input
-                  id="expirationDate"
-                  type="date"
-                  value={newDocument.expirationDate}
-                  onChange={(e) => setNewDocument({...newDocument, expirationDate: e.target.value})}
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                />
-              </div>
-            </div>
-            
+      {activeTab === 'gerar' ? (
+        <DocumentosGerarTab
+          employeeId={employeeId}
+          companyId={companyId}
+          employeeName={employeeName}
+          hideHeader={true}
+        />
+      ) : (
+        <>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-gray-700/80">
             <div>
-              <Label htmlFor="description" className="text-seguranca-lightgray">Descrição</Label>
-              <Input
-                id="description"
-                value={newDocument.description}
-                onChange={(e) => setNewDocument({...newDocument, description: e.target.value})}
-                placeholder="Descrição adicional (opcional)"
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-              />
+              <h2 className="text-xl sm:text-2xl font-bold text-seguranca-lightgray">
+                Documentos de {employeeName}
+              </h2>
+              <p className="text-sm text-gray-400">
+                {documents.length} documento{documents.length !== 1 ? 's' : ''} cadastrado{documents.length !== 1 ? 's' : ''}
+              </p>
             </div>
-            
-            <div>
-              <Label htmlFor="file" className="text-seguranca-lightgray">Arquivo *</Label>
-              <Input
-                id="file"
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                onChange={handleFileSelect}
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-              />
-              {selectedFile && (
-                <p className="text-sm text-seguranca-lightgray mt-1">
-                  Arquivo selecionado: {selectedFile.name}
-                </p>
-              )}
-            </div>
-            
-            <div className="flex space-x-2">
-              <Button 
-                onClick={handleAddDocument}
-                disabled={uploading}
-                className="bg-seguranca-red hover:bg-seguranca-darkred"
-              >
-                {uploading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Upload className="mr-2 h-4 w-4" />
-                )}
-                {uploading ? 'Enviando...' : 'Adicionar Documento'}
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => setShowAddForm(false)}
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-              >
-                Cancelar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            <Button 
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="shrink-0 whitespace-nowrap bg-seguranca-yellow hover:bg-yellow-600 text-black font-semibold shadow-md"
+            >
+              <Plus size={18} className="mr-1.5 shrink-0" />
+              <span className="whitespace-nowrap">Adicionar Documento</span>
+            </Button>
+          </div>
 
-      <div className="grid gap-4">
-        {documents.map((document) => (
-          <Card 
-            key={document.id} 
-            className="bg-seguranca-graphite border-gray-600 hover:shadow-lg transition-shadow"
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-seguranca-red rounded-full flex items-center justify-center">
-                    <FileText className="text-white" size={24} />
-                  </div>
+          {showAddForm && (
+            <Card className="bg-seguranca-graphite border-gray-600">
+              <CardHeader>
+                <CardTitle className="text-seguranca-lightgray">Novo Documento</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-seguranca-lightgray">
-                      {getDocumentTypeLabel(document.type)}
-                    </h3>
-                    <div className="flex items-center space-x-4 mt-2 text-sm text-seguranca-lightgray">
-                      <div className="flex items-center space-x-1">
-                        <Hash size={16} />
-                        <span>{document.number}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Calendar size={16} />
-                        <span>Emissão: {new Date(document.issueDate).toLocaleDateString('pt-BR')}</span>
-                      </div>
-                      {document.expirationDate && (
-                        <div className="flex items-center space-x-1">
-                          <Calendar size={16} />
-                          <span>Expira: {new Date(document.expirationDate).toLocaleDateString('pt-BR')}</span>
-                        </div>
-                      )}
-                      {document.fileName && (
-                        <div className="flex items-center space-x-1">
-                          <FileText size={16} />
-                          <span>{document.fileName}</span>
-                        </div>
-                      )}
-                    </div>
-                    {document.description && (
-                      <p className="text-sm text-seguranca-lightgray mt-2">
-                        {document.description}
-                      </p>
-                    )}
+                    <Label htmlFor="type" className="text-seguranca-lightgray">Tipo de Documento *</Label>
+                    <Select 
+                      value={newDocument.type} 
+                      onValueChange={(value) => setNewDocument({...newDocument, type: value as DocumentType})}
+                    >
+                      <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                        {documentTypes.map((type) => (
+                          <SelectItem key={type} value={type} className="text-seguranca-lightgray">
+                            {getDocumentTypeLabel(type)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="number" className="text-seguranca-lightgray">Número *</Label>
+                    <Input
+                      id="number"
+                      value={newDocument.number}
+                      onChange={(e) => setNewDocument({...newDocument, number: e.target.value})}
+                      placeholder="Número do documento"
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="issueDate" className="text-seguranca-lightgray">Data de Emissão *</Label>
+                    <Input
+                      id="issueDate"
+                      type="date"
+                      value={newDocument.issueDate}
+                      onChange={(e) => setNewDocument({...newDocument, issueDate: e.target.value})}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="expirationDate" className="text-seguranca-lightgray">Data de Expiração</Label>
+                    <Input
+                      id="expirationDate"
+                      type="date"
+                      value={newDocument.expirationDate}
+                      onChange={(e) => setNewDocument({...newDocument, expirationDate: e.target.value})}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    />
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Badge className={getStatusColor(document)}>
-                    {getStatusText(document)}
-                  </Badge>
-                  
-                  {document.fileUrl && (
-                    <>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-blue-600 text-blue-400 hover:bg-blue-900"
-                        onClick={() => handleViewFile(document.id)}
-                      >
-                        <Eye size={16} className="mr-1" />
-                        Visualizar
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-green-600 text-green-400 hover:bg-green-900"
-                        onClick={() => handleDownloadFile(document.id, document.fileName || 'documento')}
-                      >
-                        <Download size={16} className="mr-1" />
-                        Baixar
-                      </Button>
-                    </>
+                
+                <div>
+                  <Label htmlFor="description" className="text-seguranca-lightgray">Descrição</Label>
+                  <Input
+                    id="description"
+                    value={newDocument.description}
+                    onChange={(e) => setNewDocument({...newDocument, description: e.target.value})}
+                    placeholder="Descrição adicional (opcional)"
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="file" className="text-seguranca-lightgray">Arquivo *</Label>
+                  <Input
+                    id="file"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    onChange={handleFileSelect}
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  />
+                  {selectedFile && (
+                    <p className="text-sm text-seguranca-lightgray mt-1">
+                      Arquivo selecionado: {selectedFile.name}
+                    </p>
                   )}
-                  
+                </div>
+                
+                <div className="flex space-x-2">
                   <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="border-red-600 text-red-400 hover:bg-red-900"
-                    onClick={() => handleDeleteDocument(document.id)}
+                    onClick={handleAddDocument}
+                    disabled={uploading}
+                    className="bg-seguranca-red hover:bg-seguranca-darkred"
                   >
-                    <Trash2 size={16} className="mr-1" />
-                    Excluir
+                    {uploading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="mr-2 h-4 w-4" />
+                    )}
+                    {uploading ? 'Enviando...' : 'Adicionar Documento'}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => setShowAddForm(false)}
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                  >
+                    Cancelar
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          )}
 
-      {documents.length === 0 && (
-        <Card className="bg-seguranca-graphite border-gray-600">
-          <CardContent className="p-8 text-center">
-            <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-seguranca-lightgray mb-2">
-              Nenhum documento cadastrado
-            </h3>
-            <p className="text-seguranca-lightgray">
-              Clique em "Adicionar Documento" para começar.
-            </p>
-          </CardContent>
-        </Card>
+          <div className="grid gap-4">
+            {documents.map((document) => (
+              <Card 
+                key={document.id} 
+                className="bg-slate-900 border border-slate-800 hover:border-slate-700 hover:shadow-lg transition-all"
+              >
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    {/* Lado Esquerdo: Ícone + Título + Metadados */}
+                    <div className="flex items-start space-x-3.5 min-w-0 flex-1">
+                      <div className="w-10 h-10 sm:w-11 sm:h-11 bg-red-600/20 border border-red-500/30 rounded-xl flex items-center justify-center shrink-0">
+                        <FileText className="text-red-400 h-5 w-5" />
+                      </div>
+                      
+                      <div className="space-y-1.5 min-w-0 flex-1">
+                        {/* Título e Badge de Status */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
+                            {getDocumentTypeLabel(document.type)}
+                          </h3>
+                          <Badge className={`px-2 py-0.5 text-xs font-semibold shrink-0 ${getStatusColor(document)}`}>
+                            {getStatusText(document)}
+                          </Badge>
+                        </div>
+
+                        {/* Metadados: Número, Emissão, Expiração, Arquivo */}
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs sm:text-sm text-gray-300">
+                          {document.number && (
+                            <div className="flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded border border-gray-800">
+                              <Hash size={13} className="text-seguranca-yellow shrink-0" />
+                              <span className="font-mono text-gray-200 font-medium">{document.number}</span>
+                            </div>
+                          )}
+                          
+                          {document.issueDate && (
+                            <div className="flex items-center gap-1.5 text-gray-300">
+                              <Calendar size={14} className="text-gray-400 shrink-0" />
+                              <span>Emissão: <strong className="text-white">{formatDateDisplay(document.issueDate)}</strong></span>
+                            </div>
+                          )}
+
+                          {document.expirationDate && (
+                            <div className="flex items-center gap-1.5 text-gray-300">
+                              <Calendar size={14} className="text-gray-400 shrink-0" />
+                              <span>Expira: <strong className="text-white">{formatDateDisplay(document.expirationDate)}</strong></span>
+                            </div>
+                          )}
+
+                          {document.fileName && (
+                            <div className="flex items-center gap-1.5 text-gray-300 truncate max-w-[220px]" title={document.fileName}>
+                              <FileText size={14} className="text-blue-400 shrink-0" />
+                              <span className="truncate text-blue-300 font-medium">{document.fileName}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Descrição */}
+                        {document.description && (
+                          <p className="text-xs sm:text-sm text-gray-400 mt-1 italic border-l-2 border-slate-700 pl-2">
+                            {document.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Lado Direito: Botões de Ação */}
+                    <div className="flex items-center flex-wrap gap-2 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800 justify-end">
+                      {document.fileUrl && (
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 text-xs border-blue-600/60 text-blue-400 hover:bg-blue-950/60 hover:border-blue-500 font-medium shrink-0 whitespace-nowrap"
+                            onClick={() => handleViewFile(document.id)}
+                          >
+                            <Eye size={14} className="mr-1 shrink-0" />
+                            Visualizar
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 text-xs border-emerald-600/60 text-emerald-400 hover:bg-emerald-950/60 hover:border-emerald-500 font-medium shrink-0 whitespace-nowrap"
+                            onClick={() => handleDownloadFile(document.id, document.fileName || 'documento')}
+                          >
+                            <Download size={14} className="mr-1 shrink-0" />
+                            Baixar
+                          </Button>
+                        </>
+                      )}
+                      
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 text-xs border-red-600/60 text-red-400 hover:bg-red-950/60 hover:border-red-500 font-medium shrink-0 whitespace-nowrap"
+                        onClick={() => handleDeleteDocument(document.id)}
+                      >
+                        <Trash2 size={14} className="mr-1 shrink-0" />
+                        Excluir
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {documents.length === 0 && (
+            <Card className="bg-seguranca-graphite border-gray-600">
+              <CardContent className="p-8 text-center">
+                <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-seguranca-lightgray mb-2">
+                  Nenhum documento cadastrado
+                </h3>
+                <p className="text-seguranca-lightgray">
+                  Clique em "Adicionar Documento" para começar.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
   );

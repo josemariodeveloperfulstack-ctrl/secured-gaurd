@@ -98,12 +98,31 @@ public class ReportController {
         try {
             byte[] pdfBytes = contasAPagarReportService.generateContasAPagarReportPDF(startDate, endDate, null, null);
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=relatorio-contas-a-pagar.pdf")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"relatorio-contas-a-pagar-" + startDate + "-" + endDate + ".pdf\"")
+                    .contentType(MediaType.APPLICATION_PDF)
                     .body(pdfBytes);
         } catch (Exception e) {
-            log.error("Erro ao gerar relatório PDF de contas a pagar (alias): {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
+            log.error("Erro ao gerar PDF de contas a pagar: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/contas-a-pagar/custom-pdf")
+    @Operation(summary = "Relatório Personalizado de Contas a Pagar em PDF", description = "Gera relatório PDF dinâmico com filtros avançados, colunas selecionadas e agrupamento com subtotais")
+    public ResponseEntity<byte[]> generateCustomContasAPagarReportPdf(
+            @RequestBody com.z7design.secured_guard.dto.CustomContasAPagarReportRequestDTO request) {
+        try {
+            log.info("Recebida requisição para relatório PDF personalizado de contas a pagar: {}", request);
+            byte[] pdfBytes = contasAPagarReportService.generateCustomContasAPagarReportPDF(request);
+            String filename = "relatorio-contas-a-pagar-personalizado-" + LocalDate.now() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório personalizado de contas a pagar em PDF: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 

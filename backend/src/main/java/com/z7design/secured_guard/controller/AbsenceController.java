@@ -27,6 +27,8 @@ import java.util.UUID;
 @Slf4j
 public class AbsenceController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AbsenceController.class);
+
     @Autowired
     private AbsenceService absenceService;
 

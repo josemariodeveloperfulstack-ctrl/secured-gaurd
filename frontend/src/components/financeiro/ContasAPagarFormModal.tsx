@@ -14,6 +14,8 @@ import SupplierFormModal from '@/components/estoque/SupplierFormModal';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import api from '@/lib/axios';
+import departmentService from '@/services/departmentService';
 
 export interface ContaAPagar {
   id?: string;
@@ -42,6 +44,9 @@ export interface ContaAPagar {
   employeeId?: string | undefined;
   employeeName?: string | undefined;
   centroCusto?: string | undefined;
+  unitId?: string | undefined;
+  unitName?: string | undefined;
+  workSector?: string | undefined;
   createdAt?: Date;
   createdById?: string;
   createdByName?: string;
@@ -68,6 +73,8 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   const [fornecedores, setFornecedores] = useState<Supplier[]>([]);
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [siglas, setSiglas] = useState<string[]>([]);
+  const [unidades, setUnidades] = useState<any[]>([]);
+  const [setoresSugeridos, setSetoresSugeridos] = useState<string[]>([]);
   
   const [formData, setFormData] = useState<ContaAPagar>({
     dataEmissao: new Date(),
@@ -76,6 +83,9 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
     fornecedorId: '',
     empresa: '',
     empresaId: '',
+    unitId: '',
+    unitName: '',
+    workSector: '',
     descricao: '',
     tipo: 'VARIAVEL',
     valor: 0,
@@ -257,6 +267,49 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
       contasAPagarService.getSubcategorias()
         .then(data => setSubcategorias(Array.isArray(data) ? data : []))
         .catch(() => setSubcategorias([]));
+
+      // Carregar Unidades
+      api.get('/units')
+        .then(res => {
+          const list = Array.isArray(res.data) ? res.data : [];
+          setUnidades(list);
+        })
+        .catch(err => {
+          console.warn('Erro ao carregar unidades:', err);
+          setUnidades([]);
+        });
+
+      // Carregar Setores de Trabalho do banco de dados (Departamentos + Postos de Trabalho)
+      Promise.allSettled([
+        departmentService.listActive(),
+        api.get('/work-posts/all').catch(() => api.get('/work-posts'))
+      ]).then(([deptResult, postsResult]) => {
+        const deptNames: string[] = [];
+        if (deptResult.status === 'fulfilled' && Array.isArray(deptResult.value)) {
+          deptResult.value.forEach((d: any) => {
+            if (d?.name && typeof d.name === 'string') {
+              deptNames.push(d.name.trim());
+            }
+          });
+        }
+
+        const postNames: string[] = [];
+        if (postsResult.status === 'fulfilled') {
+          const raw = postsResult.value?.data;
+          const list = Array.isArray(raw) ? raw : (raw?.content || []);
+          list.forEach((p: any) => {
+            if (p?.name && typeof p.name === 'string') {
+              postNames.push(p.name.trim());
+            }
+          });
+        }
+
+        const combined = Array.from(new Set([...deptNames, ...postNames])).filter(Boolean).sort((a, b) => a.localeCompare(b));
+        setSetoresSugeridos(combined);
+      }).catch(err => {
+        console.warn('Erro ao carregar setores de trabalho:', err);
+        setSetoresSugeridos([]);
+      });
     }
   }, [open]);
 
@@ -294,7 +347,10 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           categoria: initialData.categoria || '',
           subcategoriaId: initialData.subcategoriaId || '',
           employeeId: initialData.employeeId || '',
-          centroCusto: initialData.centroCusto || ''
+          centroCusto: initialData.centroCusto || '',
+          unitId: initialData.unitId ? String(initialData.unitId) : '',
+          unitName: initialData.unitName || '',
+          workSector: initialData.workSector || ''
         });
         setValorDisplay(formatToBRL(initialData.valor ?? 0));
         setPaymentConfirmDate((typeof initialData.dataPagamento === 'string' ? parseDateFromBackend(initialData.dataPagamento) : initialData.dataPagamento) || new Date());
@@ -315,6 +371,9 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           fornecedorId: '',
           empresa: '',
           empresaId: '',
+          unitId: '',
+          unitName: '',
+          workSector: '',
           descricao: '',
           tipo: 'VARIAVEL',
           valor: 0,
@@ -608,6 +667,74 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
               </Select>
             </div>
 
+            {/* Unidade */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                <Building2 size={14} />
+                Unidade
+              </label>
+              <Select
+                value={formData.unitId || 'none'}
+                onValueChange={(value) => {
+                  if (value === 'none') {
+                    handleInputChange('unitId', '');
+                    handleInputChange('unitName', '');
+                  } else {
+                    const un = unidades.find(u => u.id === value);
+                    handleInputChange('unitId', value);
+                    handleInputChange('unitName', un?.name || '');
+                  }
+                }}
+              >
+                <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectValue placeholder="Selecione a Unidade" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-600">
+                  <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
+                    Selecione ou padrão
+                  </SelectItem>
+                  {unidades.map((u) => (
+                    <SelectItem key={u.id} value={u.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      {u.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Setor de Trabalho */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                <Tag size={14} />
+                Setor de Trabalho
+              </label>
+              <Select
+                value={formData.workSector || 'none'}
+                onValueChange={(value) => {
+                  handleInputChange('workSector', value === 'none' ? '' : value);
+                }}
+              >
+                <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                  <SelectValue placeholder="Selecione o setor de trabalho" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-600 max-h-60">
+                  <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
+                    Selecione o setor de trabalho
+                  </SelectItem>
+                  {formData.workSector && !setoresSugeridos.includes(formData.workSector) && (
+                    <SelectItem value={formData.workSector} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      {formData.workSector}
+                    </SelectItem>
+                  )}
+                  {setoresSugeridos.map((setor, idx) => (
+                    <SelectItem key={idx} value={setor} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                      {setor}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Tipo */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Tipo *</label>
@@ -792,6 +919,12 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                           handleInputChange('empresaId', match.id);
                           handleInputChange('empresa', match.name);
                           handleInputChange('companySigla', match.sigla || match.name);
+                        }
+                      }
+                      if (!formData.workSector) {
+                        const suggestedSector = (emp as any).workPostName || (emp as any).workPost?.name || (emp as any).departmentName || (emp as any).department?.name;
+                        if (suggestedSector) {
+                          handleInputChange('workSector', suggestedSector);
                         }
                       }
                     }}

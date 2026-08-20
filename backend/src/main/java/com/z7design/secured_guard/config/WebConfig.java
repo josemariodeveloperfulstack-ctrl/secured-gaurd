@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.Files;
 
@@ -28,18 +29,39 @@ public class WebConfig implements WebMvcConfigurer {
         log.info("🔧 Configurando ResourceHandlers para arquivos estáticos");
         log.info("📁 uploadDir configurado: {}", uploadDir);
 
-        // Obter caminho absoluto para garantir funcionamento independente do diretório
-        // de execução
-        String absoluteUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize().toString().replace("\\", "/");
-        if (!absoluteUploadPath.endsWith("/")) {
-            absoluteUploadPath += "/";
+        Path uploadPathObj = Paths.get(uploadDir).toAbsolutePath().normalize();
+        String uploadUri = uploadPathObj.toUri().toString();
+        if (!uploadUri.endsWith("/")) {
+            uploadUri += "/";
         }
 
-        log.info("📁 Caminho de uploads (absoluto): {}", absoluteUploadPath);
+        log.info("📁 Caminho de uploads (URI): {}", uploadUri);
 
-        // Servir arquivos de upload estaticamente
+        // Servir arquivos de upload estaticamente (/uploads/** e /api/uploads/**)
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + absoluteUploadPath)
+                .addResourceLocations(uploadUri)
+                .setCachePeriod(3600);
+
+        registry.addResourceHandler("/api/uploads/**")
+                .addResourceLocations(uploadUri)
+                .setCachePeriod(3600);
+
+        // Servir logos de empresas estaticamente (sem autenticação)
+        String logoUri = uploadPathObj.resolve("companies").resolve("logos").toUri().toString();
+        if (!logoUri.endsWith("/")) {
+            logoUri += "/";
+        }
+        registry.addResourceHandler("/api/uploads/companies/logos/**")
+                .addResourceLocations(logoUri)
+                .setCachePeriod(3600);
+
+        // Servir carimbos de profissionais SST estaticamente (sem autenticação)
+        String stampUri = uploadPathObj.resolve("safety-engineers").resolve("stamps").toUri().toString();
+        if (!stampUri.endsWith("/")) {
+            stampUri += "/";
+        }
+        registry.addResourceHandler("/api/uploads/safety-engineers/stamps/**")
+                .addResourceLocations(stampUri)
                 .setCachePeriod(3600);
 
         // Servir arquivos de holerites
@@ -47,13 +69,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .addResourceLocations("file:holerites/")
                 .setCachePeriod(3600);
 
-        // Servir logos de empresas estaticamente (sem autenticação)
-        String logoPath = absoluteUploadPath + "companies/logos/";
-        registry.addResourceHandler("/api/uploads/companies/logos/**")
-                .addResourceLocations("file:" + logoPath)
-                .setCachePeriod(3600);
-
-        log.info("✅ ResourceHandlers configurados com caminhos absolutos");
+        log.info("✅ ResourceHandlers configurados com URIs file:/// absolutas");
     }
 
     @Override

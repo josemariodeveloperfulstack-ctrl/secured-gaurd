@@ -39,6 +39,8 @@ import org.springframework.context.annotation.Lazy;
 @Order(Ordered.HIGHEST_PRECEDENCE + 99)
 public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WebSocketSecurityConfig.class);
+
     @Autowired
     private JwtService jwtService;
 

@@ -14,11 +14,12 @@ import ModelosDocumentosForm from './ModelosDocumentosForm';
 import TermoResponsabilidadeEspecificoForm from './TermoResponsabilidadeEspecificoForm';
 import TermoResponsabilidadeDanosMultasForm from './TermoResponsabilidadeDanosMultasForm';
 import TermoBodyCamForm from './TermoBodyCamForm';
+import TermoUsoImagemVozNomeForm from './TermoUsoImagemVozNomeForm';
 import NppsForm from './NppsForm';
 import FichaEntregaEPIManualForm from './FichaEntregaEPIManualForm';
 import RelatorioMovimentacaoForm from './RelatorioMovimentacaoForm';
 import ValeSafetyTermsForm from './ValeSafetyTermsForm';
-import { FileText, Shield, FileSignature, FileCheck, UserX, File, CreditCard, ArrowRightLeft, Car, Video } from 'lucide-react';
+import { FileText, Shield, FileSignature, FileCheck, UserX, File, CreditCard, ArrowRightLeft, Car, Video, Camera } from 'lucide-react';
 import type { Company } from '@/types/company';
 import { companyService } from '@/services/companyService';
 import { isVigilanciaCompany } from '@/utils/formatEmployeeAddress';
@@ -34,6 +35,7 @@ const tipos = [
   { key: 'equipamento', label: 'Termo de Responsabilidade de Equipamento', icon: Shield, shortLabel: 'Equipamento' },
   { key: 'danos-multas', label: 'Termo de Responsabilidade por Danos e Multas', icon: Car, shortLabel: 'Danos/Multas' },
   { key: 'body-cam', label: 'Termo de Responsabilidade e Uso de Câmera Corporal – Body Cam', icon: Video, shortLabel: 'Body Cam' },
+  { key: 'uso-imagem-voz-nome', label: 'Termo de Autorização para Uso de Imagem, Voz e Nome', icon: Camera, shortLabel: 'Imagem/Voz/Nome' },
   { key: 'lgpd-vig', label: 'Termo de Proteção de Dados – LGPD (VIG)', icon: FileCheck, shortLabel: 'LGPD VIG' },
   { key: 'regras-ouro-vale', label: 'Regras de Ouro da Vale', icon: Shield, shortLabel: 'Regras Ouro' },
   { key: 'autorizacao-toxicologico', label: 'Autorização para Teste Toxicológico', icon: FileCheck, shortLabel: 'Toxicológico' },
@@ -191,6 +193,7 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({
         {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm {...sharedFormProps} />}
         {tipo === 'danos-multas' && <TermoResponsabilidadeDanosMultasForm {...sharedFormProps} />}
         {tipo === 'body-cam' && <TermoBodyCamForm {...sharedFormProps} />}
+        {tipo === 'uso-imagem-voz-nome' && <TermoUsoImagemVozNomeForm {...sharedFormProps} />}
         {tipo === 'lgpd-vig' && (
           <TermoLGPDForm {...sharedFormProps} termVariant="VIGILANCIA" />
         )}

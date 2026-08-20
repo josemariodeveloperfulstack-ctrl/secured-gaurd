@@ -343,7 +343,7 @@ public class LGPDConsentStandardPdfService {
                                 .setBold()
                                 .setFontSize(vigilancia ? vigBodyFont : 10.5f)
                                 .setTextAlignment(TextAlignment.CENTER)
-                                .setMarginTop(0f)
+                                .setMarginTop(15f)
                                 .setMarginBottom(vigilancia ? 4f : 4f));
 
                 if (vigilancia) {
@@ -365,7 +365,7 @@ public class LGPDConsentStandardPdfService {
                                 .setBold()
                                 .setFontSize(Math.max(font + 1.5f, 9.5f))
                                 .setTextAlignment(TextAlignment.CENTER)
-                                .setMarginTop(0f)
+                                .setMarginTop(15f)
                                 .setMarginBottom(4f));
 
                 addDefaultIntro(document, request, company, defLayout);
