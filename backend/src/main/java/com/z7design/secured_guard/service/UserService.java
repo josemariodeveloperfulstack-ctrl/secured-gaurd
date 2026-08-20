@@ -379,8 +379,7 @@ public class UserService {
                 throw new IllegalArgumentException("Nenhum role válido encontrado. Roles fornecidos: " + roleNames);
             }
 
-            existingUser.getRoles().clear();
-            existingUser.getRoles().addAll(uniqueRoles);
+            existingUser.setRoles(new java.util.HashSet<>(uniqueRoles));
             log.info("Roles atualizadas para usuário {}: {}", id,
                     uniqueRoles.stream().map(Role::getName).collect(Collectors.toList()));
         } else {

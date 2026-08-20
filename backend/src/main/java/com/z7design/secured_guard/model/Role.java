@@ -9,10 +9,12 @@ import com.z7design.secured_guard.model.Permission;
 
 @Entity
 @Table(name = "roles")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(of = "id")
 public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
