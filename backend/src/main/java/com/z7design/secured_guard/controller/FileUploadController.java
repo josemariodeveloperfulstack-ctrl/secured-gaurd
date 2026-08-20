@@ -671,47 +671,6 @@ public class FileUploadController {
         }
     }
 
-    @GetMapping("/companies/logos/{filename:.+}")
-    @Operation(summary = "Obter logo da empresa", description = "Retorna o arquivo de logo da empresa ou 404 se não existir")
-    public ResponseEntity<Resource> getCompanyLogo(
-            @Parameter(description = "Nome do arquivo (ex: uuid.png)") @PathVariable String filename) {
-        try {
-            if (filename == null || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
-                return ResponseEntity.badRequest().build();
-            }
-            Path basePath = Paths.get(uploadDir, "companies", "logos").toAbsolutePath().normalize();
-            Path filePath = basePath.resolve(filename).normalize();
-            if (!filePath.startsWith(basePath)) {
-                return ResponseEntity.notFound().build();
-            }
-            if (!Files.exists(filePath)) {
-                restoreFromPersistentBackup(filePath);
-            }
-            Resource resource = new UrlResource(filePath.toUri());
-            if (!resource.exists() || !resource.isReadable()) {
-                if (restoreFromPersistentBackup(filePath)) {
-                    resource = new UrlResource(filePath.toUri());
-                }
-            }
-            if (!resource.exists() || !resource.isReadable()) {
-                return ResponseEntity.notFound().build();
-            }
-            String contentType = Files.probeContentType(filePath);
-            if (contentType == null) {
-                contentType = "image/png";
-            }
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CACHE_CONTROL, "max-age=3600")
-                    .body(resource);
-        } catch (MalformedURLException e) {
-            return ResponseEntity.notFound().build();
-        } catch (IOException e) {
-            log.debug("Logo não encontrado ou erro ao ler: {}", filename);
-            return ResponseEntity.notFound().build();
-        }
-    }
-
     private Path getPersistentStampBackupPath(String filename) {
         String homeDir = System.getProperty("user.home");
         if (homeDir == null || homeDir.isBlank()) {
