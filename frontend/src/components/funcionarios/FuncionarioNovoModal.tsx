@@ -4547,7 +4547,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <SelectItem value="ACTIVE" className="hover:bg-gray-700">Ativo</SelectItem>
                               <SelectItem value="INACTIVE" className="hover:bg-gray-700">Inativo</SelectItem>
                               <SelectItem value="VACATION" className="hover:bg-gray-700">Férias</SelectItem>
+                              <SelectItem value="MATERNITY_LEAVE" className="hover:bg-gray-700">Licença Maternidade</SelectItem>
+                              <SelectItem value="MEDICAL_CERTIFICATE" className="hover:bg-gray-700">Atestado</SelectItem>
                               <SelectItem value="TERMINATED" className="hover:bg-gray-700">Demitido</SelectItem>
+                              <SelectItem value="SUSPENDED" className="hover:bg-gray-700">Suspenso</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
