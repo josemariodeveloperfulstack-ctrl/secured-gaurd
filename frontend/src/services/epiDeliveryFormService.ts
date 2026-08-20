@@ -29,6 +29,7 @@ export type EPIDeliveryType = 'PRIMEIRA_ENTREGA' | 'SUBSTITUICAO' | 'DEVOLUCAO' 
 export type EPIDeliveryFormStatus = 'DRAFT' | 'COMPLETED';
 
 export interface CreateEPIDeliveryForm {
+  id?: string;
   employeeId: string;
   companyId: string;
   deliveryDate: string;

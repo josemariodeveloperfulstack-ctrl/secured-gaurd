@@ -772,11 +772,15 @@ public class EPIDeliveryStandardPdfService {
                         return;
                 }
 
-                LocalDate deliveryDate = form.getDeliveryDate();
+                LocalDate formDeliveryDate = form.getDeliveryDate();
                 EPIDeliveryType deliveryType = form.getDeliveryType();
 
                 for (EPIDeliveryFormItem item : form.getItems()) {
                         int qty = item.getQuantity() != null && item.getQuantity() > 0 ? item.getQuantity() : 1;
+
+                        LocalDate itemDeliveryDate = item.getConfirmedAt() != null
+                                        ? item.getConfirmedAt().toLocalDate()
+                                        : (formDeliveryDate != null ? formDeliveryDate : LocalDate.now());
 
                         String substitutionInfo = "";
                         String substitutionReason = "";
@@ -793,7 +797,7 @@ public class EPIDeliveryStandardPdfService {
                         if (substitutionInfo.isEmpty() || substitutionReason.isEmpty()) {
                                 if (deliveryType == EPIDeliveryType.SUBSTITUICAO || deliveryType == EPIDeliveryType.TROCA) {
                                         if (substitutionInfo.isEmpty()) {
-                                                substitutionInfo = formatDate(deliveryDate);
+                                                substitutionInfo = formatDate(itemDeliveryDate);
                                         }
                                         if (substitutionReason.isEmpty() && deliveryType != null) {
                                                 substitutionReason = deliveryType.getDescription();
@@ -811,7 +815,7 @@ public class EPIDeliveryStandardPdfService {
                                         sizeNum,
                                         item.getCa(),
                                         qty,
-                                        deliveryDate,
+                                        itemDeliveryDate,
                                         substitutionInfo,
                                         substitutionReason,
                                         item.getSignatureBase64()));

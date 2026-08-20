@@ -111,6 +111,10 @@ public class Invoice {
     @JoinColumn(name = "employee_id")
     private Employee employee;
 
+    @Size(max = 150, message = "Setor de trabalho deve ter no máximo 150 caracteres")
+    @Column(name = "work_sector", length = 150)
+    private String workSector;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "created_by_id")

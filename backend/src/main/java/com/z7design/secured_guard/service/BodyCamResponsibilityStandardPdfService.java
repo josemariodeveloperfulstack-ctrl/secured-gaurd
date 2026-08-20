@@ -35,7 +35,7 @@ public class BodyCamResponsibilityStandardPdfService {
     private static final String REPORT_TITLE_LINE1 = "TERMO DE RESPONSABILIDADE E USO DE CÂMERA CORPORAL";
     private static final String REPORT_TITLE_LINE2 = "– BODY CAM";
     /** Margem superior quando o título fica apenas no corpo (sem título fixo no cabeçalho do layout). */
-    private static final float TERM_TOP_MARGIN_PT = 72f;
+    private static final float TERM_TOP_MARGIN_PT = 108f;
     private static final float BODY_FONT_SIZE = 9f;
     private static final float BODY_LEADING = 1.15f;
 

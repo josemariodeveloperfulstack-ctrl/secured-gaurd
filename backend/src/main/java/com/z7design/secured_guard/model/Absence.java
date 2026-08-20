@@ -106,4 +106,58 @@ public class Absence {
         REJECTED,   // Rejeitada
         CANCELLED   // Cancelada
     }
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public Employee getEmployee() { return employee; }
+    public void setEmployee(Employee employee) { this.employee = employee; }
+
+    public AbsenceType getAbsenceType() { return absenceType; }
+    public void setAbsenceType(AbsenceType absenceType) { this.absenceType = absenceType; }
+
+    public LocalDate getAbsenceDate() { return absenceDate; }
+    public void setAbsenceDate(LocalDate absenceDate) { this.absenceDate = absenceDate; }
+
+    public AbsenceStatus getStatus() { return status; }
+    public void setStatus(AbsenceStatus status) { this.status = status; }
+
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
+
+    public String getDocumentUrl() { return documentUrl; }
+    public void setDocumentUrl(String documentUrl) { this.documentUrl = documentUrl; }
+
+    public Integer getMedicalCertificateDays() { return medicalCertificateDays; }
+    public void setMedicalCertificateDays(Integer medicalCertificateDays) { this.medicalCertificateDays = medicalCertificateDays; }
+
+    public Boolean getIsJustified() { return isJustified; }
+    public void setIsJustified(Boolean isJustified) { this.isJustified = isJustified; }
+
+    public BigDecimal getJustifiedHours() { return justifiedHours; }
+    public void setJustifiedHours(BigDecimal justifiedHours) { this.justifiedHours = justifiedHours; }
+
+    public User getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(User approvedBy) { this.approvedBy = approvedBy; }
+
+    public LocalDateTime getApprovalDate() { return approvalDate; }
+    public void setApprovalDate(LocalDateTime approvalDate) { this.approvalDate = approvalDate; }
+
+    public Employee getCoverageEmployee() { return coverageEmployee; }
+    public void setCoverageEmployee(Employee coverageEmployee) { this.coverageEmployee = coverageEmployee; }
+
+    public WorkPost getCoverageWorkPost() { return coverageWorkPost; }
+    public void setCoverageWorkPost(WorkPost coverageWorkPost) { this.coverageWorkPost = coverageWorkPost; }
+
+    public Boolean getCoverageIsOvertime() { return coverageIsOvertime; }
+    public void setCoverageIsOvertime(Boolean coverageIsOvertime) { this.coverageIsOvertime = coverageIsOvertime; }
+
+    public String getCoverageNotes() { return coverageNotes; }
+    public void setCoverageNotes(String coverageNotes) { this.coverageNotes = coverageNotes; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

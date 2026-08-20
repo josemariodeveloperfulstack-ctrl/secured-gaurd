@@ -29,6 +29,7 @@ import { ContasAPagarFormModal, ContaAPagar } from '@/components/financeiro/Cont
 import { ContasAPagarTable } from '@/components/financeiro/ContasAPagarTable';
 import { ContasAPagarDashboard } from '@/components/financeiro/ContasAPagarDashboard';
 import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewModal';
+import { ContasAPagarReportCustomModal } from '@/components/financeiro/ContasAPagarReportCustomModal';
 import { contasAPagarService, formatContaPlanoDeContas } from '@/services/contasAPagarService';
 import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import { format, addDays, isBefore } from 'date-fns';
@@ -45,6 +46,7 @@ const ContasAPagarTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showFormModal, setShowFormModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showCustomReportModal, setShowCustomReportModal] = useState(false);
   const [editingConta, setEditingConta] = useState<ContaAPagar | null>(null);
   const [viewingConta, setViewingConta] = useState<ContaAPagar | null>(null);
   const [alertasVencimento, setAlertasVencimento] = useState<ContaAPagar[]>([]);
@@ -799,6 +801,14 @@ const ContasAPagarTab: React.FC = () => {
         <div className="flex gap-2">
           <Button
             variant="outline"
+            onClick={() => setShowCustomReportModal(true)}
+            className="flex items-center gap-2 border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow/10"
+          >
+            <FileText size={16} />
+            Relatório PDF
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => setShowDashboard(!showDashboard)}
             className="flex items-center gap-2 border-gray-600 text-white hover:bg-seguranca-black"
           >
@@ -1492,6 +1502,11 @@ const ContasAPagarTab: React.FC = () => {
         isOpen={showViewModal}
         onClose={() => setShowViewModal(false)}
         conta={viewingConta}
+      />
+
+      <ContasAPagarReportCustomModal
+        open={showCustomReportModal}
+        onOpenChange={setShowCustomReportModal}
       />
     </div>
   );

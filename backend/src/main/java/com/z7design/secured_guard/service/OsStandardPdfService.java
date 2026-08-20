@@ -247,9 +247,6 @@ public class OsStandardPdfService {
                 if (carimbo == null) {
                         carimbo = loadEngineerStamp(engineer);
                 }
-                if (carimbo == null) {
-                        carimbo = loadImage(ASSET_CARIMBO);
-                }
 
                 if (carimbo != null) {
                         stampCell.add(new Image(carimbo)
@@ -266,12 +263,6 @@ public class OsStandardPdfService {
                                 stampCell.add(new Paragraph(engineer.getCreaNumber())
                                                 .setFontSize(7f).setTextAlignment(TextAlignment.CENTER));
                         }
-                } else {
-                        log.warn("Carimbo SST não encontrado — usando texto fallback");
-                        stampCell.add(new Paragraph("Profissional de SST")
-                                        .setBold().setFontSize(8f).setTextAlignment(TextAlignment.CENTER));
-                        stampCell.add(new Paragraph("Cadastre o carimbo em SST → Profissionais")
-                                        .setFontSize(7f).setTextAlignment(TextAlignment.CENTER));
                 }
                 header.addCell(stampCell);
 

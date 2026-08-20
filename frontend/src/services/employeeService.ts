@@ -123,10 +123,12 @@ const DATE_FIELD_KEYS = [
   'cinDataEmissao',
   'exameMedicoData',
   'exameMedicoVencimento',
+  'laudoPsicologicoData',
+  'laudoPsicologicoVencimento',
   'remanejamentoDataInicio',
 ] as const;
 
-const NESTED_ID_KEYS = ['position', 'unit', 'company', 'user', 'exameMedicoDoctor'] as const;
+const NESTED_ID_KEYS = ['position', 'unit', 'company', 'user', 'exameMedicoDoctor', 'laudoPsicologicoDoctor'] as const;
 
 /** Normaliza o body antes de POST/PUT — alinhado ao EmployeeDTO (bankData, address, patch parcial). */
 export function prepareEmployeePayload(
@@ -564,29 +566,27 @@ export const employeeService = {
       const response = await api.get('/api/employees/basic');
       const data = response.data;
 
-      if (data && data.employees) {
-        return data.employees.map((emp: any) => ({
-          id: emp.id,
-          name: emp.name,
-          email: emp.email,
-          phone: emp.phone,
-          document: emp.document,
-          workPostId: emp.workPostId || emp.workPost?.id,
-          workPostName: emp.workPostName || emp.workPost?.name,
-          status: emp.status
-        }));
-      }
-
-      return data.map((emp: any) => ({
+      const mapEmp = (emp: any): SimpleEmployee => ({
         id: emp.id,
         name: emp.name,
         email: emp.email,
         phone: emp.phone,
         document: emp.document,
-        workPostId: emp.workPostId || emp.workPost?.id,
-        workPostName: emp.workPostName || emp.workPost?.name,
+        cpf: emp.cpf,
+        registrationNumber: emp.registrationNumber || emp.registration_number || emp.registration || emp.re,
+        positionName: emp.positionName || emp.position_name || emp.position?.name,
+        departmentName: emp.departmentName || emp.department_name || emp.department?.name,
+        workPostName: emp.workPostName || emp.work_post_name || emp.workPost?.name || emp.work_post?.name || emp.departmentName || emp.department?.name,
+        workPostId: emp.workPostId || emp.work_post_id || emp.workPost?.id || emp.work_post?.id,
+        unitName: emp.unitName || emp.unit_name || emp.unit?.name,
         status: emp.status
-      }));
+      });
+
+      if (data && data.employees) {
+        return data.employees.map(mapEmp);
+      }
+
+      return Array.isArray(data) ? data.map(mapEmp) : [];
     } catch (error) {
       console.error('Erro ao buscar funcionários simplificados:', error);
       return [];

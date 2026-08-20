@@ -57,6 +57,8 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
       conta.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
       conta.fornecedor.toLowerCase().includes(searchTerm.toLowerCase()) ||
       conta.codigoBarras?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (conta.unitName && conta.unitName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (conta.workSector && conta.workSector.toLowerCase().includes(searchTerm.toLowerCase())) ||
       formatContaPlanoDeContas(conta).toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = !statusFilter || conta.status === statusFilter;
@@ -189,6 +191,8 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
                   <TableHead className="text-gray-200 font-semibold">Descrição</TableHead>
                   <TableHead className="text-gray-200 font-semibold">Conta</TableHead>
                   <TableHead className="text-gray-200 font-semibold">Empresa</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Unidade</TableHead>
+                  <TableHead className="text-gray-200 font-semibold">Setor</TableHead>
                   <TableHead className="text-gray-200 font-semibold">Tipo</TableHead>
                   <TableHead className="text-gray-200 font-semibold">Valor</TableHead>
                   <TableHead className="text-gray-200 font-semibold">Status</TableHead>
@@ -235,6 +239,8 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
                       </div>
                     </TableCell>
                     <TableCell className="font-medium text-gray-200">{conta.companySigla || '-'}</TableCell>
+                    <TableCell className="text-gray-300 text-xs">{conta.unitName || '-'}</TableCell>
+                    <TableCell className="text-gray-300 text-xs">{conta.workSector || '-'}</TableCell>
                     <TableCell>{getTipoBadge(conta.tipo)}</TableCell>
                     <TableCell className="font-semibold text-gray-200">{formatCurrency(conta.valor)}</TableCell>
                     <TableCell>{getStatusBadge(conta.status, conta.vencimento)}</TableCell>

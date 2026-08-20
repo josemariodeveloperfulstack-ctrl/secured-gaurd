@@ -35,6 +35,7 @@ import { ContasAPagarFormModal, ContaAPagar } from '@/components/financeiro/Cont
 import { ContasAPagarTable } from '@/components/financeiro/ContasAPagarTable';
 import { ContasAPagarDashboard } from '@/components/financeiro/ContasAPagarDashboard';
 import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewModal';
+import { ContasAPagarReportCustomModal } from '@/components/financeiro/ContasAPagarReportCustomModal';
 import { contasAPagarService, formatContaPlanoDeContas } from '@/services/contasAPagarService';
 import { format, addDays, isBefore, parseISO } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -47,6 +48,7 @@ const ContasAPagar: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showFormModal, setShowFormModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showCustomReportModal, setShowCustomReportModal] = useState(false);
   const [editingConta, setEditingConta] = useState<ContaAPagar | null>(null);
   const [viewingConta, setViewingConta] = useState<ContaAPagar | null>(null);
   const [alertasVencimento, setAlertasVencimento] = useState<ContaAPagar[]>([]);
@@ -932,7 +934,15 @@ const ContasAPagar: React.FC = () => {
               Gerencie o controle de contas a pagar da empresa
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCustomReportModal(true)}
+              className="flex items-center gap-2 border-seguranca-yellow/40 text-seguranca-yellow hover:bg-seguranca-yellow/10"
+            >
+              <FileText size={16} />
+              Relatório Personalizado (PDF)
+            </Button>
             <Button
               variant="outline"
               onClick={() => setShowDashboard(!showDashboard)}
@@ -943,7 +953,7 @@ const ContasAPagar: React.FC = () => {
             </Button>
             <Button
               onClick={handleCreateConta}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-black font-semibold"
             >
               <Plus size={16} />
               Nova Conta a Pagar
@@ -1655,6 +1665,12 @@ const ContasAPagar: React.FC = () => {
           onClose={handleCloseViewModal}
           conta={viewingConta}
           onEdit={handleEditConta}
+        />
+
+        {/* Modal de Relatório Personalizado (PDF) */}
+        <ContasAPagarReportCustomModal
+          open={showCustomReportModal}
+          onOpenChange={setShowCustomReportModal}
         />
       </div>
     </StandardLayout>

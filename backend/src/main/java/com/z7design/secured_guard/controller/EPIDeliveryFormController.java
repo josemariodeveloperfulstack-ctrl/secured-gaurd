@@ -351,8 +351,10 @@ public class EPIDeliveryFormController {
                 log.warn("Usuário autenticado não resolvido ao gerar ficha EPI — baixa de estoque pode falhar.");
             }
 
-            // Primeiro, salvar a ficha no banco
-            EPIDeliveryFormDTO savedForm = epiDeliveryFormService.create(dto, createdByUserId);
+            // Primeiro, salvar ou atualizar a ficha no banco
+            EPIDeliveryFormDTO savedForm = dto.getId() != null
+                    ? epiDeliveryFormService.update(dto.getId(), dto, createdByUserId)
+                    : epiDeliveryFormService.create(dto, createdByUserId);
             log.info("✅ Ficha de entrega de EPI salva no banco com ID: {}", savedForm.getId());
 
             // Buscar a ficha completa para gerar o PDF
@@ -395,7 +397,9 @@ public class EPIDeliveryFormController {
 
             UUID createdByUserId = resolveUserId(authentication);
 
-            EPIDeliveryFormDTO savedForm = epiDeliveryFormService.create(dto, createdByUserId);
+            EPIDeliveryFormDTO savedForm = dto.getId() != null
+                    ? epiDeliveryFormService.update(dto.getId(), dto, createdByUserId)
+                    : epiDeliveryFormService.create(dto, createdByUserId);
             log.info("✅ Ficha de entrega de EPI salva no banco com ID: {}", savedForm.getId());
 
             com.z7design.secured_guard.model.EPIDeliveryForm form = epiDeliveryFormService

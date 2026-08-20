@@ -749,6 +749,7 @@ public class EmployeeController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_CREATE', 'EMPLOYEES_WRITE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'RH')")
     @Operation(summary = "Criar novo funcionário", description = "Cria um novo funcionário no sistema")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Funcionário criado com sucesso"),
@@ -761,6 +762,7 @@ public class EmployeeController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_WRITE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'RH')")
     @Operation(summary = "Atualizar funcionário", description = "Atualiza os dados de um funcionário existente")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Funcionário atualizado com sucesso"),

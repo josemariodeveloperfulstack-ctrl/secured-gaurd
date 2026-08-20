@@ -32,10 +32,19 @@ import {
   Truck,
   UserCheck,
   PackageCheck,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Radio,
+  Car,
+  Crosshair,
+  AlertOctagon
 } from 'lucide-react';
 import { StandardLayout } from '@/components/StandardLayout';
 import Equipamentos from './Equipamentos';
+import { RadioChecklistTab } from '@/components/operacional/RadioChecklistTab';
+import { VehicleChecklistTab } from '@/components/operacional/VehicleChecklistTab';
+import { FirearmAcautelamentoTab } from '@/components/operacional/FirearmAcautelamentoTab';
+import { EquipmentCautelaTab } from '@/components/operacional/EquipmentCautelaTab';
+import { VehicleCriticalityTab } from '@/components/operacional/VehicleCriticalityTab';
 import OccurrenceMap from '@/components/operacional/OccurrenceMap';
 
 
@@ -801,7 +810,7 @@ const Operacional: React.FC = () => {
                 w-full
                 flex md:grid
                 overflow-x-auto md:overflow-x-visible
-                md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-11
+                md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-12
                 glass-card border-0
                 p-2 md:p-2
                 gap-2 md:gap-2
@@ -838,6 +847,86 @@ const Operacional: React.FC = () => {
                     <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
                       <p className="font-semibold">Equipamentos</p>
                       <p className="text-xs text-gray-400">Gestão de armamento e EPIs</p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger
+                        value="checklist-ht"
+                        className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                      >
+                        <Radio className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0 text-seguranca-yellow" />
+                        <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Checklist HT</span>
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                      <p className="font-semibold">Checklist HT (Rádio)</p>
+                      <p className="text-xs text-gray-400">Inspeção rápida de radiocomunicação</p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger
+                        value="checklist-viatura"
+                        className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                      >
+                        <Car className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0 text-seguranca-yellow" />
+                        <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Checklist Viatura</span>
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                      <p className="font-semibold">Checklist de Viatura</p>
+                      <p className="text-xs text-gray-400">Inspeção diária de viatura operacional</p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger
+                        value="acautelamento-armas"
+                        className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                      >
+                        <Crosshair className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0 text-seguranca-yellow" />
+                        <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Acautelamento</span>
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                      <p className="font-semibold">Acautelamento de Armas</p>
+                      <p className="text-xs text-gray-400">Termo de responsabilidade de arma e munição</p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger
+                        value="cautela-equipamentos"
+                        className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                      >
+                        <PackageCheck className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0 text-seguranca-yellow" />
+                        <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Cautela Material</span>
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                      <p className="font-semibold">Cautela de Equipamentos</p>
+                      <p className="text-xs text-gray-400">Termo de responsabilidade e empréstimo de materiais</p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger
+                        value="matriz-criticidade"
+                        className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                      >
+                        <AlertOctagon className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0 text-rose-500" />
+                        <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Criticidade Frota</span>
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                      <p className="font-semibold">Matriz de Criticidade de Viaturas</p>
+                      <p className="text-xs text-gray-400">Bloqueio imediato e manutenção preventiva</p>
                     </TooltipContent>
                   </Tooltip>
 
@@ -1119,6 +1208,26 @@ const Operacional: React.FC = () => {
 
             <TabsContent value="equipamentos" className="mt-6">
               {renderEquipamentosTab()}
+            </TabsContent>
+
+            <TabsContent value="checklist-ht" className="mt-6">
+              <RadioChecklistTab />
+            </TabsContent>
+
+            <TabsContent value="checklist-viatura" className="mt-6">
+              <VehicleChecklistTab />
+            </TabsContent>
+
+            <TabsContent value="acautelamento-armas" className="mt-6">
+              <FirearmAcautelamentoTab />
+            </TabsContent>
+
+            <TabsContent value="cautela-equipamentos" className="mt-6">
+              <EquipmentCautelaTab />
+            </TabsContent>
+
+            <TabsContent value="matriz-criticidade" className="mt-6">
+              <VehicleCriticalityTab />
             </TabsContent>
 
 

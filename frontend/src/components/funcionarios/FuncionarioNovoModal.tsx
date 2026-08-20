@@ -17,7 +17,7 @@ import { userService } from '@/services/userService';
 import { User } from '@/types/user';
 import { companyService } from '@/services/companyService';
 import { Company } from '@/types/company';
-import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield, Eye, FileSpreadsheet, History, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
+import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield, Eye, FileSpreadsheet, History, ChevronLeft, ChevronRight, Download, Loader2, Stethoscope, HeartPulse } from 'lucide-react';
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
@@ -134,6 +134,12 @@ const initialState: CreateEmployeeDTO = {
   exameMedicoObservacoes: '',
   exameMedicoPrimeiroEmprego: false,
   exameMedicoContribuicaoSindicalPaga: false,
+  // Campos de Laudo Psicológico
+  laudoPsicologicoData: '',
+  laudoPsicologicoVencimento: '',
+  laudoPsicologicoResultado: '',
+  laudoPsicologicoDoctor: { id: '' },
+  laudoPsicologicoObservacoes: '',
   // Campos de CIN
   cinNumero: '',
   cinOrgaoEmissor: '',
@@ -3846,6 +3852,103 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <Label htmlFor="sindical-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
                             </div>
                           </RadioGroup>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Dados do Laudo Psicológico */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-purple-500/20 rounded-lg">
+                          <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-white">Laudo Psicológico</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Data do Laudo Psicológico</Label>
+                          <DatePicker
+                            date={parseDateFromBackend(form.laudoPsicologicoData) || undefined}
+                            onDateChange={(date) => {
+                              const realization = formatDateForBackend(date) || '';
+                              const expiry = calcAsoExpiryDate(date || null);
+                              setForm(prev => ({
+                                ...prev,
+                                laudoPsicologicoData: realization,
+                                laudoPsicologicoVencimento: realization ? (formatDateForBackend(expiry) || '') : '',
+                              }));
+                            }}
+                            className="h-9 sm:h-10"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Data de Vencimento do Laudo</Label>
+                          <DatePicker
+                            date={parseDateFromBackend(form.laudoPsicologicoVencimento) || undefined}
+                            onDateChange={(date) => setForm(prev => ({ ...prev, laudoPsicologicoVencimento: formatDateForBackend(date) || '' }))}
+                            className="h-9 sm:h-10"
+                          />
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Calculada automaticamente (realização + 1 ano − 1 dia). Editável.
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Resultado / Status</Label>
+                          <Select 
+                            value={form.laudoPsicologicoResultado || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, laudoPsicologicoResultado: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                              <SelectValue placeholder="Selecione o resultado" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-60 overflow-auto">
+                              <SelectItem value="APTO" className="text-seguranca-lightgray hover:bg-gray-700">Apto</SelectItem>
+                              <SelectItem value="INAPTO" className="text-seguranca-lightgray hover:bg-gray-700">Inapto</SelectItem>
+                              <SelectItem value="APTO_COM_RESTRICAO" className="text-seguranca-lightgray hover:bg-gray-700">Apto com Restrição</SelectItem>
+                              <SelectItem value="EM_AVALIACAO" className="text-seguranca-lightgray hover:bg-gray-700">Em Avaliação</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <Label className="text-sm font-medium text-gray-200">Médico / Psicólogo Responsável</Label>
+                            <button
+                              type="button"
+                              onClick={() => setNovoMedicoModalOpen(true)}
+                              className="text-xs text-seguranca-yellow underline hover:no-underline focus:outline-none flex items-center gap-1"
+                            >
+                              <Plus size={12} />
+                              Cadastrar novo médico
+                            </button>
+                          </div>
+                          <Select
+                            value={form.laudoPsicologicoDoctor?.id || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, laudoPsicologicoDoctor: { id: value } }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                              <SelectValue placeholder="Selecione o médico/psicólogo" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-60 overflow-auto">
+                              {doctors.map((doctor) => (
+                                <SelectItem key={doctor.id} value={doctor.id} className="text-seguranca-lightgray hover:bg-gray-700">
+                                  {doctor.name} {doctor.crmNumber ? `(CRM/CRP: ${doctor.crmNumber}/${doctor.crmState || ''})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label className="text-sm font-medium text-gray-200">Observações do Laudo Psicológico</Label>
+                          <Textarea
+                            name="laudoPsicologicoObservacoes"
+                            value={form.laudoPsicologicoObservacoes || ''}
+                            onChange={handleChange}
+                            placeholder="Observações ou restrições do laudo psicológico..."
+                            className="bg-seguranca-graphite border-gray-600 text-white text-xs sm:text-sm"
+                            rows={2}
+                          />
                         </div>
                       </div>
                     </div>

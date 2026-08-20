@@ -43,10 +43,16 @@ import {
   Stethoscope,
   Trash2,
   Upload,
+  BarChart2,
+  Printer,
+  Download,
+  Building2,
+  Users,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { SimpleEmployee } from '@/services/employeeService';
+import departmentService, { Department } from '@/services/departmentService';
 import {
   MEDICAL_TYPE_LABELS,
   MedicalDocument,
@@ -123,6 +129,80 @@ const GestaoAtestados: React.FC = () => {
   const [cidMenuOpen, setCidMenuOpen] = useState(false);
   const [cidSelected, setCidSelected] = useState(false);
   const debouncedCid = useDebounce(form.cidCode, 400);
+
+  // Estados para relatórios e setores
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportFrom, setReportFrom] = useState('');
+  const [reportTo, setReportTo] = useState('');
+  const [reportSector, setReportSector] = useState('ALL');
+  const [reportEmployeeId, setReportEmployeeId] = useState('ALL');
+  const [reportType, setReportType] = useState('ALL');
+
+  useEffect(() => {
+    departmentService.listActive().then(setDepartments).catch(() => []);
+  }, []);
+
+  // Mapeamento total de atestados entregues por funcionário
+  const employeeCertificateCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    items.forEach((item) => {
+      if (item.employeeId) {
+        counts[item.employeeId] = (counts[item.employeeId] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [items]);
+
+  // Relatório filtrado e métricas
+  const reportFilteredItems = useMemo(() => {
+    return items.filter((doc) => {
+      if (reportFrom && doc.startDate && doc.startDate < reportFrom) return false;
+      if (reportTo && doc.startDate && doc.startDate > reportTo) return false;
+      if (reportSector !== 'ALL' && doc.employeeDepartment !== reportSector) return false;
+      if (reportType !== 'ALL' && doc.documentType !== reportType) return false;
+      return true;
+    });
+  }, [items, reportFrom, reportTo, reportSector, reportType]);
+
+  const reportTotals = useMemo(() => {
+    const totalDocs = reportFilteredItems.length;
+    const totalDays = reportFilteredItems.reduce((acc, doc) => acc + (doc.days || 0), 0);
+    const uniqueEmployees = new Set(reportFilteredItems.map((doc) => doc.employeeId).filter(Boolean)).size;
+    return { totalDocs, totalDays, uniqueEmployees };
+  }, [reportFilteredItems]);
+
+  const handleExportCsvReport = () => {
+    if (reportFilteredItems.length === 0) {
+      toast({ title: 'Atenção', description: 'Nenhum atestado para exportar.', variant: 'destructive' });
+      return;
+    }
+    const headers = ['Funcionário', 'Setor', 'Tipo', 'Data Início', 'Data Fim', 'Dias', 'CID', 'Descrição CID'];
+    const rows = reportFilteredItems.map((doc) => [
+      `"${(doc.employeeName || '').replace(/"/g, '""')}"`,
+      `"${(doc.employeeDepartment || '').replace(/"/g, '""')}"`,
+      `"${MEDICAL_TYPE_LABELS[doc.documentType] || doc.documentType}"`,
+      `"${doc.startDate || ''}"`,
+      `"${doc.endDate || ''}"`,
+      doc.days ?? '',
+      `"${(doc.cidCode || '').replace(/"/g, '""')}"`,
+      `"${(doc.cidDescription || '').replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `relatorio_atestados_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handlePrintReport = () => {
+    window.print();
+  };
+
 
   const load = async () => {
     setLoading(true);
@@ -442,6 +522,14 @@ const GestaoAtestados: React.FC = () => {
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => setReportModalOpen(true)}
+              className="border-emerald-600/50 text-emerald-400 hover:bg-emerald-950/40"
+            >
+              <BarChart2 className="h-4 w-4 mr-2 text-emerald-400" />
+              Relatórios
+            </Button>
             <Button onClick={openCreate} className="bg-seguranca-red hover:bg-seguranca-red/90">
               <Plus className="h-4 w-4 mr-2" />
               Novo lançamento
@@ -543,6 +631,11 @@ const GestaoAtestados: React.FC = () => {
                           <div className="text-xs text-muted-foreground">
                             {[doc.employeePosition, doc.employeeDepartment].filter(Boolean).join(' · ') || '—'}
                           </div>
+                          {employeeCertificateCounts[doc.employeeId] ? (
+                            <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-300 border-blue-500/30 mt-1">
+                              {employeeCertificateCounts[doc.employeeId]} atestado(s) entregue(s)
+                            </Badge>
+                          ) : null}
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary">{MEDICAL_TYPE_LABELS[doc.documentType]}</Badge>
@@ -836,6 +929,136 @@ const GestaoAtestados: React.FC = () => {
                 {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Salvar
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Relatórios de Atestados Médicos */}
+        <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-700 text-white">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <BarChart2 className="h-6 w-6 text-emerald-400" />
+                Relatórios de Atestados Médicos
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Gere relatórios detalhados de atestados filtrados por período, setor de trabalho e funcionário.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-seguranca-black/50 border border-gray-700">
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-400">Data Inicial</Label>
+                  <Input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-400">Data Final</Label>
+                  <Input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-400">Setores de Trabalho</Label>
+                  <Select value={reportSector} onValueChange={setReportSector}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Todos os setores" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">🏢 Todos os Setores</SelectItem>
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={d.name}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-400">Tipo de Documento</Label>
+                  <Select value={reportType} onValueChange={setReportType}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Todos os tipos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">📋 Todos os Tipos</SelectItem>
+                      {Object.entries(MEDICAL_TYPE_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>
+                          {v}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-3 bg-seguranca-black/40 rounded-lg border border-gray-700 text-center">
+                  <div className="text-2xl font-bold text-emerald-400">{reportTotals.totalDocs}</div>
+                  <div className="text-xs text-gray-400">Atestados Encontrados</div>
+                </div>
+                <div className="p-3 bg-seguranca-black/40 rounded-lg border border-gray-700 text-center">
+                  <div className="text-2xl font-bold text-amber-400">{reportTotals.totalDays}</div>
+                  <div className="text-xs text-gray-400">Total de Dias Afastados</div>
+                </div>
+                <div className="p-3 bg-seguranca-black/40 rounded-lg border border-gray-700 text-center">
+                  <div className="text-2xl font-bold text-blue-400">{reportTotals.uniqueEmployees}</div>
+                  <div className="text-xs text-gray-400">Funcionários Afetados</div>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-700 max-h-64 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Funcionário</TableHead>
+                      <TableHead>Setor</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Período</TableHead>
+                      <TableHead>Dias</TableHead>
+                      <TableHead>CID</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reportFilteredItems.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                          Nenhum atestado encontrado para os filtros selecionados.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      reportFilteredItems.map((doc) => (
+                        <TableRow key={doc.id}>
+                          <TableCell className="font-medium text-xs">{doc.employeeName}</TableCell>
+                          <TableCell className="text-xs text-gray-300">{doc.employeeDepartment || '—'}</TableCell>
+                          <TableCell className="text-xs">
+                            <Badge variant="outline">{MEDICAL_TYPE_LABELS[doc.documentType] || doc.documentType}</Badge>
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {formatAdmissionDateBr(doc.startDate)} {doc.endDate ? `→ ${formatAdmissionDateBr(doc.endDate)}` : ''}
+                          </TableCell>
+                          <TableCell className="text-xs font-semibold text-amber-300">{doc.days != null ? `${doc.days}d` : '—'}</TableCell>
+                          <TableCell className="text-xs">{doc.cidCode || '—'}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <DialogFooter className="flex flex-row justify-between items-center sm:justify-between gap-2">
+              <Button variant="ghost" onClick={() => setReportModalOpen(false)}>
+                Fechar
+              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleExportCsvReport} variant="outline" className="border-emerald-600/50 text-emerald-400 hover:bg-emerald-950/40">
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar Excel (.CSV)
+                </Button>
+                <Button onClick={handlePrintReport} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir / PDF
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>

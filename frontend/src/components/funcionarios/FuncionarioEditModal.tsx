@@ -50,8 +50,11 @@ import DocumentosGerarTab from './DocumentosGerarTab';
 import { EmployeeDocumentsTab } from './EmployeeDocumentsTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/utils/permissions';
-import { History, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { History, ChevronLeft, ChevronRight, ArrowRight, Stethoscope, Calendar } from 'lucide-react';
 import { remanejamentoService, Remanejamento } from '@/services/remanejamentoService';
+import { feriasService } from '@/services/feriasService';
+import { occurrenceService } from '@/services/occurrenceService';
+import { medicalDocumentService, MEDICAL_TYPE_LABELS, MedicalDocumentType } from '@/services/medicalDocumentService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DismissalReasonSelect } from '@/components/funcionarios/DismissalReasonSelect';
 import { employeeChangeHistoryService, EmployeeChangeHistoryPage } from '@/services/employeeChangeHistoryService';
@@ -184,6 +187,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     exameMedicoObservacoes: '',
     exameMedicoPrimeiroEmprego: false,
     exameMedicoContribuicaoSindicalPaga: false,
+    // Campos de Laudo Psicológico
+    laudoPsicologicoData: '',
+    laudoPsicologicoVencimento: '',
+    laudoPsicologicoResultado: '',
+    laudoPsicologicoDoctor: { id: '' },
+    laudoPsicologicoObservacoes: '',
     // Campos de CIN
     cinNumero: '',
     cinOrgaoEmissor: '',
@@ -235,6 +244,90 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [activeTab, setActiveTab] = useState('cadastro');
   const [remanejamentos, setRemanejamentos] = useState<Remanejamento[]>([]);
   const [loadingRemanejamentos, setLoadingRemanejamentos] = useState(false);
+  const [atestados, setAtestados] = useState<any[]>([]);
+  const [loadingAtestados, setLoadingAtestados] = useState(false);
+
+  useEffect(() => {
+    if (open && funcionario?.id && activeTab === 'atestados') {
+      setLoadingAtestados(true);
+      Promise.all([
+        feriasService.getAfastamentosByEmployee(funcionario.id).catch(() => []),
+        medicalDocumentService.search({ employeeId: funcionario.id, size: 100 }).catch(() => ({ content: [] })),
+        occurrenceService.getOccurrences({ employeeId: funcionario.id }).catch(() => []),
+      ]).then(([abs, medDocsRes, occs]) => {
+        const fromAfastamentos = (Array.isArray(abs) ? abs : [])
+          .filter((a: any) => a.absenceType === 'SICK_LEAVE' || a.tipo === 'ATESTADO')
+          .map((a: any) => ({
+            id: `afastamento-${a.id}`,
+            source: 'AFASTAMENTOS',
+            title: a.motivo || 'Atestado Médico',
+            dataInicio: a.dataInicio || a.startDate,
+            dataFim: a.dataFim || a.endDate,
+            dias: a.dias || a.days,
+            cidCode: a.cid,
+            documentoUrl: a.documento || a.documentUrl,
+            observations: a.observacoes || a.notes,
+          }));
+
+        const fromMedDocs = (Array.isArray(medDocsRes?.content) ? medDocsRes.content : [])
+          .map((doc: any) => ({
+            id: `med-doc-${doc.id}`,
+            source: 'GESTÃO DE ATESTADOS',
+            title: MEDICAL_TYPE_LABELS[doc.documentType as MedicalDocumentType] || doc.documentType || 'Atestado Médico',
+            dataInicio: doc.startDate,
+            dataFim: doc.endDate,
+            dias: doc.days,
+            horas: doc.hours,
+            cidCode: doc.cidCode,
+            cidDescription: doc.cidDescription,
+            doctorName: doc.doctorName,
+            crm: doc.crm,
+            documentoUrl: doc.documentUrl,
+            observations: doc.observations,
+          }));
+
+        const atestadoOccurrences = (Array.isArray(occs) ? occs : [])
+          .filter((o: any) => {
+            const t = String(o.type || '').toUpperCase();
+            const title = String(o.title || '').toUpperCase();
+            const cat = String(o.category || '').toUpperCase();
+            return t === 'MEDICAL_CERTIFICATE' || t === 'ATESTADO' || t === 'ATESTADO_MEDICO' ||
+              title.includes('ATESTADO') || cat.includes('ATESTADO');
+          })
+          .map((o: any) => ({
+            id: `ocorrencia-${o.id}`,
+            source: 'OCORRÊNCIAS',
+            title: o.title || 'Atestado Médico (Ocorrência)',
+            dataInicio: o.startDate || o.date,
+            dataFim: o.endDate || o.date,
+            description: o.description || o.reason,
+            status: o.status,
+            documentoUrl: o.documentUrl || o.attachmentUrl || o.documento,
+          }));
+
+        const combined = [...fromMedDocs, ...fromAfastamentos, ...atestadoOccurrences];
+        const unique = combined.filter((item, index, self) =>
+          index === self.findIndex((t) => (
+            t.id === item.id ||
+            (t.dataInicio === item.dataInicio && t.title === item.title && t.source === item.source)
+          ))
+        );
+
+        unique.sort((a, b) => {
+          const dateA = new Date(a.dataInicio || 0).getTime();
+          const dateB = new Date(b.dataInicio || 0).getTime();
+          return dateB - dateA;
+        });
+
+        setAtestados(unique);
+      }).catch((err) => {
+        console.error('Erro ao carregar atestados:', err);
+        setAtestados([]);
+      }).finally(() => {
+        setLoadingAtestados(false);
+      });
+    }
+  }, [open, funcionario?.id, activeTab]);
 
   // Estados que devem estar antes de qualquer return (Rules of Hooks)
   const [cpfError, setCpfError] = useState<string | null>(null);
@@ -807,6 +900,13 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           exameMedicoObservacoes: employeeData.exameMedicoObservacoes || '',
           exameMedicoPrimeiroEmprego: employeeData.exameMedicoPrimeiroEmprego || false,
           exameMedicoContribuicaoSindicalPaga: employeeData.exameMedicoContribuicaoSindicalPaga || false,
+          laudoPsicologicoData: employeeData.laudoPsicologicoData || '',
+          laudoPsicologicoVencimento: employeeData.laudoPsicologicoVencimento || '',
+          laudoPsicologicoResultado: employeeData.laudoPsicologicoResultado || '',
+          laudoPsicologicoDoctor: (employeeData as any).laudoPsicologicoDoctor?.id
+            ? { id: String((employeeData as any).laudoPsicologicoDoctor.id) }
+            : { id: '' },
+          laudoPsicologicoObservacoes: employeeData.laudoPsicologicoObservacoes || '',
           rneNumero: employeeData.rneNumero || '',
           rneValidade: employeeData.rneValidade || '',
           ricNumero: employeeData.ricNumero || '',
@@ -1630,6 +1730,13 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         exameMedicoDoctor: (funcionario as any).exameMedicoDoctor?.id
           ? { id: String((funcionario as any).exameMedicoDoctor.id) }
           : { id: '' },
+        laudoPsicologicoData: (funcionario as any).laudoPsicologicoData || '',
+        laudoPsicologicoVencimento: (funcionario as any).laudoPsicologicoVencimento || '',
+        laudoPsicologicoResultado: (funcionario as any).laudoPsicologicoResultado || '',
+        laudoPsicologicoDoctor: (funcionario as any).laudoPsicologicoDoctor?.id
+          ? { id: String((funcionario as any).laudoPsicologicoDoctor.id) }
+          : { id: '' },
+        laudoPsicologicoObservacoes: (funcionario as any).laudoPsicologicoObservacoes || '',
         bankData: employeeService.mapBankDataFromApi(funcionario as Record<string, unknown>),
         workPostId: (funcionario as any).workPostId || (funcionario as any).workPost?.id || '',
         salario: funcionario.salario != null ? String(funcionario.salario) : ('' as any),
@@ -2120,10 +2227,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-                <TabsList className={`grid w-full ${canSeeHistory ? 'grid-cols-5' : 'grid-cols-4'} bg-seguranca-graphite border border-gray-600`}>
+                <TabsList className={`grid w-full ${canSeeHistory ? 'grid-cols-6' : 'grid-cols-5'} bg-seguranca-graphite border border-gray-600`}>
                   <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
                   <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
                   <TabsTrigger value="documentos">Documentos</TabsTrigger>
+                  <TabsTrigger value="atestados" className="flex items-center gap-1.5">
+                    <Stethoscope className="h-4 w-4" />
+                    Atestados
+                  </TabsTrigger>
                   <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
                   {canSeeHistory && (
                     <TabsTrigger value="historico" className="flex items-center gap-1.5">
@@ -3373,6 +3484,103 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                     </div>
                   </Card>
 
+                  {/* Seção: Dados do Laudo Psicológico */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-purple-500/20 rounded-lg">
+                          <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-white">Laudo Psicológico</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Data do Laudo Psicológico</Label>
+                          <DatePicker
+                            date={parseDateFromBackend(form.laudoPsicologicoData) || undefined}
+                            onDateChange={(date) => {
+                              const realization = formatDateForBackend(date) || '';
+                              const expiry = calcAsoExpiryDate(date || null);
+                              setForm(prev => ({
+                                ...prev,
+                                laudoPsicologicoData: realization,
+                                laudoPsicologicoVencimento: realization ? (formatDateForBackend(expiry) || '') : '',
+                              }));
+                            }}
+                            className="h-9 sm:h-10"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Data de Vencimento do Laudo</Label>
+                          <DatePicker
+                            date={parseDateFromBackend(form.laudoPsicologicoVencimento) || undefined}
+                            onDateChange={(date) => setForm(prev => ({ ...prev, laudoPsicologicoVencimento: formatDateForBackend(date) || '' }))}
+                            className="h-9 sm:h-10"
+                          />
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Calculada automaticamente (realização + 1 ano − 1 dia). Editável.
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Resultado / Status</Label>
+                          <Select 
+                            value={form.laudoPsicologicoResultado || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, laudoPsicologicoResultado: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                              <SelectValue placeholder="Selecione o resultado" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-60 overflow-auto">
+                              <SelectItem value="APTO" className="text-seguranca-lightgray hover:bg-gray-700">Apto</SelectItem>
+                              <SelectItem value="INAPTO" className="text-seguranca-lightgray hover:bg-gray-700">Inapto</SelectItem>
+                              <SelectItem value="APTO_COM_RESTRICAO" className="text-seguranca-lightgray hover:bg-gray-700">Apto com Restrição</SelectItem>
+                              <SelectItem value="EM_AVALIACAO" className="text-seguranca-lightgray hover:bg-gray-700">Em Avaliação</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <Label className="text-sm font-medium text-gray-200">Médico / Psicólogo Responsável</Label>
+                            <button
+                              type="button"
+                              onClick={() => setNovoMedicoModalOpen(true)}
+                              className="text-xs text-seguranca-yellow underline hover:no-underline focus:outline-none flex items-center gap-1"
+                            >
+                              <Plus size={12} />
+                              Cadastrar novo médico
+                            </button>
+                          </div>
+                          <Select
+                            value={form.laudoPsicologicoDoctor?.id || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, laudoPsicologicoDoctor: { id: value } }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                              <SelectValue placeholder="Selecione o médico/psicólogo" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-60 overflow-auto">
+                              {doctors.map((doctor) => (
+                                <SelectItem key={doctor.id} value={doctor.id} className="text-seguranca-lightgray hover:bg-gray-700">
+                                  {doctor.name} {doctor.crmNumber ? `(CRM/CRP: ${doctor.crmNumber}/${doctor.crmState || ''})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label className="text-sm font-medium text-gray-200">Observações do Laudo Psicológico</Label>
+                          <Textarea
+                            name="laudoPsicologicoObservacoes"
+                            value={form.laudoPsicologicoObservacoes || ''}
+                            onChange={handleChange}
+                            placeholder="Observações ou restrições do laudo psicológico..."
+                            className="bg-seguranca-graphite border-gray-600 text-white text-xs sm:text-sm"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
                   {/* Seção: Para Estrangeiro */}
                   <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
                     <div className="p-4 space-y-4">
@@ -4366,12 +4574,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   ) : (
                     <DocumentosGerarTab
                       hideHeader={true}
-                      employeeId={employeeToEdit?.id}
+                      employeeId={employeeToEdit?.id || funcionario?.id || (form as any).id}
                       companyId={
                         selectedCompany?.id ||
                         funcionario?.company?.id ||
+                        (form as any).companyId ||
                         (form as any).company?.id
                       }
+                      employeeName={funcionario?.name || form.name || employeeToEdit?.name}
                       tipoSalarioContratual={form.tipoSalarioContratual}
                       prazoExperienciaTexto={form.prazoExperienciaTexto}
                     />
@@ -4512,6 +4722,97 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                           Cadastrar / Gerenciar EPIs
                         </Button>
           </div>
+                    </div>
+                  </Card>
+                </TabsContent>
+
+                {/* Aba Atestados */}
+                <TabsContent value="atestados" className="space-y-4 sm:space-y-6">
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="p-1.5 sm:p-2 bg-purple-500/20 rounded-lg">
+                            <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg sm:text-xl font-semibold text-white">Histórico de Atestados Médicos</h3>
+                            <p className="text-xs text-gray-400">Atestados da Gestão de Atestados e Ocorrências do funcionário</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {loadingAtestados ? (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400 mx-auto" />
+                          <p className="text-gray-400 text-sm mt-2">Carregando atestados...</p>
+                        </div>
+                      ) : atestados.length === 0 ? (
+                        <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-6 text-center">
+                          <Stethoscope className="mx-auto mb-2 text-gray-400 opacity-50" size={32} />
+                          <p className="text-gray-400 text-sm">Nenhum atestado médico registrado para este funcionário.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {atestados.map((abs: any) => (
+                            <Card key={abs.id} className="bg-seguranca-black/40 border-gray-700/50 p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-start gap-3">
+                                  <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 shrink-0">
+                                    <Stethoscope size={18} />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <p className="font-bold text-white text-sm">{abs.title || abs.motivo || 'Atestado Médico'}</p>
+                                      {abs.source && (
+                                        <Badge className={
+                                          abs.source === 'OCORRÊNCIAS'
+                                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px]'
+                                            : 'bg-blue-500/20 text-blue-300 border-blue-500/30 text-[10px]'
+                                        }>
+                                          {abs.source}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
+                                      <div className="flex items-center gap-1">
+                                        <Calendar size={12} />
+                                        <span>
+                                          {abs.dataInicio ? new Date(abs.dataInicio).toLocaleDateString('pt-BR') : '-'}
+                                          {!abs.dataFim || abs.dataFim === abs.dataInicio ? '' : ` até ${new Date(abs.dataFim).toLocaleDateString('pt-BR')}`}
+                                        </span>
+                                      </div>
+                                      {abs.dias ? <span className="text-gray-300">• {abs.dias} dia(s)</span> : null}
+                                      {abs.horas ? <span className="text-gray-300">• {abs.horas} hora(s)</span> : null}
+                                    </div>
+                                    {abs.cidCode && (
+                                      <p className="text-xs text-purple-300 mt-1 font-mono">
+                                        CID: {abs.cidCode} {abs.cidDescription ? `- ${abs.cidDescription}` : ''}
+                                      </p>
+                                    )}
+                                    {abs.doctorName && (
+                                      <p className="text-xs text-gray-400 mt-0.5">
+                                        Médico: {abs.doctorName} {abs.crm ? `(CRM: ${abs.crm})` : ''}
+                                      </p>
+                                    )}
+                                    {abs.description && (
+                                      <p className="text-xs text-gray-300 mt-1">{abs.description}</p>
+                                    )}
+                                    {abs.observations && (
+                                      <p className="text-xs text-gray-400 mt-1 italic">{abs.observations}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                {(abs.documentoUrl || abs.documento) && (
+                                  <Button variant="link" size="sm" className="text-blue-400 hover:text-blue-300 h-auto p-0" asChild>
+                                    <a href={abs.documentoUrl || abs.documento} target="_blank" rel="noopener noreferrer">Ver Anexo</a>
+                                  </Button>
+                                )}
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </Card>
                 </TabsContent>

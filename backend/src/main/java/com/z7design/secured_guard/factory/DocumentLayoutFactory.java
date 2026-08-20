@@ -47,6 +47,8 @@ public class DocumentLayoutFactory {
                 MigrationWave.WAVE_1),
         BODY_CAM_RESPONSIBILITY_TERM("Termo de Responsabilidade e Uso de Body Cam", "body-cam-responsibility",
                 MigrationWave.WAVE_1),
+        IMAGE_VOICE_NAME_AUTH_TERM("Termo de Autorização para Uso de Imagem, Voz e Nome", "image-voice-name-auth",
+                MigrationWave.WAVE_1),
         SERVICE_PROVIDER_AWARENESS_TERM("Termo de Ciência do Prestador de Serviços", "service-provider-awareness",
                 MigrationWave.WAVE_1),
         DECLARATION("Declaração", "declaration", MigrationWave.WAVE_1),

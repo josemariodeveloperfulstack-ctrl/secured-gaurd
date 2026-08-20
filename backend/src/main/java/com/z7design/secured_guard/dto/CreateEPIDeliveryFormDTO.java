@@ -9,6 +9,8 @@ import java.util.UUID;
 
 public class CreateEPIDeliveryFormDTO {
 
+    private UUID id;
+
     @NotNull(message = "Funcionário é obrigatório")
     private UUID employeeId;
 
@@ -34,6 +36,14 @@ public class CreateEPIDeliveryFormDTO {
     private List<EPIDeliveryFormItemDTO> items;
 
     public CreateEPIDeliveryFormDTO() {
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
     }
 
     // Manual Getters and Setters

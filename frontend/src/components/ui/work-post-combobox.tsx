@@ -21,21 +21,27 @@ import { workPostService, WorkPost } from "@/services/workPostService"
 import { formatWorkPostDisplayName } from "@/utils/formatters"
 
 interface WorkPostComboboxProps {
-  value: string;
-  onChange: (value: string) => void;
+  value?: string;
+  onChange?: (value: string) => void;
+  onValueChange?: (value: string) => void;
   placeholder?: string;
   searchPlaceholder?: string;
   emptyPlaceholder?: string;
   disabled?: boolean;
+  onWorkPostSelect?: (post: WorkPost) => void;
+  className?: string;
 }
 
 export function WorkPostCombobox({
-  value,
+  value = "",
   onChange,
-  placeholder = "Selecione o posto de trabalho...",
+  onValueChange,
+  placeholder = "Selecione o setor de trabalho...",
   searchPlaceholder = "Digite para buscar pelo nome ou código...",
   emptyPlaceholder = "Nenhum posto encontrado.",
-  disabled = false
+  disabled = false,
+  onWorkPostSelect,
+  className,
 }: WorkPostComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [workPosts, setWorkPosts] = React.useState<WorkPost[]>([])
@@ -78,7 +84,7 @@ export function WorkPostCombobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled || loading}
-          className="w-full justify-between border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors disabled:opacity-50"
+          className={cn("w-full justify-between border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors disabled:opacity-50", className)}
         >
           {selectedPost ? (
             <div className="flex items-center gap-2">
@@ -120,7 +126,13 @@ export function WorkPostCombobox({
                         key={post.id}
                         value={`${displayName} ${post.postCode || ''} ${post.name || ''}`}
                         onSelect={() => {
-                          onChange(value === post.id ? "" : post.id)
+                          const targetId = String(post.id);
+                          const nextVal = String(value) === targetId ? "" : targetId;
+                          if (onChange) onChange(nextVal);
+                          if (onValueChange) onValueChange(nextVal);
+                          if (nextVal && onWorkPostSelect) {
+                            onWorkPostSelect(post);
+                          }
                           setOpen(false)
                         }}
                         className="text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-lightgray"

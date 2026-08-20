@@ -109,4 +109,52 @@ public class Overtime {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public Employee getEmployee() { return employee; }
+    public void setEmployee(Employee employee) { this.employee = employee; }
+
+    public LocalDate getOvertimeDate() { return overtimeDate; }
+    public void setOvertimeDate(LocalDate overtimeDate) { this.overtimeDate = overtimeDate; }
+
+    public LocalTime getStartTime() { return startTime; }
+    public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
+
+    public LocalTime getEndTime() { return endTime; }
+    public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
+
+    public Double getTotalHours() { return totalHours; }
+    public void setTotalHours(Double totalHours) { this.totalHours = totalHours; }
+
+    public OvertimeType getType() { return type; }
+    public void setType(OvertimeType type) { this.type = type; }
+
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
+
+    public String getJustification() { return justification; }
+    public void setJustification(String justification) { this.justification = justification; }
+
+    public OvertimeStatus getStatus() { return status; }
+    public void setStatus(OvertimeStatus status) { this.status = status; }
+
+    public User getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(User approvedBy) { this.approvedBy = approvedBy; }
+
+    public LocalDateTime getApprovalDate() { return approvalDate; }
+    public void setApprovalDate(LocalDateTime approvalDate) { this.approvalDate = approvalDate; }
+
+    public WorkPost getWorkPost() { return workPost; }
+    public void setWorkPost(WorkPost workPost) { this.workPost = workPost; }
+
+    public Absence getAbsence() { return absence; }
+    public void setAbsence(Absence absence) { this.absence = absence; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 } 

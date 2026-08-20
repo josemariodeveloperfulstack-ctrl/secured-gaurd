@@ -277,11 +277,21 @@ public class PayslipService {
                     }
 
                     // Extrair seção do texto (incluir contexto antes do CPF)
-                    int inicioSecao = Math.max(0, posicaoCpf - 500);
+                    // CORREÇÃO CRÍTICA: Se for o primeiro CPF da página (ou o único holerite da página/arquivo),
+                    // inicioSecao DEVE ser 0 para capturar o cabeçalho completo (Empresa, CNPJ, Período, etc.)
+                    boolean isPrimeiroCpfDaPagina = true;
+                    for (HoleriteInfo outro : holeritesEncontrados) {
+                        if (outro.pagina == info.pagina && !outro.cpf.equals(info.cpf)
+                                && outro.posicaoNaPagina < info.posicaoNaPagina) {
+                            isPrimeiroCpfDaPagina = false;
+                            break;
+                        }
+                    }
+                    int inicioSecao = isPrimeiroCpfDaPagina ? 0 : Math.max(0, posicaoCpf - 500);
                     int fimSecao = posicaoProximoCpf;
                     info.secaoTexto = pageText.substring(inicioSecao, fimSecao);
 
-                    log.debug("   Seção extraída: {} caracteres", info.secaoTexto.length());
+                    log.debug("   Seção extraída: {} caracteres (primeiro CPF: {})", info.secaoTexto.length(), isPrimeiroCpfDaPagina);
                 }
 
                 log.info("");
@@ -308,11 +318,19 @@ public class PayslipService {
                     HoleriteInfo info = holeritesEncontrados.get(idx);
                     log.info("📄 [{}/{}] Processando holerite - CPF: {} (página {})",
                             idx + 1, holeritesEncontrados.size(), info.cpf, info.pagina);
-                    log.info("📄 Processando holerite - CPF: {} (página {})", info.cpf, info.pagina);
 
                     try {
                         // Extrair informações do holerite usando a seção do texto
                         Payslip payslip = extractPayslipInfo(info.secaoTexto, info.pagina);
+
+                        // Se a extração com seção do texto falhar em bater o CPF, tentar com o texto completo da página
+                        if (payslip == null || payslip.getCpf() == null || !payslip.getCpf().equals(info.cpf)) {
+                            log.info("🔄 Tentando extração com texto completo da página {} para CPF {}", info.pagina, info.cpf);
+                            Payslip payslipTextoCompleto = extractPayslipInfo(info.textoCompleto, info.pagina);
+                            if (payslipTextoCompleto != null && payslipTextoCompleto.getCpf() != null && payslipTextoCompleto.getCpf().equals(info.cpf)) {
+                                payslip = payslipTextoCompleto;
+                            }
+                        }
 
                         // Verificar se o CPF extraído corresponde
                         if (payslip == null || payslip.getCpf() == null || !payslip.getCpf().equals(info.cpf)) {
@@ -433,9 +451,9 @@ public class PayslipService {
     private List<String> detectarTodosCPFsNaPagina(String pageText) {
         List<String> cpfs = new ArrayList<>();
 
-        // Padrão 1: CPF: 123.456.789-00 ou CPF 123.456.789-00 ou CPF: 12345678900
-        // Melhorado para capturar CPF sem formatação também
-        Pattern cpfPattern1 = Pattern.compile("CPF[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2}|[0-9]{11})",
+        // Padrão 1: CPF: 123.456.789-00, C.P.F.: 123.456.789-00, CPF/MF: 12345678900, etc.
+        // Melhorado para capturar CPF com rótulos variados e com/sem formatação
+        Pattern cpfPattern1 = Pattern.compile("(?:CPF|C\\.P\\.F\\.|CPF/MF|DOC)[:\\s]*([0-9]{3}\\.?[0-9]{3}\\.?[0-9]{3}-?[0-9]{2}|[0-9]{11})",
                 Pattern.CASE_INSENSITIVE);
         Matcher matcher1 = cpfPattern1.matcher(pageText);
 

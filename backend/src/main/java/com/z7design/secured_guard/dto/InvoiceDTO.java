@@ -99,7 +99,10 @@ public class InvoiceDTO {
 
     private java.util.UUID createdById;
     private String createdByName;
-    
+
+    private String unitName;
+    private String workSector;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -188,10 +191,14 @@ public class InvoiceDTO {
             
             try {
                 dto.setUnitId(invoice.getUnit() != null ? invoice.getUnit().getId() : null);
+                dto.setUnitName(invoice.getUnit() != null ? invoice.getUnit().getName() : null);
             } catch (Exception e) {
                 System.err.println("⚠️ Erro ao acessar unit da invoice " + invoice.getId() + ": " + e.getMessage());
                 dto.setUnitId(null);
+                dto.setUnitName(null);
             }
+
+            dto.setWorkSector(invoice.getWorkSector());
 
             try {
                 if (invoice.getSubcategoria() != null) {

@@ -231,6 +231,7 @@ public class EPIDeliveryFormService {
             for (EPIDeliveryFormItemDTO itemDto : dto.getItems()) {
                 EPIDeliveryFormItem existing = itemDto.getId() != null ? existingItemsById.get(itemDto.getId()) : null;
                 EPIDeliveryFormItem item = EPIDeliveryFormItem.builder()
+                        .id(existing != null ? existing.getId() : null)
                         .deliveryForm(form)
                         .epiName(itemDto.getEpiName())
                         .quantity(itemDto.getQuantity() != null ? itemDto.getQuantity() : 1)
@@ -1302,10 +1303,6 @@ public class EPIDeliveryFormService {
             EPIDeliveryType deliveryType,
             LocalDate requestedDate,
             LocalDate hireDate) {
-        boolean hasPriorCompleted = hasCompletedDeliveries(employeeId, excludeFormId);
-        if (!hasPriorCompleted && deliveryType == EPIDeliveryType.PRIMEIRA_ENTREGA && hireDate != null) {
-            return hireDate;
-        }
         if (requestedDate != null) {
             return requestedDate;
         }

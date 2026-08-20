@@ -47,6 +47,7 @@ import { sstService, MedicalExam } from '@/services/sstService';
 import { trainingService, EmployeeCertification } from '@/services/trainingService';
 import { feriasService } from '@/services/feriasService';
 import { occurrenceService, Occurrence } from '@/services/occurrenceService';
+import { medicalDocumentService, MEDICAL_TYPE_LABELS, MedicalDocumentType } from '@/services/medicalDocumentService';
 import { remanejamentoService, Remanejamento } from '@/services/remanejamentoService';
 import timeRecordService, { TimeRecord } from '@/services/timeRecordService';
 import { format } from 'date-fns';
@@ -124,7 +125,7 @@ interface EmployeeViewDetailsModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     employee: Employee | null;
-    onEdit: (employee: Employee) => void;
+    onEdit?: (employee: Employee) => void;
 }
 
 export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> = ({
@@ -270,7 +271,27 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                         }]
                         : [];
 
-                    setExams([...fromFicha, ...fromSst]);
+                    const fichaHasLaudo = Boolean(
+                        empDetail?.laudoPsicologicoData ||
+                        empDetail?.laudoPsicologicoVencimento ||
+                        empDetail?.laudoPsicologicoResultado
+                    );
+
+                    const fromLaudo: UnifiedExamItem[] = fichaHasLaudo
+                        ? [{
+                            id: `ficha-laudo-${empDetail.id}`,
+                            examType: 'Laudo Psicológico',
+                            examCategory: 'Avaliação Psicológica',
+                            scheduledDate: empDetail.laudoPsicologicoData,
+                            nextExamDate: empDetail.laudoPsicologicoVencimento,
+                            status: empDetail.laudoPsicologicoData ? 'REALIZADO' : 'PENDENTE',
+                            result: empDetail.laudoPsicologicoResultado,
+                            doctorName: (empDetail as any).laudoPsicologicoDoctor?.name,
+                            source: 'FICHA',
+                        }]
+                        : [];
+
+                    setExams([...fromFicha, ...fromLaudo, ...fromSst]);
                     setTrainings(Array.isArray(certs) ? certs : []);
                     break;
                 }
@@ -278,10 +299,80 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                     const vacs = await feriasService.getFeriasByEmployee(employee.id);
                     setVacations(vacs);
                     break;
-                case 'atestados':
-                    const abs = await feriasService.getAfastamentosByEmployee(employee.id);
-                    setAbsences(abs.filter((a: any) => a.absenceType === 'SICK_LEAVE' || a.tipo === 'ATESTADO'));
+                case 'atestados': {
+                    const [abs, medDocsRes, occs] = await Promise.all([
+                        feriasService.getAfastamentosByEmployee(employee.id).catch(() => []),
+                        medicalDocumentService.search({ employeeId: employee.id, size: 100 }).catch(() => ({ content: [] })),
+                        occurrenceService.getOccurrences({ employeeId: employee.id }).catch(() => []),
+                    ]);
+
+                    const fromAfastamentos = (Array.isArray(abs) ? abs : [])
+                        .filter((a: any) => a.absenceType === 'SICK_LEAVE' || a.tipo === 'ATESTADO')
+                        .map((a: any) => ({
+                            id: `afastamento-${a.id}`,
+                            source: 'AFASTAMENTOS',
+                            title: a.motivo || 'Atestado Médico',
+                            dataInicio: a.dataInicio || a.startDate,
+                            dataFim: a.dataFim || a.endDate,
+                            dias: a.dias || a.days,
+                            cidCode: a.cid,
+                            documentoUrl: a.documento || a.documentUrl,
+                            observations: a.observacoes || a.notes,
+                        }));
+
+                    const fromMedDocs = (Array.isArray(medDocsRes?.content) ? medDocsRes.content : [])
+                        .map((doc: any) => ({
+                            id: `med-doc-${doc.id}`,
+                            source: 'GESTÃO DE ATESTADOS',
+                            title: MEDICAL_TYPE_LABELS[doc.documentType as MedicalDocumentType] || doc.documentType || 'Atestado Médico',
+                            dataInicio: doc.startDate,
+                            dataFim: doc.endDate,
+                            dias: doc.days,
+                            horas: doc.hours,
+                            cidCode: doc.cidCode,
+                            cidDescription: doc.cidDescription,
+                            doctorName: doc.doctorName,
+                            crm: doc.crm,
+                            documentoUrl: doc.documentUrl,
+                            observations: doc.observations,
+                        }));
+
+                    const atestadoOccurrences = (Array.isArray(occs) ? occs : [])
+                        .filter((o: any) => {
+                            const t = String(o.type || '').toUpperCase();
+                            const title = String(o.title || '').toUpperCase();
+                            const cat = String(o.category || '').toUpperCase();
+                            return t === 'MEDICAL_CERTIFICATE' || t === 'ATESTADO' || t === 'ATESTADO_MEDICO' ||
+                                title.includes('ATESTADO') || cat.includes('ATESTADO');
+                        })
+                        .map((o: any) => ({
+                            id: `ocorrencia-${o.id}`,
+                            source: 'OCORRÊNCIAS',
+                            title: o.title || 'Atestado Médico (Ocorrência)',
+                            dataInicio: o.startDate || o.date,
+                            dataFim: o.endDate || o.date,
+                            description: o.description || o.reason,
+                            status: o.status,
+                            documentoUrl: o.documentUrl || o.attachmentUrl || o.documento,
+                        }));
+
+                    const combined = [...fromMedDocs, ...fromAfastamentos, ...atestadoOccurrences];
+                    const unique = combined.filter((item, index, self) =>
+                        index === self.findIndex((t) => (
+                            t.id === item.id ||
+                            (t.dataInicio === item.dataInicio && t.title === item.title && t.source === item.source)
+                        ))
+                    );
+
+                    unique.sort((a, b) => {
+                        const dateA = new Date(a.dataInicio || 0).getTime();
+                        const dateB = new Date(b.dataInicio || 0).getTime();
+                        return dateB - dateA;
+                    });
+
+                    setAbsences(unique);
                     break;
+                }
                 case 'disciplinar':
                     const occs = await occurrenceService.getOccurrences({ employeeId: employee.id });
                     setOccurrences(occs.filter(o => o.type === 'ADVERTENCIA' || o.type === 'SUSPENSAO' || o.type === 'PUNICAO'));
@@ -416,18 +507,20 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                 </DialogDescription>
                             </div>
                         </div>
-                        <Button
-                            onClick={() => {
-                              const toEdit = { ...displayEmployee } as any;
-                              const listWp = (employee as any)?.workPost;
-                              if (listWp && !toEdit.workPost) toEdit.workPost = listWp;
-                              if (listWp?.id && !toEdit.workPostId) toEdit.workPostId = String(listWp.id);
-                              onEdit(toEdit);
-                            }}
-                            className="bg-seguranca-red hover:bg-seguranca-darkred text-white w-full md:w-auto"
-                        >
-                            <Edit size={18} className="mr-2" /> Editar Dados
-                        </Button>
+                        {onEdit && (
+                            <Button
+                                onClick={() => {
+                                  const toEdit = { ...displayEmployee } as any;
+                                  const listWp = (employee as any)?.workPost;
+                                  if (listWp && !toEdit.workPost) toEdit.workPost = listWp;
+                                  if (listWp?.id && !toEdit.workPostId) toEdit.workPostId = String(listWp.id);
+                                  onEdit(toEdit);
+                                }}
+                                className="bg-seguranca-red hover:bg-seguranca-darkred text-white w-full md:w-auto"
+                            >
+                                <Edit size={18} className="mr-2" /> Editar Dados
+                            </Button>
+                        )}
                     </div>
                 </DialogHeader>
 
@@ -599,7 +692,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
 
                         {/* Aba Documentos */}
                         <TabsContent value="documentos" className="mt-0">
-                            <EmployeeDocuments employeeId={employee.id} employeeName={employee.name} />
+                            <EmployeeDocuments employeeId={employee.id} employeeName={employee.name} companyId={employee.company?.id} />
                         </TabsContent>
 
                         <TabsContent value="ponto" className="mt-0">
@@ -908,26 +1001,57 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-white mb-2">Histórico de Atestados Médicos</h3>
 
-                                    {absences.length === 0 ? renderEmpty('Nenhum aatestado médico registrado.') : (
+                                    {absences.length === 0 ? renderEmpty('Nenhum atestado médico registrado.') : (
                                         <div className="space-y-3">
                                             {absences.map((abs: any) => (
                                                 <Card key={abs.id} className="bg-seguranca-black/40 border-gray-700/50 p-4">
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex items-start gap-3">
-                                                            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+                                                            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 shrink-0">
                                                                 <Stethoscope size={18} />
                                                             </div>
                                                             <div>
-                                                                <p className="font-bold text-white text-sm">{abs.motivo || 'Atestado Médico'}</p>
-                                                                <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
-                                                                    <Calendar size={12} />
-                                                                    <span>{formatDate(abs.dataInicio)} {!abs.dataFim || abs.dataFim === abs.dataInicio ? '' : `até ${formatDate(abs.dataFim)}`}</span>
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <p className="font-bold text-white text-sm">{abs.title || abs.motivo || 'Atestado Médico'}</p>
+                                                                    {abs.source && (
+                                                                        <Badge className={
+                                                                            abs.source === 'OCORRÊNCIAS'
+                                                                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px]'
+                                                                                : 'bg-blue-500/20 text-blue-300 border-blue-500/30 text-[10px]'
+                                                                        }>
+                                                                            {abs.source}
+                                                                        </Badge>
+                                                                    )}
                                                                 </div>
+                                                                <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <Calendar size={12} />
+                                                                        <span>{formatDate(abs.dataInicio)} {!abs.dataFim || abs.dataFim === abs.dataInicio ? '' : `até ${formatDate(abs.dataFim)}`}</span>
+                                                                    </div>
+                                                                    {abs.dias ? <span className="text-gray-300">• {abs.dias} dia(s)</span> : null}
+                                                                    {abs.horas ? <span className="text-gray-300">• {abs.horas} hora(s)</span> : null}
+                                                                </div>
+                                                                {abs.cidCode && (
+                                                                    <p className="text-xs text-purple-300 mt-1 font-mono">
+                                                                        CID: {abs.cidCode} {abs.cidDescription ? `- ${abs.cidDescription}` : ''}
+                                                                    </p>
+                                                                )}
+                                                                {abs.doctorName && (
+                                                                    <p className="text-xs text-gray-400 mt-0.5">
+                                                                        Médico: {abs.doctorName} {abs.crm ? `(CRM: ${abs.crm})` : ''}
+                                                                    </p>
+                                                                )}
+                                                                {abs.description && (
+                                                                    <p className="text-xs text-gray-300 mt-1">{abs.description}</p>
+                                                                )}
+                                                                {abs.observations && (
+                                                                    <p className="text-xs text-gray-400 mt-1 italic">{abs.observations}</p>
+                                                                )}
                                                             </div>
                                                         </div>
-                                                        {abs.documento && (
+                                                        {(abs.documentoUrl || abs.documento) && (
                                                             <Button variant="link" size="sm" className="text-blue-400 hover:text-blue-300 h-auto p-0" asChild>
-                                                                <a href={abs.documento} target="_blank" rel="noopener noreferrer">Ver Anexo</a>
+                                                                <a href={abs.documentoUrl || abs.documento} target="_blank" rel="noopener noreferrer">Ver Anexo</a>
                                                             </Button>
                                                         )}
                                                     </div>

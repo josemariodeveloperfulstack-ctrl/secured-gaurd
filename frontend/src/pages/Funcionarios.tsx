@@ -61,6 +61,7 @@ import { admissionRequestService, AdmissionEmployeeIntegrationContext } from '@/
 import { companyService } from '@/services/companyService';
 import { workPostService, WorkPost } from '@/services/workPostService';
 import { positionService, Position } from '@/services/positionService';
+import departmentService, { Department } from '@/services/departmentService';
 import { Employee } from '@/types/employee';
 import FuncionarioNovoModal from '@/components/funcionarios/FuncionarioNovoModal';
 import { EmployeeDocuments } from '@/components/funcionarios/EmployeeDocuments';
@@ -123,14 +124,14 @@ const Funcionarios: React.FC = () => {
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [companies, setCompanies] = useState<any[]>([]);
   const [positionFilter, setPositionFilter] = useState<string>('all');
-  const [workPostFilter, setWorkPostFilter] = useState<string>('all');
+  const [sectorFilter, setSectorFilter] = useState<string>('all');
   const [hireDateFrom, setHireDateFrom] = useState<string>('');
   const [hireDateTo, setHireDateTo] = useState<string>('');
   const [terminationDateFrom, setTerminationDateFrom] = useState<string>('');
   const [terminationDateTo, setTerminationDateTo] = useState<string>('');
-  // Listas da API para opções dos filtros (empresas, postos, departamentos, cargos)
+  // Listas da API para opções dos filtros (empresas, setores, cargos)
   const [filterCompanies, setFilterCompanies] = useState<Array<{ id: string; name?: string; sigla?: string }>>([]);
-  const [filterWorkPosts, setFilterWorkPosts] = useState<WorkPost[]>([]);
+  const [filterSectors, setFilterSectors] = useState<Department[]>([]);
   const [filterPositions, setFilterPositions] = useState<Position[]>([]);
   const [statsFromApi, setStatsFromApi] = useState<{
     total: number;
@@ -353,7 +354,7 @@ const Funcionarios: React.FC = () => {
     const debounceMs = term ? 500 : 0;
     const timeoutId = setTimeout(() => loadEmployees(buildApiFilters(), 0), debounceMs);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, statusFilter, companyFilter, positionFilter, workPostFilter, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, buildApiFilters]);
+  }, [searchTerm, statusFilter, companyFilter, positionFilter, sectorFilter, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, buildApiFilters]);
 
   // Carregar opções dos filtros (empresas, cargos) — sequencial para não competir com a listagem
   useEffect(() => {
@@ -376,36 +377,27 @@ const Funcionarios: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // Postos de trabalho: carrega depois da listagem principal (endpoint pesado)
+  // Setores de trabalho (departamentos): carrega departamentos ativos do sistema
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        await new Promise((r) => setTimeout(r, 1500));
+        await new Promise((r) => setTimeout(r, 1200));
         if (cancelled) return;
-        if (companyFilter && companyFilter !== 'all') {
-          const posts = await workPostService.getWorkPostsByCompany(companyFilter);
-          if (!cancelled) {
-            setFilterWorkPosts(Array.isArray(posts) ? posts : []);
-            setWorkPostFilter('all');
-          }
-        } else {
-          const posts = await workPostService.getAllWorkPosts();
-          if (!cancelled) {
-            setFilterWorkPosts(Array.isArray(posts) ? posts : []);
-            setWorkPostFilter('all');
-          }
+        const depts = await departmentService.listActive().catch(() => []);
+        if (!cancelled) {
+          setFilterSectors(Array.isArray(depts) ? depts : []);
         }
       } catch (e) {
         if (!cancelled) {
-          console.warn('Erro ao carregar postos:', e);
-          setFilterWorkPosts([]);
+          console.warn('Erro ao carregar setores de trabalho:', e);
+          setFilterSectors([]);
         }
       }
     };
     load();
     return () => { cancelled = true; };
-  }, [companyFilter]);
+  }, []);
 
   useEffect(() => {
     if (shouldOpenModal) setModalOpen(true);
@@ -532,9 +524,11 @@ const Funcionarios: React.FC = () => {
       same((employee.position as any)?.name, positionFilter) ||
       String((employee.position as any)?.id) === String(positionFilter);
 
-    const matchesWorkPost = isAll(workPostFilter) ||
-      same((employee.workPost as any)?.name, workPostFilter) ||
-      String((employee.workPost as any)?.id) === String(workPostFilter);
+    const matchesSector = isAll(sectorFilter) ||
+      same((employee.department as any)?.name, sectorFilter) ||
+      String((employee.department as any)?.id) === String(sectorFilter) ||
+      same((employee as any).departmentName, sectorFilter) ||
+      same((employee as any).employeeWorkSector, sectorFilter);
 
     const hireStr = employee.hireDate;
     const hireDate = hireStr ? new Date(`${String(hireStr).split('T')[0]}T12:00:00`) : null;
@@ -558,7 +552,7 @@ const Funcionarios: React.FC = () => {
       return nameMatch || emailMatch || registrationMatch || cpfMatch || positionMatch || workPostMatch || departmentMatch;
     })();
 
-    return matchesStatus && matchesSearch && matchesCompany && matchesPosition && matchesWorkPost
+    return matchesStatus && matchesSearch && matchesCompany && matchesPosition && matchesSector
       && matchesHireDateFrom && matchesHireDateTo && matchesTerminationDateFrom && matchesTerminationDateTo;
   });
 
@@ -605,7 +599,7 @@ const Funcionarios: React.FC = () => {
     setStatusFilter('all');
     setCompanyFilter('all');
     setPositionFilter('all');
-    setWorkPostFilter('all');
+    setSectorFilter('all');
     setHireDateFrom('');
     setHireDateTo('');
     setTerminationDateFrom('');
@@ -1349,17 +1343,17 @@ Para excluir este funcionário:
                 />
 
                 <SearchableSelect
-                  value={workPostFilter}
-                  onChange={setWorkPostFilter}
+                  value={sectorFilter}
+                  onChange={setSectorFilter}
                   options={[
-                    { value: "all", label: "📍 Todos os postos" },
-                    ...filterWorkPosts.map(wp => ({
-                      value: wp.name,
-                      label: wp.name
+                    { value: "all", label: "🏢 Todos os setores de trabalho" },
+                    ...filterSectors.map(s => ({
+                      value: s.name,
+                      label: s.name
                     }))
                   ]}
-                  placeholder="📍 Todos os postos"
-                  searchPlaceholder="Buscar posto..."
+                  placeholder="🏢 Todos os setores de trabalho"
+                  searchPlaceholder="Buscar setor de trabalho..."
                 />
 
                 <div className="flex flex-col gap-1">
@@ -1882,7 +1876,7 @@ Para excluir este funcionário:
         onOpenChange={setRelatoriosModalOpen}
         employees={employees}
         filterCompanies={filterCompanies}
-        filterWorkPosts={filterWorkPosts}
+        filterWorkPosts={filterSectors.map(s => ({ id: s.id, name: s.name }))}
         filterPositions={filterPositions}
       />
 

@@ -546,6 +546,26 @@ public class EmployeeService {
                 existingEmployee.setExameMedicoContribuicaoSindicalPaga(dto.getExameMedicoContribuicaoSindicalPaga());
             }
 
+            // Atualizar dados do Laudo Psicológico
+            if (dto.getLaudoPsicologicoData() != null) {
+                existingEmployee.setLaudoPsicologicoData(dto.getLaudoPsicologicoData());
+            }
+            if (dto.getLaudoPsicologicoVencimento() != null) {
+                existingEmployee.setLaudoPsicologicoVencimento(dto.getLaudoPsicologicoVencimento());
+            }
+            if (dto.getLaudoPsicologicoResultado() != null) {
+                existingEmployee.setLaudoPsicologicoResultado(dto.getLaudoPsicologicoResultado());
+            }
+            if (dto.getLaudoPsicologicoDoctor() != null && dto.getLaudoPsicologicoDoctor().getId() != null) {
+                existingEmployee.setLaudoPsicologicoDoctor(
+                        doctorRepository.findById(dto.getLaudoPsicologicoDoctor().getId()).orElse(null));
+            } else if (dto.getLaudoPsicologicoDoctor() == null) {
+                existingEmployee.setLaudoPsicologicoDoctor(null);
+            }
+            if (dto.getLaudoPsicologicoObservacoes() != null) {
+                existingEmployee.setLaudoPsicologicoObservacoes(dto.getLaudoPsicologicoObservacoes());
+            }
+
             // Atualizar campos para Estrangeiro
             if (dto.getRneNumero() != null) {
                 existingEmployee.setRneNumero(dto.getRneNumero());
@@ -2066,6 +2086,23 @@ public class EmployeeService {
                 e.setExameMedicoContribuicaoSindicalPaga(dto.getExameMedicoContribuicaoSindicalPaga());
             }
 
+            // Mapear dados do Laudo Psicológico
+            if (dto.getLaudoPsicologicoData() != null) {
+                e.setLaudoPsicologicoData(dto.getLaudoPsicologicoData());
+            }
+            if (dto.getLaudoPsicologicoVencimento() != null) {
+                e.setLaudoPsicologicoVencimento(dto.getLaudoPsicologicoVencimento());
+            }
+            if (dto.getLaudoPsicologicoResultado() != null) {
+                e.setLaudoPsicologicoResultado(dto.getLaudoPsicologicoResultado());
+            }
+            if (dto.getLaudoPsicologicoDoctor() != null && dto.getLaudoPsicologicoDoctor().getId() != null) {
+                e.setLaudoPsicologicoDoctor(doctorRepository.findById(dto.getLaudoPsicologicoDoctor().getId()).orElse(null));
+            }
+            if (dto.getLaudoPsicologicoObservacoes() != null) {
+                e.setLaudoPsicologicoObservacoes(dto.getLaudoPsicologicoObservacoes());
+            }
+
             // Mapear documentos se fornecidos
             if (dto.getDocuments() != null && !dto.getDocuments().isEmpty()) {
                 System.out.println("[DEBUG] Documentos fornecidos: " + dto.getDocuments().size());
@@ -2288,6 +2325,12 @@ public class EmployeeService {
             dto.setExameMedicoPrimeiroEmprego(e.getExameMedicoPrimeiroEmprego());
             dto.setExameMedicoContribuicaoSindicalPaga(e.getExameMedicoContribuicaoSindicalPaga());
 
+            // Mapear dados do Laudo Psicológico
+            dto.setLaudoPsicologicoData(e.getLaudoPsicologicoData());
+            dto.setLaudoPsicologicoVencimento(e.getLaudoPsicologicoVencimento());
+            dto.setLaudoPsicologicoResultado(e.getLaudoPsicologicoResultado());
+            dto.setLaudoPsicologicoObservacoes(e.getLaudoPsicologicoObservacoes());
+
             // Mapear campos de CIN
             dto.setCinNumero(e.getCinNumero());
             dto.setCinOrgaoEmissor(e.getCinOrgaoEmissor());
@@ -2356,6 +2399,17 @@ public class EmployeeService {
                 }
             } catch (Exception docEx) {
                 System.err.println("[WARNING] Erro ao mapear exameMedicoDoctor: " + docEx.getMessage());
+            }
+
+            try {
+                if (e.getLaudoPsicologicoDoctor() != null) {
+                    EmployeeDTO.IdOnlyDTO psiDoctorDTO = new EmployeeDTO.IdOnlyDTO();
+                    psiDoctorDTO.setId(e.getLaudoPsicologicoDoctor().getId());
+                    psiDoctorDTO.setName(e.getLaudoPsicologicoDoctor().getName());
+                    dto.setLaudoPsicologicoDoctor(psiDoctorDTO);
+                }
+            } catch (Exception psiEx) {
+                System.err.println("[WARNING] Erro ao mapear laudoPsicologicoDoctor: " + psiEx.getMessage());
             }
 
             // Mapear dados bancários

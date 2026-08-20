@@ -18,6 +18,8 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "app.workers.enabled", havingValue = "true", matchIfMissing = true)
 public class WorkerInitializationChecker {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WorkerInitializationChecker.class);
+
     private final ApplicationContext applicationContext;
 
     public WorkerInitializationChecker(ApplicationContext applicationContext) {

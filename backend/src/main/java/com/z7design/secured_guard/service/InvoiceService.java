@@ -501,6 +501,7 @@ public class InvoiceService {
             invoice.setBarcode(dto.getBarcode());
             invoice.setNotes(dto.getNotes());
             invoice.setCompanySigla(dto.getCompanySigla());
+            invoice.setWorkSector(dto.getWorkSector());
             
             log.debug("Campos básicos definidos");
             

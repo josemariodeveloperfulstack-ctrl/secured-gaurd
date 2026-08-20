@@ -591,6 +591,29 @@ public class Employee {
     @Column(name = "exame_medico_contribuicao_sindical_paga")
     private Boolean exameMedicoContribuicaoSindicalPaga; // true = Sim, false = Não
 
+    // Dados do Laudo Psicológico
+    @Column(name = "laudo_psicologico_data")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate laudoPsicologicoData;
+
+    @Column(name = "laudo_psicologico_vencimento")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate laudoPsicologicoVencimento;
+
+    @Column(name = "laudo_psicologico_resultado", length = 50)
+    private String laudoPsicologicoResultado;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JoinColumn(name = "laudo_psicologico_doctor_id")
+    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Doctor laudoPsicologicoDoctor;
+
+    @Column(name = "laudo_psicologico_observacoes", columnDefinition = "TEXT")
+    private String laudoPsicologicoObservacoes;
+
     // Método para obter o nome completo do funcionário
     public String getFullName() {
         return this.name;

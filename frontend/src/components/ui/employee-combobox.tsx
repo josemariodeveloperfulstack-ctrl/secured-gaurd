@@ -27,8 +27,9 @@ import {
 import { employeeService, SimpleEmployee } from "@/services/employeeService"
 
 interface EmployeeComboboxProps {
-  value: string;
-  onChange: (value: string) => void;
+  value?: string;
+  onChange?: (value: string) => void;
+  onValueChange?: (value: string) => void;
   placeholder?: string;
   searchPlaceholder?: string;
   emptyPlaceholder?: string;
@@ -50,11 +51,14 @@ interface EmployeeComboboxProps {
   displayNameOnly?: boolean;
   /** Filtra localmente por empresa do funcionário (companyId). */
   companyId?: string;
+  /** Estilos customizados adicionais para o botão do combobox */
+  className?: string;
 }
 
 export function EmployeeCombobox({ 
-  value,
+  value = "",
   onChange,
+  onValueChange,
   placeholder = "Selecione o funcionário",
   searchPlaceholder = "Digite o nome do funcionário para buscar",
   emptyPlaceholder = "Nenhum funcionário encontrado.",
@@ -66,6 +70,7 @@ export function EmployeeCombobox({
   positionFilter,
   displayNameOnly = false,
   companyId,
+  className,
 }: EmployeeComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [employees, setEmployees] = React.useState<SimpleEmployee[]>([])
@@ -96,8 +101,10 @@ export function EmployeeCombobox({
     return String(emp.companyId || '') === String(companyId);
   }, [companyId])
 
-  // Buscar funcionários quando o usuário digitar (a partir de minChars caracteres)
+  // Buscar funcionários quando o combobox for aberto ou quando o usuário digitar
   React.useEffect(() => {
+    if (!open) return;
+
     if (debouncedSearchTerm.trim().length >= minChars) {
       setLoading(true)
       employeeService.searchSimpleEmployees(debouncedSearchTerm.trim())
@@ -110,9 +117,16 @@ export function EmployeeCombobox({
         })
         .finally(() => setLoading(false))
     } else {
-      setEmployees([])
+      // Carregar lista inicial de funcionários ativando o combobox
+      setLoading(true)
+      employeeService.searchSimpleEmployees("")
+        .then(result => {
+          setEmployees(result.filter(matchesPositionFilter).filter(matchesCompanyFilter))
+        })
+        .catch(() => setEmployees([]))
+        .finally(() => setLoading(false))
     }
-  }, [debouncedSearchTerm, minChars, matchesPositionFilter, matchesCompanyFilter])
+  }, [open, debouncedSearchTerm, minChars, matchesPositionFilter, matchesCompanyFilter])
 
   // Garantir que o funcionário selecionado apareça na lista mesmo se não estiver carregado
   React.useEffect(() => {
@@ -254,7 +268,7 @@ export function EmployeeCombobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className="w-full justify-between border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors disabled:opacity-50"
+          className={cn("w-full justify-between border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors disabled:opacity-50", className)}
         >
           {displayLabel ? (
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -319,15 +333,19 @@ export function EmployeeCombobox({
                   {options.map((option) => (
                     <CommandItem
                       key={option.value}
-                      value={option.value}
-                      onSelect={(currentValue) => {
-                        const isSelected = currentValue === value;
-                        onChange(isSelected ? "" : currentValue)
+                      value={`${option.employee.name} ${option.employee.registrationNumber || ''} ${option.value}`}
+                      onSelect={() => {
+                        const targetVal = option.value;
+                        const isSelected = String(targetVal) === String(value);
+                        const nextVal = isSelected ? "" : targetVal;
+                        if (onChange) onChange(nextVal);
+                        if (onValueChange) onValueChange(nextVal);
+                        setSelectedEmployee(option.employee);
                         if (!isSelected && onEmployeeSelect) {
                           onEmployeeSelect(option.employee);
                         }
-                        setOpen(false)
-                        setSearchTerm("")
+                        setOpen(false);
+                        setSearchTerm("");
                       }}
                       className="text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-lightgray"
                     >

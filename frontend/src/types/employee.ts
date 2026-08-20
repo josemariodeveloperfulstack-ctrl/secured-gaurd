@@ -305,6 +305,13 @@ export interface Employee {
   exameMedicoPrimeiroEmprego?: boolean;
   exameMedicoContribuicaoSindicalPaga?: boolean;
 
+  // Dados do Laudo Psicológico
+  laudoPsicologicoData?: string;
+  laudoPsicologicoVencimento?: string;
+  laudoPsicologicoResultado?: string;
+  laudoPsicologicoDoctor?: { id: UUID | string; name?: string };
+  laudoPsicologicoObservacoes?: string;
+
   createdAt?: string;
   updatedAt?: string;
 }
@@ -455,6 +462,13 @@ export interface CreateEmployeeDTO {
   exameMedicoPrimeiroEmprego?: boolean; // true = Sim, false = Não
   exameMedicoContribuicaoSindicalPaga?: boolean; // true = Sim, false = Não
   exameMedicoHorarioIntervalo?: string;
+
+  // Dados do Laudo Psicológico
+  laudoPsicologicoData?: string;
+  laudoPsicologicoVencimento?: string;
+  laudoPsicologicoResultado?: string;
+  laudoPsicologicoDoctor?: { id: string; name?: string };
+  laudoPsicologicoObservacoes?: string;
 
   // CIN (Carteira de Identidade Nacional)
   cinNumero?: string;

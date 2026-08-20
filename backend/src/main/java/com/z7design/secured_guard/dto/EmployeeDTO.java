@@ -232,6 +232,15 @@ public class EmployeeDTO {
     private Boolean exameMedicoPrimeiroEmprego; // true = Sim, false = Não
     private Boolean exameMedicoContribuicaoSindicalPaga; // true = Sim, false = Não
 
+    // Dados do Laudo Psicológico
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate laudoPsicologicoData;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate laudoPsicologicoVencimento;
+    private String laudoPsicologicoResultado;
+    private IdOnlyDTO laudoPsicologicoDoctor;
+    private String laudoPsicologicoObservacoes;
+
     /** Tipo de admissão para recontratação: READMISSAO ou PROMOCAO */
     private String admissionType;
 

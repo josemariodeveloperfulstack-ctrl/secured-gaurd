@@ -150,6 +150,11 @@ export default defineConfig(({ mode }) => {
           timeout: 120000,
           proxyTimeout: 120000,
         },
+        '/uploads': {
+          target: 'http://localhost:8083',
+          changeOrigin: true,
+          secure: false,
+        },
         '/ws': {
           target: 'http://localhost:8083',
           changeOrigin: true,
