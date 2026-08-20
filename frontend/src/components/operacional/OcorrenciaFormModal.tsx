@@ -201,31 +201,47 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
     }
   }, [ocorrencia, open]);
 
-  // Busca de funcionários por digitação (a partir de 3 caracteres)
+  // Busca de funcionários por digitação (exibe lista local e busca na API a partir de 3 caracteres)
   useEffect(() => {
     const term = employeeSearchTerm.trim();
-    if (term.length < 3) {
-      setEmployeeSearchResults([]);
-      setShowEmployeeDropdown(term.length > 0);
+    if (term.length === 0) {
+      setEmployeeSearchResults(employees.slice(0, 50));
       return;
     }
-    if (employeeSearchDebounceRef.current) clearTimeout(employeeSearchDebounceRef.current);
-    employeeSearchDebounceRef.current = setTimeout(async () => {
-      setEmployeeSearching(true);
-      setShowEmployeeDropdown(true);
-      try {
-        const list = await employeeService.searchEmployees(term);
-        setEmployeeSearchResults(Array.isArray(list) ? list : []);
-      } catch {
-        setEmployeeSearchResults([]);
-      } finally {
-        setEmployeeSearching(false);
-      }
-    }, 300);
+
+    const termLower = term.toLowerCase();
+    const localMatches = employees.filter(emp =>
+      (emp.name && emp.name.toLowerCase().includes(termLower)) ||
+      (emp.cpf && emp.cpf.includes(term)) ||
+      (emp.registrationNumber && emp.registrationNumber.includes(term))
+    );
+    setEmployeeSearchResults(localMatches);
+
+    if (term.length >= 3) {
+      if (employeeSearchDebounceRef.current) clearTimeout(employeeSearchDebounceRef.current);
+      employeeSearchDebounceRef.current = setTimeout(async () => {
+        setEmployeeSearching(true);
+        try {
+          const list = await employeeService.searchEmployees(term);
+          if (Array.isArray(list) && list.length > 0) {
+            setEmployeeSearchResults(prev => {
+              const combined = [...prev, ...list];
+              return combined.filter((emp, index, self) =>
+                index === self.findIndex(e => e.id === emp.id)
+              );
+            });
+          }
+        } catch {
+          /* silencioso */
+        } finally {
+          setEmployeeSearching(false);
+        }
+      }, 300);
+    }
     return () => {
       if (employeeSearchDebounceRef.current) clearTimeout(employeeSearchDebounceRef.current);
     };
-  }, [employeeSearchTerm]);
+  }, [employeeSearchTerm, employees]);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -757,13 +773,12 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
                         setFormData(prev => ({ ...prev, employeeId: '' }));
                         setSelectedEmployeeName('');
                       }
-                      if (v.trim().length >= 3) setShowEmployeeDropdown(true);
-                      else setEmployeeSearchResults([]);
+                      setShowEmployeeDropdown(true);
                     }}
                     onFocus={() => {
-                      if (employeeSearchResults.length > 0 || employeeSearchTerm.trim().length >= 3) setShowEmployeeDropdown(true);
+                      setShowEmployeeDropdown(true);
                     }}
-                    placeholder="Digite pelo menos 3 caracteres para buscar pelo nome"
+                    placeholder="Clique ou digite o nome do funcionário para buscar..."
                     className={`bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11 pr-9 ${errors.employeeId ? 'border-red-500' : ''}`}
                     autoComplete="off"
                   />
@@ -774,25 +789,23 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
                         setFormData(prev => ({ ...prev, employeeId: '' }));
                         setSelectedEmployeeName('');
                         setEmployeeSearchTerm('');
-                        setEmployeeSearchResults([]);
                         setErrors(prev => ({ ...prev, employeeId: '' }));
+                        setShowEmployeeDropdown(true);
                       }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-1"
-                      title="Limpar"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-1 text-lg font-bold"
+                      title="Limpar seleção"
                     >
                       ×
                     </button>
                   )}
                   {showEmployeeDropdown && (
-                    <div className="absolute z-50 w-full mt-1 py-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-[220px] overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 py-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-xl max-h-[240px] overflow-y-auto">
                       {employeeSearching ? (
                         <div className="px-3 py-4 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" /> Buscando...
+                          <Loader2 className="h-4 w-4 animate-spin text-seguranca-yellow" /> Buscando no banco de dados...
                         </div>
-                      ) : employeeSearchTerm.trim().length < 3 ? (
-                        <div className="px-3 py-3 text-gray-400 text-sm">Digite pelo menos 3 caracteres para listar os funcionários</div>
                       ) : employeeSearchResults.length === 0 ? (
-                        <div className="px-3 py-3 text-gray-400 text-sm">Nenhum funcionário encontrado</div>
+                        <div className="px-3 py-3 text-gray-400 text-sm text-center">Nenhum funcionário encontrado</div>
                       ) : (
                         employeeSearchResults.map((emp) => {
                           const empWorkPost = emp.workPostName || emp.workPost?.name || emp.departmentName || emp.department?.name;
@@ -800,12 +813,14 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
                             <button
                               key={emp.id}
                               type="button"
-                              className="w-full text-left px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-red/20 rounded transition-colors text-sm flex flex-col"
+                              className="w-full text-left px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-red/20 rounded transition-colors text-sm flex flex-col border-b border-gray-700/40 last:border-0"
                               onClick={() => handleSelectEmployee(emp)}
                             >
                               <span className="font-medium text-white">{emp.name}</span>
-                              {empWorkPost && (
-                                <span className="text-xs text-emerald-400">Setor/Posto da Admissão: {empWorkPost}</span>
+                              {empWorkPost ? (
+                                <span className="text-xs text-emerald-400 font-medium">📍 Setor/Posto da Admissão: {empWorkPost}</span>
+                              ) : (
+                                <span className="text-xs text-gray-400">CPF: {emp.cpf || 'Não informado'}</span>
                               )}
                             </button>
                           );
