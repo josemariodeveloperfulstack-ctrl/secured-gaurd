@@ -19,6 +19,9 @@ import { employeeService, Employee } from '@/services/employeeService';
 import { occurrenceService } from '@/services/occurrenceService';
 import { workPostService, WorkPost } from '@/services/workPostService';
 import { operationalService } from '@/services/operationalService';
+import { medicalDocumentService, CidSuggestion } from '@/services/medicalDocumentService';
+import { useDebounce } from '@/hooks/use-debounce';
+import { Badge } from '@/components/ui/badge';
 import { 
   Loader2, 
   AlertTriangle, 
@@ -28,7 +31,11 @@ import {
   Clock, 
   FileText,
   UserCheck,
-  Tag
+  Tag,
+  Stethoscope,
+  Upload,
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
 
 interface OcorrenciaFormModalProps {
@@ -79,6 +86,48 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+
+  // Estados específicos para formulário de cadastro de atestado médico
+  const [cidCode, setCidCode] = useState('');
+  const [cidDescription, setCidDescription] = useState('');
+  const [crm, setCrm] = useState('');
+  const [doctorName, setDoctorName] = useState('');
+  const [specialty, setSpecialty] = useState('');
+  const [days, setDays] = useState('1');
+  const [hours, setHours] = useState('');
+  const [cidSuggestions, setCidSuggestions] = useState<CidSuggestion[]>([]);
+  const [cidMenuOpen, setCidMenuOpen] = useState(false);
+  const [cidLookingUp, setCidLookingUp] = useState(false);
+  const debouncedCid = useDebounce(cidCode, 400);
+
+  // Busca automática de CID ao digitar no campo CID do atestado
+  useEffect(() => {
+    const cid = debouncedCid.trim();
+    if (formData.type !== 'atestado' || cid.length < 3) {
+      setCidSuggestions([]);
+      setCidMenuOpen(false);
+      return;
+    }
+    setCidLookingUp(true);
+    medicalDocumentService
+      .searchCid(cid)
+      .then((list) => {
+        setCidSuggestions(list);
+        setCidMenuOpen(list.length > 0);
+        if (list.length === 1 && list[0].code.replace(/\s/g, '').toUpperCase() === cid.replace(/\s/g, '').toUpperCase()) {
+          if (!cidDescription) {
+            setCidDescription(list[0].description || '');
+          }
+        }
+      })
+      .catch(() => {
+        setCidSuggestions([]);
+        setCidMenuOpen(false);
+      })
+      .finally(() => {
+        setCidLookingUp(false);
+      });
+  }, [debouncedCid, formData.type]);
 
   useEffect(() => {
     if (ocorrencia) {
@@ -547,7 +596,7 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
       // Se for a opção Atestado, vincula automaticamente criando o registro na Gestão de Atestados
       if (formData.type === 'atestado') {
         try {
-          let certDays = 1;
+          let certDays = days ? parseInt(days, 10) : 1;
           if (formData.startDate && formData.endDate) {
             const start = new Date(formData.startDate);
             const end = new Date(formData.endDate);
@@ -570,6 +619,24 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
             }
           }
 
+          // Salvar na Gestão de Atestados oficial
+          await medicalDocumentService.create({
+            employeeId: formData.employeeId!,
+            documentType: 'ATESTADO',
+            startDate: formData.startDate || formData.date || new Date().toISOString().split('T')[0],
+            endDate: formData.endDate || undefined,
+            days: certDays,
+            hours: hours ? Number(hours) : undefined,
+            cidCode: cidCode || undefined,
+            cidDescription: cidDescription || undefined,
+            crm: crm || undefined,
+            doctorName: doctorName || undefined,
+            specialty: specialty || undefined,
+            documentUrl: uploadedDocUrl || undefined,
+            observations: formData.reason || formData.description || 'Atestado gerado via Ocorrência'
+          });
+
+          // Backup na tabela de ausências operacionais
           await operationalService.createAbsence({
             employeeId: formData.employeeId!,
             absenceDate: formData.startDate || formData.date || new Date().toISOString().split('T')[0],
@@ -581,8 +648,8 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
           });
 
           toast({
-            title: 'Ocorrência e Atestado Registrados!',
-            description: 'Ocorrência salva e atestado médico vinculado com sucesso à Gestão de Atestados.',
+            title: 'Ocorrência e Atestado Registrados com Sucesso!',
+            description: 'O atestado médico foi cadastrado com CID e vinculado à Gestão de Atestados.',
           });
         } catch (absError) {
           console.warn('Ocorrência salva, mas erro ao registrar na Gestão de Atestados:', absError);
@@ -732,6 +799,142 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
               </div>
             </CardContent>
           </Card>
+
+          {/* Seção Especial: Cadastro de Atestado Médico (quando Tipo = Atestado) */}
+          {formData.type === 'atestado' && (
+            <Card className="bg-gradient-to-r from-red-950/60 via-seguranca-graphite to-gray-800 border-seguranca-red/70 shadow-xl">
+              <CardHeader className="pb-3 border-b border-gray-700/60">
+                <CardTitle className="text-lg text-white font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-seguranca-red/30 rounded-lg text-seguranca-red">
+                      <Stethoscope className="h-5 w-5" />
+                    </div>
+                    <span>Cadastro de Atestado Médico (Gestão de Atestados)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-emerald-600 text-white font-semibold text-xs py-1">
+                      ✓ Integração Automática Gestão de Atestados
+                    </Badge>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                <p className="text-xs text-gray-300">
+                  Preencha os dados do atestado médico. Ao salvar, os dados serão integrados automaticamente à <strong>Gestão de Atestados</strong> e ao painel de controle de afastamentos CLT/INSS.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* CID Código com Auto-complete */}
+                  <div className="space-y-2 relative">
+                    <Label className="text-seguranca-lightgray font-medium flex items-center justify-between">
+                      <span>Código CID</span>
+                      {cidLookingUp && <Loader2 className="h-3 w-3 animate-spin text-seguranca-yellow" />}
+                    </Label>
+                    <Input
+                      value={cidCode}
+                      onChange={(e) => setCidCode(e.target.value.toUpperCase())}
+                      placeholder="Digite 3+ caracteres (ex: J06, M54)"
+                      className="bg-seguranca-graphite border-gray-600 text-white focus:border-seguranca-yellow h-11"
+                    />
+                    {cidMenuOpen && cidSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-2xl max-h-[200px] overflow-y-auto">
+                        {cidSuggestions.map((item) => (
+                          <button
+                            key={item.code}
+                            type="button"
+                            className="w-full text-left px-3 py-2.5 text-xs hover:bg-seguranca-red/20 text-white border-b border-gray-700/40 last:border-0 flex flex-col"
+                            onClick={() => {
+                              setCidCode(item.code);
+                              setCidDescription(item.description || '');
+                              setCidMenuOpen(false);
+                            }}
+                          >
+                            <span className="font-bold text-seguranca-yellow">{item.code}</span>
+                            <span className="text-gray-300">{item.description}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Descrição do CID */}
+                  <div className="md:col-span-2 space-y-2">
+                    <Label className="text-seguranca-lightgray font-medium">Descrição do CID / Diagnóstico Médico</Label>
+                    <Input
+                      value={cidDescription}
+                      onChange={(e) => setCidDescription(e.target.value)}
+                      placeholder="Ex: Infecção aguda das vias aéreas superiores"
+                      className="bg-seguranca-graphite border-gray-600 text-white focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Dias de Afastamento */}
+                  <div className="space-y-2">
+                    <Label className="text-seguranca-lightgray font-medium">Dias de Afastamento *</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={days}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDays(val);
+                        if (formData.startDate && val) {
+                          const daysNum = parseInt(val, 10);
+                          if (daysNum > 0) {
+                            const d = new Date(`${formData.startDate}T12:00:00`);
+                            d.setDate(d.getDate() + daysNum - 1);
+                            const y = d.getFullYear();
+                            const m = String(d.getMonth() + 1).padStart(2, '0');
+                            const dayStr = String(d.getDate()).padStart(2, '0');
+                            setFormData(prev => ({ ...prev, endDate: `${y}-${m}-${dayStr}` }));
+                          }
+                        }
+                      }}
+                      className="bg-seguranca-graphite border-gray-600 text-white focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+
+                  {/* Horas (opcional) */}
+                  <div className="space-y-2">
+                    <Label className="text-seguranca-lightgray font-medium">Horas de Ausência (opcional)</Label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      placeholder="Ex: 4"
+                      value={hours}
+                      onChange={(e) => setHours(e.target.value)}
+                      className="bg-seguranca-graphite border-gray-600 text-white focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+
+                  {/* CRM do Médico */}
+                  <div className="space-y-2">
+                    <Label className="text-seguranca-lightgray font-medium">CRM do Médico</Label>
+                    <Input
+                      placeholder="Ex: 12345/SP"
+                      value={crm}
+                      onChange={(e) => setCrm(e.target.value)}
+                      className="bg-seguranca-graphite border-gray-600 text-white focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+
+                  {/* Nome do Médico */}
+                  <div className="space-y-2">
+                    <Label className="text-seguranca-lightgray font-medium">Nome do Médico / Clínica</Label>
+                    <Input
+                      placeholder="Ex: Dr. Carlos Silva"
+                      value={doctorName}
+                      onChange={(e) => setDoctorName(e.target.value)}
+                      className="bg-seguranca-graphite border-gray-600 text-white focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Seção: Informações Principais */}
           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
