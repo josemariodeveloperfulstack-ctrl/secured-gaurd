@@ -229,10 +229,27 @@ export const VehicleChecklistFormModal: React.FC<VehicleChecklistFormModalProps>
         })
         .catch(() => setFuncionarios([]));
 
-      // Carregar veículos da frota
-      api.get('/api/vehicles')
-        .then((res) => setVeiculos(Array.isArray(res.data) ? res.data : []))
-        .catch(() => setVeiculos([]));
+      // Carregar veículos da frota com suporte a endpoints /api/vehicles e /api/frota/vehicles
+      const fetchVeiculos = async () => {
+        try {
+          const res = await api.get('/api/vehicles');
+          let list = Array.isArray(res.data) ? res.data : (res.data?.content || []);
+          if (!list || list.length === 0) {
+            const res2 = await api.get('/api/frota/vehicles');
+            list = Array.isArray(res2.data) ? res2.data : (res2.data?.content || []);
+          }
+          setVeiculos(list || []);
+        } catch {
+          try {
+            const res2 = await api.get('/api/frota/vehicles');
+            const list = Array.isArray(res2.data) ? res2.data : (res2.data?.content || []);
+            setVeiculos(list || []);
+          } catch {
+            setVeiculos([]);
+          }
+        }
+      };
+      fetchVeiculos();
 
       if (initialData) {
         setPlate(initialData.plate || '');
@@ -288,10 +305,13 @@ export const VehicleChecklistFormModal: React.FC<VehicleChecklistFormModalProps>
     setSelectedVehicleId(vehicleId);
     const v = veiculos.find((item) => String(item.id) === vehicleId);
     if (v) {
-      setPlate(v.plate || '');
-      setModel(v.model || `${v.brand || ''} ${v.model || ''}`);
-      if (v.currentMileage || v.km) {
-        setCurrentKm(String(v.currentMileage || v.km));
+      const plateVal = v.plate || v.placa || '';
+      const modelVal = v.model || v.modelo || `${v.brand || v.marca || ''} ${v.model || v.modelo || ''}`.trim();
+      const kmVal = v.currentMileage || v.currentKm || v.km || v.quilometragem || v.odometer || '';
+      setPlate(plateVal);
+      setModel(modelVal);
+      if (kmVal) {
+        setCurrentKm(String(kmVal));
       }
     }
   };
@@ -560,20 +580,28 @@ export const VehicleChecklistFormModal: React.FC<VehicleChecklistFormModalProps>
                   <Car className="w-3 h-3 text-seguranca-yellow" /> Viatura (Frota / Placa)
                 </Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {veiculos.length > 0 ? (
-                    <Select value={selectedVehicleId} onValueChange={handleSelectVehicle}>
-                      <SelectTrigger className="bg-slate-900 border-slate-700 text-white text-sm h-9">
-                        <SelectValue placeholder="Selecione da frota..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-700 text-white">
-                        {veiculos.map((v) => (
-                          <SelectItem key={v.id} value={String(v.id)}>
-                            {v.plate} - {v.model || v.brand}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : null}
+                  <Select value={selectedVehicleId} onValueChange={handleSelectVehicle}>
+                    <SelectTrigger className="bg-slate-900 border-slate-700 text-white text-sm h-9">
+                      <SelectValue placeholder={veiculos.length > 0 ? "Selecione da frota..." : "Frota de veículos..."} />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-700 text-white max-h-60">
+                      {veiculos.length > 0 ? (
+                        veiculos.map((v) => {
+                          const plateStr = v.plate || v.placa || 'Sem placa';
+                          const modelStr = v.model || v.modelo || v.brand || v.marca || 'Veículo';
+                          return (
+                            <SelectItem key={v.id} value={String(v.id)}>
+                              🚗 {plateStr} — {modelStr}
+                            </SelectItem>
+                          );
+                        })
+                      ) : (
+                        <SelectItem value="empty" disabled>
+                          Nenhum veículo encontrado no cadastro
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
                   <Input
                     value={plate}
                     onChange={(e) => setPlate(e.target.value.toUpperCase())}
