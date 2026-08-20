@@ -688,20 +688,24 @@ export const FirearmAcautelamentoFormModal: React.FC<FirearmAcautelamentoFormMod
                   <ShieldAlert className="w-3 h-3 text-seguranca-yellow" /> Armamento Cadastrado
                 </Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {armas.length > 0 ? (
-                    <Select value={selectedEquipmentId} onValueChange={handleSelectArma}>
-                      <SelectTrigger className="bg-slate-900 border-slate-700 text-white text-sm h-9">
-                        <SelectValue placeholder="Selecione da armaria..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-700 text-white">
-                        {armas.map((a) => (
+                  <Select value={selectedEquipmentId} onValueChange={handleSelectArma}>
+                    <SelectTrigger className="bg-slate-900 border-slate-700 text-white text-sm h-9">
+                      <SelectValue placeholder={armas.length > 0 ? "Selecione da armaria..." : "Armamentos da armaria..."} />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-700 text-white max-h-60">
+                      {armas.length > 0 ? (
+                        armas.map((a) => (
                           <SelectItem key={a.id} value={String(a.id)}>
-                            {a.serialNumber || a.code} - {a.brand || a.name}
+                            🔫 {a.serialNumber || a.code || 'Sem série'} — {a.name || a.brand || 'Armamento'}
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : null}
+                        ))
+                      ) : (
+                        <SelectItem value="empty" disabled>
+                          Nenhum armamento cadastrado no estoque
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
                   <Input
                     value={serialNumber}
                     onChange={(e) => setSerialNumber(e.target.value)}
