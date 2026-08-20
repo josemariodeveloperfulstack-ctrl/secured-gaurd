@@ -730,19 +730,7 @@ export const employeeService = {
     }
   },
 
-  /**
-   * Buscar funcionários por termo (nome ou documento)
-   */
-  async searchEmployees(query: string): Promise<Employee[]> {
-    try {
-      const response = await api.get(`/api/employees/search?q=${encodeURIComponent(query)}`);
-      const employees = response.data || [];
-      return employees.map((e: any) => this.normalizeEmployee(e));
-    } catch (error) {
-      console.error('Erro ao buscar funcionários:', error);
-      return [];
-    }
-  },
+
 
   /**
    * Buscar funcionários por status

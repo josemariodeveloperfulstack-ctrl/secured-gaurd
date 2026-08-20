@@ -833,15 +833,6 @@ const GestaoAtestados: React.FC = () => {
                 </TableBody>
               </Table>
             )}
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            )}
           </CardContent>
         </Card>
 
