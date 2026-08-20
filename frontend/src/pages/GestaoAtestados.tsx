@@ -31,12 +31,15 @@ import {
 } from '@/components/ui/table';
 import {
   AlertTriangle,
+  AlertOctagon,
+  ShieldAlert,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
   Calendar,
   FileText,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -152,6 +155,42 @@ const GestaoAtestados: React.FC = () => {
       }
     });
     return counts;
+  }, [items]);
+
+  // Agrupamento por funcionário para Alertas CLT / INSS (15 dias de atestado)
+  const inssAlertSummary = useMemo(() => {
+    const map: Record<string, {
+      employeeId: string;
+      employeeName: string;
+      employeePosition?: string;
+      employeeDepartment?: string;
+      totalDays: number;
+      totalCount: number;
+      documents: MedicalDocument[];
+    }> = {};
+
+    items.forEach((item) => {
+      if (!item.employeeId) return;
+      if (!map[item.employeeId]) {
+        map[item.employeeId] = {
+          employeeId: item.employeeId,
+          employeeName: item.employeeName || 'Colaborador',
+          employeePosition: item.employeePosition,
+          employeeDepartment: item.employeeDepartment,
+          totalDays: 0,
+          totalCount: 0,
+          documents: []
+        };
+      }
+      map[item.employeeId].totalDays += item.days || 0;
+      map[item.employeeId].totalCount += 1;
+      map[item.employeeId].documents.push(item);
+    });
+
+    const criticalINSS = Object.values(map).filter(e => e.totalDays >= 15);
+    const warningINSS = Object.values(map).filter(e => e.totalDays >= 12 && e.totalDays < 15);
+
+    return { criticalINSS, warningINSS, map };
   }, [items]);
 
   // Relatório filtrado e métricas
@@ -564,6 +603,95 @@ const GestaoAtestados: React.FC = () => {
           </p>
         )}
 
+        {/* Banner de Alertas CLT / INSS (15 Dias de Atestado) */}
+        {(inssAlertSummary.criticalINSS.length > 0 || inssAlertSummary.warningINSS.length > 0) && (
+          <Card className="bg-gradient-to-r from-red-950/70 via-amber-950/50 to-seguranca-graphite border-red-700/60 shadow-lg">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-bold text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-red-600/30 rounded-lg text-red-400">
+                    <AlertOctagon className="h-5 w-5 animate-pulse" />
+                  </div>
+                  <span>Alertas de Afastamento CLT & Encaminhamento INSS (Lei 8.213/91)</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {inssAlertSummary.criticalINSS.length > 0 && (
+                    <Badge variant="destructive" className="bg-red-600 font-bold px-2.5 py-1 text-xs">
+                      🚨 {inssAlertSummary.criticalINSS.length} Alerta(s) INSS (15+ dias)
+                    </Badge>
+                  )}
+                  {inssAlertSummary.warningINSS.length > 0 && (
+                    <Badge className="bg-amber-600 text-white font-bold px-2.5 py-1 text-xs">
+                      ⚠️ {inssAlertSummary.warningINSS.length} Próximo(s) do limite (12-14 dias)
+                    </Badge>
+                  )}
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-2">
+              <p className="text-xs text-gray-300">
+                De acordo com a <strong>CLT (Art. 476)</strong> e a <strong>Lei nº 8.213/91 (Art. 60)</strong>, a empresa arca com os primeiros 15 dias de afastamento. Ao atingir ou ultrapassar 15 dias de atestado, o funcionário deve ser encaminhado para <strong>Perícia Médica do INSS</strong>.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Funcionários Críticos (15+ dias) */}
+                {inssAlertSummary.criticalINSS.map((emp) => (
+                  <div
+                    key={emp.employeeId}
+                    className="p-3 bg-red-950/60 border border-red-600/70 rounded-lg flex flex-col justify-between space-y-2 shadow"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-bold text-red-100 text-sm flex items-center gap-1.5">
+                          <ShieldAlert className="h-4 w-4 text-red-400 shrink-0" />
+                          {emp.employeeName}
+                        </span>
+                        <span className="text-xs text-red-300/80 block mt-0.5">
+                          {[emp.employeePosition, emp.employeeDepartment].filter(Boolean).join(' · ') || 'Setor não informado'}
+                        </span>
+                      </div>
+                      <Badge className="bg-red-600 text-white font-bold whitespace-nowrap">
+                        {emp.totalDays} dias acumulados
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-red-200/90 pt-1.5 border-t border-red-800/40">
+                      <span>📋 <strong>{emp.totalCount} atestado(s)</strong> entregue(s)</span>
+                      <span className="text-red-300 font-bold">🚨 Ação: Encaminhar para Perícia Médica INSS</span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Funcionários em Alerta (12-14 dias) */}
+                {inssAlertSummary.warningINSS.map((emp) => (
+                  <div
+                    key={emp.employeeId}
+                    className="p-3 bg-amber-950/50 border border-amber-600/60 rounded-lg flex flex-col justify-between space-y-2 shadow"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-bold text-amber-100 text-sm flex items-center gap-1.5">
+                          <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                          {emp.employeeName}
+                        </span>
+                        <span className="text-xs text-amber-300/80 block mt-0.5">
+                          {[emp.employeePosition, emp.employeeDepartment].filter(Boolean).join(' · ') || 'Setor não informado'}
+                        </span>
+                      </div>
+                      <Badge className="bg-amber-600 text-white font-bold whitespace-nowrap">
+                        {emp.totalDays} dias acumulados
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-amber-200/90 pt-1.5 border-t border-amber-800/40">
+                      <span>📋 <strong>{emp.totalCount} atestado(s)</strong> entregue(s)</span>
+                      <span className="text-amber-300 font-bold">⚠️ Próximo ao limite CLT (15 dias)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="bg-seguranca-graphite/40 border-gray-700">
           <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
             <div className="md:col-span-2 relative">
@@ -612,7 +740,7 @@ const GestaoAtestados: React.FC = () => {
                     <SortableHead column="createdAt">Cadastro</SortableHead>
                     <SortableHead column="days">Dias/Horas</SortableHead>
                     <SortableHead column="cidCode">CID</SortableHead>
-                    <TableHead>INSS</TableHead>
+                    <TableHead>Alerta INSS / CLT</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -624,61 +752,87 @@ const GestaoAtestados: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    sortedItems.map((doc) => (
-                      <TableRow key={doc.id}>
-                        <TableCell>
-                          <div className="font-medium">{doc.employeeName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {[doc.employeePosition, doc.employeeDepartment].filter(Boolean).join(' · ') || '—'}
-                          </div>
-                          {employeeCertificateCounts[doc.employeeId] ? (
-                            <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-300 border-blue-500/30 mt-1">
-                              {employeeCertificateCounts[doc.employeeId]} atestado(s) entregue(s)
-                            </Badge>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{MEDICAL_TYPE_LABELS[doc.documentType]}</Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {formatAdmissionDateBr(doc.startDate)}
-                          {doc.endDate ? ` → ${formatAdmissionDateBr(doc.endDate)}` : ''}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {doc.createdAt ? formatAdmissionDateBr(doc.createdAt.slice(0, 10)) : '—'}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {doc.days != null ? `${doc.days}d` : '-'}
-                          {doc.hours != null ? ` / ${doc.hours}h` : ''}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {doc.cidCode || '-'}
-                          {doc.cidDescription ? (
-                            <div className="text-xs text-muted-foreground truncate max-w-[180px]">
-                              {doc.cidDescription}
+                    sortedItems.map((doc) => {
+                      const empData = doc.employeeId ? inssAlertSummary.map[doc.employeeId] : null;
+                      const totalEmpDays = empData?.totalDays ?? doc.relatedDaysInWindow ?? doc.days ?? 0;
+                      return (
+                        <TableRow key={doc.id}>
+                          <TableCell>
+                            <div className="font-medium">{doc.employeeName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {[doc.employeePosition, doc.employeeDepartment].filter(Boolean).join(' · ') || '—'}
                             </div>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>
-                          {doc.inssAlert ? (
-                            <Badge className="bg-amber-600/80">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              {doc.relatedDaysInWindow || ''}d
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right space-x-1">
-                          <Button size="sm" variant="ghost" onClick={() => openEdit(doc)}>
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-red-400"
-                            onClick={() => void handleDelete(doc.id)}
-                          >
+                            {employeeCertificateCounts[doc.employeeId] ? (
+                              <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-300 border-blue-500/30 mt-1">
+                                {employeeCertificateCounts[doc.employeeId]} atestado(s) entregue(s)
+                              </Badge>
+                            ) : null}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{MEDICAL_TYPE_LABELS[doc.documentType]}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatAdmissionDateBr(doc.startDate)}
+                            {doc.endDate ? ` → ${formatAdmissionDateBr(doc.endDate)}` : ''}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {doc.createdAt ? formatAdmissionDateBr(doc.createdAt.slice(0, 10)) : '—'}
+                          </TableCell>
+                          <TableCell className="text-sm font-semibold">
+                            {doc.days != null ? `${doc.days}d` : '-'}
+                            {doc.hours != null ? ` / ${doc.hours}h` : ''}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {doc.cidCode || '-'}
+                            {doc.cidDescription ? (
+                              <div className="text-xs text-muted-foreground truncate max-w-[180px]">
+                                {doc.cidDescription}
+                              </div>
+                            ) : null}
+                          </TableCell>
+                          <TableCell>
+                            {totalEmpDays >= 15 ? (
+                              <Badge variant="destructive" className="bg-red-600 font-bold flex items-center gap-1 w-fit text-[11px]">
+                                <ShieldAlert className="h-3 w-3 shrink-0" />
+                                <span>15+ dias (INSS)</span>
+                              </Badge>
+                            ) : totalEmpDays >= 12 ? (
+                              <Badge className="bg-amber-600 text-white font-bold flex items-center gap-1 w-fit text-[11px]">
+                                <AlertTriangle className="h-3 w-3 shrink-0" />
+                                <span>Alerta ({totalEmpDays}d)</span>
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{totalEmpDays > 0 ? `${totalEmpDays}d acum.` : '—'}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right space-x-1.5 whitespace-nowrap">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-blue-500/50 text-blue-400 hover:bg-blue-950/40 hover:text-blue-300 h-8 px-2.5"
+                              onClick={() => openEdit(doc)}
+                              title="Editar lançamento de atestado"
+                            >
+                              <Pencil className="h-3.5 w-3.5 mr-1 text-blue-400" />
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-400 hover:text-red-300 hover:bg-red-950/30 h-8 px-2"
+                              onClick={() => void handleDelete(doc.id)}
+                              title="Cancelar atestado"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            )}
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>
