@@ -44,12 +44,9 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
     // Últimas movimentações
     @Query("SELECT sm FROM StockMovement sm " +
            "LEFT JOIN FETCH sm.stockItem si " +
-           "LEFT JOIN FETCH si.unit " +
            "LEFT JOIN FETCH sm.unit " +
            "LEFT JOIN FETCH sm.employee e " +
            "LEFT JOIN FETCH sm.user u " +
-           "LEFT JOIN FETCH sm.itemLocation il " +
-           "LEFT JOIN FETCH il.shelf " +
            "ORDER BY sm.movementDate DESC")
     List<StockMovement> findRecentMovements(Pageable pageable);
 

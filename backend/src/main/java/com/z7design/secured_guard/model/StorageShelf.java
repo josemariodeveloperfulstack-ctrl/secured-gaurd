@@ -60,6 +60,9 @@ public class StorageShelf {
      * Retorna a localização completa formatada para exibição.
      */
     public String getFullLocationDisplay() {
+        if (identification == null || identification.isEmpty()) {
+            return "";
+        }
         StringBuilder sb = new StringBuilder(identification);
         if (block != null && !block.isEmpty()) sb.append(" | Bloco: ").append(block);
         if (section != null && !section.isEmpty()) sb.append(" | Seção: ").append(section);
