@@ -23,6 +23,7 @@ public class StockItemDTO {
     private String supplier;
     private String barcode;
     private String caNumber;
+    private Boolean requiresCa;
     private String qrCode;
     private Boolean active;
     private UUID unitId;
