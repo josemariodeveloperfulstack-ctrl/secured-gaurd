@@ -783,17 +783,19 @@ public class StockService {
         Long activeAlerts = stockAlertRepository.countByIsResolvedFalse();
         Long criticalAlerts = stockAlertRepository.countCriticalUnresolvedAlerts();
 
-        return Map.of(
-                "totalItems", totalItems,
-                "lowStockCount", lowStockCount,
-                "outOfStockCount", outOfStockCount,
-                "totalValue", totalValue,
-                "totalQuantity", totalQuantity,
-                "itemsByCategory", itemsByCategory,
-                "activeAlerts", activeAlerts,
-                "criticalAlerts", criticalAlerts,
-                "lowStockItems", lowStockItems,
-                "outOfStockItems", outOfStockItems);
+        Map<String, Object> report = new HashMap<>();
+        report.put("totalItems", totalItems != null ? totalItems : 0L);
+        report.put("lowStockCount", lowStockCount != null ? lowStockCount : 0L);
+        report.put("outOfStockCount", outOfStockCount != null ? outOfStockCount : 0L);
+        report.put("totalValue", totalValue);
+        report.put("totalQuantity", totalQuantity);
+        report.put("itemsByCategory", itemsByCategory != null ? itemsByCategory : Map.of());
+        report.put("activeAlerts", activeAlerts != null ? activeAlerts : 0L);
+        report.put("criticalAlerts", criticalAlerts != null ? criticalAlerts : 0L);
+        report.put("lowStockItems", lowStockItems != null ? lowStockItems : List.of());
+        report.put("outOfStockItems", outOfStockItems != null ? outOfStockItems : List.of());
+
+        return report;
     }
 
     // ===== RELATÓRIOS DETALHADOS =====

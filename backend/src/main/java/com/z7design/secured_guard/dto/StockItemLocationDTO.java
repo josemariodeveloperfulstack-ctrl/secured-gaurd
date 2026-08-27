@@ -30,7 +30,8 @@ public class StockItemLocationDTO {
         if (entity.getShelf() != null) {
             dto.setShelfId(entity.getShelf().getId());
             dto.setShelfIdentification(entity.getShelf().getIdentification());
-            dto.setFullLocationDisplay(entity.getShelf().getFullLocationDisplay() + 
+            String fullDisplay = entity.getShelf().getFullLocationDisplay();
+            dto.setFullLocationDisplay((fullDisplay != null ? fullDisplay : "") + 
                 (entity.getFloor() != null ? " | Andar: " + entity.getFloor() : ""));
         }
 
