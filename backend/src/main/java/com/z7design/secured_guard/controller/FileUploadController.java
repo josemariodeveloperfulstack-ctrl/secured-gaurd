@@ -256,7 +256,7 @@ public class FileUploadController {
         }
     }
 
-    @PostMapping("/companies/logo")
+    @PostMapping({"/companies/logo", "/companies/logos"})
     @Operation(summary = "Upload de logo da empresa", description = "Faz upload de logo da empresa (PNG, JPG, JPEG)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Logo enviado com sucesso"),
@@ -264,7 +264,7 @@ public class FileUploadController {
             @ApiResponse(responseCode = "403", description = "Acesso negado"),
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'ADMINISTRADOR', 'ROLE_RH', 'RH', 'ROLE_GESTOR', 'GESTOR', 'ROLE_COMERCIAL', 'COMERCIAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'DEPARTAMENTO_PESSOAL')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, String>> uploadCompanyLogo(
             @Parameter(description = "Arquivo do logo (PNG, JPG, JPEG)") @RequestParam("file") MultipartFile file) {
 
@@ -513,9 +513,10 @@ public class FileUploadController {
     private Path saveLogoFile(MultipartFile file, String uniqueFilename) throws IOException {
         Path uploadPath = Paths.get(uploadDir, "companies", "logos").toAbsolutePath().normalize();
         Path filePath = uploadPath.resolve(uniqueFilename);
+        byte[] fileBytes = file.getBytes();
         try {
             Files.createDirectories(uploadPath);
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            Files.write(filePath, fileBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             savePersistentLogoBackup(filePath, uniqueFilename);
             return filePath;
         } catch (Exception e) {
@@ -523,7 +524,7 @@ public class FileUploadController {
             Path backupPath = getPersistentLogoBackupPath(uniqueFilename);
             if (backupPath != null) {
                 Files.createDirectories(backupPath.getParent());
-                Files.copy(file.getInputStream(), backupPath, StandardCopyOption.REPLACE_EXISTING);
+                Files.write(backupPath, fileBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
                 log.info("✅ Logo salvo com sucesso no caminho de backup: {}", backupPath);
                 return backupPath;
             }
@@ -534,9 +535,10 @@ public class FileUploadController {
     private Path saveStampFile(MultipartFile file, String uniqueFilename) throws IOException {
         Path uploadPath = Paths.get(uploadDir, "safety-engineers", "stamps").toAbsolutePath().normalize();
         Path filePath = uploadPath.resolve(uniqueFilename);
+        byte[] fileBytes = file.getBytes();
         try {
             Files.createDirectories(uploadPath);
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            Files.write(filePath, fileBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             savePersistentStampBackup(filePath, uniqueFilename);
             return filePath;
         } catch (Exception e) {
@@ -544,7 +546,7 @@ public class FileUploadController {
             Path backupPath = getPersistentStampBackupPath(uniqueFilename);
             if (backupPath != null) {
                 Files.createDirectories(backupPath.getParent());
-                Files.copy(file.getInputStream(), backupPath, StandardCopyOption.REPLACE_EXISTING);
+                Files.write(backupPath, fileBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
                 log.info("✅ Carimbo salvo com sucesso no caminho de backup: {}", backupPath);
                 return backupPath;
             }
