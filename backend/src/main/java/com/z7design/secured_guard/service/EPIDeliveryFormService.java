@@ -692,6 +692,13 @@ public class EPIDeliveryFormService {
     }
 
     @Transactional(readOnly = true)
+    public List<EPIDeliveryFormDTO> findMineByEmployeeId(UUID employeeId) {
+        return epiDeliveryFormRepository.findByEmployeeIdAndStatusNot(employeeId, EPIDeliveryFormStatus.REFUSED).stream()
+                .map(EPIDeliveryFormDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<EPIDeliveryFormDTO> findByCompanyId(UUID companyId) {
         return epiDeliveryFormRepository.findByCompanyId(companyId).stream()
                 .map(EPIDeliveryFormDTO::fromEntity)
@@ -1117,6 +1124,55 @@ public class EPIDeliveryFormService {
             }
         }
         return EPIDeliveryFormDTO.fromEntity(form);
+    }
+
+    @Transactional
+    public EPIDeliveryFormDTO refuseOwnReceipt(UUID formId, UUID authenticatedEmployeeId, String reason, UUID actingUserId) {
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByIdWithDetails(formId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + formId));
+
+        if (form.getEmployee() == null || !form.getEmployee().getId().equals(authenticatedEmployeeId)) {
+            throw new BusinessException("Você só pode recusar o recebimento das suas próprias fichas de EPI.");
+        }
+        if (form.getStatus() == EPIDeliveryFormStatus.COMPLETED || form.getSignedAt() != null) {
+            throw new BusinessException("Recebimento já foi confirmado anteriormente e não pode ser recusado.");
+        }
+        if (form.getStatus() == EPIDeliveryFormStatus.REFUSED) {
+            throw new BusinessException("Ficha de EPI já se encontra recusada.");
+        }
+
+        form.setStatus(EPIDeliveryFormStatus.REFUSED);
+        form.setRefusedAt(LocalDateTime.now());
+        form.setRefusalReason(reason != null && !reason.isBlank() ? reason.trim() : null);
+
+        EPIDeliveryForm saved = epiDeliveryFormRepository.save(form);
+        User actingUser = actingUserId != null ? userRepository.findById(actingUserId).orElse(null) : null;
+        recordHistoryForForm(saved, actingUser, "RECUSA PELO FUNCIONÁRIO");
+        log.info("❌ Recebimento EPI recusado pelo funcionário na ficha {}", form.getId());
+        return EPIDeliveryFormDTO.fromEntity(saved);
+    }
+
+    @Transactional
+    public EPIDeliveryFormDTO resendForm(UUID formId, UUID actingUserId) {
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByIdWithDetails(formId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + formId));
+
+        if (form.getStatus() != EPIDeliveryFormStatus.REFUSED) {
+            throw new BusinessException("Apenas fichas recusadas podem ser reenviadas.");
+        }
+
+        form.setStatus(EPIDeliveryFormStatus.DRAFT);
+        form.setRefusedAt(null);
+        form.setRefusalReason(null);
+        form.setConfirmationToken(null);
+        form.setConfirmationCode(null);
+        form.setConfirmationExpiresAt(null);
+
+        EPIDeliveryForm saved = epiDeliveryFormRepository.save(form);
+        User actingUser = actingUserId != null ? userRepository.findById(actingUserId).orElse(null) : null;
+        recordHistoryForForm(saved, actingUser, "REENVIO DE FICHA PELO RH/ALMOXARIFADO");
+        log.info("🔄 Ficha EPI {} reenviada para o colaborador pelo RH/Almoxarifado", form.getId());
+        return EPIDeliveryFormDTO.fromEntity(saved);
     }
 
     private void applyConfirmation(EPIDeliveryForm form, String code, String signatureBase64,

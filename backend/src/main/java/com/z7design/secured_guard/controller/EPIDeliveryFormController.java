@@ -231,7 +231,7 @@ public class EPIDeliveryFormController {
             log.warn("⚠️ /epi-delivery-forms/me sem Employee associado ao usuário autenticado");
             return ResponseEntity.ok(Collections.emptyList());
         }
-        return ResponseEntity.ok(epiDeliveryFormService.findByEmployeeId(employeeId.get()));
+        return ResponseEntity.ok(epiDeliveryFormService.findMineByEmployeeId(employeeId.get()));
     }
 
     @Operation(summary = "Funcionário autentica confirma o recebimento da própria ficha de EPI")
@@ -249,6 +249,34 @@ public class EPIDeliveryFormController {
                 employeeId,
                 request != null ? request.getCode() : null,
                 actingUserId);
+        return ResponseEntity.ok(updated);
+    }
+
+    @Operation(summary = "Funcionário recusa o recebimento da própria ficha de EPI")
+    @PostMapping("/{id}/refuse-own-receipt")
+    public ResponseEntity<EPIDeliveryFormDTO> refuseOwnReceipt(
+            @PathVariable UUID id,
+            @RequestBody(required = false) com.z7design.secured_guard.dto.RefuseEpiReceiptRequestDTO request,
+            Authentication authentication) {
+        UUID employeeId = resolveAuthenticatedEmployeeId()
+                .orElseThrow(() -> new com.z7design.secured_guard.exception.BusinessException(
+                        "Funcionário não vinculado ao usuário autenticado. Peça ao RH para vincular seu usuário."));
+        UUID actingUserId = resolveUserId(authentication);
+        EPIDeliveryFormDTO updated = epiDeliveryFormService.refuseOwnReceipt(
+                id,
+                employeeId,
+                request != null ? request.getReason() : null,
+                actingUserId);
+        return ResponseEntity.ok(updated);
+    }
+
+    @Operation(summary = "RH/Almoxarifado reenvia ficha de EPI recusada para o colaborador")
+    @PostMapping("/{id}/resend")
+    public ResponseEntity<EPIDeliveryFormDTO> resendForm(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        UUID actingUserId = resolveUserId(authentication);
+        EPIDeliveryFormDTO updated = epiDeliveryFormService.resendForm(id, actingUserId);
         return ResponseEntity.ok(updated);
     }
 

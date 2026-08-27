@@ -14,9 +14,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { epiDeliveryFormService, EPIDeliveryForm } from '@/services/epiDeliveryFormService';
-import { Loader2, Calendar, Download, Eye, HardHat, FileText, MapPin, CheckCircle2 } from 'lucide-react';
+import { Loader2, Calendar, Download, Eye, HardHat, FileText, MapPin, CheckCircle2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal';
@@ -26,7 +27,7 @@ interface MeusEPIsContentProps {
 }
 
 function needsConfirmation(ficha: EPIDeliveryForm): boolean {
-  return ficha.status !== 'COMPLETED';
+  return ficha.status !== 'COMPLETED' && ficha.status !== 'REFUSED';
 }
 
 const MeusEPIsContent: React.FC<MeusEPIsContentProps> = ({ standalone = false }) => {
@@ -44,6 +45,11 @@ const MeusEPIsContent: React.FC<MeusEPIsContentProps> = ({ standalone = false })
   const [confirmFicha, setConfirmFicha] = useState<EPIDeliveryForm | null>(null);
   const [confirmCode, setConfirmCode] = useState('');
   const [confirming, setConfirming] = useState(false);
+
+  const [refuseOpen, setRefuseOpen] = useState(false);
+  const [refuseFicha, setRefuseFicha] = useState<EPIDeliveryForm | null>(null);
+  const [refuseReason, setRefuseReason] = useState('');
+  const [refusing, setRefusing] = useState(false);
 
   const loadFichas = async () => {
     try {
@@ -171,6 +177,38 @@ const MeusEPIsContent: React.FC<MeusEPIsContentProps> = ({ standalone = false })
     }
   };
 
+  const openRefuse = (ficha: EPIDeliveryForm) => {
+    setRefuseFicha(ficha);
+    setRefuseReason('');
+    setRefuseOpen(true);
+  };
+
+  const handleRefuseReceipt = async () => {
+    if (!refuseFicha) return;
+    try {
+      setRefusing(true);
+      await epiDeliveryFormService.refuseOwnReceipt(
+        refuseFicha.id,
+        refuseReason.trim() || undefined
+      );
+      toast({
+        title: 'Recebimento recusado',
+        description: 'A recusa foi registrada. A ficha deixará de ser exibida aqui e o RH/Almoxarifado foi notificado.',
+      });
+      setRefuseOpen(false);
+      setRefuseFicha(null);
+      await loadFichas();
+    } catch (err: any) {
+      toast({
+        title: 'Não foi possível recusar',
+        description: err?.response?.data?.message || err?.message || 'Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRefusing(false);
+    }
+  };
+
   return (
     <StandardLayout
       isSubPage={standalone}
@@ -268,14 +306,25 @@ const MeusEPIsContent: React.FC<MeusEPIsContentProps> = ({ standalone = false })
                     </div>
 
                     {pending && (
-                      <Button
-                        size="sm"
-                        className="w-full bg-green-600 hover:bg-green-500 text-white font-semibold"
-                        onClick={() => openConfirm(ficha)}
-                      >
-                        <CheckCircle2 className="w-4 h-4 mr-1" />
-                        Confirmar recebimento
-                      </Button>
+                      <div className="flex gap-2 w-full">
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-green-600 hover:bg-green-500 text-white font-semibold"
+                          onClick={() => openConfirm(ficha)}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1" />
+                          Confirmar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300 font-semibold"
+                          onClick={() => openRefuse(ficha)}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Recusar
+                        </Button>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -338,6 +387,48 @@ const MeusEPIsContent: React.FC<MeusEPIsContentProps> = ({ standalone = false })
             >
               {confirming ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
               Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={refuseOpen} onOpenChange={setRefuseOpen}>
+        <DialogContent className="bg-seguranca-graphite border-gray-700 text-gray-100">
+          <DialogHeader>
+            <DialogTitle className="text-red-400 flex items-center gap-2">
+              <XCircle className="w-5 h-5" />
+              Recusar recebimento de EPI
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Informe abaixo o motivo da recusa (opcional). A ficha deixará de ser exibida na sua área e o RH/Almoxarifado será notificado para realizar o ajuste.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <label className="text-sm text-gray-300">Motivo da recusa (opcional)</label>
+            <Textarea
+              value={refuseReason}
+              onChange={(e) => setRefuseReason(e.target.value)}
+              placeholder="Ex: Tamanho incorreto, EPI incompleto, item danificado..."
+              className="bg-seguranca-black border-gray-600 text-white min-h-[90px]"
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              className="border-gray-600 text-gray-100"
+              onClick={() => setRefuseOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-500 text-white font-semibold"
+              onClick={handleRefuseReceipt}
+              disabled={refusing}
+            >
+              {refusing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
+              Confirmar Recusa
             </Button>
           </DialogFooter>
         </DialogContent>

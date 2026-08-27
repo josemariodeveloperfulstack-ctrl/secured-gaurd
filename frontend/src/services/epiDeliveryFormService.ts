@@ -26,7 +26,7 @@ export interface EPIDeliveryFormItem {
 }
 
 export type EPIDeliveryType = 'PRIMEIRA_ENTREGA' | 'SUBSTITUICAO' | 'DEVOLUCAO' | 'TROCA';
-export type EPIDeliveryFormStatus = 'DRAFT' | 'COMPLETED';
+export type EPIDeliveryFormStatus = 'DRAFT' | 'COMPLETED' | 'REFUSED';
 
 export interface CreateEPIDeliveryForm {
   id?: string;
@@ -68,6 +68,8 @@ export interface EPIDeliveryForm {
   confirmationSentAt?: string;
   confirmationExpiresAt?: string;
   confirmationPending?: boolean;
+  refusedAt?: string;
+  refusalReason?: string;
 }
 
 export interface EpiItemConfirmation {
@@ -247,6 +249,18 @@ export const epiDeliveryFormService = {
     const response = await api.post(`/epi-delivery-forms/${id}/confirm-own-receipt`, {
       code: code || undefined,
     });
+    return response.data;
+  },
+
+  async refuseOwnReceipt(id: string, reason?: string): Promise<EPIDeliveryForm> {
+    const response = await api.post(`/epi-delivery-forms/${id}/refuse-own-receipt`, {
+      reason: reason || undefined,
+    });
+    return response.data;
+  },
+
+  async resendForm(id: string): Promise<EPIDeliveryForm> {
+    const response = await api.post(`/epi-delivery-forms/${id}/resend`);
     return response.data;
   },
 

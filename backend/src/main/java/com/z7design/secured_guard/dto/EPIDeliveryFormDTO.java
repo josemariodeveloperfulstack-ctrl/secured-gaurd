@@ -35,8 +35,26 @@ public class EPIDeliveryFormDTO {
         private LocalDateTime confirmationSentAt;
         private LocalDateTime confirmationExpiresAt;
         private boolean confirmationPending;
+        private LocalDateTime refusedAt;
+        private String refusalReason;
 
         public EPIDeliveryFormDTO() {
+        }
+
+        public LocalDateTime getRefusedAt() {
+                return refusedAt;
+        }
+
+        public void setRefusedAt(LocalDateTime refusedAt) {
+                this.refusedAt = refusedAt;
+        }
+
+        public String getRefusalReason() {
+                return refusalReason;
+        }
+
+        public void setRefusalReason(String refusalReason) {
+                this.refusalReason = refusalReason;
         }
 
         public LocalDateTime getConfirmationSentAt() {
@@ -284,6 +302,8 @@ public class EPIDeliveryFormDTO {
                 dto.setStockRequisitionId(form.getStockRequisitionId());
                 dto.setConfirmationSentAt(form.getConfirmationSentAt());
                 dto.setConfirmationExpiresAt(form.getConfirmationExpiresAt());
+                dto.setRefusedAt(form.getRefusedAt());
+                dto.setRefusalReason(form.getRefusalReason());
                 boolean pending = form.getConfirmationToken() != null
                                 && form.getSignedAt() == null
                                 && form.getStatus() != com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus.COMPLETED;
