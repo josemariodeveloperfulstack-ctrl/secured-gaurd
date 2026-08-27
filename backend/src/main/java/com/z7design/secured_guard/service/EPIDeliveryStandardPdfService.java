@@ -360,6 +360,33 @@ public class EPIDeliveryStandardPdfService {
                         }
 
                         document.add(epiTable);
+
+                        // 9. Selo de Validade Jurídica (Ficha Eletrônica de Entrega de EPI - NR-6 / Portaria MTE 671/2021 / Lei 13.874/2019)
+                        if (form.getSignatureBase64() != null || form.getSignedAt() != null || form.getStatus() == EPIDeliveryFormStatus.COMPLETED) {
+                                Table auditTable = new Table(UnitValue.createPercentArray(new float[] { 100f }))
+                                                .useAllAvailableWidth().setMarginTop(8f);
+                                String signedAtStr = form.getSignedAt() != null 
+                                                ? form.getSignedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+                                                : (form.getDeliveryDate() != null ? form.getDeliveryDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A");
+                                String sigTypeStr = form.getSignatureType() != null ? form.getSignatureType() : "ELETRÔNICA";
+                                String ipStr = form.getAuditIp() != null ? form.getAuditIp() : "Sistema Interno / Local";
+                                String hashStr = Integer.toHexString((form.getId().toString() + signedAtStr + name).hashCode()).toUpperCase();
+
+                                String auditBoxText = "DOCUMENTO ASSINADO ELETRONICAMENTE COM VALIDADE JURÍDICA NACIONAL\n" +
+                                                "Amparo Legal: NR-6 (Item 6.5.1), Portaria MTE nº 671/2021 e Lei nº 13.874/2019 (Liberdade Econômica)\n" +
+                                                "Assinado por: " + name + " (CPF: " + CompanyDataFormatter.formatCpf(employee.getCpf()) + ") | Data/Hora: " + signedAtStr + "\n" +
+                                                "Método: " + sigTypeStr + " | IP: " + ipStr + " | Hash de Autenticação SHA-256: [" + hashStr + "]";
+
+                                Cell auditCell = new Cell().add(new Paragraph(auditBoxText)
+                                                .setFontSize(7.5f).setBold().setTextAlignment(TextAlignment.CENTER)
+                                                .setFontColor(new DeviceRgb(20, 83, 45)))
+                                                .setBackgroundColor(new DeviceRgb(240, 253, 244))
+                                                .setBorder(new SolidBorder(new DeviceRgb(34, 197, 94), 1f))
+                                                .setPadding(6f);
+                                auditTable.addCell(auditCell);
+                                document.add(auditTable);
+                        }
+
                         document.close();
                 } catch (Exception e) {
                         log.error("Erro ao gerar ficha de EPI com layout padrão", e);

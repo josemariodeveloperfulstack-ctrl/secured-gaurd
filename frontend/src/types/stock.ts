@@ -13,6 +13,7 @@ export interface StockItem {
   supplier?: string;
   barcode?: string;
   caNumber?: string;
+  requiresCa?: boolean;
   qrCode?: string;
   active: boolean;
   unitId?: string;
@@ -178,6 +179,7 @@ export interface CreateStockItemDTO {
   supplier?: string;
   barcode?: string;
   caNumber?: string;
+  requiresCa?: boolean;
   unitId?: string;
   notes?: string;
   initialShelfId?: string;

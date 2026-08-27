@@ -205,8 +205,29 @@ public class StockService {
         return dto;
     }
 
+    private void validateCaIfRequired(StockItemDTO dto) {
+        if (dto == null) return;
+        boolean categoryIsEpi = dto.getCategory() == StockCategory.EPI;
+        boolean requiresCa = Boolean.TRUE.equals(dto.getRequiresCa()) || categoryIsEpi;
+
+        String nameUpper = dto.getName() != null ? dto.getName().toUpperCase() : "";
+        boolean isEpiNameMatch = nameUpper.contains("COLETE BALÍSTICO") || nameUpper.contains("COLETE BALISTICO")
+                || nameUpper.contains("CALÇADO") || nameUpper.contains("CALCADO") || nameUpper.contains("SAPATO") || nameUpper.contains("BOTA")
+                || nameUpper.contains("CAPA DE CHUVA") || nameUpper.contains("ÓCULOS") || nameUpper.contains("OCULOS")
+                || nameUpper.contains("PROTETOR AURICULAR") || nameUpper.contains("CAPACETE") || nameUpper.contains("LUVA");
+
+        if (requiresCa || isEpiNameMatch) {
+            if (dto.getCaNumber() == null || dto.getCaNumber().trim().isEmpty()) {
+                throw new IllegalArgumentException("Item classificado como EPI (Grupo 1: Colete, Calçado, Capa de Chuva, Óculos, Protetor, Capacete, Luva). É obrigatório informar o número do Certificado de Aprovação (CA) válido conforme a NR-6.");
+            }
+        }
+    }
+
     public StockItemDTO createItem(StockItemDTO dto) {
         log.info("Criando novo item de estoque: {}", dto.getName());
+
+        // Validação NR-6: CA Obrigatório para EPIs Grupo 1
+        validateCaIfRequired(dto);
 
         // Verificar se código já existe
         if (dto.getCode() != null && stockItemRepository.existsByCode(dto.getCode())) {
@@ -247,6 +268,9 @@ public class StockService {
     public StockItemDTO updateItem(UUID id, StockItemDTO dto) {
         log.info("Atualizando item de estoque: {}", id);
 
+        // Validação NR-6: CA Obrigatório para EPIs Grupo 1
+        validateCaIfRequired(dto);
+
         StockItem existingItem = stockItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Item de estoque não encontrado: " + id));
 
@@ -260,6 +284,8 @@ public class StockService {
         existingItem.setCode(dto.getCode());
         existingItem.setName(dto.getName());
         existingItem.setCategory(dto.getCategory());
+        existingItem.setRequiresCa(dto.getRequiresCa());
+        existingItem.setCaNumber(dto.getCaNumber());
         existingItem.setSizeVariation(dto.getSizeVariation());
         existingItem.setDescription(dto.getDescription());
         if (dto.getCurrentQuantity() != null) {
@@ -345,6 +371,16 @@ public class StockService {
         // Calcular nova quantidade total do item
         int newQuantity;
         if (dto.getMovementType() == MovementType.ENTRADA) {
+            boolean isEpiCategory = item.getCategory() == StockCategory.EPI || Boolean.TRUE.equals(item.getRequiresCa());
+            String nameUpper = item.getName() != null ? item.getName().toUpperCase() : "";
+            boolean isEpiNameMatch = nameUpper.contains("COLETE BALÍSTICO") || nameUpper.contains("COLETE BALISTICO")
+                    || nameUpper.contains("CALÇADO") || nameUpper.contains("CALCADO") || nameUpper.contains("SAPATO") || nameUpper.contains("BOTA")
+                    || nameUpper.contains("CAPA DE CHUVA") || nameUpper.contains("ÓCULOS") || nameUpper.contains("OCULOS")
+                    || nameUpper.contains("PROTETOR AURICULAR") || nameUpper.contains("CAPACETE") || nameUpper.contains("LUVA");
+
+            if ((isEpiCategory || isEpiNameMatch) && (item.getCaNumber() == null || item.getCaNumber().trim().isEmpty())) {
+                throw new IllegalArgumentException("Trava de Segurança NR-6: Não é possível dar entrada no estoque ou nota fiscal de um item EPI (Grupo 1) sem um Certificado de Aprovação (CA) válido cadastrado.");
+            }
             newQuantity = item.getCurrentQuantity() + dto.getQuantity();
         } else {
             newQuantity = item.getCurrentQuantity() - dto.getQuantity();

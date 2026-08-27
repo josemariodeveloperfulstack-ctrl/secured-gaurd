@@ -224,6 +224,7 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
         supplier: source.supplier || '',
         barcode: source.barcode || '',
         caNumber: source.caNumber || '',
+        requiresCa: source.requiresCa ?? (source.category === StockCategory.EPI),
         notes: source.notes || ''
       });
       if (source.unitCost) {
@@ -269,6 +270,7 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
         supplier: '',
         barcode: '',
         caNumber: '',
+        requiresCa: false,
         notes: '',
         initialShelfId: '',
         initialFloor: ''
@@ -344,6 +346,23 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
       return;
     }
 
+    const nameUpper = (formData.name || '').toUpperCase();
+    const isEpiNameMatch = nameUpper.includes('COLETE BALÍSTICO') || nameUpper.includes('COLETE BALISTICO') ||
+      nameUpper.includes('CALÇADO') || nameUpper.includes('CALCADO') || nameUpper.includes('SAPATO') || nameUpper.includes('BOTA') ||
+      nameUpper.includes('CAPA DE CHUVA') || nameUpper.includes('ÓCULOS') || nameUpper.includes('OCULOS') ||
+      nameUpper.includes('PROTETOR AURICULAR') || nameUpper.includes('CAPACETE') || nameUpper.includes('LUVA');
+
+    const isGroup1Epi = formData.category === StockCategory.EPI || formData.requiresCa || isEpiNameMatch;
+
+    if (isGroup1Epi && (!formData.caNumber || !formData.caNumber.trim())) {
+      toast({
+        title: 'CA Obrigatório (NR-6 Grupo 1)',
+        description: 'Este item é um Equipamento de Proteção Individual (EPI Grupo 1: Colete, Calçado, Capa de Chuva, Óculos, Protetor, Capacete, Luva). É obrigatório informar o número do CA válido para salvar.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Preparar dados para envio, garantindo que todos os campos obrigatórios estejam presentes
@@ -361,6 +380,8 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                   undefined,
         supplier: formData.supplier?.trim() || undefined,
         barcode: formData.barcode?.trim() || undefined,
+        caNumber: formData.caNumber?.trim() || undefined,
+        requiresCa: isGroup1Epi,
         notes: formData.notes?.trim() || undefined
       };
 
@@ -513,24 +534,75 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                 </div>
               </div>
 
-              {formData.category === StockCategory.EPI && (
-                <div className="space-y-2">
-                  <Label htmlFor="caNumber" className="text-yellow-400 flex items-center gap-2 text-sm sm:text-base font-semibold">
-                    <Tag className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-400 flex-shrink-0" />
-                    Número do CA (Certificado de Aprovação) *
-                  </Label>
-                  <Input
-                    id="caNumber"
-                    value={formData.caNumber || ''}
-                    onChange={(e) => handleInputChange('caNumber', e.target.value)}
-                    placeholder="Ex: 12345 ou CA-12345 (Preenchimento automático na Ficha de EPI)"
-                    className="bg-seguranca-black/50 border-yellow-500/50 text-white placeholder-gray-400 focus:border-yellow-400 focus:ring-yellow-400/20 h-10 sm:h-11 text-sm sm:text-base"
-                  />
-                  <p className="text-[11px] text-gray-400">
-                    O número do CA informado aqui virá preenchido automaticamente ao criar ou alterar a Ficha de EPI do funcionário.
-                  </p>
-                </div>
-              )}
+              {/* Seção NR-6: Grupo 1 (EPI - Exige CA) vs Grupo 2 (Uniformes / Acessórios - Sem CA) */}
+              {(() => {
+                const nameUpper = (formData.name || '').toUpperCase();
+                const isNameEpi = nameUpper.includes('COLETE BALÍSTICO') || nameUpper.includes('COLETE BALISTICO') ||
+                  nameUpper.includes('CALÇADO') || nameUpper.includes('CALCADO') || nameUpper.includes('SAPATO') || nameUpper.includes('BOTA') ||
+                  nameUpper.includes('CAPA DE CHUVA') || nameUpper.includes('ÓCULOS') || nameUpper.includes('OCULOS') ||
+                  nameUpper.includes('PROTETOR AURICULAR') || nameUpper.includes('CAPACETE') || nameUpper.includes('LUVA');
+                const isGroup1 = formData.category === StockCategory.EPI || formData.requiresCa || isNameEpi;
+
+                return (
+                  <div className="space-y-3 bg-seguranca-black/30 border border-gray-700/50 p-3.5 rounded-lg">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Tag className={`h-4 w-4 ${isGroup1 ? 'text-yellow-400' : 'text-blue-400'}`} />
+                        <span className="text-sm font-semibold text-white">Classificação NR-6:</span>
+                        <Badge className={`${isGroup1 ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' : 'bg-blue-500/20 text-blue-400 border-blue-500/40'}`}>
+                          {isGroup1 ? 'Grupo 1: EPI (Exige CA = SIM)' : 'Grupo 2: Uniforme / Acessório (Exige CA = NÃO)'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="toggleRequiresCa" className="text-xs text-gray-400 cursor-pointer">
+                          Exige CA?
+                        </Label>
+                        <input
+                          id="toggleRequiresCa"
+                          type="checkbox"
+                          checked={Boolean(formData.requiresCa || isGroup1)}
+                          onChange={(e) => handleInputChange('requiresCa', e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-600 bg-seguranca-black text-seguranca-yellow focus:ring-yellow-400"
+                        />
+                      </div>
+                    </div>
+
+                    {isGroup1 ? (
+                      <div className="space-y-2 pt-1">
+                        <Label htmlFor="caNumber" className="text-yellow-400 flex items-center gap-2 text-sm font-semibold">
+                          Número do CA (Certificado de Aprovação - NR-6) *
+                        </Label>
+                        <Input
+                          id="caNumber"
+                          value={formData.caNumber || ''}
+                          onChange={(e) => handleInputChange('caNumber', e.target.value)}
+                          placeholder="Digite o número do CA válido (Ex: 12345)"
+                          className="bg-seguranca-black/50 border-yellow-500/50 text-white placeholder-gray-400 focus:border-yellow-400 focus:ring-yellow-400/20 h-10 text-sm font-mono"
+                        />
+                        <p className="text-[11px] text-yellow-300/80">
+                          ⚠️ <strong>Trava de Segurança:</strong> O sistema exige o número do CA para salvar o cadastro e dar entrada na nota fiscal. Este CA virá preenchido automaticamente ao gerar a Ficha de EPI do funcionário.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 pt-1">
+                        <Label htmlFor="caNumber" className="text-gray-300 flex items-center gap-2 text-xs">
+                          Número do CA (Opcional para Uniformes e Acessórios)
+                        </Label>
+                        <Input
+                          id="caNumber"
+                          value={formData.caNumber || ''}
+                          onChange={(e) => handleInputChange('caNumber', e.target.value)}
+                          placeholder="Opcional"
+                          className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 h-9 text-xs font-mono"
+                        />
+                        <p className="text-[11px] text-gray-400">
+                          Uniformes (camisa, calça, gôndola), coletes refletivos e acessórios não exigem CA, mas seu estoque e entregas por funcionário são controlados normalmente.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="space-y-2">
                 <Label htmlFor="description" className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">

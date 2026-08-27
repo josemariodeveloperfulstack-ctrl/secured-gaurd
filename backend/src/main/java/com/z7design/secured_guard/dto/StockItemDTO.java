@@ -51,6 +51,7 @@ public class StockItemDTO {
         dto.setSupplier(entity.getSupplier());
         dto.setBarcode(entity.getBarcode());
         dto.setCaNumber(entity.getCaNumber());
+        dto.setRequiresCa(entity.getRequiresCa());
         dto.setQrCode(entity.getQrCode());
         dto.setActive(entity.getActive());
         dto.setCreatedAt(entity.getCreatedAt());
@@ -86,6 +87,7 @@ public class StockItemDTO {
         entity.setSupplier(dto.getSupplier());
         entity.setBarcode(dto.getBarcode());
         entity.setCaNumber(dto.getCaNumber());
+        entity.setRequiresCa(dto.getRequiresCa() != null ? dto.getRequiresCa() : Boolean.FALSE);
         entity.setQrCode(dto.getQrCode());
         entity.setActive(dto.getActive() != null ? dto.getActive() : Boolean.TRUE);
         entity.setNotes(dto.getNotes());
