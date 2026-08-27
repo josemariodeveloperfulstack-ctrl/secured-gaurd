@@ -35,7 +35,8 @@ import {
   Plus,
   MapPin,
   Edit,
-  FileSpreadsheet
+  FileSpreadsheet,
+  RotateCcw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { epiDeliveryFormService, EPIDeliveryForm, EPIDeliveryType } from '@/services/epiDeliveryFormService';
@@ -272,6 +273,33 @@ export const FichasEntregaEPIContent: React.FC = () => {
     );
   };
 
+  const getStatusBadge = (status?: string) => {
+    if (status === 'COMPLETED') {
+      return <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs">Confirmado</Badge>;
+    }
+    if (status === 'REFUSED') {
+      return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 text-xs font-semibold">Recusado</Badge>;
+    }
+    return <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Pendente</Badge>;
+  };
+
+  const handleResend = async (fichaId: string) => {
+    try {
+      await epiDeliveryFormService.resendForm(fichaId);
+      toast({
+        title: 'Sucesso',
+        description: 'Ficha de EPI reenviada para o colaborador com sucesso!',
+      });
+      loadFichas();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao reenviar',
+        description: error?.response?.data?.message || 'Não foi possível reenviar a ficha.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <>
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -399,6 +427,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
                           <TableHead>Funcionário</TableHead>
                           <TableHead>Setor</TableHead>
                           <TableHead>Tipo</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead>Empresa</TableHead>
                           <TableHead>Data</TableHead>
                           <TableHead>Itens</TableHead>
@@ -408,7 +437,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
                       </TableHeader>
                       <TableBody>
                         {filteredFichas.map((ficha) => (
-                          <TableRow key={ficha.id}>
+                          <TableRow key={ficha.id} className={ficha.status === 'REFUSED' ? 'bg-red-50/40 dark:bg-red-950/20' : ''}>
                             <TableCell>
                               <div className="flex flex-col">
                                 <span className="font-medium">{ficha.employeeName}</span>
@@ -432,6 +461,9 @@ export const FichasEntregaEPIContent: React.FC = () => {
                               {getDeliveryTypeBadge(ficha.deliveryType)}
                             </TableCell>
                             <TableCell>
+                              {getStatusBadge(ficha.status)}
+                            </TableCell>
+                            <TableCell>
                               <div className="flex flex-col">
                                 <span className="font-medium text-sm">{ficha.companyName}</span>
                               </div>
@@ -451,6 +483,17 @@ export const FichasEntregaEPIContent: React.FC = () => {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
+                                {ficha.status === 'REFUSED' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleResend(ficha.id)}
+                                    className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                    title="Reenviar para o Colaborador"
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -580,9 +623,10 @@ export const FichasEntregaEPIContent: React.FC = () => {
             </DialogHeader>
             {selectedFicha && (
               <div className="space-y-6">
-                {/* Tipo de entrega badge */}
+                {/* Tipo de entrega badge e status */}
                 <div className="flex items-center gap-3">
                   {getDeliveryTypeBadge(selectedFicha.deliveryType)}
+                  {getStatusBadge(selectedFicha.status)}
                   {selectedFicha.employeeWorkSector && (
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5" />
@@ -590,6 +634,20 @@ export const FichasEntregaEPIContent: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {selectedFicha.status === 'REFUSED' && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-md space-y-1">
+                    <p className="text-xs font-semibold text-red-700 dark:text-red-300">
+                      Entrecotada/Recusada pelo Funcionário
+                      {selectedFicha.refusedAt && (
+                        <span> em {formatAdmissionDateBr(selectedFicha.refusedAt)}</span>
+                      )}
+                    </p>
+                    <p className="text-sm text-red-900 dark:text-red-200">
+                      <strong>Motivo:</strong> {selectedFicha.refusalReason || 'Nenhum motivo específico informado.'}
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>

@@ -33,6 +33,11 @@ public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm
     List<EPIDeliveryForm> findByEmployeeId(UUID employeeId);
 
     /**
+     * Busca fichas por ID do funcionário excluindo determinado status
+     */
+    List<EPIDeliveryForm> findByEmployeeIdAndStatusNot(UUID employeeId, com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status);
+
+    /**
      * Busca fichas por empresa
      */
     List<EPIDeliveryForm> findByCompany(Company company);

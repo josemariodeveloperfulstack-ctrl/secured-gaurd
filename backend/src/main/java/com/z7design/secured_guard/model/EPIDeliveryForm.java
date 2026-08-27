@@ -121,6 +121,12 @@ public class EPIDeliveryForm {
     @Column(name = "audit_user_agent", length = 500)
     private String auditUserAgent;
 
+    @Column(name = "refused_at")
+    private LocalDateTime refusedAt;
+
+    @Column(name = "refusal_reason", columnDefinition = "TEXT")
+    private String refusalReason;
+
     @OneToMany(mappedBy = "deliveryForm", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference
     @Builder.Default
