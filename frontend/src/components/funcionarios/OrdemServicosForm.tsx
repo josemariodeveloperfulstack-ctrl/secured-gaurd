@@ -115,8 +115,8 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     return '/api/uploads/safety-engineers/stamps/' + clean;
   };
 
-  const professionalsWithStamp = sstProfessionals.filter(
-    (p) => p.active !== false && Boolean(p.stampImageUrl),
+  const activeProfessionals = sstProfessionals.filter(
+    (p) => p.active !== false,
   );
 
   /** Exibe cliente da lista, preview resolvido do posto ou dados do posto selecionado */
@@ -769,8 +769,8 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                 </Label>
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-start">
                   <Select
-                    value={form.safetyEngineerId || undefined}
-                    onValueChange={(value) => setForm((prev) => ({ ...prev, safetyEngineerId: value }))}
+                    value={form.safetyEngineerId || 'NONE'}
+                    onValueChange={(value) => setForm((prev) => ({ ...prev, safetyEngineerId: value === 'NONE' ? '' : value }))}
                     disabled={loadingSst || !form.companyId}
                   >
                     <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60">
@@ -778,53 +778,67 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                         placeholder={
                           loadingSst
                             ? 'Carregando profissionais...'
-                            : professionalsWithStamp.length === 0
-                              ? 'Nenhum carimbo cadastrado para a empresa'
+                            : activeProfessionals.length === 0
+                              ? 'Nenhum profissional SST cadastrado'
                               : 'Selecione o carimbo / profissional'
                         }
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {professionalsWithStamp.length === 0 ? (
-                        <div className="p-3 text-sm text-muted-foreground">
-                          Cadastre o carimbo em RH → SST → Profissionais.
-                        </div>
-                      ) : (
-                        professionalsWithStamp.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                            {p.creaNumber ? ` — ${p.creaNumber}` : ''}
-                            {p.companyDefault ? ' (padrão)' : ''}
-                          </SelectItem>
-                        ))
-                      )}
+                      <SelectItem value="NONE">
+                        Nenhum — Exibir apenas &quot;Saúde e Segurança do trabalho&quot;
+                      </SelectItem>
+                      {activeProfessionals.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                          {p.creaNumber ? ` — ${p.creaNumber}` : ''}
+                          {p.stampImageUrl ? ' (com carimbo)' : ' (somente texto)'}
+                          {p.companyDefault ? ' (padrão)' : ''}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                  {selectedSst?.stampImageUrl ? (
-                    <div className="rounded border border-border bg-white/5 p-2 inline-flex flex-col items-center gap-1 min-w-[160px]">
-                      <img
-                        src={stampSrc(selectedSst.stampImageUrl) || ''}
-                        alt={`Carimbo de ${selectedSst.name}`}
-                        className="max-h-20 max-w-[170px] object-contain"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          target.onerror = null;
-                          target.style.display = 'none';
-                          if (target.parentElement && !target.parentElement.querySelector('.stamp-fallback')) {
-                            const fallback = document.createElement('span');
-                            fallback.className = 'stamp-fallback text-xs text-amber-400 font-medium py-1';
-                            fallback.innerText = 'Carimbo indisponível (Reenviar)';
-                            target.parentElement.appendChild(fallback);
-                          }
-                        }}
-                      />
-                      <span className="text-[10px] text-muted-foreground text-center">
-                        {SST_PROFESSIONAL_TYPE_LABELS[selectedSst.professionalType] || selectedSst.professionalType}
-                      </span>
-                    </div>
+
+                  {selectedSst ? (
+                    selectedSst.stampImageUrl ? (
+                      <div className="rounded border border-border bg-white/5 p-2 inline-flex flex-col items-center gap-1 min-w-[180px]">
+                        <span className="text-[10px] font-bold text-cyan-400">Saúde e Segurança do trabalho</span>
+                        <img
+                          src={stampSrc(selectedSst.stampImageUrl) || ''}
+                          alt={`Carimbo de ${selectedSst.name}`}
+                          className="max-h-20 max-w-[170px] object-contain"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.onerror = null;
+                            target.style.display = 'none';
+                            if (target.parentElement && !target.parentElement.querySelector('.stamp-fallback')) {
+                              const fallback = document.createElement('div');
+                              fallback.className = 'stamp-fallback text-xs text-center py-1';
+                              fallback.innerHTML = `<div className="font-bold text-white">${selectedSst.name}</div><div className="text-[10px] text-muted-foreground">${SST_PROFESSIONAL_TYPE_LABELS[selectedSst.professionalType] || selectedSst.professionalType}</div>${selectedSst.creaNumber ? `<div className="text-[10px] text-muted-foreground">${selectedSst.creaNumber}</div>` : ''}`;
+                              target.parentElement.appendChild(fallback);
+                            }
+                          }}
+                        />
+                        <span className="text-[10px] text-muted-foreground text-center">
+                          {SST_PROFESSIONAL_TYPE_LABELS[selectedSst.professionalType] || selectedSst.professionalType}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="rounded border border-border bg-white/5 p-2.5 inline-flex flex-col items-center justify-center text-center min-w-[180px] min-h-[70px]">
+                        <span className="text-[10px] font-bold text-cyan-400">Saúde e Segurança do trabalho</span>
+                        <span className="text-xs font-bold text-white mt-0.5">{selectedSst.name}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {SST_PROFESSIONAL_TYPE_LABELS[selectedSst.professionalType] || selectedSst.professionalType}
+                        </span>
+                        {selectedSst.creaNumber && (
+                          <span className="text-[10px] text-muted-foreground font-mono">{selectedSst.creaNumber}</span>
+                        )}
+                      </div>
+                    )
                   ) : (
-                    <div className="rounded border border-dashed border-amber-600/50 p-3 text-xs text-amber-400 max-w-[200px]">
-                      Sem prévia — envie o carimbo no cadastro do profissional de SST.
+                    <div className="rounded border border-border bg-white/5 p-2.5 inline-flex flex-col items-center justify-center text-center min-w-[180px] min-h-[70px]">
+                      <span className="text-[10px] font-bold text-cyan-400">Saúde e Segurança do trabalho</span>
+                      <span className="text-[10px] text-muted-foreground/80 mt-1 italic">(Profissional não definido)</span>
                     </div>
                   )}
                 </div>
