@@ -12,24 +12,14 @@ export function resolveCompanyLogoUrl(
   const raw = typeof companyOrUrl === 'string' ? companyOrUrl.trim() : companyOrUrl.logoUrl?.trim();
   if (!raw) return null;
 
-  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
+  if (raw.startsWith('data:')) {
     return raw;
   }
 
-  const baseUrl = getApiUrl().replace(/\/api\/?$/, '');
-  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
-
-  if (normalized.startsWith('/api/uploads/')) {
-    return `${baseUrl}${normalized}`;
-  }
-  if (normalized.startsWith('/uploads/')) {
-    return `${baseUrl}/api${normalized}`;
-  }
-  if (normalized.includes('/uploads/companies/logos/')) {
-    return `${baseUrl}/api${normalized.startsWith('/') ? normalized : `/${normalized}`}`;
-  }
-
   const fileName = raw.replace(/^.*\//, '');
+  if (!fileName) return null;
+
+  const baseUrl = getApiUrl().replace(/\/api\/?$/, '');
   return `${baseUrl}/api/uploads/companies/logos/${fileName}`;
 }
 

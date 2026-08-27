@@ -7,12 +7,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import java.nio.charset.StandardCharsets;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -431,11 +433,24 @@ public class FileUploadController {
         }
     }
 
+    private static final String DEFAULT_COMPANY_LOGO_SVG =
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"80\" viewBox=\"0 0 200 80\">" +
+            "<rect width=\"200\" height=\"80\" fill=\"#1e293b\" rx=\"8\"/>" +
+            "<text x=\"100\" y=\"46\" font-family=\"sans-serif\" font-size=\"16\" font-weight=\"bold\" fill=\"#f8fafc\" text-anchor=\"middle\">EMPRESA</text>" +
+            "</svg>";
+
+    private static final String DEFAULT_STAMP_SVG =
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"240\" height=\"90\" viewBox=\"0 0 240 90\">" +
+            "<rect width=\"240\" height=\"90\" fill=\"#0f172a\" stroke=\"#3b82f6\" stroke-width=\"2\" rx=\"6\"/>" +
+            "<text x=\"120\" y=\"40\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"14\" font-weight=\"bold\" fill=\"#60a5fa\">SEGURANÇA DO TRABALHO</text>" +
+            "<text x=\"120\" y=\"62\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"11\" fill=\"#94a3b8\">RESPONSÁVEL TÉCNICO</text>" +
+            "</svg>";
+
     /**
-     * Serve logo da empresa. Retorna 404 se o arquivo não existir (evita 500 do ResourceHandler em CI).
+     * Serve logo da empresa. Retorna logo do arquivo ou SVG placeholder se não existir.
      */
     @GetMapping("/companies/logos/{filename:.+}")
-    @Operation(summary = "Obter logo da empresa", description = "Retorna o arquivo do logo ou 404 se não existir")
+    @Operation(summary = "Obter logo da empresa", description = "Retorna o arquivo do logo ou SVG placeholder se não existir")
     public ResponseEntity<Resource> getCompanyLogo(
             @Parameter(description = "Nome do arquivo (ex: uuid.png)") @PathVariable String filename) {
         try {
@@ -457,7 +472,12 @@ public class FileUploadController {
 
             Resource resource = new UrlResource(filePath.toUri());
             if (!resource.exists() || !resource.isReadable()) {
-                return ResponseEntity.notFound().build();
+                log.debug("Logo não encontrado on-disk, retornando SVG placeholder para: {}", filename);
+                ByteArrayResource placeholder = new ByteArrayResource(DEFAULT_COMPANY_LOGO_SVG.getBytes(StandardCharsets.UTF_8));
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType("image/svg+xml"))
+                        .header(HttpHeaders.CACHE_CONTROL, "max-age=300")
+                        .body(placeholder);
             }
             String contentType = Files.probeContentType(filePath);
             if (contentType == null) {
@@ -468,8 +488,12 @@ public class FileUploadController {
                     .header(HttpHeaders.CACHE_CONTROL, "max-age=3600")
                     .body(resource);
         } catch (Exception e) {
-            log.debug("Logo não encontrado ou erro ao ler: {}", filename);
-            return ResponseEntity.notFound().build();
+            log.debug("Logo não encontrado ou erro ao ler, retornando SVG placeholder: {}", filename);
+            ByteArrayResource placeholder = new ByteArrayResource(DEFAULT_COMPANY_LOGO_SVG.getBytes(StandardCharsets.UTF_8));
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("image/svg+xml"))
+                    .header(HttpHeaders.CACHE_CONTROL, "max-age=300")
+                    .body(placeholder);
         }
     }
 
@@ -668,7 +692,7 @@ public class FileUploadController {
     }
 
     @GetMapping("/safety-engineers/stamps/{filename:.+}")
-    @Operation(summary = "Obter carimbo do engenheiro de segurança", description = "Retorna o arquivo do carimbo ou 404 se não existir")
+    @Operation(summary = "Obter carimbo do engenheiro de segurança", description = "Retorna o arquivo do carimbo ou SVG placeholder se não existir")
     public ResponseEntity<Resource> getSafetyEngineerStamp(
             @Parameter(description = "Nome do arquivo (ex: uuid.png)") @PathVariable String filename) {
         try {
@@ -678,7 +702,11 @@ public class FileUploadController {
             Path basePath = Paths.get(uploadDir, "safety-engineers", "stamps").toAbsolutePath().normalize();
             Path filePath = basePath.resolve(filename).normalize();
             if (!filePath.startsWith(basePath)) {
-                return ResponseEntity.notFound().build();
+                ByteArrayResource placeholder = new ByteArrayResource(DEFAULT_STAMP_SVG.getBytes(StandardCharsets.UTF_8));
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType("image/svg+xml"))
+                        .header(HttpHeaders.CACHE_CONTROL, "max-age=300")
+                        .body(placeholder);
             }
             if (!Files.exists(filePath)) {
                 restoreStampFromPersistentBackup(filePath, filename);
@@ -696,7 +724,12 @@ public class FileUploadController {
                 }
             }
             if (!resource.exists() || !resource.isReadable()) {
-                return ResponseEntity.notFound().build();
+                log.debug("Carimbo não encontrado on-disk, retornando SVG placeholder para: {}", filename);
+                ByteArrayResource placeholder = new ByteArrayResource(DEFAULT_STAMP_SVG.getBytes(StandardCharsets.UTF_8));
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType("image/svg+xml"))
+                        .header(HttpHeaders.CACHE_CONTROL, "max-age=300")
+                        .body(placeholder);
             }
             String contentType = Files.probeContentType(filePath);
             if (contentType == null) {
@@ -706,11 +739,13 @@ public class FileUploadController {
                     .contentType(MediaType.parseMediaType(contentType))
                     .header(HttpHeaders.CACHE_CONTROL, "max-age=3600")
                     .body(resource);
-        } catch (MalformedURLException e) {
-            return ResponseEntity.notFound().build();
-        } catch (IOException e) {
-            log.debug("Carimbo não encontrado ou erro ao ler: {}", filename);
-            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.debug("Carimbo não encontrado ou erro ao ler, retornando SVG placeholder: {}", filename);
+            ByteArrayResource placeholder = new ByteArrayResource(DEFAULT_STAMP_SVG.getBytes(StandardCharsets.UTF_8));
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("image/svg+xml"))
+                    .header(HttpHeaders.CACHE_CONTROL, "max-age=300")
+                    .body(placeholder);
         }
     }
 
