@@ -170,6 +170,15 @@ public class EmployeeHistoryPdfService {
                 asoLine += " (" + employee.getExameMedicoTipo() + ")";
             }
             addTableRow(dadosTable, "ASO:", asoLine);
+
+            String laudoLine = formatDate(employee.getLaudoPsicologicoData()) + " | Vencimento: " + formatDate(employee.getLaudoPsicologicoVencimento());
+            if (employee.getLaudoPsicologicoResultado() != null && !employee.getLaudoPsicologicoResultado().trim().isEmpty()) {
+                laudoLine += " (" + employee.getLaudoPsicologicoResultado() + ")";
+            }
+            if (employee.getLaudoPsicologicoDoctor() != null && employee.getLaudoPsicologicoDoctor().getName() != null) {
+                laudoLine += " — " + employee.getLaudoPsicologicoDoctor().getName();
+            }
+            addTableRow(dadosTable, "Laudo Psicológico:", laudoLine);
             document.add(dadosTable);
 
             // Histórico de alterações

@@ -57,6 +57,9 @@ public class StockItem {
     @Column(name = "barcode")
     private String barcode;
 
+    @Column(name = "ca_number")
+    private String caNumber;
+
     @Column(name = "qr_code")
     private String qrCode;
 

@@ -12,6 +12,7 @@ public enum EmployeeChangeCategory {
     ESCALA("Escala de trabalho"),
     BENEFICIOS("Benefícios"),
     EXAME_ASO("Exame ASO / Saúde"),
+    LAUDO_PSICOLOGICO("Laudo Psicológico"),
     OCORRENCIA("Ocorrência"),
     FERIAS("Férias"),
     STATUS("Status"),

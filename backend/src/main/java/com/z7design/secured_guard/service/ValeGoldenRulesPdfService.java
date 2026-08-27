@@ -1,20 +1,28 @@
 package com.z7design.secured_guard.service;
 
+import com.itextpdf.io.font.constants.StandardFonts;
+import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.colors.DeviceRgb;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.kernel.geom.PageSize;
+import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
-import com.itextpdf.layout.element.List;
-import com.itextpdf.layout.element.ListItem;
+import com.itextpdf.layout.borders.Border;
+import com.itextpdf.layout.borders.SolidBorder;
+import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.properties.TextAlignment;
-import com.z7design.secured_guard.dto.ReportLayoutConfig;
+import com.itextpdf.layout.properties.UnitValue;
+import com.itextpdf.layout.properties.VerticalAlignment;
 import com.z7design.secured_guard.dto.ValeSafetyTermRequest;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
-import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,29 +34,31 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * Regras de Ouro da Vale – Termo de ciência e compromisso (funcionários VIG).
+ * Gera o PDF no layout idêntico ao modelo físico oficial da Vale.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ValeGoldenRulesPdfService {
 
-    private static final DeviceRgb TITLE_BLUE = new DeviceRgb(0, 51, 102);
+    private static final DeviceRgb TEAL_VALE = new DeviceRgb(0, 95, 115);
+    private static final DeviceRgb DARK_GRAY = new DeviceRgb(34, 34, 34);
+    private static final DeviceRgb LIGHT_GRAY_BORDER = new DeviceRgb(190, 190, 190);
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private static final String[] RULES = {
-            "Nunca trabalhar sob efeito de álcool e drogas.",
-            "Nunca trabalhar em altura (≥ 1,8m) sem treinamento e cinto de segurança tipo paraquedista.",
-            "Nunca operar veículos e equipamentos móveis sem treinamento e dispositivos de segurança.",
-            "Nunca realizar manutenção em equipamentos sem garantir energia zero (bloqueio e etiquetagem).",
-            "Nunca se posicionar em áreas isoladas ou sob cargas suspensas.",
-            "Nunca trabalhar sozinho em espaço confinado sem treinamento e EPIs adequados.",
-            "Nunca entrar em áreas de produção, barragens ou subestações sem autorização.",
-            "Nunca utilizar ferramentas ou máquinas improvisadas ou defeituosas.",
-            "Nunca executar atividade sem conhecer os riscos e as medidas de controle.",
-            "Nunca utilizar celular ou equipamentos que gerem distração em áreas operacionais não autorizadas."
+            "Nunca trabalhe sob influência de álcool, drogas e substâncias que diminuam a aptidão para o trabalho.",
+            "Nunca trabalhe em altura (maior ou igual a 1,8 m) sem o devido treinamento, autorização e sempre use cinto de segurança fixado em ponto de ancoragem apropriado.",
+            "Nunca opere veículos e equipamentos móveis sem o devido treinamento, autorização e dispositivos de segurança. Respeite o plano de trânsito.",
+            "Nunca execute manutenções ou intervenções em instalações ou equipamentos sem ter certeza de que todas as fontes de energias tenham sido bloqueadas, identificadas e testadas com \"zero energia\".",
+            "Nunca se posicione em área isolada ou sob carga suspensa e nem opere equipamentos de movimentação não certificados.",
+            "Nunca trabalhe sozinho num espaço confinado e sem treinamento, autorização, permissão de entrada e EPI apropriado.",
+            "Nunca entre sem autorização em áreas de produção, de rejeitos, salas elétricas/subestações ou qualquer outra área restrita.",
+            "Nunca use ferramentas, máquinas e equipamentos improvisados ou defeituosos para executar um trabalho.",
+            "Nunca realize uma atividade sem conhecer seus riscos e cumpra todas as medidas de controle exigidas.",
+            "Nunca utilize telefone celular ou qualquer outro equipamento que desvie sua atenção em áreas operacionais não autorizadas, escadas ou ao atravessar ruas."
     };
 
-    private final StandardReportLayoutService pdfLayoutService;
     private final CompanyRepository companyRepository;
     private final EmployeeRepository employeeRepository;
     private final EmployeeDocumentDateResolver documentDateResolver;
@@ -57,17 +67,18 @@ public class ValeGoldenRulesPdfService {
         ResolvedData data = resolve(request);
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             PdfWriter writer = new PdfWriter(baos);
-            var configBuilder = ReportLayoutConfig.builder()
-                    .companyId(data.companyId())
-                    .reportTitle(null)
-                    .topMargin(90f)
-                    .includeEmailInFooter(true);
-            documentDateResolver.applyAdmissionDateFooter(configBuilder, request.getEmployeeId());
-            ReportLayoutConfig config = configBuilder.build();
+            PdfDocument pdfDoc = new PdfDocument(writer);
+            Document document = new Document(pdfDoc, PageSize.A4);
+            document.setMargins(25f, 30f, 25f, 30f);
 
-            DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
-            Document document = docWithPdf.getDocument();
-            addContent(document, data);
+            PdfFont fontRegular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+            PdfFont fontBold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
+
+            addHeader(document, fontBold);
+            addIntroText(document, fontRegular, fontBold);
+            addRulesBox(document, fontRegular, fontBold);
+            addFillInAndSignatureSection(document, data, fontRegular, fontBold);
+
             document.close();
             return baos.toByteArray();
         } catch (Exception e) {
@@ -76,58 +87,156 @@ public class ValeGoldenRulesPdfService {
         }
     }
 
-    private void addContent(Document document, ResolvedData data) {
-        document.add(new Paragraph("Regras de Ouro da Vale")
-                .setBold().setFontSize(18f).setFontColor(TITLE_BLUE)
-                .setTextAlignment(TextAlignment.CENTER).setMarginBottom(2f));
-        document.add(new Paragraph("Termo de ciência e compromisso")
-                .setBold().setFontSize(12f).setFontColor(TITLE_BLUE)
-                .setTextAlignment(TextAlignment.CENTER).setMarginBottom(12f));
+    private void addHeader(Document document, PdfFont fontBold) {
+        Table headerTable = new Table(UnitValue.createPercentArray(new float[]{30f, 70f}))
+                .useAllAvailableWidth()
+                .setMarginBottom(8f);
 
-        document.add(new Paragraph(
-                "Na Vale, a segurança é um pacto inegociável com a vida. As Regras de Ouro orientam o comportamento "
-                        + "seguro de todos os empregados próprios e contratados.")
-                .setFontSize(9.5f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(6f));
-        document.add(new Paragraph(
-                "Preencha seus dados abaixo e assine este termo, declarando ciência e compromisso com as 10 Regras de Ouro.")
-                .setFontSize(9.5f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(10f));
+        // Coluna Esquerda: Badge "10 Regras de Ouro da Segurança"
+        Cell leftCell = new Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        Table badgeTable = new Table(1).setWidth(110f);
+        Cell badgeCell = new Cell()
+                .setBackgroundColor(new DeviceRgb(55, 71, 79))
+                .setBorder(new SolidBorder(new DeviceRgb(229, 57, 53), 2f))
+                .setPadding(6f)
+                .setTextAlignment(TextAlignment.CENTER);
+        badgeCell.add(new Paragraph("10 Regras")
+                .setFont(fontBold).setFontSize(11f).setFontColor(ColorConstants.WHITE).setMargin(0).setLeading(12f));
+        badgeCell.add(new Paragraph("de Ouro da")
+                .setFont(fontBold).setFontSize(10f).setFontColor(new DeviceRgb(255, 202, 40)).setMargin(0).setLeading(11f));
+        badgeCell.add(new Paragraph("Segurança")
+                .setFont(fontBold).setFontSize(11f).setFontColor(ColorConstants.WHITE).setMargin(0).setLeading(12f));
+        badgeTable.addCell(badgeCell);
+        leftCell.add(badgeTable);
+        headerTable.addCell(leftCell);
 
-        document.add(new Paragraph("As 10 Regras de Ouro")
-                .setBold().setFontSize(11f).setFontColor(TITLE_BLUE)
-                .setMarginBottom(6f));
+        // Coluna Direita: Título e Subtítulo
+        Cell rightCell = new Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        rightCell.add(new Paragraph("Regras de Ouro da Vale")
+                .setFont(fontBold).setFontSize(18f).setFontColor(TEAL_VALE).setMarginBottom(4f));
+        rightCell.add(new Paragraph("Termo de ciência e compromisso")
+                .setFont(fontBold).setFontSize(13f).setFontColor(TEAL_VALE).setMarginBottom(0f));
+        headerTable.addCell(rightCell);
 
-        List list = new List().setSymbolIndent(10).setListSymbol("").setFontSize(9f).setMarginBottom(14f);
-        for (int i = 0; i < RULES.length; i++) {
-            list.add(new ListItem((i + 1) + ". " + RULES[i]));
-        }
-        document.add(list);
+        document.add(headerTable);
 
-        String dateStr = data.documentDate().format(DATE_FMT);
-        String year = String.valueOf(data.documentDate().getYear());
-
-        document.add(fieldLine("Data: ", dateStr + "  (ano " + year + ")"));
-        document.add(fieldLine("Local: ", data.location()));
-        document.add(fieldLine("Nome do(a) empregado(a) (letra de forma): ", data.employeeName().toUpperCase()));
-        document.add(new Paragraph()
-                .add(new Text("Você trabalha:  (  ) Vale   ( X ) Contratada.  Nome da empresa contratada: ").setFontSize(9.5f))
-                .add(new Text(data.companyName()).setBold().setFontSize(9.5f))
-                .setMarginBottom(8f));
-        document.add(fieldLine("Matrícula Vale ou Nº de identificação da contratada: ",
-                data.registrationNumber().isBlank() ? "_______________________________" : data.registrationNumber()));
-
-        document.add(new Paragraph("\nAssinatura do(a) empregado(a) _______________________________________________")
-                .setFontSize(9.5f).setMarginTop(16f).setMarginBottom(20f));
-
-        document.add(new Paragraph(
-                "Os setores de RH e Segurança são responsáveis pela guarda deste termo assinado.")
-                .setItalic().setFontSize(8f).setTextAlignment(TextAlignment.CENTER).setFontColor(new DeviceRgb(80, 80, 80)));
+        // Linha divisória verde/teal horizontal
+        Table lineTable = new Table(1).useAllAvailableWidth().setMarginBottom(10f);
+        lineTable.addCell(new Cell().setHeight(1.5f).setBackgroundColor(TEAL_VALE).setBorder(Border.NO_BORDER));
+        document.add(lineTable);
     }
 
-    private Paragraph fieldLine(String label, String value) {
-        return new Paragraph()
-                .add(new Text(label).setFontSize(9.5f))
-                .add(new Text(value).setBold().setFontSize(9.5f))
+    private void addIntroText(Document document, PdfFont fontRegular, PdfFont fontBold) {
+        Paragraph p1 = new Paragraph(
+                "Na Vale, temos um pacto inegociável com a vida. É dever de todos os empregados da Vale e empresas contratadas obedecer rigorosamente "
+                        + "às Regras de Ouro, visando não apenas a própria segurança, mas também a dos colegas.")
+                .setFont(fontRegular).setFontSize(9f).setFontColor(DARK_GRAY)
+                .setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(4f).setFixedLeading(12f);
+        document.add(p1);
+
+        Paragraph p2 = new Paragraph()
+                .setFont(fontRegular).setFontSize(9f).setFontColor(DARK_GRAY)
+                .setMarginBottom(8f).setFixedLeading(12f)
+                .add(new Text("Leia com atenção e, ao final, "))
+                .add(new Text("preencha seus dados e confirme seu compromisso.").setFont(fontBold));
+        document.add(p2);
+    }
+
+    private void addRulesBox(Document document, PdfFont fontRegular, PdfFont fontBold) {
+        Table boxTable = new Table(1).useAllAvailableWidth().setMarginBottom(10f);
+        Cell boxCell = new Cell()
+                .setBorder(new SolidBorder(LIGHT_GRAY_BORDER, 1f))
+                .setPadding(8f)
+                .setBackgroundColor(ColorConstants.WHITE);
+
+        boxCell.add(new Paragraph("As 10 Regras de Ouro da Vale")
+                .setFont(fontBold).setFontSize(10.5f).setFontColor(TEAL_VALE).setMarginBottom(6f));
+
+        for (int i = 0; i < RULES.length; i++) {
+            Paragraph rulePara = new Paragraph()
+                    .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY)
+                    .setFixedLeading(11f).setMarginBottom(3f)
+                    .add(new Text((i + 1) + ".  ").setFont(fontBold))
+                    .add(new Text(RULES[i]));
+            boxCell.add(rulePara);
+        }
+        boxTable.addCell(boxCell);
+        document.add(boxTable);
+    }
+
+    private void addFillInAndSignatureSection(Document document, ResolvedData data, PdfFont fontRegular, PdfFont fontBold) {
+        // Linha divisória fina
+        Table lineTable = new Table(1).useAllAvailableWidth().setMarginBottom(6f);
+        lineTable.addCell(new Cell().setHeight(0.5f).setBackgroundColor(LIGHT_GRAY_BORDER).setBorder(Border.NO_BORDER));
+        document.add(lineTable);
+
+        document.add(new Paragraph(
+                "Li e concordo com as Regras de Ouro, detalhadas acima, porque sei que a vida está sempre em primeiro lugar.")
+                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(6f));
+
+        String dateVal = data.documentDate() != null ? data.documentDate().format(DATE_FMT) : "____________";
+        String yearVal = data.documentDate() != null ? String.valueOf(data.documentDate().getYear()) : "____";
+        String localVal = data.location().isBlank() ? "___________________________" : data.location();
+        String empName = data.employeeName().isBlank() ? "_______________________________________" : data.employeeName().toUpperCase();
+        String companyName = data.companyName().isBlank() ? "_______________________" : data.companyName();
+        String regNumber = data.registrationNumber().isBlank() ? "_______________________________________" : data.registrationNumber();
+
+        // Linha 1: Data e Local
+        document.add(new Paragraph()
+                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(4f)
+                .add(new Text("Data: "))
+                .add(new Text(dateVal + ", 20" + (yearVal.length() >= 2 ? yearVal.substring(yearVal.length() - 2) : yearVal)).setFont(fontBold))
+                .add(new Text("          Local: "))
+                .add(new Text(localVal).setFont(fontBold)));
+
+        // Linha 2: Nome do empregado
+        document.add(new Paragraph()
+                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(4f)
+                .add(new Text("Nome do(a) empregado(a) (letra de forma): "))
+                .add(new Text(empName).setFont(fontBold)));
+
+        // Linha 3: Você trabalha
+        document.add(new Paragraph()
+                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(4f)
+                .add(new Text("Você trabalha:  (  ) Vale   ( X ) Contratada, Nome da empresa contratada: "))
+                .add(new Text(companyName).setFont(fontBold)));
+
+        // Linha 4: Matrícula
+        document.add(new Paragraph()
+                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(4f)
+                .add(new Text("Matricula Vale ou Nº de identificação da contratada; "))
+                .add(new Text(regNumber).setFont(fontBold)));
+
+        // Linha 5: Firmo meu compromisso
+        document.add(new Paragraph("Firmo meu compromisso:")
+                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(12f));
+
+        // Assinatura e Logo Vale
+        Table bottomTable = new Table(UnitValue.createPercentArray(new float[]{70f, 30f}))
+                .useAllAvailableWidth()
                 .setMarginBottom(8f);
+
+        Cell sigCell = new Cell().setBorder(Border.NO_BORDER);
+        sigCell.add(new Paragraph("_______________________________________")
+                .setFont(fontRegular).setFontSize(8.5f).setMarginBottom(2f));
+        sigCell.add(new Paragraph("Assinatura do(a) empregado(a)")
+                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY));
+        bottomTable.addCell(sigCell);
+
+        Cell logoCell = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT).setVerticalAlignment(VerticalAlignment.BOTTOM);
+        Paragraph valeLogo = new Paragraph()
+                .add(new Text("▲ ").setFontSize(14f).setFontColor(new DeviceRgb(255, 179, 0)))
+                .add(new Text("VALE").setFont(fontBold).setFontSize(14f).setFontColor(TEAL_VALE));
+        logoCell.add(valeLogo);
+        bottomTable.addCell(logoCell);
+
+        document.add(bottomTable);
+
+        // Rodapé final explicativo
+        document.add(new Paragraph(
+                "Cabe à área de Recursos Humanos (para empregados Vale) e a de Segurança do Trabalho (para contratados) armazenar os Termos de Ciência e Compromisso devidamente preenchidas e assinados.")
+                .setFont(fontRegular).setFontSize(7.5f).setFontColor(new DeviceRgb(100, 100, 100))
+                .setItalic().setTextAlignment(TextAlignment.CENTER));
     }
 
     private ResolvedData resolve(ValeSafetyTermRequest request) {

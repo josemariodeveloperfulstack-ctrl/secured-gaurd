@@ -279,6 +279,9 @@ public class EmployeeReportPdfService {
             case "cnhCategory" -> "Categ. CNH";
             case "cnhExpirationDate" -> "Validade CNH";
             case "exameMedicoVencimento" -> "Próx. ASO";
+            case "laudoPsicologicoVencimento" -> "Venc. Laudo Psicológico";
+            case "laudoPsicologicoData" -> "Data Laudo Psicológico";
+            case "laudoPsicologicoResultado" -> "Res. Laudo Psicológico";
             case "proximasFeriasVencimento" -> "Venc. Férias";
             case "address" -> "Endereço";
             case "nationality" -> "Nacionalidade";
@@ -321,6 +324,9 @@ public class EmployeeReportPdfService {
             case "cnhCategory" -> emp.getCnhCategory();
             case "cnhExpirationDate" -> emp.getCnhExpirationDate() != null ? emp.getCnhExpirationDate().format(DATE_FMT) : null;
             case "exameMedicoVencimento" -> emp.getExameMedicoVencimento() != null ? emp.getExameMedicoVencimento().format(DATE_FMT) : null;
+            case "laudoPsicologicoVencimento" -> emp.getLaudoPsicologicoVencimento() != null ? emp.getLaudoPsicologicoVencimento().format(DATE_FMT) : null;
+            case "laudoPsicologicoData" -> emp.getLaudoPsicologicoData() != null ? emp.getLaudoPsicologicoData().format(DATE_FMT) : null;
+            case "laudoPsicologicoResultado" -> emp.getLaudoPsicologicoResultado();
             case "proximasFeriasVencimento" -> emp.getProximasFeriasVencimento() != null ? emp.getProximasFeriasVencimento().format(DATE_FMT) : null;
             case "address" -> emp.getAddress();
             case "nationality" -> emp.getNationality();

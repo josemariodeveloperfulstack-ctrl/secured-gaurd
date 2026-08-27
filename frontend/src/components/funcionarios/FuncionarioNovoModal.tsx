@@ -906,6 +906,15 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         exameMedicoPrimeiroEmprego: employeeToEdit.exameMedicoPrimeiroEmprego,
         exameMedicoContribuicaoSindicalPaga: employeeToEdit.exameMedicoContribuicaoSindicalPaga,
 
+        // Campos de Laudo Psicológico
+        laudoPsicologicoData: employeeToEdit.laudoPsicologicoData || '',
+        laudoPsicologicoVencimento: employeeToEdit.laudoPsicologicoVencimento || '',
+        laudoPsicologicoResultado: employeeToEdit.laudoPsicologicoResultado || '',
+        laudoPsicologicoDoctor: (employeeToEdit as any).laudoPsicologicoDoctor?.id
+          ? { id: String((employeeToEdit as any).laudoPsicologicoDoctor.id) }
+          : { id: '' },
+        laudoPsicologicoObservacoes: employeeToEdit.laudoPsicologicoObservacoes || '',
+
         // Campos de CIN
         cinNumero: employeeToEdit.cinNumero || '',
         cinOrgaoEmissor: employeeToEdit.cinOrgaoEmissor || '',

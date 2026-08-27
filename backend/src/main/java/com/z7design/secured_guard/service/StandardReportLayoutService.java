@@ -640,9 +640,8 @@ public class StandardReportLayoutService {
             leftBlock.add(addressText);
         }
 
-        // Adiciona o bloco na posição yPosition + 10f. O texto cresce para cima
-        // a partir desta base, adaptando-se caso tenha mais linhas de endereço.
-        canvas.add(leftBlock.setFixedPosition(leftFooterX, yPosition + 10f, leftFooterWidth));
+        // Adiciona o bloco na posição yPosition + 28.35f (1cm de margem inferior para impressão sem cortes).
+        canvas.add(leftBlock.setFixedPosition(leftFooterX, yPosition + 28.35f, leftFooterWidth));
 
         // Bloco direito: apenas numeração de página (em applyPageNumbers).
         // Usuário e data do relatório removidos do rodapé.
@@ -662,7 +661,7 @@ public class StandardReportLayoutService {
                 .setTextAlignment(TextAlignment.RIGHT)
                 .setFontColor(pageNumColor)
                 .setMarginBottom(0f);
-        canvas.add(pageNumFooter.setFixedPosition(rightFooterX, yPosition + 10f, rightFooterWidth));
+        canvas.add(pageNumFooter.setFixedPosition(rightFooterX, yPosition + 28.35f, rightFooterWidth));
     }
 
     /**
@@ -741,10 +740,10 @@ public class StandardReportLayoutService {
         drawFooterBackgroundLine(pdfCanvas, pdfDoc, pageWidth, company);
     }
 
-    /** Linha gradiente fina na base da página (rodapé visual). */
+    /** Linha gradiente fina na base da página (rodapé visual posicionado a 24.35pt / ~0.86cm da borda). */
     private void drawFooterBackgroundLine(PdfCanvas pdfCanvas, PdfDocument pdfDoc, float pageWidth, Company company) {
         float footerLineHeight = 4f;
-        addHorizontalGradient(pdfCanvas, pdfDoc, new Rectangle(0, 0, pageWidth, footerLineHeight), company);
+        addHorizontalGradient(pdfCanvas, pdfDoc, new Rectangle(0, 24.35f, pageWidth, footerLineHeight), company);
     }
 
     /**

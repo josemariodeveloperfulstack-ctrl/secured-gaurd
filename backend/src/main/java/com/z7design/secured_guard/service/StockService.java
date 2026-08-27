@@ -289,6 +289,7 @@ public class StockService {
         // Não zerar unitCost quando o frontend omite o campo
         existingItem.setSupplier(dto.getSupplier());
         existingItem.setBarcode(dto.getBarcode());
+        existingItem.setCaNumber(dto.getCaNumber());
         if (dto.getActive() != null) {
             existingItem.setActive(dto.getActive());
         }

@@ -187,7 +187,10 @@ public class MedicalDocumentService {
         long declaracoes = docs.stream().filter(d ->
                 d.getDocumentType() == MedicalDocumentType.DECLARACAO_COMPARECIMENTO
                         || d.getDocumentType() == MedicalDocumentType.DECLARACAO_MEDICA).count();
-        int dias = docs.stream().mapToInt(d -> d.getDays() != null ? d.getDays() : 0).sum();
+        int dias = docs.stream()
+                .filter(d -> d.getDocumentType() == MedicalDocumentType.ATESTADO
+                        || d.getDocumentType() == MedicalDocumentType.AFASTAMENTO)
+                .mapToInt(d -> d.getDays() != null ? d.getDays() : 0).sum();
         BigDecimal horas = docs.stream()
                 .map(d -> d.getHours() != null ? d.getHours() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -271,6 +274,15 @@ public class MedicalDocumentService {
         }
         if (doc.getStartDate().isAfter(LocalDate.now())) {
             throw new BusinessException("Data inicial não pode ser futura");
+        }
+
+        if (doc.getDocumentType() == MedicalDocumentType.DECLARACAO_COMPARECIMENTO
+                || doc.getDocumentType() == MedicalDocumentType.DECLARACAO_MEDICA) {
+            doc.setDays(0);
+            if (doc.getEndDate() == null) {
+                doc.setEndDate(doc.getStartDate());
+            }
+            return;
         }
 
         if (doc.getDays() != null && doc.getDays() > 0 && doc.getEndDate() == null) {

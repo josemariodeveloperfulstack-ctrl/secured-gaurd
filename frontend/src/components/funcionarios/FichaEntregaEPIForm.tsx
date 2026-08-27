@@ -549,6 +549,9 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
         const selectedItem = stockItems.find(item => item.id === value);
         if (selectedItem) {
           updatedItem.nome = selectedItem.name || selectedItem.fullName || updatedItem.nome || '';
+          if (selectedItem.caNumber || (selectedItem as any).ca) {
+            updatedItem.ca = selectedItem.caNumber || (selectedItem as any).ca || '';
+          }
         }
       }
       

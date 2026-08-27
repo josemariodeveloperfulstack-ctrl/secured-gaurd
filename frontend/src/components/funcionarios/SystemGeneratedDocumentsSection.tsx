@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Trash2,
   RefreshCw,
+  Eye,
 } from 'lucide-react';
 import {
   documentoGeradoService,
@@ -106,8 +107,34 @@ export const SystemGeneratedDocumentsSection: React.FC<
 }) => {
   const { toast } = useToast();
   const invalidateDocumentos = useInvalidateDocumentosGerados();
-  const [downloadingId, setDownloadingId] = React.useState<string | null>(null);
-  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [viewingId, setViewingId] = React.useState<string | null>(null);
+
+  const handleView = async (doc: DocumentoGerado) => {
+    try {
+      setViewingId(doc.id);
+      const blob = await documentoGeradoService.downloadArquivo(doc.id);
+      const fileBlob = new Blob([blob], { type: 'application/pdf' });
+      const url = globalThis.URL.createObjectURL(fileBlob);
+      const newWin = globalThis.window.open(url, '_blank');
+      if (!newWin) {
+        toast({
+          title: 'Aviso',
+          description: 'O navegador bloqueou a abertura em nova aba. Verifique os pop-ups.',
+          variant: 'destructive',
+        });
+      }
+      setTimeout(() => globalThis.URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      console.error('Erro ao visualizar documento:', error);
+      toast({
+        title: 'Erro ao visualizar',
+        description: 'Não foi possível visualizar o documento.',
+        variant: 'destructive',
+      });
+    } finally {
+      setViewingId(null);
+    }
+  };
 
   const handleDownload = async (doc: DocumentoGerado) => {
     try {
@@ -315,11 +342,30 @@ export const SystemGeneratedDocumentsSection: React.FC<
                         size="sm"
                         className={`h-8 gap-1.5 ${
                           isRh
+                            ? 'text-blue-400 hover:text-blue-300 hover:bg-gray-700'
+                            : 'text-blue-600 hover:text-blue-900 hover:bg-gray-100'
+                        }`}
+                        onClick={() => handleView(doc)}
+                        disabled={viewingId === doc.id || downloadingId === doc.id || deletingId === doc.id}
+                        title="Visualizar"
+                      >
+                        {viewingId === doc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                        Visualizar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 gap-1.5 ${
+                          isRh
                             ? 'text-gray-400 hover:text-white hover:bg-gray-700'
                             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                         }`}
                         onClick={() => handleDownload(doc)}
-                        disabled={downloadingId === doc.id || deletingId === doc.id}
+                        disabled={downloadingId === doc.id || deletingId === doc.id || viewingId === doc.id}
                         title="Baixar"
                       >
                         {downloadingId === doc.id ? (

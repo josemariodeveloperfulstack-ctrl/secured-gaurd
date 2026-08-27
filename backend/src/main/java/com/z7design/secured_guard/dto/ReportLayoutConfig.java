@@ -65,11 +65,11 @@ public class ReportLayoutConfig {
     private float marginExtraTop = 0f;
 
     /**
-     * Margem inferior do conteúdo (para acomodar o rodapé)
-     * Padrão: 80px
+     * Margem inferior do conteúdo (para acomodar o rodapé a 1cm da borda inferior)
+     * Padrão: 85px
      */
     @Builder.Default
-    private float bottomMargin = 80f;
+    private float bottomMargin = 85f;
 
     /**
      * Margem esquerda do conteúdo

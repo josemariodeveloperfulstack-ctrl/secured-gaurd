@@ -182,7 +182,9 @@ const GestaoAtestados: React.FC = () => {
           documents: []
         };
       }
-      map[item.employeeId].totalDays += item.days || 0;
+      if (item.documentType === 'ATESTADO' || item.documentType === 'AFASTAMENTO') {
+        map[item.employeeId].totalDays += item.days || 0;
+      }
       map[item.employeeId].totalCount += 1;
       map[item.employeeId].documents.push(item);
     });
@@ -884,7 +886,16 @@ const GestaoAtestados: React.FC = () => {
                 <Label>Tipo *</Label>
                 <Select
                   value={form.documentType}
-                  onValueChange={(v) => setForm((p) => ({ ...p, documentType: v as MedicalDocumentType }))}
+                  onValueChange={(v) => {
+                    const newType = v as MedicalDocumentType;
+                    const isDecl = newType === 'DECLARACAO_COMPARECIMENTO' || newType === 'DECLARACAO_MEDICA';
+                    setForm((p) => ({
+                      ...p,
+                      documentType: newType,
+                      days: isDecl ? '0' : (p.days === '0' ? '1' : p.days),
+                      endDate: isDecl ? p.startDate : p.endDate
+                    }));
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
