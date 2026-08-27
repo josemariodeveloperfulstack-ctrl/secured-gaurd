@@ -32,6 +32,11 @@ import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
+import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.layout.element.Image;
+
+import java.io.InputStream;
+
 /**
  * Regras de Ouro da Vale – Termo de ciência e compromisso (funcionários VIG).
  * Gera o PDF no layout idêntico ao modelo físico oficial da Vale.
@@ -69,13 +74,12 @@ public class ValeGoldenRulesPdfService {
             PdfWriter writer = new PdfWriter(baos);
             PdfDocument pdfDoc = new PdfDocument(writer);
             Document document = new Document(pdfDoc, PageSize.A4);
-            document.setMargins(25f, 30f, 25f, 30f);
+            document.setMargins(20f, 25f, 20f, 25f);
 
             PdfFont fontRegular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont fontBold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
 
-            addHeader(document, fontBold);
-            addIntroText(document, fontRegular, fontBold);
+            addHeader(document, fontBold, fontRegular);
             addRulesBox(document, fontRegular, fontBold);
             addFillInAndSignatureSection(document, data, fontRegular, fontBold);
 
@@ -87,74 +91,78 @@ public class ValeGoldenRulesPdfService {
         }
     }
 
-    private void addHeader(Document document, PdfFont fontBold) {
-        Table headerTable = new Table(UnitValue.createPercentArray(new float[]{30f, 70f}))
+    private void addHeader(Document document, PdfFont fontBold, PdfFont fontRegular) {
+        Table headerTable = new Table(UnitValue.createPercentArray(new float[]{24f, 76f}))
                 .useAllAvailableWidth()
-                .setMarginBottom(8f);
+                .setMarginBottom(6f);
 
-        // Coluna Esquerda: Badge "10 Regras de Ouro da Segurança"
-        Cell leftCell = new Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE);
-        Table badgeTable = new Table(1).setWidth(110f);
-        Cell badgeCell = new Cell()
-                .setBackgroundColor(new DeviceRgb(55, 71, 79))
-                .setBorder(new SolidBorder(new DeviceRgb(229, 57, 53), 2f))
-                .setPadding(6f)
-                .setTextAlignment(TextAlignment.CENTER);
-        badgeCell.add(new Paragraph("10 Regras")
-                .setFont(fontBold).setFontSize(11f).setFontColor(ColorConstants.WHITE).setMargin(0).setFixedLeading(12f));
-        badgeCell.add(new Paragraph("de Ouro da")
-                .setFont(fontBold).setFontSize(10f).setFontColor(new DeviceRgb(255, 202, 40)).setMargin(0).setFixedLeading(11f));
-        badgeCell.add(new Paragraph("Segurança")
-                .setFont(fontBold).setFontSize(11f).setFontColor(ColorConstants.WHITE).setMargin(0).setFixedLeading(12f));
-        badgeTable.addCell(badgeCell);
-        leftCell.add(badgeTable);
+        // Coluna Esquerda: Brasão oficial "10 Regras de Ouro da Segurança"
+        Cell leftCell = new Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.TOP);
+        Image shieldImg = loadShieldImage();
+        if (shieldImg != null) {
+            shieldImg.setMaxWidth(100f);
+            shieldImg.setAutoScale(true);
+            leftCell.add(shieldImg);
+        } else {
+            Table badgeTable = new Table(1).setWidth(100f);
+            Cell badgeCell = new Cell()
+                    .setBackgroundColor(new DeviceRgb(55, 71, 79))
+                    .setBorder(new SolidBorder(new DeviceRgb(229, 57, 53), 2f))
+                    .setPadding(6f)
+                    .setTextAlignment(TextAlignment.CENTER);
+            badgeCell.add(new Paragraph("10 Regras")
+                    .setFont(fontBold).setFontSize(11f).setFontColor(ColorConstants.WHITE).setMargin(0).setFixedLeading(12f));
+            badgeCell.add(new Paragraph("de Ouro da")
+                    .setFont(fontBold).setFontSize(10f).setFontColor(new DeviceRgb(255, 202, 40)).setMargin(0).setFixedLeading(11f));
+            badgeCell.add(new Paragraph("Segurança")
+                    .setFont(fontBold).setFontSize(11f).setFontColor(ColorConstants.WHITE).setMargin(0).setFixedLeading(12f));
+            badgeTable.addCell(badgeCell);
+            leftCell.add(badgeTable);
+        }
         headerTable.addCell(leftCell);
 
-        // Coluna Direita: Título e Subtítulo
-        Cell rightCell = new Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        // Coluna Direita: Título, Subtítulo, Linha e Texto de Introdução
+        Cell rightCell = new Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.TOP).setPaddingLeft(10f);
         rightCell.add(new Paragraph("Regras de Ouro da Vale")
-                .setFont(fontBold).setFontSize(18f).setFontColor(TEAL_VALE).setMarginBottom(4f));
+                .setFont(fontBold).setFontSize(17f).setFontColor(TEAL_VALE).setMarginBottom(2f));
         rightCell.add(new Paragraph("Termo de ciência e compromisso")
-                .setFont(fontBold).setFontSize(13f).setFontColor(TEAL_VALE).setMarginBottom(0f));
-        headerTable.addCell(rightCell);
+                .setFont(fontBold).setFontSize(13f).setFontColor(TEAL_VALE).setMarginBottom(6f));
 
-        document.add(headerTable);
+        // Linha horizontal teal sob o título
+        Table titleLine = new Table(1).useAllAvailableWidth().setMarginBottom(8f);
+        titleLine.addCell(new Cell().setHeight(1.5f).setBackgroundColor(TEAL_VALE).setBorder(Border.NO_BORDER));
+        rightCell.add(titleLine);
 
-        // Linha divisória verde/teal horizontal
-        Table lineTable = new Table(1).useAllAvailableWidth().setMarginBottom(10f);
-        lineTable.addCell(new Cell().setHeight(1.5f).setBackgroundColor(TEAL_VALE).setBorder(Border.NO_BORDER));
-        document.add(lineTable);
-    }
-
-    private void addIntroText(Document document, PdfFont fontRegular, PdfFont fontBold) {
-        Paragraph p1 = new Paragraph(
+        // Parágrafos de introdução
+        rightCell.add(new Paragraph(
                 "Na Vale, temos um pacto inegociável com a vida. É dever de todos os empregados da Vale e empresas contratadas obedecer rigorosamente "
                         + "às Regras de Ouro, visando não apenas a própria segurança, mas também a dos colegas.")
-                .setFont(fontRegular).setFontSize(9f).setFontColor(DARK_GRAY)
-                .setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(4f).setFixedLeading(12f);
-        document.add(p1);
+                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY)
+                .setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(6f).setFixedLeading(11.5f));
 
-        Paragraph p2 = new Paragraph()
-                .setFont(fontRegular).setFontSize(9f).setFontColor(DARK_GRAY)
-                .setMarginBottom(8f).setFixedLeading(12f)
+        rightCell.add(new Paragraph()
+                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY)
+                .setMarginBottom(0f).setFixedLeading(11.5f)
                 .add(new Text("Leia com atenção e, ao final, "))
-                .add(new Text("preencha seus dados e confirme seu compromisso.").setFont(fontBold));
-        document.add(p2);
+                .add(new Text("preencha seus dados e confirme seu compromisso.").setFont(fontBold)));
+
+        headerTable.addCell(rightCell);
+        document.add(headerTable);
     }
 
     private void addRulesBox(Document document, PdfFont fontRegular, PdfFont fontBold) {
-        Table boxTable = new Table(1).useAllAvailableWidth().setMarginBottom(10f);
+        Table boxTable = new Table(1).useAllAvailableWidth().setMarginBottom(8f);
         Cell boxCell = new Cell()
-                .setBorder(new SolidBorder(LIGHT_GRAY_BORDER, 1f))
+                .setBorder(new SolidBorder(LIGHT_GRAY_BORDER, 0.75f))
                 .setPadding(8f)
                 .setBackgroundColor(ColorConstants.WHITE);
 
         boxCell.add(new Paragraph("As 10 Regras de Ouro da Vale")
-                .setFont(fontBold).setFontSize(10.5f).setFontColor(TEAL_VALE).setMarginBottom(6f));
+                .setFont(fontBold).setFontSize(10.5f).setFontColor(TEAL_VALE).setMarginBottom(5f));
 
         for (int i = 0; i < RULES.length; i++) {
             Paragraph rulePara = new Paragraph()
-                    .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY)
+                    .setFont(fontRegular).setFontSize(8.2f).setFontColor(DARK_GRAY)
                     .setFixedLeading(11f).setMarginBottom(3f)
                     .add(new Text((i + 1) + ".  ").setFont(fontBold))
                     .add(new Text(RULES[i]));
@@ -166,13 +174,13 @@ public class ValeGoldenRulesPdfService {
 
     private void addFillInAndSignatureSection(Document document, ResolvedData data, PdfFont fontRegular, PdfFont fontBold) {
         // Linha divisória fina
-        Table lineTable = new Table(1).useAllAvailableWidth().setMarginBottom(6f);
+        Table lineTable = new Table(1).useAllAvailableWidth().setMarginBottom(5f);
         lineTable.addCell(new Cell().setHeight(0.5f).setBackgroundColor(LIGHT_GRAY_BORDER).setBorder(Border.NO_BORDER));
         document.add(lineTable);
 
         document.add(new Paragraph(
                 "Li e concordo com as Regras de Ouro, detalhadas acima, porque sei que a vida está sempre em primeiro lugar.")
-                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(6f));
+                .setFont(fontRegular).setFontSize(8.2f).setFontColor(DARK_GRAY).setMarginBottom(5f));
 
         String dateVal = data.documentDate() != null ? data.documentDate().format(DATE_FMT) : "____________";
         String yearVal = data.documentDate() != null ? String.valueOf(data.documentDate().getYear()) : "____";
@@ -183,7 +191,7 @@ public class ValeGoldenRulesPdfService {
 
         // Linha 1: Data e Local
         document.add(new Paragraph()
-                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(4f)
+                .setFont(fontRegular).setFontSize(8.2f).setFontColor(DARK_GRAY).setMarginBottom(3.5f)
                 .add(new Text("Data: "))
                 .add(new Text(dateVal + ", 20" + (yearVal.length() >= 2 ? yearVal.substring(yearVal.length() - 2) : yearVal)).setFont(fontBold))
                 .add(new Text("          Local: "))
@@ -191,52 +199,83 @@ public class ValeGoldenRulesPdfService {
 
         // Linha 2: Nome do empregado
         document.add(new Paragraph()
-                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(4f)
+                .setFont(fontRegular).setFontSize(8.2f).setFontColor(DARK_GRAY).setMarginBottom(3.5f)
                 .add(new Text("Nome do(a) empregado(a) (letra de forma): "))
                 .add(new Text(empName).setFont(fontBold)));
 
         // Linha 3: Você trabalha
         document.add(new Paragraph()
-                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(4f)
-                .add(new Text("Você trabalha:  (  ) Vale   ( X ) Contratada, Nome da empresa contratada: "))
+                .setFont(fontRegular).setFontSize(8.2f).setFontColor(DARK_GRAY).setMarginBottom(3.5f)
+                .add(new Text("Você trabalha:  (  ) Vale   ( X ) Contratada. Nome da empresa contratada: "))
                 .add(new Text(companyName).setFont(fontBold)));
 
         // Linha 4: Matrícula
         document.add(new Paragraph()
-                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(4f)
-                .add(new Text("Matricula Vale ou Nº de identificação da contratada; "))
+                .setFont(fontRegular).setFontSize(8.2f).setFontColor(DARK_GRAY).setMarginBottom(3.5f)
+                .add(new Text("Matricula Vale ou Nº de identificação da contratada: "))
                 .add(new Text(regNumber).setFont(fontBold)));
 
         // Linha 5: Firmo meu compromisso
         document.add(new Paragraph("Firmo meu compromisso:")
-                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY).setMarginBottom(12f));
+                .setFont(fontRegular).setFontSize(8.2f).setFontColor(DARK_GRAY).setMarginBottom(10f));
 
         // Assinatura e Logo Vale
-        Table bottomTable = new Table(UnitValue.createPercentArray(new float[]{70f, 30f}))
+        Table bottomTable = new Table(UnitValue.createPercentArray(new float[]{65f, 35f}))
                 .useAllAvailableWidth()
-                .setMarginBottom(8f);
+                .setMarginBottom(6f);
 
         Cell sigCell = new Cell().setBorder(Border.NO_BORDER);
         sigCell.add(new Paragraph("_______________________________________")
-                .setFont(fontRegular).setFontSize(8.5f).setMarginBottom(2f));
+                .setFont(fontRegular).setFontSize(8.2f).setMarginBottom(2f));
         sigCell.add(new Paragraph("Assinatura do(a) empregado(a)")
-                .setFont(fontRegular).setFontSize(8.5f).setFontColor(DARK_GRAY));
+                .setFont(fontRegular).setFontSize(8.2f).setFontColor(DARK_GRAY));
         bottomTable.addCell(sigCell);
 
         Cell logoCell = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT).setVerticalAlignment(VerticalAlignment.BOTTOM);
-        Paragraph valeLogo = new Paragraph()
-                .add(new Text("▲ ").setFontSize(14f).setFontColor(new DeviceRgb(255, 179, 0)))
-                .add(new Text("VALE").setFont(fontBold).setFontSize(14f).setFontColor(TEAL_VALE));
-        logoCell.add(valeLogo);
+        Image valeLogoImg = loadValeLogoImage();
+        if (valeLogoImg != null) {
+            valeLogoImg.setMaxWidth(75f);
+            valeLogoImg.setAutoScale(true);
+            logoCell.add(valeLogoImg);
+        } else {
+            Paragraph valeLogo = new Paragraph()
+                    .add(new Text("▲ ").setFontSize(14f).setFontColor(new DeviceRgb(255, 179, 0)))
+                    .add(new Text("VALE").setFont(fontBold).setFontSize(14f).setFontColor(TEAL_VALE));
+            logoCell.add(valeLogo);
+        }
         bottomTable.addCell(logoCell);
 
         document.add(bottomTable);
 
         // Rodapé final explicativo
         document.add(new Paragraph(
-                "Cabe à área de Recursos Humanos (para empregados Vale) e a de Segurança do Trabalho (para contratados) armazenar os Termos de Ciência e Compromisso devidamente preenchidas e assinados.")
-                .setFont(fontRegular).setFontSize(7.5f).setFontColor(new DeviceRgb(100, 100, 100))
+                "Cabe à área de Recursos Humanos (para empregados Vale) e a de Segurança do Trabalho (para contratados) armazenar os Termos de Ciência e Compromisso devidamente preenchidos e assinados.")
+                .setFont(fontRegular).setFontSize(7f).setFontColor(new DeviceRgb(100, 100, 100))
                 .setItalic().setTextAlignment(TextAlignment.CENTER));
+    }
+
+    private Image loadShieldImage() {
+        try (InputStream in = getClass().getResourceAsStream("/static/images/regras_ouro_vale_shield.png")) {
+            if (in != null) {
+                byte[] bytes = in.readAllBytes();
+                return new Image(ImageDataFactory.create(bytes));
+            }
+        } catch (Exception e) {
+            log.warn("Imagem do brasão Regras de Ouro não encontrada no classpath", e);
+        }
+        return null;
+    }
+
+    private Image loadValeLogoImage() {
+        try (InputStream in = getClass().getResourceAsStream("/static/images/vale_logo.png")) {
+            if (in != null) {
+                byte[] bytes = in.readAllBytes();
+                return new Image(ImageDataFactory.create(bytes));
+            }
+        } catch (Exception e) {
+            log.warn("Imagem da logo Vale não encontrada no classpath", e);
+        }
+        return null;
     }
 
     private ResolvedData resolve(ValeSafetyTermRequest request) {
