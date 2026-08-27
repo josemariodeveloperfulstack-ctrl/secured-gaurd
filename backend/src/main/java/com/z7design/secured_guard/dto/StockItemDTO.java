@@ -89,8 +89,15 @@ public class StockItemDTO {
         entity.setCaNumber(dto.getCaNumber());
         entity.setRequiresCa(dto.getRequiresCa() != null ? dto.getRequiresCa() : Boolean.FALSE);
         entity.setQrCode(dto.getQrCode());
-        entity.setActive(dto.getActive() != null ? dto.getActive() : Boolean.TRUE);
         entity.setNotes(dto.getNotes());
         return entity;
+    }
+
+    public Boolean getRequiresCa() {
+        return requiresCa != null ? requiresCa : Boolean.FALSE;
+    }
+
+    public void setRequiresCa(Boolean requiresCa) {
+        this.requiresCa = requiresCa;
     }
 }

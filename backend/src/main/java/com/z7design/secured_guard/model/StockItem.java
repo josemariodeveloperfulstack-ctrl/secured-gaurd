@@ -130,4 +130,12 @@ public class StockItem {
         }
         return trimmedName;
     }
+
+    public Boolean getRequiresCa() {
+        return requiresCa != null ? requiresCa : Boolean.FALSE;
+    }
+
+    public void setRequiresCa(Boolean requiresCa) {
+        this.requiresCa = requiresCa;
+    }
 }

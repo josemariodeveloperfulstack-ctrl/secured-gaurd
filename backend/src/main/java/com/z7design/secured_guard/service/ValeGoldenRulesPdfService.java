@@ -101,11 +101,11 @@ public class ValeGoldenRulesPdfService {
                 .setPadding(6f)
                 .setTextAlignment(TextAlignment.CENTER);
         badgeCell.add(new Paragraph("10 Regras")
-                .setFont(fontBold).setFontSize(11f).setFontColor(ColorConstants.WHITE).setMargin(0).setLeading(12f));
+                .setFont(fontBold).setFontSize(11f).setFontColor(ColorConstants.WHITE).setMargin(0).setFixedLeading(12f));
         badgeCell.add(new Paragraph("de Ouro da")
-                .setFont(fontBold).setFontSize(10f).setFontColor(new DeviceRgb(255, 202, 40)).setMargin(0).setLeading(11f));
+                .setFont(fontBold).setFontSize(10f).setFontColor(new DeviceRgb(255, 202, 40)).setMargin(0).setFixedLeading(11f));
         badgeCell.add(new Paragraph("Segurança")
-                .setFont(fontBold).setFontSize(11f).setFontColor(ColorConstants.WHITE).setMargin(0).setLeading(12f));
+                .setFont(fontBold).setFontSize(11f).setFontColor(ColorConstants.WHITE).setMargin(0).setFixedLeading(12f));
         badgeTable.addCell(badgeCell);
         leftCell.add(badgeTable);
         headerTable.addCell(leftCell);
