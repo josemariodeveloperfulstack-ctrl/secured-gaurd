@@ -683,6 +683,12 @@ public class FileUploadController {
             if (!Files.exists(filePath)) {
                 restoreStampFromPersistentBackup(filePath, filename);
             }
+            if (!Files.exists(filePath)) {
+                Path tmpPath = Paths.get(System.getProperty("java.io.tmpdir"), "secured_guard_uploads", "safety-engineers", "stamps", filename).toAbsolutePath().normalize();
+                if (Files.exists(tmpPath)) {
+                    filePath = tmpPath;
+                }
+            }
             Resource resource = new UrlResource(filePath.toUri());
             if (!resource.exists() || !resource.isReadable()) {
                 if (restoreStampFromPersistentBackup(filePath, filename)) {
