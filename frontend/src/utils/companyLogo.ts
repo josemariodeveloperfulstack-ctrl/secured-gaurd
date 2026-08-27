@@ -5,11 +5,11 @@ import type { Company } from '@/types/company';
  * Resolve URL absoluta do logo da empresa para exibição / captura em PDF.
  */
 export function resolveCompanyLogoUrl(
-  company?: Pick<Company, 'logoUrl'> | null
+  companyOrUrl?: Pick<Company, 'logoUrl'> | string | null
 ): string | null {
-  if (!company?.logoUrl) return null;
+  if (!companyOrUrl) return null;
 
-  const raw = company.logoUrl.trim();
+  const raw = typeof companyOrUrl === 'string' ? companyOrUrl.trim() : companyOrUrl.logoUrl?.trim();
   if (!raw) return null;
 
   if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
