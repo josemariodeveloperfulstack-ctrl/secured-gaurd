@@ -806,6 +806,17 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                         src={stampSrc(selectedSst.stampImageUrl) || ''}
                         alt={`Carimbo de ${selectedSst.name}`}
                         className="max-h-20 max-w-[170px] object-contain"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.onerror = null;
+                          target.style.display = 'none';
+                          if (target.parentElement && !target.parentElement.querySelector('.stamp-fallback')) {
+                            const fallback = document.createElement('span');
+                            fallback.className = 'stamp-fallback text-xs text-amber-400 font-medium py-1';
+                            fallback.innerText = 'Carimbo indisponível (Reenviar)';
+                            target.parentElement.appendChild(fallback);
+                          }
+                        }}
                       />
                       <span className="text-[10px] text-muted-foreground text-center">
                         {SST_PROFESSIONAL_TYPE_LABELS[selectedSst.professionalType] || selectedSst.professionalType}
