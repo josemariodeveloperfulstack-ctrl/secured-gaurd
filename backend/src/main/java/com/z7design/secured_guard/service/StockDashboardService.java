@@ -41,28 +41,38 @@ public class StockDashboardService {
         List<StockMovementChartDTO> movementsChart = getMovementsChartData(start, end);
 
         // 3. Distribuição por Categoria
-        Map<StockCategory, Long> categoryDist = (Map<StockCategory, Long>) stats.get("itemsByCategory");
         Map<String, Long> categoryDistStr = new HashMap<>();
-        if (categoryDist != null) {
-            categoryDist.forEach((k, v) -> categoryDistStr.put(k.toString(), v));
+        Object rawCategoryDist = stats.get("itemsByCategory");
+        if (rawCategoryDist instanceof Map<?, ?> categoryDist) {
+            categoryDist.forEach((k, v) -> {
+                if (k != null && v != null) {
+                    categoryDistStr.put(k.toString(), ((Number) v).longValue());
+                }
+            });
         }
 
         // 4. Status do Estoque
+        long totalItems = stats.get("totalItems") instanceof Number n ? n.longValue() : 0L;
+        long lowStockCount = stats.get("lowStockCount") instanceof Number n ? n.longValue() : 0L;
+        long outOfStockCount = stats.get("outOfStockCount") instanceof Number n ? n.longValue() : 0L;
+
         Map<String, Long> statusDist = new HashMap<>();
-        statusDist.put("NORMAL", (Long) stats.get("totalItems") - (Long) stats.get("lowStockCount") - (Long) stats.get("outOfStockCount"));
-        statusDist.put("BAIXO", (Long) stats.get("lowStockCount"));
-        statusDist.put("SEM_ESTOQUE", (Long) stats.get("outOfStockCount"));
+        statusDist.put("NORMAL", Math.max(0L, totalItems - lowStockCount - outOfStockCount));
+        statusDist.put("BAIXO", lowStockCount);
+        statusDist.put("SEM_ESTOQUE", outOfStockCount);
 
         // 5. Requisições
         Long generated = stockRequisitionRepository.count();
         Long consolidated = stockRequisitionRepository.countByStatus(StockRequisitionStatus.DELIVERED);
 
+        double totalValueDb = stats.get("totalValue") instanceof Number n ? n.doubleValue() : 0.0;
+
         return StockDashboardDTO.builder()
-                .totalItems((Long) stats.get("totalItems"))
-                .lowStockCount((Long) stats.get("lowStockCount"))
-                .outOfStockCount((Long) stats.get("outOfStockCount"))
+                .totalItems(totalItems)
+                .lowStockCount(lowStockCount)
+                .outOfStockCount(outOfStockCount)
                 .normalStockCount(statusDist.get("NORMAL"))
-                .totalValue(BigDecimal.valueOf((Double) stats.get("totalValue")))
+                .totalValue(BigDecimal.valueOf(totalValueDb))
                 .movementsChart(movementsChart)
                 .categoryDistribution(categoryDistStr)
                 .stockStatusDistribution(statusDist)
