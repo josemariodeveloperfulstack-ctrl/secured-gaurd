@@ -667,6 +667,21 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
     if (source.some(epi => epi.nome === 'Uniforme de Trabalho' && epi.uniformeTipo === 'INDIVIDUAL' && !epi.uniformePeca)) {
       return 'Para Uniforme de Trabalho Individual, selecione a peça específica!';
     }
+
+    // Validação NR-6 Grupo 1 (Colete, Calçado/Bota, Capa de Chuva, Óculos, Protetor, Capacete, Luva)
+    for (const epi of source) {
+      const nameUpper = (epi.nome || '').toUpperCase();
+      const stockItem = stockItems.find((s) => s.id === epi.stockItemId);
+      const isEpiGroup1 = (stockItem && (stockItem.category === 'EPI' || stockItem.requiresCa)) ||
+        nameUpper.includes('COLETE BALÍSTICO') || nameUpper.includes('COLETE BALISTICO') ||
+        nameUpper.includes('CALÇADO') || nameUpper.includes('CALCADO') || nameUpper.includes('SAPATO') || nameUpper.includes('BOTA') ||
+        nameUpper.includes('CAPA DE CHUVA') || nameUpper.includes('ÓCULOS') || nameUpper.includes('OCULOS') ||
+        nameUpper.includes('PROTETOR AURICULAR') || nameUpper.includes('CAPACETE') || nameUpper.includes('LUVA');
+
+      if (isEpiGroup1 && (!epi.ca || !epi.ca.trim())) {
+        return `Para o item EPI (Grupo 1) "${epi.nome}", é obrigatório o número do CA válido conforme a NR-6!`;
+      }
+    }
     const withoutStock = source.filter(epi => !epi.stockItemId || epi.stockItemId === 'none');
     if (withoutStock.length > 0) {
       const names = withoutStock.map(e => e.nome || 'Item sem nome').join(', ');
@@ -1112,10 +1127,13 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-2xl">
                 <HardHat className="h-6 w-6 text-primary" />
-                Ficha de Entrega de EPI
+                Ficha de Entrega de EPI Eletrônica
               </CardTitle>
-              <CardDescription>
-                Registre a entrega de Equipamentos de Proteção Individual.
+              <CardDescription className="text-xs text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
+                <span>Controle e Registro de Equipamentos de Proteção Individual.</span>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
+                  Amparo Jurídico: NR-6 (Item 6.5.1) • Portaria MTE nº 671/2021 • Lei nº 13.874/2019
+                </Badge>
               </CardDescription>
             </div>
             {(funcionario && empresa) && (

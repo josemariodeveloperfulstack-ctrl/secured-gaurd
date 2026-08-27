@@ -60,6 +60,9 @@ public class StockItem {
     @Column(name = "ca_number")
     private String caNumber;
 
+    @Column(name = "requires_ca")
+    private Boolean requiresCa = false;
+
     @Column(name = "qr_code")
     private String qrCode;
 
