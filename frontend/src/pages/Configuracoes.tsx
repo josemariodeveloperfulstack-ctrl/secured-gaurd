@@ -55,6 +55,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { companyConfigService } from '@/services/companyConfigService';
+import { resolveCompanyLogoUrl } from '@/utils/companyLogo';
 import { companyService } from '@/services/companyService';
 import { userService, User } from '@/services/userService';
 import { securitySettingsService, SecuritySettings } from '@/services/securitySettingsService';
@@ -735,7 +737,7 @@ const Configuracoes = () => {
                     <div className="flex items-start gap-4 p-4 bg-seguranca-black/50 rounded-lg border border-gray-700">
                       <div className="flex-shrink-0">
                         <img 
-                          src={empresaForm.logoUrl} 
+                          src={resolveCompanyLogoUrl(empresaForm.logoUrl) || empresaForm.logoUrl} 
                           alt={`Logo ${empresaForm.name || 'Empresa'}`}
                           className="max-h-32 max-w-32 object-contain rounded border border-gray-600"
                           onError={(e) => {
