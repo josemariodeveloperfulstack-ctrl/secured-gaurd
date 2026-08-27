@@ -46,53 +46,19 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({ open, onOpen
 
   React.useEffect(() => {
     if (open && initialData) {
-      const normalizedLogoUrl = (() => {
-        if (!initialData.logoUrl) return '';
-        if (initialData.logoUrl.startsWith('http://') || initialData.logoUrl.startsWith('https://')) {
-          try {
-            const url = new URL(initialData.logoUrl);
-            return url.pathname;
-          } catch {
-            return initialData.logoUrl;
-          }
-        }
-        return initialData.logoUrl;
-      })();
+      const rawLogo = initialData.logoUrl?.trim() || '';
+      const logoFileName = rawLogo ? rawLogo.replace(/^.*\//, '') : '';
+      const normalizedLogoUrl = logoFileName ? `/api/uploads/companies/logos/${logoFileName}` : '';
 
       setForm(prev => ({
         ...prev,
         ...initialData,
         logoUrl: normalizedLogoUrl
       } as CreateCompanyRequest));
-      if (initialData.logoUrl) {
-        // Se for uma URL relativa, construir URL completa
+
+      if (logoFileName) {
         const baseUrl = getApiUrl().replace('/api', '');
-        let logoUrl = normalizedLogoUrl || initialData.logoUrl;
-        let finalUrl = '';
-        
-        // Se já for URL completa (http/https), usar como está
-        if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
-          finalUrl = logoUrl;
-        } 
-        // Se começar com /api/uploads, usar diretamente com baseUrl
-        else if (logoUrl.startsWith('/api/uploads/')) {
-          finalUrl = `${baseUrl}${logoUrl}`;
-        }
-        // Se começar com /uploads, adicionar /api
-        else if (logoUrl.startsWith('/uploads/')) {
-          finalUrl = `${baseUrl}/api${logoUrl}`;
-        }
-        // Se não começar com /, assumir que é relativo ao endpoint de uploads
-        else {
-          finalUrl = `${baseUrl}/api/uploads/companies/logos/${logoUrl}`;
-        }
-        
-        console.log('🔍 Construindo URL do logo:', { 
-          original: logoUrl, 
-          baseUrl, 
-          finalUrl 
-        });
-        setLogoPreview(finalUrl);
+        setLogoPreview(`${baseUrl}${normalizedLogoUrl}`);
       }
     } else if (open) {
       // Reset form when opening for new company

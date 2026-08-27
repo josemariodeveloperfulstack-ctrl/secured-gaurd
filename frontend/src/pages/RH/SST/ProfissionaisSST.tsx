@@ -267,22 +267,12 @@ const ProfissionaisSST: React.FC = () => {
     }
   };
 
-  const STAMP_BASE_URL = '/api/uploads/safety-engineers/stamps/';
-
   const stampSrc = (url?: string) => {
     if (!url) return null;
-    if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:')) return url;
-    const clean = url.startsWith('/') ? url.slice(1) : url;
-    if (clean.startsWith('api/uploads/safety-engineers/stamps/')) {
-      return '/' + clean;
-    }
-    if (clean.startsWith('uploads/safety-engineers/stamps/')) {
-      return '/api/' + clean;
-    }
-    if (clean.startsWith('safety-engineers/stamps/')) {
-      return STAMP_BASE_URL + clean.replace('safety-engineers/stamps/', '');
-    }
-    return STAMP_BASE_URL + clean;
+    if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+    const fileName = url.replace(/^.*\//, '');
+    if (!fileName) return null;
+    return `/api/uploads/safety-engineers/stamps/${fileName}`;
   };
 
   return (

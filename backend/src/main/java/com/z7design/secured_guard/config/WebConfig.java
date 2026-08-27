@@ -37,31 +37,9 @@ public class WebConfig implements WebMvcConfigurer {
 
         log.info("📁 Caminho de uploads (URI): {}", uploadUri);
 
-        // Servir arquivos de upload estaticamente (/uploads/** e /api/uploads/**)
+        // Servir arquivos de upload estaticamente (/uploads/**)
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(uploadUri)
-                .setCachePeriod(3600);
-
-        registry.addResourceHandler("/api/uploads/**")
-                .addResourceLocations(uploadUri)
-                .setCachePeriod(3600);
-
-        // Servir logos de empresas estaticamente (sem autenticação)
-        String logoUri = uploadPathObj.resolve("companies").resolve("logos").toUri().toString();
-        if (!logoUri.endsWith("/")) {
-            logoUri += "/";
-        }
-        registry.addResourceHandler("/api/uploads/companies/logos/**")
-                .addResourceLocations(logoUri)
-                .setCachePeriod(3600);
-
-        // Servir carimbos de profissionais SST estaticamente (sem autenticação)
-        String stampUri = uploadPathObj.resolve("safety-engineers").resolve("stamps").toUri().toString();
-        if (!stampUri.endsWith("/")) {
-            stampUri += "/";
-        }
-        registry.addResourceHandler("/api/uploads/safety-engineers/stamps/**")
-                .addResourceLocations(stampUri)
                 .setCachePeriod(3600);
 
         // Servir arquivos de holerites
