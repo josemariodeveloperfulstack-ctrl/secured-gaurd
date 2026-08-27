@@ -22,6 +22,7 @@ import {
     UserCheck,
     Users,
     Stethoscope,
+    Brain,
     ChevronDown,
     ChevronUp,
     RefreshCcw,
@@ -82,6 +83,9 @@ const REPORT_COLUMNS: { key: string; label: string }[] = [
     { key: 'cnhCategory', label: 'Categ. CNH' },
     { key: 'cnhExpirationDate', label: 'Validade CNH' },
     { key: 'exameMedicoVencimento', label: 'Próx. ASO' },
+    { key: 'laudoPsicologicoData', label: 'Data Laudo Psicológico' },
+    { key: 'laudoPsicologicoVencimento', label: 'Venc. Laudo Psicológico' },
+    { key: 'laudoPsicologicoResultado', label: 'Res. Laudo Psicológico' },
     { key: 'proximasFeriasVencimento', label: 'Venc. Férias' },
     { key: 'address', label: 'Endereço' },
     { key: 'nationality', label: 'Nacionalidade' },
@@ -115,6 +119,7 @@ export function RelatoriosModal({
     const { user } = useAuth();
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [asoFilter, setAsoFilter] = useState<string>('all');
+    const [laudoFilter, setLaudoFilter] = useState<string>('all');
     const [companyFilters, setCompanyFilters] = useState<string[]>([]);
     const [workPostFilters, setWorkPostFilters] = useState<string[]>([]);
     const [positionFilters, setPositionFilters] = useState<string[]>([]);
@@ -179,6 +184,7 @@ export function RelatoriosModal({
             const hireTime = toLocalDayTime(emp.hireDate);
             const termTime = toLocalDayTime(emp.dataRescisao || emp.terminationDate);
             const asoTime = toLocalDayTime(emp.exameMedicoVencimento);
+            const laudoVencTime = toLocalDayTime(emp.laudoPsicologicoVencimento);
             const feriasVencTime = toLocalDayTime(emp.proximasFeriasVencimento);
 
             return {
@@ -186,6 +192,7 @@ export function RelatoriosModal({
                 _hireTime: hireTime,
                 _termTime: termTime,
                 _asoTime: asoTime,
+                _laudoVencTime: laudoVencTime,
                 _feriasVencTime: feriasVencTime
             };
         });
@@ -236,6 +243,7 @@ export function RelatoriosModal({
     const deferredFilters = useDeferredValue({
         status: statusFilter,
         aso: asoFilter,
+        laudo: laudoFilter,
         company: companyFilters,
         workPost: workPostFilters,
         position: positionFilters,
@@ -283,6 +291,14 @@ export function RelatoriosModal({
                 sem_aso: 'Sem ASO informado',
             };
             parts.push(`ASO: ${asoLabels[asoFilter] || asoFilter}`);
+        }
+        if (laudoFilter !== 'all') {
+            const laudoLabels: Record<string, string> = {
+                valido: 'Laudo Psicológico válido',
+                vencido: 'Laudo Psicológico vencido',
+                sem_laudo: 'Sem Laudo informado',
+            };
+            parts.push(`Laudo Psicológico: ${laudoLabels[laudoFilter] || laudoFilter}`);
         }
         if (feriasFilter !== 'all') {
             parts.push(`Férias: ${feriasFilter === 'vencidas' ? 'Vencidas' : 'A vencer (90 dias)'}`);
@@ -333,6 +349,19 @@ export function RelatoriosModal({
                 if (deferredFilters.aso === 'vencido' && !isExpired) return false;
                 if (deferredFilters.aso === 'valido' && isExpired) return false;
                 if (deferredFilters.aso === 'sem_aso') return false;
+            }
+
+            // Laudo Psicológico Filter
+            if (deferredFilters.laudo !== 'all') {
+                if (!emp._laudoVencTime) {
+                    return deferredFilters.laudo === 'sem_laudo';
+                }
+
+                const isExpired = emp._laudoVencTime < todayTime;
+
+                if (deferredFilters.laudo === 'vencido' && !isExpired) return false;
+                if (deferredFilters.laudo === 'valido' && isExpired) return false;
+                if (deferredFilters.laudo === 'sem_laudo') return false;
             }
 
             // Company Filter
@@ -526,6 +555,9 @@ export function RelatoriosModal({
                 if (columnsToUse.includes('cnhCategory')) row['Categ. CNH'] = emp.cnhCategory || '';
                 if (columnsToUse.includes('cnhExpirationDate')) row['Validade CNH'] = formatReportDate(emp.cnhExpirationDate);
                 if (columnsToUse.includes('exameMedicoVencimento')) row['Próx. ASO'] = formatReportDate(emp.exameMedicoVencimento);
+                if (columnsToUse.includes('laudoPsicologicoData')) row['Data Laudo Psicológico'] = formatReportDate(emp.laudoPsicologicoData);
+                if (columnsToUse.includes('laudoPsicologicoVencimento')) row['Venc. Laudo Psicológico'] = formatReportDate(emp.laudoPsicologicoVencimento);
+                if (columnsToUse.includes('laudoPsicologicoResultado')) row['Res. Laudo Psicológico'] = emp.laudoPsicologicoResultado || '';
                 if (columnsToUse.includes('proximasFeriasVencimento')) row['Venc. Férias'] = formatReportDate(emp.proximasFeriasVencimento);
                 if (columnsToUse.includes('address')) row['Endereço'] = getAddress(emp.address);
                 if (columnsToUse.includes('nationality')) row['Nacionalidade'] = emp.nationality || '';
@@ -667,6 +699,7 @@ export function RelatoriosModal({
     const resetFilters = () => {
         setStatusFilter('all');
         setAsoFilter('all');
+        setLaudoFilter('all');
         setCompanyFilters([]);
         setWorkPostFilters([]);
         setPositionFilters([]);
@@ -838,6 +871,24 @@ export function RelatoriosModal({
                                             <SelectItem value="valido">ASO Válido (No Prazo)</SelectItem>
                                             <SelectItem value="vencido">ASO Vencido</SelectItem>
                                             <SelectItem value="sem_aso">Sem Data Informada</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Laudo Psicológico */}
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-medium text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                                        <Brain className="h-3 w-3" /> Laudo Psicológico
+                                    </Label>
+                                    <Select value={laudoFilter} onValueChange={setLaudoFilter}>
+                                        <SelectTrigger className="w-full bg-seguranca-black border-gray-600 text-gray-200">
+                                            <SelectValue placeholder="Situação Laudo" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-seguranca-graphite border-gray-600 text-gray-200">
+                                            <SelectItem value="all">Todas as Situações</SelectItem>
+                                            <SelectItem value="valido">Laudo Válido (No Prazo)</SelectItem>
+                                            <SelectItem value="vencido">Laudo Vencido</SelectItem>
+                                            <SelectItem value="sem_laudo">Sem Data Informada</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -1055,6 +1106,8 @@ export function RelatoriosModal({
                                         </div>
                                     </div>
                                 </div>
+                                
+
 
                                 {/* Termination Reason - Conditional */}
                                 {(statusFilter === 'TERMINATED' || statusFilter === 'all') && (
