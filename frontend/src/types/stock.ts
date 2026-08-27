@@ -12,6 +12,7 @@ export interface StockItem {
   previousUnitCost?: number;
   supplier?: string;
   barcode?: string;
+  caNumber?: string;
   qrCode?: string;
   active: boolean;
   unitId?: string;
@@ -176,6 +177,7 @@ export interface CreateStockItemDTO {
   unitCost?: number;
   supplier?: string;
   barcode?: string;
+  caNumber?: string;
   unitId?: string;
   notes?: string;
   initialShelfId?: string;

@@ -185,20 +185,9 @@ export const EmployeeDocuments: React.FC<EmployeeDocumentsProps> = ({
     }
   };
 
-  const handleViewFile = async (documentId: string) => {
+  const handleViewFile = async (documentId: string, fileName?: string) => {
     try {
-      const blob = await documentService.downloadFile(documentId);
-      const fileBlob = blob.type ? blob : new Blob([blob], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(fileBlob);
-      const newWin = window.open(url, '_blank');
-      if (!newWin) {
-        toast({
-          title: "Aviso",
-          description: "O navegador bloqueou a abertura do arquivo em nova aba. Verifique as permissões de pop-up.",
-          variant: "destructive"
-        });
-      }
-      setTimeout(() => window.URL.revokeObjectURL(url), 15000);
+      await documentService.viewFile(documentId, fileName);
     } catch (error) {
       console.error('Erro ao visualizar arquivo:', error);
       toast({
@@ -506,28 +495,24 @@ export const EmployeeDocuments: React.FC<EmployeeDocumentsProps> = ({
 
                     {/* Lado Direito: Botões de Ação */}
                     <div className="flex items-center flex-wrap gap-2 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800 justify-end">
-                      {document.fileUrl && (
-                        <>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 text-xs border-blue-600/60 text-blue-400 hover:bg-blue-950/60 hover:border-blue-500 font-medium shrink-0 whitespace-nowrap"
-                            onClick={() => handleViewFile(document.id)}
-                          >
-                            <Eye size={14} className="mr-1 shrink-0" />
-                            Visualizar
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 text-xs border-emerald-600/60 text-emerald-400 hover:bg-emerald-950/60 hover:border-emerald-500 font-medium shrink-0 whitespace-nowrap"
-                            onClick={() => handleDownloadFile(document.id, document.fileName || 'documento')}
-                          >
-                            <Download size={14} className="mr-1 shrink-0" />
-                            Baixar
-                          </Button>
-                        </>
-                      )}
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 text-xs border-blue-600/60 text-blue-400 hover:bg-blue-950/60 hover:border-blue-500 font-medium shrink-0 whitespace-nowrap"
+                        onClick={() => handleViewFile(document.id, document.fileName)}
+                      >
+                        <Eye size={14} className="mr-1 shrink-0" />
+                        Visualizar
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 text-xs border-emerald-600/60 text-emerald-400 hover:bg-emerald-950/60 hover:border-emerald-500 font-medium shrink-0 whitespace-nowrap"
+                        onClick={() => handleDownloadFile(document.id, document.fileName || 'documento')}
+                      >
+                        <Download size={14} className="mr-1 shrink-0" />
+                        Baixar
+                      </Button>
                       
                       <Button 
                         variant="outline" 

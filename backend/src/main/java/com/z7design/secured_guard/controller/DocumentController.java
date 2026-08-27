@@ -247,6 +247,18 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.uploadFile(id, file));
     }
 
+    private MediaType getMediaTypeForFileName(String fileName) {
+        if (fileName == null) return MediaType.APPLICATION_OCTET_STREAM;
+        String fn = fileName.toLowerCase();
+        if (fn.endsWith(".pdf")) return MediaType.APPLICATION_PDF;
+        if (fn.endsWith(".png")) return MediaType.IMAGE_PNG;
+        if (fn.endsWith(".jpg") || fn.endsWith(".jpeg")) return MediaType.IMAGE_JPEG;
+        if (fn.endsWith(".webp")) return MediaType.parseMediaType("image/webp");
+        if (fn.endsWith(".gif")) return MediaType.IMAGE_GIF;
+        if (fn.endsWith(".txt")) return MediaType.TEXT_PLAIN;
+        return MediaType.APPLICATION_OCTET_STREAM;
+    }
+
     @Operation(summary = "Faz download do arquivo de um documento",
                description = "Faz download do arquivo associado a um documento específico. Requer o papel de ADMIN, GESTOR, SUPERVISOR ou VIGILANTE.")
     @ApiResponses(value = {
@@ -265,16 +277,15 @@ public class DocumentController {
                 return ResponseEntity.notFound().build();
             }
 
-            // Se o documento tem um arquivo associado, baixar o arquivo
             if (document.getFileName() != null && !document.getFileName().isEmpty()) {
                 Resource file = documentService.getFile(id);
+                MediaType mediaType = getMediaTypeForFileName(document.getFileName());
                 return ResponseEntity.ok()
+                    .contentType(mediaType)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + document.getFileName() + "\"")
                     .body(file);
             }
 
-            // Se não tem arquivo, tentar gerar PDF baseado no tipo de documento
-            // Por enquanto, retornar erro 404 se não há arquivo
             return ResponseEntity.notFound().build();
                 
         } catch (Exception e) {
@@ -297,10 +308,13 @@ public class DocumentController {
     public ResponseEntity<Resource> viewFile(@PathVariable UUID id) {
         Document document = documentService.findById(id);
         Resource file = documentService.getFile(id);
+        MediaType mediaType = getMediaTypeForFileName(document != null ? document.getFileName() : null);
+        String fileName = (document != null && document.getFileName() != null) ? document.getFileName() : "documento.pdf";
         
         return ResponseEntity.ok()
+                .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, 
-                        "inline; filename=\"" + document.getFileName() + "\"")
+                        "inline; filename=\"" + fileName + "\"")
                 .body(file);
     }
 

@@ -15,6 +15,7 @@ import {
   Plus,
   Loader2,
   File,
+  Eye,
 } from 'lucide-react';
 import { documentService } from '@/services/documentService';
 import { Document, DocumentType } from '@/types/document';
@@ -240,9 +241,22 @@ export const EmployeeDocumentsTab: React.FC<EmployeeDocumentsTabProps> = ({ empl
     }
   };
 
-  const handleDownload = async (id: string) => {
+  const handleView = async (id: string, fileName?: string) => {
     try {
-      await documentService.download(id);
+      await documentService.viewFile(id, fileName);
+    } catch (error) {
+      console.error('Erro ao visualizar documento:', error);
+      toast({
+        title: 'Erro ao visualizar',
+        description: 'Não foi possível visualizar o arquivo em nova aba.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDownload = async (id: string, fileName?: string) => {
+    try {
+      await documentService.download(id, fileName);
     } catch (error) {
       toast({
         title: 'Erro no download',
@@ -434,26 +448,38 @@ export const EmployeeDocumentsTab: React.FC<EmployeeDocumentsTabProps> = ({ empl
                       </Badge>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-700">
-                      <span className="text-[10px] text-gray-500">Nº {doc.number || 'N/A'}</span>
-                      <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-700">
+                      <span className="text-[11px] text-gray-400 font-medium">Nº {doc.number || 'N/A'}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-gray-400 hover:text-white hover:bg-gray-700"
-                          onClick={() => handleDownload(doc.id)}
-                          title="Baixar"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs border-blue-600/60 text-blue-400 hover:bg-blue-950/60 hover:border-blue-500 font-medium shrink-0"
+                          onClick={() => handleView(doc.id, doc.fileName)}
+                          title="Visualizar documento"
                         >
-                          <Download className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5 mr-1" />
+                          Visualizar
                         </Button>
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                          onClick={() => handleDelete(doc.id)}
-                          title="Excluir"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs border-emerald-600/60 text-emerald-400 hover:bg-emerald-950/60 hover:border-emerald-500 font-medium shrink-0"
+                          onClick={() => handleDownload(doc.id, doc.fileName)}
+                          title="Baixar arquivo"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Download className="h-3.5 w-3.5 mr-1" />
+                          Baixar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs border-red-600/60 text-red-400 hover:bg-red-950/60 hover:border-red-500 font-medium shrink-0"
+                          onClick={() => handleDelete(doc.id)}
+                          title="Excluir documento"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />
+                          Excluir
                         </Button>
                       </div>
                     </div>

@@ -22,6 +22,7 @@ public class StockItemDTO {
     private BigDecimal previousUnitCost;
     private String supplier;
     private String barcode;
+    private String caNumber;
     private String qrCode;
     private Boolean active;
     private UUID unitId;
@@ -49,6 +50,7 @@ public class StockItemDTO {
         dto.setPreviousUnitCost(entity.getPreviousUnitCost());
         dto.setSupplier(entity.getSupplier());
         dto.setBarcode(entity.getBarcode());
+        dto.setCaNumber(entity.getCaNumber());
         dto.setQrCode(entity.getQrCode());
         dto.setActive(entity.getActive());
         dto.setCreatedAt(entity.getCreatedAt());
@@ -83,6 +85,7 @@ public class StockItemDTO {
         entity.setPreviousUnitCost(dto.getPreviousUnitCost());
         entity.setSupplier(dto.getSupplier());
         entity.setBarcode(dto.getBarcode());
+        entity.setCaNumber(dto.getCaNumber());
         entity.setQrCode(dto.getQrCode());
         entity.setActive(dto.getActive() != null ? dto.getActive() : Boolean.TRUE);
         entity.setNotes(dto.getNotes());

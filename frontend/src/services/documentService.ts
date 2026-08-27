@@ -85,32 +85,62 @@ class DocumentService {
   }
 
   /**
+   * Visualiza o arquivo em nova aba garantindo o tipo MIME correto
+   */
+  async viewFile(id: string, fileName?: string): Promise<void> {
+    const response = await api.get(`/documents/${id}/view`, {
+      responseType: 'blob',
+    });
+    
+    let mimeType = 'application/pdf';
+    if (fileName) {
+      const lower = fileName.toLowerCase();
+      if (lower.endsWith('.png')) mimeType = 'image/png';
+      else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) mimeType = 'image/jpeg';
+      else if (lower.endsWith('.txt')) mimeType = 'text/plain';
+    } else if (response.data.type && response.data.type !== 'application/octet-stream') {
+      mimeType = response.data.type;
+    }
+
+    const fileBlob = new Blob([response.data], { type: mimeType });
+    const url = window.URL.createObjectURL(fileBlob);
+    const newWin = window.open(url, '_blank');
+    if (!newWin) {
+      throw new Error('Pop-up bloqueado pelo navegador');
+    }
+    setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+  }
+
+  /**
    * Faz o download do arquivo e inicia o salvamento no navegador
    */
-  async download(id: string): Promise<void> {
+  async download(id: string, defaultFileName?: string): Promise<void> {
     const response = await api.get(`/documents/${id}/download`, {
       responseType: 'blob',
     });
     
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    
     // Tentar pegar o nome do arquivo do header content-disposition
     const contentDisposition = response.headers['content-disposition'];
-    let fileName = 'documento.pdf';
+    let fileName = defaultFileName || 'documento.pdf';
     if (contentDisposition) {
       const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
       if (fileNameMatch && fileNameMatch.length > 1) {
         fileName = fileNameMatch[1];
       }
     }
-    
+
+    let mimeType = 'application/pdf';
+    if (fileName.toLowerCase().endsWith('.png')) mimeType = 'image/png';
+    else if (fileName.toLowerCase().endsWith('.jpg') || fileName.toLowerCase().endsWith('.jpeg')) mimeType = 'image/jpeg';
+
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: mimeType }));
+    const link = document.createElement('a');
+    link.href = url;
     link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.URL.revokeObjectURL(url);
+    setTimeout(() => window.URL.revokeObjectURL(url), 5000);
   }
 
   // --- Aliases para compatibilidade com componentes legados ---

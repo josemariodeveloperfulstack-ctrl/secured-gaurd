@@ -223,6 +223,7 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
         unitCost: source.unitCost || 0,
         supplier: source.supplier || '',
         barcode: source.barcode || '',
+        caNumber: source.caNumber || '',
         notes: source.notes || ''
       });
       if (source.unitCost) {
@@ -267,6 +268,7 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
         unitCost: 0,
         supplier: '',
         barcode: '',
+        caNumber: '',
         notes: '',
         initialShelfId: '',
         initialFloor: ''
@@ -510,6 +512,25 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                   />
                 </div>
               </div>
+
+              {formData.category === StockCategory.EPI && (
+                <div className="space-y-2">
+                  <Label htmlFor="caNumber" className="text-yellow-400 flex items-center gap-2 text-sm sm:text-base font-semibold">
+                    <Tag className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-400 flex-shrink-0" />
+                    Número do CA (Certificado de Aprovação) *
+                  </Label>
+                  <Input
+                    id="caNumber"
+                    value={formData.caNumber || ''}
+                    onChange={(e) => handleInputChange('caNumber', e.target.value)}
+                    placeholder="Ex: 12345 ou CA-12345 (Preenchimento automático na Ficha de EPI)"
+                    className="bg-seguranca-black/50 border-yellow-500/50 text-white placeholder-gray-400 focus:border-yellow-400 focus:ring-yellow-400/20 h-10 sm:h-11 text-sm sm:text-base"
+                  />
+                  <p className="text-[11px] text-gray-400">
+                    O número do CA informado aqui virá preenchido automaticamente ao criar ou alterar a Ficha de EPI do funcionário.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="description" className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">

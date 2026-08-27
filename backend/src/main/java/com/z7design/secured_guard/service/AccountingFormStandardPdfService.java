@@ -116,8 +116,15 @@ public class AccountingFormStandardPdfService {
                         addRow(aso, "Nome do Médico", employee.getExameMedicoDoctor() != null ? employee.getExameMedicoDoctor().getName() : "", "CRM nº", resolveDoctorCrm(employee));
                         addRow(aso, "Horário", employee.getExameMedicoHorario(), "Intervalos Almoço/Janta", displayYesNo(employee.getExameMedicoIntervalosRefeicao()));
                         addRow(aso, "Horário Intervalo", employee.getExameMedicoHorarioIntervalo(), "Contribuição Sindical paga", displayYesNo(employee.getExameMedicoContribuicaoSindicalPaga()));
-                        addRow(aso, "Primeiro Emprego", displayYesNo(employee.getExameMedicoPrimeiroEmprego()), "Observações", employee.getExameMedicoObservacoes());
                         document.add(aso);
+
+                        document.add(sectionTitle("Dados do Laudo Psicológico"));
+                        Table laudoTable = new Table(UnitValue.createPercentArray(new float[] { 18, 32, 18, 32 }))
+                                        .useAllAvailableWidth().setFontSize(8f);
+                        addRow(laudoTable, "Data do Laudo", displayDate(employee.getLaudoPsicologicoData()), "Vencimento do Laudo", displayDate(employee.getLaudoPsicologicoVencimento()));
+                        addRow(laudoTable, "Resultado", employee.getLaudoPsicologicoResultado(), "Nome do Médico/Psicólogo", resolveLaudoDoctorName(employee));
+                        addRow(laudoTable, "CRM/Reg. Profissional", resolveLaudoDoctorCrm(employee), "Observações", employee.getLaudoPsicologicoObservacoes());
+                        document.add(laudoTable);
 
                         document.add(sectionTitle("Para Estrangeiro"));
                         Table estrangeiro = new Table(UnitValue.createPercentArray(new float[] { 18, 32, 18, 32 }))
@@ -345,6 +352,15 @@ public class AccountingFormStandardPdfService {
                                         displayYesNo(employee.getExameMedicoPrimeiroEmprego()), "Observações",
                                         employee.getExameMedicoObservacoes(), labelStyle, valueStyle);
 
+                        rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "Dados do Laudo Psicológico", lastColumn,
+                                        workbook);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Data do Laudo", displayDate(employee.getLaudoPsicologicoData()),
+                                        "Vencimento do Laudo", displayDate(employee.getLaudoPsicologicoVencimento()), labelStyle, valueStyle);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "Resultado", employee.getLaudoPsicologicoResultado(),
+                                        "Médico/Psicólogo", resolveLaudoDoctorName(employee), labelStyle, valueStyle);
+                        rowIndex = addExcelQuadRow(sheet, rowIndex, "CRM/Reg. Profissional", resolveLaudoDoctorCrm(employee),
+                                        "Observações", employee.getLaudoPsicologicoObservacoes(), labelStyle, valueStyle);
+
                         rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "Para Estrangeiro", lastColumn,
                                         workbook);
                         rowIndex = addExcelQuadRow(sheet, rowIndex, "RNE nº", employee.getRneNumero(), "Validade",
@@ -559,6 +575,15 @@ public class AccountingFormStandardPdfService {
                                 displayYesNo(employee.getExameMedicoContribuicaoSindicalPaga()));
                 htmlRow(html, "Primeiro Emprego", displayYesNo(employee.getExameMedicoPrimeiroEmprego()), "Observações",
                                 employee.getExameMedicoObservacoes());
+                html.append("</table>");
+                appendHtmlLaudoPsicologico(html, employee);
+        }
+
+        private void appendHtmlLaudoPsicologico(StringBuilder html, Employee employee) {
+                html.append("<h2>Dados do Laudo Psicológico</h2><table>");
+                htmlRow(html, "Data do Laudo", displayDate(employee.getLaudoPsicologicoData()), "Vencimento do Laudo", displayDate(employee.getLaudoPsicologicoVencimento()));
+                htmlRow(html, "Resultado", employee.getLaudoPsicologicoResultado(), "Médico/Psicólogo", resolveLaudoDoctorName(employee));
+                htmlRow(html, "CRM/Reg. Profissional", resolveLaudoDoctorCrm(employee), "Observações", employee.getLaudoPsicologicoObservacoes());
                 html.append("</table>");
         }
 
@@ -839,6 +864,28 @@ public class AccountingFormStandardPdfService {
                 }
                 String crm = employee.getExameMedicoDoctor().getCrmNumber();
                 String uf = employee.getExameMedicoDoctor().getCrmState();
+                if (crm == null || crm.isBlank()) {
+                        return "";
+                }
+                if (uf == null || uf.isBlank()) {
+                        return crm;
+                }
+                return crm + "/" + uf;
+        }
+
+        private String resolveLaudoDoctorName(Employee employee) {
+                if (employee.getLaudoPsicologicoDoctor() == null) {
+                        return "";
+                }
+                return employee.getLaudoPsicologicoDoctor().getName();
+        }
+
+        private String resolveLaudoDoctorCrm(Employee employee) {
+                if (employee.getLaudoPsicologicoDoctor() == null) {
+                        return "";
+                }
+                String crm = employee.getLaudoPsicologicoDoctor().getCrmNumber();
+                String uf = employee.getLaudoPsicologicoDoctor().getCrmState();
                 if (crm == null || crm.isBlank()) {
                         return "";
                 }

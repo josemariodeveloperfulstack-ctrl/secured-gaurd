@@ -36,7 +36,10 @@ import {
     Mail,
     Phone,
     Briefcase,
-    GraduationCap
+    GraduationCap,
+    Brain,
+    History,
+    ArrowLeftRight,
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
 import type { Dependent } from '@/types/dependent';
@@ -50,6 +53,7 @@ import { occurrenceService, Occurrence } from '@/services/occurrenceService';
 import { medicalDocumentService, MEDICAL_TYPE_LABELS, MedicalDocumentType } from '@/services/medicalDocumentService';
 import { remanejamentoService, Remanejamento } from '@/services/remanejamentoService';
 import timeRecordService, { TimeRecord } from '@/services/timeRecordService';
+import { employeeChangeHistoryService, EmployeeChangeHistoryItem } from '@/services/employeeChangeHistoryService';
 import { format } from 'date-fns';
 import { formatCPF, formatRG, formatPhone, formatDate as formatSystemDate } from '@/utils/formatters';
 
@@ -70,6 +74,7 @@ type UnifiedExamItem = {
     status?: string;
     result?: string;
     doctorName?: string;
+    observations?: string;
     source: 'SST' | 'FICHA';
 };
 
@@ -119,6 +124,7 @@ const VIEW_TABS = [
     { value: 'atestados', label: 'Atestados', icon: Stethoscope },
     { value: 'disciplinar', label: 'Disciplinar', icon: AlertTriangle },
     { value: 'remanejamentos', label: 'Remanejamentos', icon: MoveHorizontal },
+    { value: 'historico', label: 'Histórico', icon: History },
 ] as const;
 
 interface EmployeeViewDetailsModalProps {
@@ -149,6 +155,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
     const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
     const [transfers, setTransfers] = useState<Remanejamento[]>([]);
     const [timeRecords, setTimeRecords] = useState<TimeRecord[]>([]);
+    const [historyItems, setHistoryItems] = useState<EmployeeChangeHistoryItem[]>([]);
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [generatingReport, setGeneratingReport] = useState(false);
@@ -287,6 +294,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                             status: empDetail.laudoPsicologicoData ? 'REALIZADO' : 'PENDENTE',
                             result: empDetail.laudoPsicologicoResultado,
                             doctorName: (empDetail as any).laudoPsicologicoDoctor?.name,
+                            observations: (empDetail as any).laudoPsicologicoObservacoes,
                             source: 'FICHA',
                         }]
                         : [];
@@ -380,6 +388,10 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                 case 'remanejamentos':
                     const rems = await remanejamentoService.getRemanejamentosByEmployee(employee.id);
                     setTransfers(rems);
+                    break;
+                case 'historico':
+                    const histData = await employeeChangeHistoryService.getByEmployeeId(employee.id, 0, 50);
+                    setHistoryItems(histData?.content || []);
                     break;
                 case 'ponto':
                     // Se estivermos na aba de ponto, buscamos os registros por período (mês selecionado)
@@ -645,7 +657,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                 </Card>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <Card className="bg-seguranca-black/40 border-gray-700/50 overflow-hidden">
                                     <div className="bg-green-500/10 px-4 py-2 border-b border-gray-700/50 flex items-center gap-2">
                                         <MapPin size={14} className="text-green-400" />
@@ -670,6 +682,53 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                                 })()}
                                             </p>
                                         </div>
+                                    </CardContent>
+                                </Card>
+
+                                <Card className="bg-seguranca-black/40 border-gray-700/50 overflow-hidden">
+                                    <div className="bg-emerald-500/10 px-4 py-2 border-b border-gray-700/50 flex items-center gap-2">
+                                        <Brain size={14} className="text-emerald-400" />
+                                        <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Laudo Psicológico</span>
+                                    </div>
+                                    <CardContent className="p-4 space-y-3">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] text-gray-500 uppercase font-bold">Data do Laudo</span>
+                                                <span className="text-sm text-white font-mono">{formatDate((displayEmployee as any).laudoPsicologicoData)}</span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] text-gray-500 uppercase font-bold">Vencimento</span>
+                                                <span className="text-sm text-white font-mono">{formatDate((displayEmployee as any).laudoPsicologicoVencimento)}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-gray-500 uppercase font-bold">Resultado</span>
+                                            <div className="mt-0.5">
+                                                {(displayEmployee as any).laudoPsicologicoResultado ? (
+                                                    <Badge className={`${
+                                                        String((displayEmployee as any).laudoPsicologicoResultado).toUpperCase().includes('APTO') ? 'bg-green-500/20 text-green-400' :
+                                                        String((displayEmployee as any).laudoPsicologicoResultado).toUpperCase().includes('INAPTO') ? 'bg-red-500/20 text-red-400' :
+                                                        'bg-yellow-500/20 text-yellow-400'
+                                                    }`}>
+                                                        {(displayEmployee as any).laudoPsicologicoResultado}
+                                                    </Badge>
+                                                ) : (
+                                                    <span className="text-sm text-gray-400">-</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-gray-500 uppercase font-bold">Profissional / Médico</span>
+                                            <span className="text-sm text-white">{(displayEmployee as any).laudoPsicologicoDoctor?.name || '-'}</span>
+                                        </div>
+                                        {(displayEmployee as any).laudoPsicologicoObservacoes && (
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] text-gray-500 uppercase font-bold">Observações</span>
+                                                <p className="text-xs text-seguranca-lightgray italic leading-relaxed">
+                                                    {(displayEmployee as any).laudoPsicologicoObservacoes}
+                                                </p>
+                                            </div>
+                                        )}
                                     </CardContent>
                                 </Card>
 
@@ -845,11 +904,11 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                             {loading ? renderLoading() : (
                                 <div className="space-y-6">
                                     <div>
-                                        <h3 className="text-lg font-semibold text-white mb-2">Exames Médicos (ASO)</h3>
+                                        <h3 className="text-lg font-semibold text-white mb-2">Exames Médicos (ASO) & Laudo Psicológico</h3>
                                         <p className="text-xs text-gray-500 mb-3">
-                                            Inclui ASO da ficha (admissional, periódico, demissional etc.) e exames do módulo SST.
+                                            Inclui ASO da ficha, Laudo Psicológico da ficha e exames do módulo SST.
                                         </p>
-                                        {exams.length === 0 ? renderEmpty('Nenhum exame médico encontrado na ficha nem no SST.') : (
+                                        {exams.length === 0 ? renderEmpty('Nenhum exame médico ou laudo psicológico encontrado.') : (
                                             <div className="space-y-3">
                                                 {[...exams]
                                                     .sort((a, b) => {
@@ -861,9 +920,12 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                                     <Card key={exam.id} className="bg-seguranca-black/40 border-gray-700/50 p-4">
                                                         <div className="flex items-center justify-between gap-3">
                                                             <div className="flex items-center gap-3 min-w-0">
-                                                                <div className={`p-2 rounded-lg shrink-0 ${exam.status === 'REALIZADO' || exam.status === 'COMPLETED' ? 'bg-green-500/10 text-green-400' : 'bg-seguranca-yellow/10 text-seguranca-yellow'
+                                                                <div className={`p-2 rounded-lg shrink-0 ${
+                                                                    exam.examType === 'Laudo Psicológico' 
+                                                                        ? 'bg-emerald-500/10 text-emerald-400' 
+                                                                        : (exam.status === 'REALIZADO' || exam.status === 'COMPLETED' ? 'bg-green-500/10 text-green-400' : 'bg-seguranca-yellow/10 text-seguranca-yellow')
                                                                     }`}>
-                                                                    <Stethoscope size={18} />
+                                                                    {exam.examType === 'Laudo Psicológico' ? <Brain size={18} /> : <Stethoscope size={18} />}
                                                                 </div>
                                                                 <div className="min-w-0">
                                                                     <p className="font-bold text-white text-sm truncate">{exam.examType}</p>
@@ -872,6 +934,11 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                                                         {exam.scheduledDate ? ` • Realizado: ${formatDate(exam.scheduledDate)}` : ''}
                                                                         {exam.nextExamDate ? ` • Vence: ${formatDate(exam.nextExamDate)}` : ''}
                                                                     </p>
+                                                                    {exam.observations && (
+                                                                        <p className="text-xs text-gray-400 mt-1 italic">
+                                                                            Obs: {exam.observations}
+                                                                        </p>
+                                                                    )}
                                                                     <Badge variant="outline" className="mt-1 text-[10px] border-gray-600 text-gray-400">
                                                                         {exam.source === 'FICHA' ? 'Ficha do funcionário' : 'Módulo SST'}
                                                                     </Badge>
@@ -1133,6 +1200,58 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                                         {rem.observacao && (
                                                             <p className="text-xs text-gray-400 border-t border-gray-700 pt-2 italic">"{rem.observacao}"</p>
                                                         )}
+                                                    </div>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </TabsContent>
+
+                        {/* Aba Histórico de Alterações */}
+                        <TabsContent value="historico" className="mt-0">
+                            {loading ? renderLoading() : (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-lg font-semibold text-white">Histórico de Alterações do Funcionário</h3>
+                                        <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                                            {historyItems.length} Alterações
+                                        </Badge>
+                                    </div>
+
+                                    {historyItems.length === 0 ? renderEmpty('Nenhuma alteração de histórico registrada para este funcionário.') : (
+                                        <div className="space-y-3">
+                                            {historyItems.map((item) => (
+                                                <Card key={item.id} className="bg-seguranca-black/40 border-gray-700/50 p-4 border-l-4 border-l-purple-500">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 shrink-0">
+                                                                {item.category === 'LAUDO_PSICOLOGICO' ? <Brain size={18} /> : <History size={18} />}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <Badge className="bg-purple-500/20 text-purple-300 text-[10px]">
+                                                                        {item.categoryLabel || item.category}
+                                                                    </Badge>
+                                                                    <span className="text-xs font-bold text-white">
+                                                                        {item.fieldLabel || item.fieldName}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-xs text-gray-300 mt-1 flex flex-wrap items-center gap-1.5">
+                                                                    <span className="text-gray-500 line-through">{item.oldValue || '—'}</span>
+                                                                    <span className="text-seguranca-yellow font-medium">→ {item.newValue || '—'}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right shrink-0">
+                                                            <span className="text-[10px] text-gray-400 font-mono">
+                                                                {item.changedAt ? new Date(item.changedAt).toLocaleString('pt-BR') : '-'}
+                                                            </span>
+                                                            {item.changedByName && (
+                                                                <p className="text-[10px] text-gray-500">Por: {item.changedByName}</p>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </Card>
                                             ))}

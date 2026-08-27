@@ -1030,6 +1030,10 @@ public class EmployeeService {
         m.put("hireDate", e.getHireDate() != null ? e.getHireDate().toString() : null);
         m.put("terminationDate", e.getTerminationDate() != null ? e.getTerminationDate().toString() : null);
         m.put("exameMedicoVencimento", e.getExameMedicoVencimento() != null ? e.getExameMedicoVencimento().toString() : null);
+        m.put("laudoPsicologicoData", e.getLaudoPsicologicoData() != null ? e.getLaudoPsicologicoData().toString() : null);
+        m.put("laudoPsicologicoVencimento", e.getLaudoPsicologicoVencimento() != null ? e.getLaudoPsicologicoVencimento().toString() : null);
+        m.put("laudoPsicologicoResultado", e.getLaudoPsicologicoResultado());
+        m.put("laudoPsicologicoDoctor", e.getLaudoPsicologicoDoctor() != null ? e.getLaudoPsicologicoDoctor().getName() : null);
         return m;
     }
 
@@ -1063,6 +1067,13 @@ public class EmployeeService {
             recordIfChanged(employeeId, EmployeeChangeCategory.DADOS_CADASTRAIS, "hireDate", "Data de admissão", oldSnapshot.get("hireDate"), emp.getHireDate() != null ? emp.getHireDate().toString() : null, changedByUserId);
             recordIfChanged(employeeId, EmployeeChangeCategory.DADOS_CADASTRAIS, "terminationDate", "Data de desligamento", oldSnapshot.get("terminationDate"), emp.getTerminationDate() != null ? emp.getTerminationDate().toString() : null, changedByUserId);
             recordIfChanged(employeeId, EmployeeChangeCategory.EXAME_ASO, "exameMedicoVencimento", "Vencimento ASO", oldSnapshot.get("exameMedicoVencimento"), emp.getExameMedicoVencimento() != null ? emp.getExameMedicoVencimento().toString() : null, changedByUserId);
+            
+            // Laudo Psicológico
+            recordIfChanged(employeeId, EmployeeChangeCategory.LAUDO_PSICOLOGICO, "laudoPsicologicoData", "Data do Laudo Psicológico", oldSnapshot.get("laudoPsicologicoData"), emp.getLaudoPsicologicoData() != null ? emp.getLaudoPsicologicoData().toString() : null, changedByUserId);
+            recordIfChanged(employeeId, EmployeeChangeCategory.LAUDO_PSICOLOGICO, "laudoPsicologicoVencimento", "Vencimento do Laudo Psicológico", oldSnapshot.get("laudoPsicologicoVencimento"), emp.getLaudoPsicologicoVencimento() != null ? emp.getLaudoPsicologicoVencimento().toString() : null, changedByUserId);
+            recordIfChanged(employeeId, EmployeeChangeCategory.LAUDO_PSICOLOGICO, "laudoPsicologicoResultado", "Resultado do Laudo Psicológico", oldSnapshot.get("laudoPsicologicoResultado"), emp.getLaudoPsicologicoResultado(), changedByUserId);
+            String laudoDocNew = emp.getLaudoPsicologicoDoctor() != null ? emp.getLaudoPsicologicoDoctor().getName() : null;
+            recordIfChanged(employeeId, EmployeeChangeCategory.LAUDO_PSICOLOGICO, "laudoPsicologicoDoctor", "Profissional do Laudo Psicológico", oldSnapshot.get("laudoPsicologicoDoctor"), laudoDocNew, changedByUserId);
         } catch (Exception ex) {
             log.warn("Falha ao registrar histórico de alterações do funcionário {}: {}", emp.getId(), ex.getMessage());
         }
