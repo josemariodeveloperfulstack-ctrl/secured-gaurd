@@ -42,7 +42,7 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
     List<StockMovement> findDeliveryHistoryByEmployee(@Param("employeeId") UUID employeeId);
 
     // Últimas movimentações
-    @Query("SELECT DISTINCT sm FROM StockMovement sm " +
+    @Query("SELECT sm FROM StockMovement sm " +
            "LEFT JOIN FETCH sm.stockItem si " +
            "LEFT JOIN FETCH si.unit " +
            "LEFT JOIN FETCH sm.unit " +
