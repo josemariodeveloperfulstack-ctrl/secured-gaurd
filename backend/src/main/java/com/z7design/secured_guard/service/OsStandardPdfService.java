@@ -271,19 +271,17 @@ public class OsStandardPdfService {
 
         private SafetyEngineer resolveSafetyEngineer(Company company, OperationalServiceOrderRequest request) {
                 try {
-                        if (request != null && request.getSafetyEngineerId() != null) {
-                                return safetyEngineerRepository.findById(request.getSafetyEngineerId()).orElse(null);
-                        }
-                        if (company == null || company.getId() == null) {
+                        if (request != null) {
+                                if (request.getSafetyEngineerId() != null) {
+                                        return safetyEngineerRepository.findById(request.getSafetyEngineerId()).orElse(null);
+                                }
+                                // Quando não selecionado na requisição, respeita a escolha do usuário e não busca engenheiro padrão
                                 return null;
                         }
-                        if (company.getSafetyEngineerId() != null) {
+                        if (company != null && company.getSafetyEngineerId() != null) {
                                 return safetyEngineerRepository.findById(company.getSafetyEngineerId()).orElse(null);
                         }
-                        return safetyEngineerRepository
-                                        .findFirstByCompanyIdAndActiveTrueOrderByNameAsc(company.getId())
-                                        .or(() -> safetyEngineerRepository.findFirstByCompanyIdOrderByNameAsc(company.getId()))
-                                        .orElse(null);
+                        return null;
                 } catch (Exception e) {
                         log.warn("Não foi possível resolver profissional de SST: {}", e.getMessage());
                         return null;
