@@ -23,6 +23,7 @@ import { Contract, contractService } from '@/services/contractService';
 import { companyConfigService, CompanyConfig } from '@/services/companyConfigService';
 import { clientService } from '@/services/clientService';
 import { companyService } from '@/services/companyService';
+import { resolveCompanyLogoUrl } from '@/utils/companyLogo';
 import { ClientFormModal } from '@/components/clientes/ClientFormModal';
 import { Client } from '@/types/client';
 import { formatDateForBackend, formatDateForDisplay, parseDateFromBackend, parseBrazilianDateString } from '@/utils/dateUtils';
@@ -339,16 +340,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   };
 
   const getLogoDisplayUrl = (logoUrl: string | undefined): string | null => {
-    if (!logoUrl) return null;
-    const baseUrl = getApiUrl().replace('/api', '');
-    const trimmed = logoUrl.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-    if (trimmed.startsWith('/api/uploads/')) return `${baseUrl}${trimmed}`;
-    if (trimmed.startsWith('api/uploads/')) return `${baseUrl}/${trimmed}`;
-    if (trimmed.startsWith('/uploads/')) return `${baseUrl}/api${trimmed}`;
-    if (trimmed.startsWith('uploads/')) return `${baseUrl}/api/${trimmed}`;
-    const filename = trimmed.replace(/^\/+/, '').replace(/^api\/uploads\/companies\/logos\//, '');
-    return `${baseUrl}/api/uploads/companies/logos/${filename}`;
+    return resolveCompanyLogoUrl(logoUrl);
   };
 
   const generateContractHTML = () => {

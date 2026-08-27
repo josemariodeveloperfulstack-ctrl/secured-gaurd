@@ -10,6 +10,7 @@ import { Save, Eye, Loader2, Building2 } from 'lucide-react';
 import { companyConfigService, CompanyConfig, ContractTemplatePreviewRequest } from '@/services/companyConfigService';
 import { companyService } from '@/services/companyService';
 import { getApiUrl } from '@/config/environment';
+import { resolveCompanyLogoUrl } from '@/utils/companyLogo';
 
 interface CompanySettingsProps {
   open: boolean;
@@ -179,16 +180,7 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }
   };
 
   const getLogoDisplayUrl = (logoUrl: string | undefined): string | null => {
-    if (!logoUrl) return null;
-    const baseUrl = getApiUrl().replace('/api', '');
-    const trimmed = logoUrl.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-    if (trimmed.startsWith('/api/uploads/')) return `${baseUrl}${trimmed}`;
-    if (trimmed.startsWith('api/uploads/')) return `${baseUrl}/${trimmed}`;
-    if (trimmed.startsWith('/uploads/')) return `${baseUrl}/api${trimmed}`;
-    if (trimmed.startsWith('uploads/')) return `${baseUrl}/api/${trimmed}`;
-    const filename = trimmed.replace(/^\/+/, '').replace(/^api\/uploads\/companies\/logos\//, '');
-    return `${baseUrl}/api/uploads/companies/logos/${filename}`;
+    return resolveCompanyLogoUrl(logoUrl);
   };
 
   const handleSave = async () => {

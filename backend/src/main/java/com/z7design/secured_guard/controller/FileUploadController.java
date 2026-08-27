@@ -444,18 +444,18 @@ public class FileUploadController {
             }
             Path basePath = Paths.get(uploadDir, "companies", "logos").toAbsolutePath().normalize();
             Path filePath = basePath.resolve(filename).normalize();
-            if (!filePath.startsWith(basePath)) {
-                return ResponseEntity.notFound().build();
-            }
+
             if (!Files.exists(filePath)) {
                 restoreFromPersistentBackup(filePath, filename);
             }
-            Resource resource = new UrlResource(filePath.toUri());
-            if (!resource.exists() || !resource.isReadable()) {
-                if (restoreFromPersistentBackup(filePath, filename)) {
-                    resource = new UrlResource(filePath.toUri());
+            if (!Files.exists(filePath)) {
+                Path tmpPath = Paths.get(System.getProperty("java.io.tmpdir"), "secured_guard_uploads", "companies", "logos", filename).toAbsolutePath().normalize();
+                if (Files.exists(tmpPath)) {
+                    filePath = tmpPath;
                 }
             }
+
+            Resource resource = new UrlResource(filePath.toUri());
             if (!resource.exists() || !resource.isReadable()) {
                 return ResponseEntity.notFound().build();
             }
@@ -467,9 +467,7 @@ public class FileUploadController {
                     .contentType(MediaType.parseMediaType(contentType))
                     .header(HttpHeaders.CACHE_CONTROL, "max-age=3600")
                     .body(resource);
-        } catch (MalformedURLException e) {
-            return ResponseEntity.notFound().build();
-        } catch (IOException e) {
+        } catch (Exception e) {
             log.debug("Logo não encontrado ou erro ao ler: {}", filename);
             return ResponseEntity.notFound().build();
         }
@@ -512,46 +510,82 @@ public class FileUploadController {
     }
 
     private Path saveLogoFile(MultipartFile file, String uniqueFilename) throws IOException {
-        Path uploadPath = Paths.get(uploadDir, "companies", "logos").toAbsolutePath().normalize();
-        Path filePath = uploadPath.resolve(uniqueFilename);
         byte[] fileBytes = file.getBytes();
+        // 1. Tentar caminho principal configurado
         try {
+            Path uploadPath = Paths.get(uploadDir, "companies", "logos").toAbsolutePath().normalize();
             Files.createDirectories(uploadPath);
+            Path filePath = uploadPath.resolve(uniqueFilename);
             Files.write(filePath, fileBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             savePersistentLogoBackup(filePath, uniqueFilename);
             return filePath;
-        } catch (Exception e) {
-            log.warn("⚠️ Não foi possível salvar logo no caminho primário ({}): {}. Salvando no backup...", filePath, e.getMessage());
+        } catch (Exception e1) {
+            log.warn("⚠️ Falha ao salvar logo no diretório primário ({}/companies/logos): {}", uploadDir, e1.getMessage());
+        }
+
+        // 2. Tentar backup no home do usuário
+        try {
             Path backupPath = getPersistentLogoBackupPath(uniqueFilename);
             if (backupPath != null) {
                 Files.createDirectories(backupPath.getParent());
                 Files.write(backupPath, fileBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                log.info("✅ Logo salvo com sucesso no caminho de backup: {}", backupPath);
+                log.info("✅ Logo salvo com sucesso no caminho de backup (home): {}", backupPath);
                 return backupPath;
             }
-            throw new IOException("Falha ao salvar logo: " + e.getMessage(), e);
+        } catch (Exception e2) {
+            log.warn("⚠️ Falha ao salvar logo no diretório de backup (home): {}", e2.getMessage());
+        }
+
+        // 3. Fallback garantido no diretório temporário do sistema (/tmp)
+        try {
+            Path tmpPath = Paths.get(System.getProperty("java.io.tmpdir"), "secured_guard_uploads", "companies", "logos", uniqueFilename).toAbsolutePath().normalize();
+            Files.createDirectories(tmpPath.getParent());
+            Files.write(tmpPath, fileBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            log.info("✅ Logo salvo com sucesso no diretório temporário (/tmp): {}", tmpPath);
+            return tmpPath;
+        } catch (Exception e3) {
+            log.error("❌ Falha crítica ao salvar logo em todas as estratégias de armazenamento", e3);
+            throw new IOException("Não foi possível salvar a imagem do logo: " + e3.getMessage(), e3);
         }
     }
 
     private Path saveStampFile(MultipartFile file, String uniqueFilename) throws IOException {
-        Path uploadPath = Paths.get(uploadDir, "safety-engineers", "stamps").toAbsolutePath().normalize();
-        Path filePath = uploadPath.resolve(uniqueFilename);
         byte[] fileBytes = file.getBytes();
+        // 1. Tentar caminho principal configurado
         try {
+            Path uploadPath = Paths.get(uploadDir, "safety-engineers", "stamps").toAbsolutePath().normalize();
             Files.createDirectories(uploadPath);
+            Path filePath = uploadPath.resolve(uniqueFilename);
             Files.write(filePath, fileBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             savePersistentStampBackup(filePath, uniqueFilename);
             return filePath;
-        } catch (Exception e) {
-            log.warn("⚠️ Não foi possível salvar carimbo no caminho primário ({}): {}. Salvando no backup...", filePath, e.getMessage());
+        } catch (Exception e1) {
+            log.warn("⚠️ Falha ao salvar carimbo no diretório primário ({}/safety-engineers/stamps): {}", uploadDir, e1.getMessage());
+        }
+
+        // 2. Tentar backup no home do usuário
+        try {
             Path backupPath = getPersistentStampBackupPath(uniqueFilename);
             if (backupPath != null) {
                 Files.createDirectories(backupPath.getParent());
                 Files.write(backupPath, fileBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                log.info("✅ Carimbo salvo com sucesso no caminho de backup: {}", backupPath);
+                log.info("✅ Carimbo salvo com sucesso no caminho de backup (home): {}", backupPath);
                 return backupPath;
             }
-            throw new IOException("Falha ao salvar carimbo: " + e.getMessage(), e);
+        } catch (Exception e2) {
+            log.warn("⚠️ Falha ao salvar carimbo no diretório de backup (home): {}", e2.getMessage());
+        }
+
+        // 3. Fallback garantido no diretório temporário do sistema (/tmp)
+        try {
+            Path tmpPath = Paths.get(System.getProperty("java.io.tmpdir"), "secured_guard_uploads", "safety-engineers", "stamps", uniqueFilename).toAbsolutePath().normalize();
+            Files.createDirectories(tmpPath.getParent());
+            Files.write(tmpPath, fileBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            log.info("✅ Carimbo salvo com sucesso no diretório temporário (/tmp): {}", tmpPath);
+            return tmpPath;
+        } catch (Exception e3) {
+            log.error("❌ Falha crítica ao salvar carimbo em todas as estratégias de armazenamento", e3);
+            throw new IOException("Não foi possível salvar a imagem do carimbo: " + e3.getMessage(), e3);
         }
     }
 
