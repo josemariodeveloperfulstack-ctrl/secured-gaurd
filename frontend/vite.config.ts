@@ -57,22 +57,6 @@ export default defineConfig(({ mode }) => {
         navigateFallback: null,
         navigateFallbackDenylist: [/^\/api/, /^\/ws/, /^\/email-marketing/],
         runtimeCaching: [
-          // NUNCA cachear chamadas de API — sempre buscar do backend.
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
-            handler: 'NetworkOnly',
-            options: {
-              cacheName: 'api-no-cache',
-            },
-          },
-          // WebSocket / SSE
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith('/ws'),
-            handler: 'NetworkOnly',
-            options: {
-              cacheName: 'ws-no-cache',
-            },
-          },
           // Bundles JS: NetworkFirst com janela curta (1h) para que novas
           // versões sejam pegas rapidamente após deploy.
           {
