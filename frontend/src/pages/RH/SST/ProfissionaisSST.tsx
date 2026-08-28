@@ -605,13 +605,24 @@ const ProfissionaisSST: React.FC = () => {
                         target.style.display = 'none';
                       }}
                     />
-                    <div className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> Carimbo pronto para uso
+                    <div className="text-xs text-emerald-400 mt-2 flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> Carimbo pronto para uso
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/40"
+                        onClick={() => setForm((prev) => ({ ...prev, stampImageUrl: '' }))}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" /> Remover carimbo
+                      </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="text-xs text-amber-400 flex items-center gap-1">
-                    <Upload className="h-3 w-3" /> Nenhum carimbo enviado
+                    <Upload className="h-3 w-3" /> Nenhum carimbo enviado (exibição apenas em texto: Nome + Registro)
                   </div>
                 )}
               </div>

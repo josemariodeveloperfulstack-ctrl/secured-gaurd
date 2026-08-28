@@ -464,6 +464,12 @@ public class FileUploadController {
                 restoreFromPersistentBackup(filePath, filename);
             }
             if (!Files.exists(filePath)) {
+                Path backupPath = getPersistentLogoBackupPath(filename);
+                if (backupPath != null && Files.exists(backupPath)) {
+                    filePath = backupPath;
+                }
+            }
+            if (!Files.exists(filePath)) {
                 Path tmpPath = Paths.get(System.getProperty("java.io.tmpdir"), "secured_guard_uploads", "companies", "logos", filename).toAbsolutePath().normalize();
                 if (Files.exists(tmpPath)) {
                     filePath = tmpPath;
@@ -479,9 +485,21 @@ public class FileUploadController {
                         .header(HttpHeaders.CACHE_CONTROL, "max-age=300")
                         .body(placeholder);
             }
-            String contentType = Files.probeContentType(filePath);
-            if (contentType == null) {
-                contentType = "image/png";
+            String contentType = null;
+            try {
+                contentType = Files.probeContentType(filePath);
+            } catch (Exception e) {
+                log.debug("⚠️ Não foi possível determinar content-type via Files.probeContentType para {}: {}", filename, e.getMessage());
+            }
+            if (contentType == null || contentType.isBlank()) {
+                String fn = filename.toLowerCase();
+                if (fn.endsWith(".jpg") || fn.endsWith(".jpeg")) {
+                    contentType = "image/jpeg";
+                } else if (fn.endsWith(".svg")) {
+                    contentType = "image/svg+xml";
+                } else {
+                    contentType = "image/png";
+                }
             }
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
@@ -712,6 +730,12 @@ public class FileUploadController {
                 restoreStampFromPersistentBackup(filePath, filename);
             }
             if (!Files.exists(filePath)) {
+                Path backupPath = getPersistentStampBackupPath(filename);
+                if (backupPath != null && Files.exists(backupPath)) {
+                    filePath = backupPath;
+                }
+            }
+            if (!Files.exists(filePath)) {
                 Path tmpPath = Paths.get(System.getProperty("java.io.tmpdir"), "secured_guard_uploads", "safety-engineers", "stamps", filename).toAbsolutePath().normalize();
                 if (Files.exists(tmpPath)) {
                     filePath = tmpPath;
@@ -731,9 +755,21 @@ public class FileUploadController {
                         .header(HttpHeaders.CACHE_CONTROL, "max-age=300")
                         .body(placeholder);
             }
-            String contentType = Files.probeContentType(filePath);
-            if (contentType == null) {
-                contentType = "image/png";
+            String contentType = null;
+            try {
+                contentType = Files.probeContentType(filePath);
+            } catch (Exception e) {
+                log.debug("⚠️ Não foi possível determinar content-type via Files.probeContentType para carimbo {}: {}", filename, e.getMessage());
+            }
+            if (contentType == null || contentType.isBlank()) {
+                String fn = filename.toLowerCase();
+                if (fn.endsWith(".jpg") || fn.endsWith(".jpeg")) {
+                    contentType = "image/jpeg";
+                } else if (fn.endsWith(".svg")) {
+                    contentType = "image/svg+xml";
+                } else {
+                    contentType = "image/png";
+                }
             }
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))

@@ -113,7 +113,7 @@ services:
     ports:
       - "8081:8080"
     volumes:
-      - uploads_ci:/var/www/secured_guard/ci/uploads
+      - /var/www/secured_guard/ci/uploads:/var/www/secured_guard/ci/uploads
       - logs_ci:/var/www/secured_guard/ci/logs
     depends_on:
       postgres-ci:
