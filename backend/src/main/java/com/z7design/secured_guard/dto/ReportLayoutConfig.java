@@ -169,4 +169,11 @@ public class ReportLayoutConfig {
      */
     @Builder.Default
     private boolean showFooterContentSeparator = false;
+
+    /**
+     * Se deve desenhar a barra/linha colorida na base extrema da página (abaixo dos dados da empresa).
+     * Padrão: true
+     */
+    @Builder.Default
+    private boolean showFooterBackgroundLine = true;
 }

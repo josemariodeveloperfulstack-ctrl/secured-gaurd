@@ -77,6 +77,7 @@ public class OsStandardPdfService {
                                         .reportTitle(null)
                                         .showHeader(false)
                                         .showFooterContentSeparator(true)
+                                        .showFooterBackgroundLine(false)
                                         .includeEmailInFooter(true)
                                         .topMargin(20f)
                                         .marginExtraTop(0f)
