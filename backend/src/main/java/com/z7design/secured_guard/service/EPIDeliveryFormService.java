@@ -658,14 +658,6 @@ public class EPIDeliveryFormService {
     @Transactional(readOnly = true)
     public Page<EPIDeliveryFormDTO> findByFilters(UUID employeeId, UUID companyId, LocalDate startDate, LocalDate endDate, Pageable pageable) {
         Specification<EPIDeliveryForm> spec = (root, query, cb) -> {
-            // Fetch joins para evitar LazyInitializationException (apenas associações single-valued;
-            // items é collection - fetch com paginação causa HHH000104)
-            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
-                root.fetch("employee", jakarta.persistence.criteria.JoinType.LEFT);
-                root.fetch("company", jakarta.persistence.criteria.JoinType.LEFT);
-                root.fetch("responsibleEmployee", jakarta.persistence.criteria.JoinType.LEFT);
-                root.fetch("createdBy", jakarta.persistence.criteria.JoinType.LEFT);
-            }
             List<Predicate> predicates = new ArrayList<>();
             if (employeeId != null) {
                 predicates.add(cb.equal(root.get("employee").get("id"), employeeId));
