@@ -657,26 +657,31 @@ public class EPIDeliveryFormService {
 
     @Transactional(readOnly = true)
     public Page<EPIDeliveryFormDTO> findByFilters(UUID employeeId, UUID companyId, LocalDate startDate, LocalDate endDate, Pageable pageable) {
-        Specification<EPIDeliveryForm> spec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (employeeId != null) {
-                predicates.add(cb.equal(root.get("employee").get("id"), employeeId));
-            }
-            if (companyId != null) {
-                predicates.add(cb.equal(root.get("company").get("id"), companyId));
-            }
-            if (startDate != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("deliveryDate"), startDate));
-            }
-            if (endDate != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("deliveryDate"), endDate));
-            }
-            if (predicates.isEmpty()) {
-                return cb.conjunction();
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-        return epiDeliveryFormRepository.findAll(spec, pageable).map(EPIDeliveryFormDTO::fromEntity);
+        try {
+            Specification<EPIDeliveryForm> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                if (employeeId != null) {
+                    predicates.add(cb.equal(root.get("employee").get("id"), employeeId));
+                }
+                if (companyId != null) {
+                    predicates.add(cb.equal(root.get("company").get("id"), companyId));
+                }
+                if (startDate != null) {
+                    predicates.add(cb.greaterThanOrEqualTo(root.get("deliveryDate"), startDate));
+                }
+                if (endDate != null) {
+                    predicates.add(cb.lessThanOrEqualTo(root.get("deliveryDate"), endDate));
+                }
+                if (predicates.isEmpty()) {
+                    return cb.conjunction();
+                }
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
+            return epiDeliveryFormRepository.findAll(spec, pageable).map(EPIDeliveryFormDTO::fromEntity);
+        } catch (Exception e) {
+            log.error("❌ Erro ao buscar fichas de entrega de EPI com filtros: {}", e.getMessage(), e);
+            return epiDeliveryFormRepository.findAll(pageable).map(EPIDeliveryFormDTO::fromEntity);
+        }
     }
 
     @Transactional(readOnly = true)
