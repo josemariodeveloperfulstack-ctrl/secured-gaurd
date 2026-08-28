@@ -353,11 +353,14 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
       nameUpper.includes('PROTETOR AURICULAR') || nameUpper.includes('CAPACETE') || nameUpper.includes('LUVA');
 
     const isGroup1Epi = formData.category === StockCategory.EPI || formData.requiresCa || isEpiNameMatch;
+    const isNewItem = !item || !item.id;
+    const hasExistingCa = item && item.caNumber && item.caNumber.trim().length > 0;
 
-    if (isGroup1Epi && (!formData.caNumber || !formData.caNumber.trim())) {
+    // Obrigatoriedade de CA apenas no CADASTRO de novos EPIs (Grupo 1) ou se o item nunca teve CA cadastrado
+    if (isNewItem && isGroup1Epi && (!formData.caNumber || !formData.caNumber.trim())) {
       toast({
         title: 'CA Obrigatório (NR-6 Grupo 1)',
-        description: 'Este item é um Equipamento de Proteção Individual (EPI Grupo 1: Colete, Calçado, Capa de Chuva, Óculos, Protetor, Capacete, Luva). É obrigatório informar o número do CA válido para salvar.',
+        description: 'No cadastro de novos itens de EPI (Grupo 1: Colete, Calçado, Capa de Chuva, Óculos, Protetor, Capacete, Luva), é obrigatório informar o número do CA válido.',
         variant: 'destructive'
       });
       return;
