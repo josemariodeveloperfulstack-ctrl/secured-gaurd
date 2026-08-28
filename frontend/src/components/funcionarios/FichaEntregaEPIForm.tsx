@@ -678,8 +678,14 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
         nameUpper.includes('CAPA DE CHUVA') || nameUpper.includes('ÓCULOS') || nameUpper.includes('OCULOS') ||
         nameUpper.includes('PROTETOR AURICULAR') || nameUpper.includes('CAPACETE') || nameUpper.includes('LUVA');
 
-      if (isEpiGroup1 && (!epi.ca || !epi.ca.trim())) {
-        return `Para o item EPI (Grupo 1) "${epi.nome}", é obrigatório o número do CA válido conforme a NR-6!`;
+      // Se o item do estoque já tem CA cadastrado, herda o CA caso esteja em branco
+      if ((!epi.ca || !epi.ca.trim()) && stockItem?.caNumber) {
+        epi.ca = stockItem.caNumber;
+      }
+
+      // Exige CA apenas se for cadastro e não houver CA nem no item nem no formulário
+      if (!currentFichaId && isEpiGroup1 && (!epi.ca || !epi.ca.trim()) && (!stockItem || !stockItem.caNumber)) {
+        return `Para o novo item EPI (Grupo 1) "${epi.nome}", é obrigatório informar o número do CA válido!`;
       }
     }
     const withoutStock = source.filter(epi => !epi.stockItemId || epi.stockItemId === 'none');

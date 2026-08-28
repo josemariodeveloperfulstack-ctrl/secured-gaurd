@@ -266,13 +266,21 @@ public class StockService {
     }
 
     public StockItemDTO updateItem(UUID id, StockItemDTO dto) {
-        log.info("Atualizando item de estoque: {}", id);
-
-        // Validação NR-6: CA Obrigatório para EPIs Grupo 1
-        validateCaIfRequired(dto);
+        log.info("Atualizando item de estoque ID: {}", id);
 
         StockItem existingItem = stockItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Item de estoque não encontrado: " + id));
+
+        // Se a DTO de edição não forneceu CA, mas o item já possui CA cadastrado, preserva o CA existente
+        if ((dto.getCaNumber() == null || dto.getCaNumber().trim().isEmpty())
+                && existingItem.getCaNumber() != null && !existingItem.getCaNumber().isBlank()) {
+            dto.setCaNumber(existingItem.getCaNumber());
+        }
+
+        // Validação NR-6: Exige CA apenas se o item NUNCA teve CA cadastrado
+        if (existingItem.getCaNumber() == null || existingItem.getCaNumber().isBlank()) {
+            validateCaIfRequired(dto);
+        }
 
         // Verificar se código já existe em outro item
         if (dto.getCode() != null && !dto.getCode().equals(existingItem.getCode()) &&
