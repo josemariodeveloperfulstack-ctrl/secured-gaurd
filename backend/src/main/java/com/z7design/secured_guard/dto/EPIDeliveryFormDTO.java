@@ -268,31 +268,46 @@ public class EPIDeliveryFormDTO {
         public static EPIDeliveryFormDTO fromEntity(EPIDeliveryForm form) {
                 EPIDeliveryFormDTO dto = new EPIDeliveryFormDTO();
                 dto.setId(form.getId());
-                if (form.getEmployee() != null) {
-                        dto.setEmployeeId(form.getEmployee().getId());
-                        dto.setEmployeeName(form.getEmployee().getName());
-                        dto.setEmployeeCpf(form.getEmployee().getDocument());
+                try {
+                        if (form.getEmployee() != null) {
+                                dto.setEmployeeId(form.getEmployee().getId());
+                                dto.setEmployeeName(form.getEmployee().getName());
+                                dto.setEmployeeCpf(form.getEmployee().getDocument());
+                        }
+                } catch (Exception e) {
+                        // Trata proxy ou chave estrangeira inexistente de forma segura
                 }
-                if (form.getCompany() != null) {
-                        dto.setCompanyId(form.getCompany().getId());
-                        dto.setCompanyName(form.getCompany().getName());
-                        dto.setCompanyCnpj(form.getCompany().getCnpj());
+                try {
+                        if (form.getCompany() != null) {
+                                dto.setCompanyId(form.getCompany().getId());
+                                dto.setCompanyName(form.getCompany().getName());
+                                dto.setCompanyCnpj(form.getCompany().getCnpj());
+                        }
+                } catch (Exception e) {
+                        // Trata proxy ou chave estrangeira inexistente de forma segura
                 }
                 dto.setDeliveryDate(form.getDeliveryDate());
-                if (form.getResponsibleEmployee() != null) {
-                        dto.setResponsibleEmployeeId(form.getResponsibleEmployee().getId());
-                        dto.setResponsibleEmployeeName(form.getResponsibleEmployee().getName());
-                } else if (form.getCreatedBy() != null && form.getCreatedBy().getName() != null) {
-                        // Fallback: usuário logado que registrou a entrega
-                        dto.setResponsibleEmployeeName(form.getCreatedBy().getName());
+                try {
+                        if (form.getResponsibleEmployee() != null) {
+                                dto.setResponsibleEmployeeId(form.getResponsibleEmployee().getId());
+                                dto.setResponsibleEmployeeName(form.getResponsibleEmployee().getName());
+                        } else if (form.getCreatedBy() != null && form.getCreatedBy().getName() != null) {
+                                dto.setResponsibleEmployeeName(form.getCreatedBy().getName());
+                        }
+                } catch (Exception e) {
+                        // Trata proxy ou chave estrangeira inexistente de forma segura
                 }
                 dto.setObservations(form.getObservations());
                 dto.setPdfUrl(form.getPdfUrl());
                 dto.setDeliveryType(form.getDeliveryType());
                 dto.setEmployeeWorkSector(form.getEmployeeWorkSector());
-                if (form.getCreatedBy() != null) {
-                        dto.setCreatedById(form.getCreatedBy().getId());
-                        dto.setCreatedByName(form.getCreatedBy().getName());
+                try {
+                        if (form.getCreatedBy() != null) {
+                                dto.setCreatedById(form.getCreatedBy().getId());
+                                dto.setCreatedByName(form.getCreatedBy().getName());
+                        }
+                } catch (Exception e) {
+                        // Trata proxy ou chave estrangeira inexistente de forma segura
                 }
                 dto.setCreatedAt(form.getCreatedAt());
                 dto.setUpdatedAt(form.getUpdatedAt());
