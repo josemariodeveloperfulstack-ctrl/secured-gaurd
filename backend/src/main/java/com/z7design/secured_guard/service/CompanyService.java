@@ -212,8 +212,9 @@ public class CompanyService {
         existingCompany.setZipCode(dto.getZipCode() != null ? dto.getZipCode().trim() : null);
         existingCompany.setPhone(dto.getPhone() != null ? dto.getPhone().trim() : null);
         existingCompany.setEmail(dto.getEmail() != null ? dto.getEmail().trim() : null);
-        if (dto.getLogoUrl() != null && !dto.getLogoUrl().isBlank()) {
-            existingCompany.setLogoUrl(dto.getLogoUrl().trim());
+        if (dto.getLogoUrl() != null) {
+            String logo = dto.getLogoUrl().trim();
+            existingCompany.setLogoUrl(logo.isEmpty() ? null : logo);
         }
         existingCompany.setStatus(dto.getStatus());
         
