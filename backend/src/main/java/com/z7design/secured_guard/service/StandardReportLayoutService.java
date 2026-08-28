@@ -348,14 +348,16 @@ public class StandardReportLayoutService {
                             canvasLayout.add(backgroundImage);
                             canvasLayout.close();
                         } catch (Exception e) {
-                            service.drawBackgroundElements(backgroundCanvas, pdfDoc, pageWidth, pageHeight, company);
+                            service.drawBackgroundElements(backgroundCanvas, pdfDoc, pageWidth, pageHeight, company, config);
                         }
                     } else {
-                        service.drawBackgroundElements(backgroundCanvas, pdfDoc, pageWidth, pageHeight, company);
+                        service.drawBackgroundElements(backgroundCanvas, pdfDoc, pageWidth, pageHeight, company, config);
                     }
                 } else {
-                    // Mantém apenas a faixa gradiente do rodapé
-                    service.drawFooterBackgroundLine(backgroundCanvas, pdfDoc, pageWidth, company);
+                    // Mantém apenas a faixa gradiente do rodapé caso habilitada
+                    if (config.isShowFooterBackgroundLine()) {
+                        service.drawFooterBackgroundLine(backgroundCanvas, pdfDoc, pageWidth, company);
+                    }
                 }
                 backgroundCanvas.release();
 
@@ -395,9 +397,11 @@ public class StandardReportLayoutService {
             float pageWidth = pageSize.getWidth();
 
             try {
-                PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
-                service.drawFooterBackgroundLine(backgroundCanvas, pdfDoc, pageWidth, company);
-                backgroundCanvas.release();
+                if (config.isShowFooterBackgroundLine()) {
+                    PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
+                    service.drawFooterBackgroundLine(backgroundCanvas, pdfDoc, pageWidth, company);
+                    backgroundCanvas.release();
+                }
 
                 PdfCanvas footerCanvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdfDoc);
                 if (config.isShowFooterContentSeparator()) {
@@ -728,7 +732,7 @@ public class StandardReportLayoutService {
      * está disponível)
      */
     private void drawBackgroundElements(PdfCanvas pdfCanvas, PdfDocument pdfDoc, float pageWidth, float pageHeight,
-            Company company) {
+            Company company, ReportLayoutConfig config) {
         // Barra gradiente horizontal no topo (amarelo → laranja → vermelho)
         float gradientBarHeight = 30f; // Altura da barra gradiente no topo
         addHorizontalGradient(pdfCanvas, pdfDoc,
@@ -737,7 +741,9 @@ public class StandardReportLayoutService {
         // Forma curva escura no canto superior esquerdo
         addDarkCurveShape(pdfCanvas, pageWidth, pageHeight);
 
-        drawFooterBackgroundLine(pdfCanvas, pdfDoc, pageWidth, company);
+        if (config == null || config.isShowFooterBackgroundLine()) {
+            drawFooterBackgroundLine(pdfCanvas, pdfDoc, pageWidth, company);
+        }
     }
 
     /** Linha gradiente fina na base da página (rodapé visual posicionado a 24.35pt / ~0.86cm da borda). */
