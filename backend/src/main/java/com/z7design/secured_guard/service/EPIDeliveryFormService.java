@@ -671,6 +671,9 @@ public class EPIDeliveryFormService {
             if (endDate != null) {
                 predicates.add(cb.lessThanOrEqualTo(root.get("deliveryDate"), endDate));
             }
+            if (predicates.isEmpty()) {
+                return cb.conjunction();
+            }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
         return epiDeliveryFormRepository.findAll(spec, pageable).map(EPIDeliveryFormDTO::fromEntity);

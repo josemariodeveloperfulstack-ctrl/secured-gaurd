@@ -186,6 +186,9 @@ public class EPIDeliveryReportService {
             }
             if (startDate != null) predicates.add(cb.greaterThanOrEqualTo(root.get("deliveryDate"), startDate));
             if (endDate != null) predicates.add(cb.lessThanOrEqualTo(root.get("deliveryDate"), endDate));
+            if (predicates.isEmpty()) {
+                return cb.conjunction();
+            }
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
     }
