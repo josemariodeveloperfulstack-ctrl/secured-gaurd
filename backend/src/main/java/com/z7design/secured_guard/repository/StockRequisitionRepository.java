@@ -15,6 +15,8 @@ public interface StockRequisitionRepository extends JpaRepository<StockRequisiti
 
     Optional<StockRequisition> findByRequisitionNumber(String requisitionNumber);
 
+    boolean existsByRequisitionNumber(String requisitionNumber);
+
     @Query("""
             SELECT new com.z7design.secured_guard.dto.StockRequisitionListItemDTO(
               r.id, r.requisitionNumber, r.status, e.name, r.movementReason, r.createdAt, u.name,
