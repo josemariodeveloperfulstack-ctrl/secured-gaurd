@@ -373,10 +373,22 @@ public class EPIDeliveryFormService {
 
         validateAllItemsLinkedToStock(form);
 
-        // Se já existe uma REQ-EPI, cancelar movimentações e gerar nova (reflete alterações na lista)
+        // Se já existe uma REQ-EPI vinculada, cancelar movimentações e gerar nova (reflete alterações na lista)
         if (form.getStockRequisitionId() != null) {
             cancelStockRequisition(form, userId);
         }
+
+        // Também verificar se já existe uma requisição legada pelo número base REQ-EPI-{id}
+        String baseNumber = "REQ-EPI-" + form.getId().toString().substring(0, 8).toUpperCase();
+        stockRequisitionRepository.findByRequisitionNumber(baseNumber).ifPresent(oldReq -> {
+            log.info("🗑️ Encontrada requisição legada {} por número; cancelando e estornando...", baseNumber);
+            form.setStockRequisitionId(oldReq.getId());
+            cancelStockRequisition(form, userId);
+        });
+
+        // Garantir flush antes de qualquer inserção para evitar conflito de chave única no Hibernate
+        stockRequisitionRepository.flush();
+        stockMovementRepository.flush();
 
         User actingUser = null;
         if (userId != null) {
@@ -387,8 +399,13 @@ public class EPIDeliveryFormService {
                     "Usuário responsável pela baixa de estoque não identificado. Faça login novamente e tente gerar a ficha.");
         }
 
+        String reqNum = baseNumber;
+        if (stockRequisitionRepository.existsByRequisitionNumber(reqNum)) {
+            reqNum = baseNumber + "-" + (System.currentTimeMillis() % 100000);
+        }
+
         StockRequisition requisition = StockRequisition.builder()
-                .requisitionNumber("REQ-EPI-" + form.getId().toString().substring(0, 8).toUpperCase())
+                .requisitionNumber(reqNum)
                 .employee(form.getEmployee())
                 .requestedByUser(actingUser)
                 .movementReason(form.getDeliveryType() == EPIDeliveryType.PRIMEIRA_ENTREGA ?
@@ -502,12 +519,12 @@ public class EPIDeliveryFormService {
             storno.setNotes("Estorno automático por alteração na Ficha de EPI: " + form.getId());
             stockService.createMovement(storno, effectiveUserId);
             
-            // Marcar movimento original como cancelado (se houver campo) ou apenas deletar se permitido
-            // Aqui vamos apenas deletar para limpar o histórico, ou marcar como deletado se tiver soft delete
             stockMovementRepository.delete(m);
         }
+        stockMovementRepository.flush();
         
         stockRequisitionRepository.delete(req);
+        stockRequisitionRepository.flush();
         form.setStockRequisitionId(null);
     }
 
