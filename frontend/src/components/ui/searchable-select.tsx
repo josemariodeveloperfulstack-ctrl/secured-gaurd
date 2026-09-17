@@ -38,6 +38,8 @@ interface SearchableSelectProps {
   minCharsMessage?: string;
   /** Callback para busca server-side (debounced opcional). */
   onSearchChange?: (query: string) => void;
+  /** Label de fallback caso a opção não esteja na lista de opções atual */
+  fallbackLabel?: string;
   className?: string;
 }
 
@@ -52,12 +54,20 @@ export function SearchableSelect({
   minSearchChars = 0,
   minCharsMessage,
   onSearchChange,
+  fallbackLabel,
   className,
 }: Readonly<SearchableSelectProps>) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
 
   const selectedOption = options.find((opt) => opt && opt.value === value)
+  const displayLabel = selectedOption
+    ? selectedOption.label
+    : (value && fallbackLabel ? fallbackLabel : placeholder)
+
+  const tooltipText = selectedOption
+    ? `${selectedOption.label}${selectedOption.description ? ` — ${selectedOption.description}` : ''}`
+    : (value && fallbackLabel ? fallbackLabel : (displayLabel !== placeholder ? displayLabel : ''))
 
   // Notifica busca externa (server-side) com debounce simples
   React.useEffect(() => {
@@ -103,13 +113,17 @@ export function SearchableSelect({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
+          title={tooltipText || undefined}
           className={cn(
             "h-11 w-full justify-between border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors disabled:opacity-50 px-3",
             className
           )}
         >
-          <div className="flex items-center gap-2 truncate font-medium text-sm sm:text-base">
-            {selectedOption ? selectedOption.label : placeholder}
+          <div
+            className="flex items-center gap-2 truncate font-medium text-sm sm:text-base text-left flex-1"
+            title={tooltipText || undefined}
+          >
+            {displayLabel}
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

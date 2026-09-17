@@ -165,6 +165,8 @@ public class EPIDeliveryFormService {
                         .sizeNumber(resolveSizeNumber(itemDto.getSizeNumber(), itemDto.getStockItemId(), itemDto.getEpiName()))
                         .substitutedDate(itemDto.getSubstitutedDate())
                         .replacementReason(itemDto.getReplacementReason())
+                        .returnedDate(itemDto.getReturnedDate())
+                        .returnReason(itemDto.getReturnReason())
                         .build();
                 form.getItems().add(item);
             }
@@ -245,7 +247,10 @@ public class EPIDeliveryFormService {
                         .sizeNumber(resolveSizeNumber(itemDto.getSizeNumber(), itemDto.getStockItemId(), itemDto.getEpiName()))
                         .substitutedDate(itemDto.getSubstitutedDate())
                         .replacementReason(itemDto.getReplacementReason())
+                        .returnedDate(itemDto.getReturnedDate())
+                        .returnReason(itemDto.getReturnReason())
                         .build();
+
                 if (existing != null) {
                     item.setConfirmationToken(existing.getConfirmationToken());
                     item.setConfirmationCode(existing.getConfirmationCode());
@@ -341,6 +346,10 @@ public class EPIDeliveryFormService {
         }
         List<String> missing = new ArrayList<>();
         for (EPIDeliveryFormItem item : form.getItems()) {
+            // Itens devolvidos/substituídos não necessitam de vínculo obrigatório para nova baixa
+            if (item.getSubstitutedDate() != null || item.getReturnedDate() != null) {
+                continue;
+            }
             String label = item.getEpiName() != null && !item.getEpiName().isBlank()
                     ? item.getEpiName()
                     : "Item sem nome";
@@ -354,13 +363,13 @@ public class EPIDeliveryFormService {
         }
         if (!missing.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Todos os itens da ficha concluída devem estar vinculados ao estoque para dar baixa. "
+                    "Todos os itens ativos da ficha concluída devem estar vinculados ao estoque para dar baixa. "
                             + "Sem vínculo: " + String.join(", ", missing));
         }
     }
 
     private void syncWithStockRequisition(EPIDeliveryForm form, UUID userId) {
-        log.info("📦 Sincronizando ficha EPI {} com requisição de estoque (baixa de todos os itens)", form.getId());
+        log.info("📦 Sincronizando ficha EPI {} com requisição de estoque (baixa de todos os itens ativos)", form.getId());
 
         validateAllItemsLinkedToStock(form);
 
@@ -396,6 +405,13 @@ public class EPIDeliveryFormService {
                 .build();
 
         for (EPIDeliveryFormItem item : form.getItems()) {
+            // Se o item foi devolvido/substituído, o cancelStockRequisition já deu entrada compensatória. Não gera nova baixa.
+            if (item.getSubstitutedDate() != null || item.getReturnedDate() != null) {
+                log.info("ℹ️ Item {} marcado como substituído/devolvido em {} / {}; estorno de estoque mantido (sem nova baixa).",
+                        item.getEpiName(), item.getSubstitutedDate(), item.getReturnedDate());
+                continue;
+            }
+
             if (item.getStockItemId() == null) {
                 throw new IllegalArgumentException(
                         "Item sem vínculo de estoque: " + (item.getEpiName() != null ? item.getEpiName() : "sem nome"));

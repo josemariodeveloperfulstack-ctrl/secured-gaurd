@@ -355,6 +355,7 @@ export interface EmployeeFilters {
   companyId?: string;
   unitId?: string;
   workPostId?: string;
+  sector?: string;
   hireDateFrom?: string;
   hireDateTo?: string;
   terminationDateFrom?: string;
@@ -390,6 +391,9 @@ function buildEmployeeListQueryParams(
   }
   if (filters?.workPostId && filters.workPostId !== 'all') {
     params.workPostId = filters.workPostId;
+  }
+  if (filters?.sector && filters.sector !== 'all') {
+    params.sector = filters.sector;
   }
   if (filters?.hireDateFrom) {
     params.hireDateFrom = filters.hireDateFrom;
@@ -1188,6 +1192,62 @@ export const employeeService = {
       deletedDocuments: documentsArr.length,
       deletedGeneratedDocs,
     };
+  },
+
+  /**
+   * Consulta se um CPF já possui cadastro no sistema e retorna os dados pessoais para reaproveitamento.
+   */
+  async checkCpf(cpf: string): Promise<{
+    exists: boolean;
+    employeeId?: string;
+    name?: string;
+    cpf?: string;
+    status?: string;
+    currentWorkPostName?: string;
+    currentPositionName?: string;
+    companyId?: string;
+    companyName?: string;
+    birthDate?: string;
+    rg?: string;
+    motherName?: string;
+    fatherName?: string;
+    email?: string;
+    phone?: string;
+    sexo?: string;
+    maritalStatus?: string;
+    grauInstrucao?: string;
+    nationality?: string;
+    enderecoRua?: string;
+    enderecoNumero?: string;
+    enderecoComplemento?: string;
+    enderecoBairro?: string;
+    enderecoCidade?: string;
+    enderecoEstado?: string;
+    enderecoCep?: string;
+    ctps?: string;
+    ctpsSeries?: string;
+    pis?: string;
+    cbo?: string;
+    cnhNumber?: string;
+    cnhCategory?: string;
+    cnhExpirationDate?: string;
+    matriculaEsocial?: string;
+    bankInfo?: {
+      bank?: string;
+      agency?: string;
+      account?: string;
+      accountDigit?: string;
+      pixKey?: string;
+      accountType?: string;
+    };
+  }> {
+    try {
+      const response = await api.get('/employees/check-cpf', { params: { cpf } });
+      return response.data;
+    } catch (err) {
+      console.error('Erro ao verificar CPF:', err);
+      return { exists: false };
+    }
   }
 };
 

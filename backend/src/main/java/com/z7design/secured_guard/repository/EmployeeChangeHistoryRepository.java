@@ -32,4 +32,6 @@ public interface EmployeeChangeHistoryRepository extends JpaRepository<EmployeeC
         @Param("changedByUserId") UUID changedByUserId,
         Pageable pageable
     );
+
+    java.util.Optional<EmployeeChangeHistory> findFirstByEmployeeIdAndCategoryOrderByChangedAtDesc(UUID employeeId, EmployeeChangeCategory category);
 }

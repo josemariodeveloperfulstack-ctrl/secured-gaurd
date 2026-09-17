@@ -17,6 +17,10 @@ export interface EPIDeliveryFormItem {
   substitutedDate?: string;
   /** Motivo da substituição — coluna MOTIVO DA SUBST. no PDF */
   replacementReason?: string;
+  /** Data da devolução — coluna DEVOLUÇÃO no PDF se for devolução */
+  returnedDate?: string;
+  /** Motivo da devolução — coluna MOTIVO DA DEVOLUÇÃO no PDF se for devolução */
+  returnReason?: string;
   /** Código de 6 dígitos enviado no WhatsApp para este item (modo por item) */
   confirmationCode?: string;
   confirmationSentAt?: string;

@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Processa cada linha da planilha em transação independente (REQUIRES_NEW).
@@ -45,9 +46,10 @@ public class EmployeeImportRowService {
             Company company,
             boolean[] isNewRef) {
 
-        // Garantir proteção total: se o funcionário já existir no banco, cancela para NUNCA alterar registros existentes
-        if (employeeRepository.existsByNormalizedDocument(cpf)) {
-            throw new IllegalStateException("Funcionário com CPF " + cpf + " já existe na base de dados. O cadastro existente foi preservado sem alterações.");
+        // Permite cadastrar o mesmo CPF para empresas diferentes ou re-admissão se demitido. Bloqueia apenas se ativo na mesma empresa.
+        UUID companyId = company != null ? company.getId() : null;
+        if (employeeRepository.existsByNormalizedDocumentAndCompanyIdAndNotTerminated(cpf, companyId)) {
+            throw new IllegalStateException("Funcionário com CPF " + cpf + " já existe e está ativo nesta empresa. O cadastro existente foi preservado sem alterações.");
         }
 
         Employee emp = new Employee();

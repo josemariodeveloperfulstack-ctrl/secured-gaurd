@@ -171,6 +171,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [rehireAdmissionType, setRehireAdmissionType] = useState<EmploymentAdmissionType | ''>('');
   /** Opt-in na edição: só exibe Readmissão/Promoção quando habilitado. No cadastro novo via CPF, liga automaticamente. */
   const [rehireEnabled, setRehireEnabled] = useState(false);
+  const [cpfConfirmModalOpen, setCpfConfirmModalOpen] = useState(false);
+  const [existingCpfData, setExistingCpfData] = useState<any | null>(null);
   const [employmentPeriods, setEmploymentPeriods] = useState<EmployeeEmploymentPeriod[]>([]);
   const [employmentPeriodsLoading, setEmploymentPeriodsLoading] = useState(false);
   const [cancelDismissalOpen, setCancelDismissalOpen] = useState(false);
@@ -1452,6 +1454,93 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     setForm((prev) => ({ ...prev, tituloEleitor: formatted }));
   };
 
+  const handleConfirmReuseCpfData = () => {
+    if (!existingCpfData) return;
+
+    if (existingCpfData.status === 'ACTIVE') {
+      toast({
+        title: "Funcionário já Ativo",
+        description: `O CPF ${existingCpfData.cpf} já possui um cadastro ATIVO no sistema. O mesmo CPF não pode estar ativo em mais de uma empresa simultaneamente.`,
+        variant: "destructive"
+      });
+      setCpfConfirmModalOpen(false);
+      return;
+    }
+
+    setRehireEnabled(true);
+    if (existingCpfData.employeeId) {
+      setEligibleRehireEmployee({
+        id: existingCpfData.employeeId,
+        name: existingCpfData.name,
+        cpf: existingCpfData.cpf,
+        rg: existingCpfData.rg,
+        birthDate: existingCpfData.birthDate,
+        email: existingCpfData.email,
+        phone: existingCpfData.phone,
+        status: existingCpfData.status,
+        hireDate: existingCpfData.birthDate, // Keep reference for historical check
+      } as any);
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      name: existingCpfData.name || prev.name,
+      rg: existingCpfData.rg || prev.rg,
+      birthDate: existingCpfData.birthDate || prev.birthDate,
+      email: existingCpfData.email || prev.email,
+      phone: existingCpfData.phone || prev.phone,
+      telefoneContato: existingCpfData.phone || prev.telefoneContato,
+      sexo: existingCpfData.sexo || prev.sexo,
+      maritalStatus: existingCpfData.maritalStatus || prev.maritalStatus,
+      grauInstrucao: existingCpfData.grauInstrucao || prev.grauInstrucao,
+      nationality: existingCpfData.nationality || prev.nationality,
+      nomeMae: existingCpfData.motherName || prev.nomeMae,
+      nomePai: existingCpfData.fatherName || prev.nomePai,
+
+      // Endereço
+      enderecoRua: existingCpfData.enderecoRua || prev.enderecoRua,
+      enderecoNumero: existingCpfData.enderecoNumero || prev.enderecoNumero,
+      enderecoComplemento: existingCpfData.enderecoComplemento || prev.enderecoComplemento,
+      enderecoBairro: existingCpfData.enderecoBairro || prev.enderecoBairro,
+      enderecoCidade: existingCpfData.enderecoCidade || prev.enderecoCidade,
+      enderecoEstado: existingCpfData.enderecoEstado || prev.enderecoEstado,
+      enderecoCep: existingCpfData.enderecoCep || prev.enderecoCep,
+
+      // Documentos
+      ctps: existingCpfData.ctps || prev.ctps,
+      ctpsSeries: existingCpfData.ctpsSeries || prev.ctpsSeries,
+      pis: existingCpfData.pis || prev.pis,
+      cbo: existingCpfData.cbo || prev.cbo,
+      cnhNumber: existingCpfData.cnhNumber || prev.cnhNumber,
+      cnhCategory: existingCpfData.cnhCategory || prev.cnhCategory,
+      cnhExpirationDate: existingCpfData.cnhExpirationDate || prev.cnhExpirationDate,
+      matriculaEsocial: existingCpfData.matriculaEsocial || prev.matriculaEsocial,
+
+      // Dados Bancários
+      bankData: existingCpfData.bankInfo ? {
+        bank: existingCpfData.bankInfo.bank || '',
+        agency: existingCpfData.bankInfo.agency || '',
+        account: existingCpfData.bankInfo.account || '',
+        accountDigit: existingCpfData.bankInfo.accountDigit || '',
+        type: (existingCpfData.bankInfo.accountType as any) || 'CORRENTE',
+        chavePix: existingCpfData.bankInfo.pixKey || '',
+      } : prev.bankData,
+
+      // Reseta data de admissão e rescisão para forçar o preenchimento da NOVA data de admissão no novo contrato
+      hireDate: undefined,
+      status: 'ACTIVE',
+      dataRescisao: undefined,
+      terminationReason: undefined,
+    }));
+
+    toast({
+      title: "Dados Carregados para Readmissão",
+      description: `Dados pessoais de ${existingCpfData.name} reaproveitados. Por favor, informe a nova data de admissão.`,
+    });
+
+    setCpfConfirmModalOpen(false);
+  };
+
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/\D/g, '');
     const formatted = formatCpfForInput(raw);
@@ -1470,23 +1559,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         if (cpfRehireCheckRef.current) clearTimeout(cpfRehireCheckRef.current);
         cpfRehireCheckRef.current = setTimeout(async () => {
           try {
-            const eligible = await employeeService.findEligibleForRehire(formatted);
-            if (eligible) {
-              setEligibleRehireEmployee(eligible as EligibleRehireEmployee);
-              setRehireEnabled(true);
-              setForm((prev) => ({
-                ...prev,
-                name: eligible.name || prev.name,
-                cpf: formatted,
-                ctps: formatted,
-                rg: eligible.rg || prev.rg,
-                birthDate: eligible.birthDate || prev.birthDate,
-                email: eligible.email || prev.email,
-                phone: eligible.phone || prev.phone,
-                status: 'ACTIVE',
-                dataRescisao: undefined,
-                terminationReason: undefined,
-              }));
+            const checkData = await employeeService.checkCpf(formatted);
+            if (checkData.exists) {
+              setExistingCpfData(checkData);
+              setCpfConfirmModalOpen(true);
             } else {
               setEligibleRehireEmployee(null);
               setRehireAdmissionType('');
@@ -1584,15 +1660,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     }
   };
 
+  const toYyyyMmDdStr = (val: any) => (val ? String(val).trim().split('T')[0] : '');
+
   const handleRehireAdmissionTypeChange = (type: EmploymentAdmissionType) => {
     setRehireAdmissionType(type);
-    const prevHire = eligibleRehireEmployee?.hireDate;
+    const prevHireStr = toYyyyMmDdStr(eligibleRehireEmployee?.hireDate);
+    const currentHireStr = toYyyyMmDdStr(form.hireDate);
     setForm((prev) => ({
       ...prev,
       status: 'ACTIVE',
       dataRescisao: undefined,
       terminationReason: undefined,
-      hireDate: prev.hireDate === prevHire ? '' : prev.hireDate,
+      hireDate: currentHireStr === prevHireStr ? '' : prev.hireDate,
     }));
   };
 
@@ -1769,8 +1848,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         setError('Informe a nova data de admissão para a recontratação.');
         return;
       }
-      const prevHire = eligibleRehireEmployee?.hireDate;
-      if (prevHire && form.hireDate === prevHire) {
+      const prevHireStr = toYyyyMmDdStr(eligibleRehireEmployee?.hireDate);
+      const newHireStr = toYyyyMmDdStr(form.hireDate);
+      if (prevHireStr && newHireStr && prevHireStr === newHireStr) {
         setError('A nova data de admissão deve ser diferente da data do vínculo anterior (preservada no histórico).');
         return;
       }
@@ -1790,8 +1870,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         setError('Informe a nova data de admissão para a recontratação.');
         return;
       }
-      const prevHire = eligibleRehireEmployee?.hireDate;
-      if (prevHire && form.hireDate === prevHire) {
+      const prevHireStr = toYyyyMmDdStr(eligibleRehireEmployee?.hireDate);
+      const newHireStr = toYyyyMmDdStr(form.hireDate);
+      if (prevHireStr && newHireStr && prevHireStr === newHireStr) {
         setError('A nova data de admissão deve ser diferente da data do vínculo anterior (preservada no histórico).');
         return;
       }
@@ -5461,6 +5542,70 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           loading={cancelDismissalLoading}
           onConfirm={handleConfirmCancelDismissal}
         />
+
+        {/* Modal de Confirmação de CPF Existente (Opção B) */}
+        <Dialog open={cpfConfirmModalOpen} onOpenChange={setCpfConfirmModalOpen}>
+          <DialogContent className="max-w-md bg-seguranca-black border-gray-600 text-white">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-seguranca-yellow">
+                <AlertCircle className="h-5 w-5 text-seguranca-yellow" />
+                CPF Já Cadastrado no Sistema
+              </DialogTitle>
+              <DialogDescription className="text-gray-300 pt-2">
+                Foi localizado um cadastro anterior com o CPF <span className="font-mono text-white font-semibold">{existingCpfData?.cpf}</span> pertencente a <strong className="text-seguranca-yellow">{existingCpfData?.name}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 py-2 text-xs text-gray-300">
+              <div className="p-3 rounded bg-gray-800/80 border border-gray-700 space-y-1">
+                <p><strong>Cargo Anterior/Registrado:</strong> {existingCpfData?.currentPositionName || 'Não informado'}</p>
+                <p><strong>Setor de Trabalho:</strong> {existingCpfData?.currentWorkPostName || 'Não informado'}</p>
+                <p>
+                  <strong>Status Atual:</strong>{' '}
+                  <span className={existingCpfData?.status === 'ACTIVE' ? 'text-green-400 font-bold' : 'text-red-400'}>
+                    {existingCpfData?.status === 'ACTIVE' ? 'Ativo' : 'Inativo / Demitido'}
+                  </span>
+                </p>
+              </div>
+
+              {existingCpfData?.status === 'ACTIVE' && (
+                <div className="p-3 rounded bg-orange-950/60 border border-orange-500/40 text-orange-200">
+                  <p className="font-semibold flex items-center gap-1 text-orange-300">
+                    <AlertCircle className="h-4 w-4" /> Funcionário atualmente ATIVO!
+                  </p>
+                  <p className="text-[11px] mt-1">
+                    Ao confirmar a nova admissão, os dados pessoais serão reaproveitados para registrar o novo contrato/cargo, mantendo a rastreabilidade do vínculo anterior.
+                  </p>
+                </div>
+              )}
+
+              <p className="text-gray-300">
+                Deseja reaproveitar os dados pessoais (Nome, RG, Data Nasc., Endereço, Documentos, etc.) para registrar esta nova admissão?
+              </p>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setCpfConfirmModalOpen(false);
+                  setExistingCpfData(null);
+                }}
+                className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmReuseCpfData}
+                className="bg-seguranca-red hover:bg-red-700 text-white font-semibold"
+              >
+                Reaproveitar Dados Pessoais
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </Dialog>
     </TooltipProvider >
   );

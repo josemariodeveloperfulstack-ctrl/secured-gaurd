@@ -42,6 +42,17 @@ public class EmployeeEmploymentPeriodService {
     }
 
     @Transactional(readOnly = true)
+    public java.util.Map<UUID, List<EmployeeEmploymentPeriodDTO>> findPeriodsForEmployees(List<UUID> employeeIds) {
+        if (employeeIds == null || employeeIds.isEmpty()) {
+            return java.util.Map.of();
+        }
+        List<EmployeeEmploymentPeriod> list = periodRepository.findByEmployeeIdInOrderByHireDateDesc(employeeIds);
+        return list.stream()
+                .map(this::toDTO)
+                .collect(Collectors.groupingBy(EmployeeEmploymentPeriodDTO::getEmployeeId));
+    }
+
+    @Transactional(readOnly = true)
     public int countByEmployeeId(UUID employeeId) {
         if (employeeId == null) {
             return 0;

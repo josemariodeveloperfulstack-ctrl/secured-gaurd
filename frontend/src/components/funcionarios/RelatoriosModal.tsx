@@ -64,6 +64,7 @@ const REPORT_COLUMNS: { key: string; label: string }[] = [
     { key: 'workPost', label: 'Setor de Trabalho' },
     { key: 'company', label: 'Empresa' },
     { key: 'status', label: 'Status' },
+    { key: 'previousStatus', label: 'Status/Vínculo Anterior' },
     { key: 'cpf', label: 'CPF' },
     { key: 'rg', label: 'RG' },
     { key: 'birthDate', label: 'Data Nasc.' },
@@ -527,6 +528,16 @@ export function RelatoriosModal({
                 }
                 if (columnsToUse.includes('company')) row['Empresa'] = emp.company?.sigla || emp.company?.name || emp.empresaNome || '';
                 if (columnsToUse.includes('status')) row['Status'] = getStatusLabel(emp.status);
+                if (columnsToUse.includes('previousStatus')) {
+                    const prevDateStr = emp.previousTerminationDate ? formatReportDate(emp.previousTerminationDate) : '';
+                    const prevStatusLabel = emp.previousStatus === 'TERMINATED' ? 'Demitido' : (emp.previousStatus || '');
+                    const prevParts = [
+                        prevStatusLabel,
+                        prevDateStr ? `em ${prevDateStr}` : '',
+                        emp.previousWorkPostName ? `(${emp.previousWorkPostName})` : ''
+                    ].filter(Boolean).join(' ');
+                    row['Status/Vínculo Anterior'] = prevParts || 'Nenhum';
+                }
                 if (columnsToUse.includes('cpf')) row['CPF'] = emp.cpf || (emp as any).document || '';
                 if (columnsToUse.includes('rg')) row['RG'] = emp.rg || '';
                 if (columnsToUse.includes('birthDate')) row['Data Nasc.'] = formatReportDate(emp.birthDate);

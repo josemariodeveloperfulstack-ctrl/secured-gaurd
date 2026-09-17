@@ -57,6 +57,14 @@ export interface Employee {
   status?: string;
   notes?: string;
   periodCount?: number;
+  isReadmitido?: boolean;
+  admissionType?: string;
+  lastPromotionDate?: string;
+  lastPromotionInfo?: string;
+  previousStatus?: string;
+  previousWorkPostName?: string;
+  previousTerminationDate?: string;
+  previousTerminationReason?: string;
 
   // Campos adicionais do backend
   tituloEleitor?: string;

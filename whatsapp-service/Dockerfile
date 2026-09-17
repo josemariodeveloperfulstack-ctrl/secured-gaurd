@@ -1,11 +1,12 @@
 FROM node:20-bookworm-slim
 
-# Instalar Chromium e dependências necessárias
+# Instalar Chromium, Git e dependências necessárias
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     fonts-liberation \
     ca-certificates \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Configurar Puppeteer para usar Chromium do sistema
@@ -22,4 +23,4 @@ COPY src ./src
 EXPOSE 3333
 ENV NODE_ENV=production
 
-CMD ["node", "src/server.js"]
+CMD ["npm", "start"]

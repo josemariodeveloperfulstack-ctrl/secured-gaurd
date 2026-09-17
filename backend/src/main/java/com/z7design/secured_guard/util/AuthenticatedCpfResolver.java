@@ -10,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -87,9 +88,9 @@ public class AuthenticatedCpfResolver {
         }
 
         if (user.getId() != null) {
-            Optional<Employee> byUserId = employeeRepository.findByUserId(user.getId());
-            if (byUserId.isPresent()) {
-                cpf = extractCpfFromEmployee(byUserId.get());
+            List<Employee> employees = employeeRepository.findAllByUserId(user.getId());
+            for (Employee emp : employees) {
+                cpf = extractCpfFromEmployee(emp);
                 if (cpf.isPresent()) {
                     return cpf;
                 }

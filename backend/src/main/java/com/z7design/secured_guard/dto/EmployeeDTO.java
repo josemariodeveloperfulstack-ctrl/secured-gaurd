@@ -251,6 +251,23 @@ public class EmployeeDTO {
      */
     private Integer periodCount;
 
+    /** Indica se o funcionário possui histórico de readmissão */
+    private Boolean isReadmitido;
+
+    /** Data da última promoção / alteração de cargo */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate lastPromotionDate;
+
+    /** Resumo da última promoção / alteração de cargo (ex: "Promovido para Supervisor") */
+    private String lastPromotionInfo;
+
+    /** Informações do vínculo / contrato anterior (para readmitidos ou demitidos do posto anterior) */
+    private String previousStatus;
+    private String previousWorkPostName;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate previousTerminationDate;
+    private String previousTerminationReason;
+
     /**
      * Usuário do sistema vinculado ao funcionário (opcional).
      * Só deve ser preenchido se o funcionário também for usuário do sistema.
@@ -259,6 +276,10 @@ public class EmployeeDTO {
     private PositionDTO position;
     private UnitDTO unit;
     private IdOnlyDTO company;
+
+    public java.util.UUID getCompanyId() {
+        return company != null ? company.getId() : null;
+    }
 
     @Data
     @NoArgsConstructor

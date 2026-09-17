@@ -106,6 +106,79 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
   const isTerminatedEmployee = (e: Employee) =>
     e.status === 'TERMINATED' || !!terminationDateForDisplay(e);
 
+  const renderHistoryBadges = (employee: Employee, isMobile = false) => {
+    const badges = [];
+    const isReadmitido = employee.isReadmitido || (employee.periodCount && employee.periodCount > 1) || employee.admissionType === 'READMISSAO';
+
+    if (isReadmitido) {
+      badges.push(
+        <Badge
+          key="readmitido"
+          variant="secondary"
+          className={`bg-purple-500/20 text-purple-300 border border-purple-500/30 whitespace-nowrap ${
+            isMobile ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0.5'
+          }`}
+        >
+          Readmitido {employee.periodCount && employee.periodCount > 1 ? `(${employee.periodCount}º contrato)` : ''}
+        </Badge>
+      );
+    } else if (employee.periodCount && employee.periodCount > 1) {
+      badges.push(
+        <Badge
+          key="vinculos"
+          variant="secondary"
+          className={`bg-blue-500/10 text-blue-400 border border-blue-500/30 whitespace-nowrap ${
+            isMobile ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0.5'
+          }`}
+        >
+          {employee.periodCount} Vínculos
+        </Badge>
+      );
+    }
+
+    if (employee.admissionType === 'PROMOCAO' || employee.lastPromotionDate) {
+      const promoLabel = employee.lastPromotionDate
+        ? `Promovido em ${formatDatePtBr(employee.lastPromotionDate)}`
+        : 'Promovido';
+      badges.push(
+        <Badge
+          key="promovido"
+          variant="secondary"
+          className={`bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap ${
+            isMobile ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0.5'
+          }`}
+        >
+          {promoLabel}
+        </Badge>
+      );
+    }
+
+    if (employee.previousStatus || employee.previousWorkPostName || employee.previousTerminationDate) {
+      const prevDateStr = employee.previousTerminationDate ? formatDatePtBr(employee.previousTerminationDate) : null;
+      const statusLabel = employee.previousStatus === 'TERMINATED' ? 'Demitido' : (employee.previousStatus || 'Vínculo anterior');
+      const details = [
+        statusLabel,
+        prevDateStr ? `em ${prevDateStr}` : null,
+        employee.previousWorkPostName ? `(${employee.previousWorkPostName})` : null
+      ].filter(Boolean).join(' ');
+
+      badges.push(
+        <Badge
+          key="previous-status"
+          variant="outline"
+          className={`bg-gray-500/10 text-gray-300 border border-gray-500/30 whitespace-normal text-left ${
+            isMobile ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0.5'
+          }`}
+          title={`Histórico anterior: ${details}`}
+        >
+          Anterior: {details}
+        </Badge>
+      );
+    }
+
+    return badges;
+  };
+
   const getWorkPostsLabel = (employee: Employee) => {
     const wp = (employee.workPost as any)?.name;
     const wpId = (employee.workPost as any)?.id;
@@ -292,21 +365,26 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                  <div className="flex flex-col gap-0.5 text-xs text-seguranca-lightgray leading-tight">
                     {(() => {
                       const workPostsLabel = getWorkPostsLabel(employee);
                       return workPostsLabel ? (
-                        <div className="flex items-center gap-2" title="Setor de Trabalho">
-                          <MapPin className="h-3.5 w-3.5 text-seguranca-yellow" />
+                        <div className="flex items-center gap-2" title="Setor de Trabalho Atual">
+                          <MapPin className="h-3.5 w-3.5 text-seguranca-yellow flex-shrink-0" />
                           <span className="truncate max-w-[200px]">{workPostsLabel}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2" title="Sem Setor de Trabalho">
-                          <MapPin className="h-3.5 w-3.5 text-gray-500" />
+                          <MapPin className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
                           <span className="text-gray-500 italic text-xs">Sem setor</span>
                         </div>
                       );
                     })()}
+                    {employee.previousWorkPostName && (
+                      <div className="text-[10px] text-gray-400 pl-5 truncate max-w-[200px]" title={`Posto Anterior: ${employee.previousWorkPostName}`}>
+                        Anterior: {employee.previousWorkPostName}
+                      </div>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -343,11 +421,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   <div className="flex flex-col gap-1 items-start">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {getStatusBadge(effectiveEmploymentStatus(employee))}
-                      {employee.periodCount && employee.periodCount > 1 && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-400 border border-blue-500/30 whitespace-nowrap">
-                          {employee.periodCount} Vínculos
-                        </Badge>
-                      )}
+                      {renderHistoryBadges(employee)}
                     </div>
                     {pendingAdmissionEmployeeIds?.has(employee.id) && (
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/70 text-amber-300 whitespace-normal text-left leading-tight">
