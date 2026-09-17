@@ -68,6 +68,8 @@ public class EmployeeService {
     @Autowired
     private EmployeeChangeHistoryService employeeChangeHistoryService;
     @Autowired
+    private com.z7design.secured_guard.repository.EmployeeChangeHistoryRepository employeeChangeHistoryRepository;
+    @Autowired
     private RemanejamentoService remanejamentoService;
     @Autowired
     private com.z7design.secured_guard.repository.DependentRepository dependentRepository;
@@ -101,9 +103,10 @@ public class EmployeeService {
 
     private static boolean useNativeBasicDataQuery(String sortBy, java.time.LocalDate hireDateFrom,
             java.time.LocalDate hireDateTo, java.time.LocalDate terminationDateFrom,
-            java.time.LocalDate terminationDateTo) {
+            java.time.LocalDate terminationDateTo, String sector) {
         return isDateSortField(sortBy)
-                || hasDateRangeFilters(hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo);
+                || hasDateRangeFilters(hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo)
+                || (sector != null && !sector.isBlank());
     }
 
     private static String orderClauseForBasicData(String sortBy, String sortDir) {
@@ -121,34 +124,76 @@ public class EmployeeService {
     private List<Object[]> findBasicDataPagedNative(String searchTerm, java.util.UUID companyId, String status,
             int limit, int offset, String sortBy, String sortDir, java.time.LocalDate hireDateFrom,
             java.time.LocalDate hireDateTo, java.time.LocalDate terminationDateFrom,
-            java.time.LocalDate terminationDateTo) {
+            java.time.LocalDate terminationDateTo, String sector) {
         String order = orderClauseForBasicData(sortBy, sortDir);
         // Não usar "(? IS NULL OR col = ?)" com :status nulo — o PostgreSQL não infere o tipo do parâmetro (42P18).
         StringBuilder sql = new StringBuilder(BASIC_DATA_SELECT).append(BASIC_DATA_JOINS).append("WHERE 1=1 ");
         boolean hasSearch = searchTerm != null && !searchTerm.trim().isEmpty();
         if (hasSearch) {
             sql.append("AND (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
-                    .append("OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) ")
-                    .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) ");
+                    .append("OR UPPER(COALESCE(e.document, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.cpf, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.matricula_esocial, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.registration_number, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(p.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(wp.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(d.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(u.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND (")
+                    .append("    REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
+                    .append("    OR REGEXP_REPLACE(COALESCE(e.cpf, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
+                    .append("    OR REGEXP_REPLACE(COALESCE(e.matricula_esocial, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
+                    .append("    OR REGEXP_REPLACE(COALESCE(e.registration_number, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')")
+                    .append("))) ");
         }
         if (companyId != null) {
             sql.append("AND e.company_id = :companyId ");
         }
         boolean filterStatus = status != null && !status.isBlank();
         if (filterStatus) {
-            sql.append("AND CAST(e.status AS text) = :status ");
+            if ("TERMINATED".equalsIgnoreCase(status.trim())) {
+                sql.append("AND (CAST(e.status AS text) = :status OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED')) ");
+            } else {
+                sql.append("AND CAST(e.status AS text) = :status ");
+            }
         }
-        if (hireDateFrom != null) {
-            sql.append("AND e.hire_date >= :hireDateFrom ");
+        List<String> sectorList = (sector != null && !sector.isBlank())
+                ? java.util.Arrays.stream(sector.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(java.util.stream.Collectors.toList())
+                : java.util.Collections.emptyList();
+        boolean filterSector = !sectorList.isEmpty();
+        if (filterSector) {
+            sql.append("AND (");
+            for (int i = 0; i < sectorList.size(); i++) {
+                if (i > 0) sql.append(" OR ");
+                String pName = "secParam" + i;
+                sql.append("(UPPER(COALESCE(wp.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
+                        .append("OR UPPER(COALESCE(d.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
+                        .append("OR UPPER(COALESCE(u.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
+                        .append("OR (NULLIF(REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '') IS NOT NULL AND (")
+                        .append("    REGEXP_REPLACE(COALESCE(wp.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%') ")
+                        .append("    OR REGEXP_REPLACE(COALESCE(d.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%') ")
+                        .append("    OR REGEXP_REPLACE(COALESCE(u.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%')")
+                        .append("))) ");
+            }
+            sql.append(") ");
         }
-        if (hireDateTo != null) {
-            sql.append("AND e.hire_date <= :hireDateTo ");
+        if (hireDateFrom != null && hireDateTo != null) {
+            sql.append("AND ((e.hire_date >= :hireDateFrom AND e.hire_date <= :hireDateTo) OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.hire_date >= :hireDateFrom AND p.hire_date <= :hireDateTo)) ");
+        } else if (hireDateFrom != null) {
+            sql.append("AND (e.hire_date >= :hireDateFrom OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.hire_date >= :hireDateFrom)) ");
+        } else if (hireDateTo != null) {
+            sql.append("AND (e.hire_date <= :hireDateTo OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.hire_date <= :hireDateTo)) ");
         }
-        if (terminationDateFrom != null) {
-            sql.append("AND COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom ");
-        }
-        if (terminationDateTo != null) {
-            sql.append("AND COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo ");
+        if (terminationDateFrom != null && terminationDateTo != null) {
+            sql.append("AND ((COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom AND COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo) OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED' AND p.termination_date >= :terminationDateFrom AND p.termination_date <= :terminationDateTo)) ");
+        } else if (terminationDateFrom != null) {
+            sql.append("AND (COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED' AND p.termination_date >= :terminationDateFrom)) ");
+        } else if (terminationDateTo != null) {
+            sql.append("AND (COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED' AND p.termination_date <= :terminationDateTo)) ");
         }
         sql.append(order);
         sql.append("LIMIT :limit OFFSET :offset");
@@ -161,6 +206,11 @@ public class EmployeeService {
         }
         if (filterStatus) {
             q.setParameter("status", status);
+        }
+        if (filterSector) {
+            for (int i = 0; i < sectorList.size(); i++) {
+                q.setParameter("secParam" + i, sectorList.get(i));
+            }
         }
         if (hireDateFrom != null) {
             q.setParameter("hireDateFrom", hireDateFrom);
@@ -195,6 +245,14 @@ public class EmployeeService {
 
             System.out.println("[DEBUG] Validações passaram, convertendo DTO para Entity");
             Employee employee = toEntity(dto);
+
+            // Vínculo unificado de usuário: se já existe um User para este CPF, associa ao mesmo User
+            if (employee.getUser() == null && dto.getCpf() != null) {
+                String normalizedCpf = dto.getCpf().replaceAll("[^0-9]", "");
+                if (!normalizedCpf.isEmpty()) {
+                    userRepository.findByUsername(normalizedCpf).ifPresent(employee::setUser);
+                }
+            }
 
             // Log fields after toEntity conversion
             System.out.println("[DEBUG] Fields after toEntity:");
@@ -1366,7 +1424,7 @@ public class EmployeeService {
 
     private void appendEmployeeListWhereClause(StringBuilder sql, String searchTerm, java.util.UUID companyId,
             String status, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
-            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo, String sector) {
         boolean hasSearch = searchTerm != null && !searchTerm.trim().isEmpty();
         if (hasSearch) {
             sql.append("AND (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
@@ -1374,37 +1432,69 @@ public class EmployeeService {
                     .append("OR UPPER(COALESCE(e.cpf, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
                     .append("OR UPPER(COALESCE(e.matricula_esocial, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
                     .append("OR UPPER(COALESCE(e.registration_number, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(p.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(wp.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(d.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(u.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
                     .append("OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND (")
                     .append("    REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
                     .append("    OR REGEXP_REPLACE(COALESCE(e.cpf, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
                     .append("    OR REGEXP_REPLACE(COALESCE(e.matricula_esocial, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
                     .append("    OR REGEXP_REPLACE(COALESCE(e.registration_number, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')")
-                    .append(")) ")
-                    .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) ");
+                    .append("))) ");
         }
         if (companyId != null) {
             sql.append("AND e.company_id = :companyId ");
         }
         if (status != null && !status.isBlank()) {
-            sql.append("AND CAST(e.status AS text) = :status ");
+            if ("TERMINATED".equalsIgnoreCase(status.trim())) {
+                sql.append("AND (CAST(e.status AS text) = :status OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED')) ");
+            } else {
+                sql.append("AND CAST(e.status AS text) = :status ");
+            }
         }
-        if (hireDateFrom != null) {
-            sql.append("AND e.hire_date >= :hireDateFrom ");
+        List<String> sectorList = (sector != null && !sector.isBlank())
+                ? java.util.Arrays.stream(sector.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(java.util.stream.Collectors.toList())
+                : java.util.Collections.emptyList();
+        if (!sectorList.isEmpty()) {
+            sql.append("AND (");
+            for (int i = 0; i < sectorList.size(); i++) {
+                if (i > 0) sql.append(" OR ");
+                String pName = "secStatsParam" + i;
+                sql.append("(UPPER(COALESCE(wp.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
+                        .append("OR UPPER(COALESCE(d.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
+                        .append("OR UPPER(COALESCE(u.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
+                        .append("OR (NULLIF(REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '') IS NOT NULL AND (")
+                        .append("    REGEXP_REPLACE(COALESCE(wp.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%') ")
+                        .append("    OR REGEXP_REPLACE(COALESCE(d.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%') ")
+                        .append("    OR REGEXP_REPLACE(COALESCE(u.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%')")
+                        .append("))) ");
+            }
+            sql.append(") ");
         }
-        if (hireDateTo != null) {
-            sql.append("AND e.hire_date <= :hireDateTo ");
+        if (hireDateFrom != null && hireDateTo != null) {
+            sql.append("AND ((e.hire_date >= :hireDateFrom AND e.hire_date <= :hireDateTo) OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.hire_date >= :hireDateFrom AND p.hire_date <= :hireDateTo)) ");
+        } else if (hireDateFrom != null) {
+            sql.append("AND (e.hire_date >= :hireDateFrom OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.hire_date >= :hireDateFrom)) ");
+        } else if (hireDateTo != null) {
+            sql.append("AND (e.hire_date <= :hireDateTo OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.hire_date <= :hireDateTo)) ");
         }
-        if (terminationDateFrom != null) {
-            sql.append("AND COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom ");
-        }
-        if (terminationDateTo != null) {
-            sql.append("AND COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo ");
+        if (terminationDateFrom != null && terminationDateTo != null) {
+            sql.append("AND ((COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom AND COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo) OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED' AND p.termination_date >= :terminationDateFrom AND p.termination_date <= :terminationDateTo)) ");
+        } else if (terminationDateFrom != null) {
+            sql.append("AND (COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED' AND p.termination_date >= :terminationDateFrom)) ");
+        } else if (terminationDateTo != null) {
+            sql.append("AND (COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED' AND p.termination_date <= :terminationDateTo)) ");
         }
     }
 
     private void bindEmployeeListWhereParams(jakarta.persistence.Query q, String searchTerm, java.util.UUID companyId,
             String status, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
-            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo, String sector) {
         if (searchTerm != null && !searchTerm.trim().isEmpty()) {
             q.setParameter("searchTerm", searchTerm.trim());
         }
@@ -1413,6 +1503,15 @@ public class EmployeeService {
         }
         if (status != null && !status.isBlank()) {
             q.setParameter("status", status);
+        }
+        List<String> sectorList = (sector != null && !sector.isBlank())
+                ? java.util.Arrays.stream(sector.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(java.util.stream.Collectors.toList())
+                : java.util.Collections.emptyList();
+        for (int i = 0; i < sectorList.size(); i++) {
+            q.setParameter("secStatsParam" + i, sectorList.get(i));
         }
         if (hireDateFrom != null) {
             q.setParameter("hireDateFrom", hireDateFrom);
@@ -1435,20 +1534,31 @@ public class EmployeeService {
     public Map<String, Long> getStatsFiltered(String searchTerm, java.util.UUID companyId, String status,
             java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
             java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+        return getStatsFiltered(searchTerm, companyId, status, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> getStatsFiltered(String searchTerm, java.util.UUID companyId, String status,
+            java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo, String sector) {
         // CAST explícito — evita ::bigint, que o Hibernate confunde com parâmetro nomeado :bigint
         StringBuilder sql = new StringBuilder(
                 "SELECT CAST(COUNT(*) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'ACTIVE' THEN 1 ELSE 0 END), 0) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'VACATION' THEN 1 ELSE 0 END), 0) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) IN ('MEDICAL_CERTIFICATE', 'MATERNITY_LEAVE') THEN 1 ELSE 0 END), 0) AS bigint), "
-                        + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'TERMINATED' THEN 1 ELSE 0 END), 0) AS bigint), "
+                        + "CAST(COALESCE(SUM(CASE WHEN (CAST(e.status AS text) = 'TERMINATED' OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED')) THEN 1 ELSE 0 END), 0) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'SUSPENDED' THEN 1 ELSE 0 END), 0) AS bigint) "
-                        + "FROM employees e WHERE 1=1 ");
+                        + "FROM employees e "
+                        + "LEFT JOIN work_posts wp ON e.work_post_id = wp.id "
+                        + "LEFT JOIN departments d ON e.department_id = d.id "
+                        + "LEFT JOIN units u ON e.unit_id = u.id "
+                        + "WHERE 1=1 ");
         appendEmployeeListWhereClause(sql, searchTerm, companyId, status, hireDateFrom, hireDateTo,
-                terminationDateFrom, terminationDateTo);
+                terminationDateFrom, terminationDateTo, sector);
         Query q = entityManager.createNativeQuery(sql.toString());
         bindEmployeeListWhereParams(q, searchTerm, companyId, status, hireDateFrom, hireDateTo,
-                terminationDateFrom, terminationDateTo);
+                terminationDateFrom, terminationDateTo, sector);
         Object result = q.getSingleResult();
         Object[] row = result instanceof Object[] ? (Object[]) result : new Object[] { result };
         Map<String, Long> stats = new HashMap<>();
@@ -1487,33 +1597,8 @@ public class EmployeeService {
      * Se companyId for null, retorna totais globais. Caso contrário, retorna totais da empresa.
      */
     @Transactional(readOnly = true)
-    public Map<String, Long> getStatsByCompany(UUID companyId) {
-        long total, active, vacation, medicalCertificate, terminated, suspended;
-        if (companyId == null) {
-            total = employeeRepository.count();
-            active = employeeRepository.countByStatus(EmploymentStatus.ACTIVE);
-            vacation = employeeRepository.countByStatus(EmploymentStatus.VACATION);
-            medicalCertificate = employeeRepository.countByStatus(EmploymentStatus.MEDICAL_CERTIFICATE)
-                    + employeeRepository.countByStatus(EmploymentStatus.MATERNITY_LEAVE);
-            terminated = employeeRepository.countByStatus(EmploymentStatus.TERMINATED);
-            suspended = employeeRepository.countByStatus(EmploymentStatus.SUSPENDED);
-        } else {
-            total = employeeRepository.countByCompanyId(companyId);
-            active = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.ACTIVE);
-            vacation = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.VACATION);
-            medicalCertificate = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.MEDICAL_CERTIFICATE)
-                    + employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.MATERNITY_LEAVE);
-            terminated = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.TERMINATED);
-            suspended = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.SUSPENDED);
-        }
-        Map<String, Long> stats = new HashMap<>();
-        stats.put("total", total);
-        stats.put("active", active);
-        stats.put("vacation", vacation);
-        stats.put("medicalCertificate", medicalCertificate);
-        stats.put("terminated", terminated);
-        stats.put("suspended", suspended);
-        return stats;
+    public Map<String, Long> getStats(java.util.UUID companyId) {
+        return getStatsFiltered(null, companyId, null, null, null, null, null, null);
     }
 
     public List<Employee> findByUnit(UUID unitId) {
@@ -1567,7 +1652,6 @@ public class EmployeeService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "employees", key = "'basic-data'")
     public List<Object[]> findBasicData() {
         try {
             System.out.println("🔍 EmployeeService.findBasicData - Buscando dados básicos");
@@ -1582,7 +1666,6 @@ public class EmployeeService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "employees", key = "'search-' + #searchTerm")
     public List<Object[]> findBasicDataBySearchTerm(String searchTerm) {
         try {
             System.out.println("🔍 EmployeeService.findBasicDataBySearchTerm - Buscando por termo: " + searchTerm);
@@ -1601,24 +1684,20 @@ public class EmployeeService {
      * Dados básicos de funcionários com aniversário no mês informado (1–12).
      */
     @Transactional(readOnly = true)
-    @Cacheable(value = "employees", key = "'birthdays-' + #month + '-' + #onlyActive + '-' + #companyId")
     public List<Object[]> findBasicDataByBirthMonth(int month, boolean onlyActive, java.util.UUID companyId) {
-        if (month < 1 || month > 12) {
-            throw new IllegalArgumentException("Mês deve estar entre 1 e 12");
-        }
-        int onlyActiveFlag = onlyActive ? 1 : 0;
-        int companyFilter = companyId != null ? 1 : 0;
         try {
+            Boolean onlyActiveFlag = onlyActive ? Boolean.TRUE : null;
+            java.util.UUID companyFilter = companyId;
             System.out.println("🔍 EmployeeService.findBasicDataByBirthMonth - month=" + month + " onlyActive="
                     + onlyActive + " companyId=" + companyId);
             List<Object[]> data = employeeRepository.findBasicDataByBirthMonth(month, onlyActiveFlag, companyFilter,
-                    companyId);
+                    null);
             System.out.println("✅ EmployeeService.findBasicDataByBirthMonth - " + data.size() + " registros");
             return data;
         } catch (Exception e) {
             System.err.println("❌ EmployeeService.findBasicDataByBirthMonth - Erro: " + e.getMessage());
             e.printStackTrace();
-            throw new RuntimeException("Erro ao buscar aniversariantes: " + e.getMessage(), e);
+            throw new RuntimeException("Erro ao buscar aniversariantes do mês: " + e.getMessage(), e);
         }
     }
 
@@ -1628,7 +1707,7 @@ public class EmployeeService {
      */
     @Transactional(readOnly = true)
     public List<Object[]> findBasicDataPaged(int page, int size, java.util.UUID companyId, String status) {
-        return findBasicDataPaged(page, size, companyId, status, null, null);
+        return findBasicDataPaged(page, size, companyId, status, null, null, null, null, null, null, null);
     }
 
     /**
@@ -1638,14 +1717,20 @@ public class EmployeeService {
     @Transactional(readOnly = true)
     public List<Object[]> findBasicDataPaged(int page, int size, java.util.UUID companyId, String status,
             String sortBy, String sortDir) {
-        return findBasicDataPaged(page, size, companyId, status, sortBy, sortDir, null, null, null, null);
+        return findBasicDataPaged(page, size, companyId, status, sortBy, sortDir, null, null, null, null, null);
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "employees", key = "'paged-' + #page + '-' + #size + '-' + #companyId + '-' + #status + '-' + #sortBy + '-' + #sortDir + '-' + #hireDateFrom + '-' + #hireDateTo + '-' + #terminationDateFrom + '-' + #terminationDateTo")
     public List<Object[]> findBasicDataPaged(int page, int size, java.util.UUID companyId, String status,
             String sortBy, String sortDir, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
             java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+        return findBasicDataPaged(page, size, companyId, status, sortBy, sortDir, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Object[]> findBasicDataPaged(int page, int size, java.util.UUID companyId, String status,
+            String sortBy, String sortDir, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo, String sector) {
         try {
             int pageSize = Math.min(Math.max(size, 1), 500);
             int offset = Math.max(page, 0) * pageSize;
@@ -1653,16 +1738,9 @@ public class EmployeeService {
                     "🔍 EmployeeService.findBasicDataPaged - page=" + page + " size=" + pageSize + " offset=" + offset
                             + " companyId=" + companyId + " status=" + status + " sortBy=" + sortBy + " sortDir="
                             + sortDir + " hireDateFrom=" + hireDateFrom + " hireDateTo=" + hireDateTo
-                            + " terminationDateFrom=" + terminationDateFrom + " terminationDateTo=" + terminationDateTo);
-            List<Object[]> data;
-            if (useNativeBasicDataQuery(sortBy, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo)) {
-                data = findBasicDataPagedNative(null, companyId, status, pageSize, offset, sortBy, sortDir,
-                        hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo);
-            } else {
-                data = companyId == null
-                        ? employeeRepository.findBasicDataPaged(pageSize, offset, status)
-                        : employeeRepository.findBasicDataPagedByCompany(pageSize, offset, companyId, status);
-            }
+                            + " terminationDateFrom=" + terminationDateFrom + " terminationDateTo=" + terminationDateTo + " sector=" + sector);
+            List<Object[]> data = findBasicDataPagedNative(null, companyId, status, pageSize, offset, sortBy, sortDir,
+                    hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sector);
             System.out.println("✅ EmployeeService.findBasicDataPaged - Encontrados " + data.size() + " registros");
             return data;
         } catch (Exception e) {
@@ -1678,21 +1756,27 @@ public class EmployeeService {
      */
     @Transactional(readOnly = true)
     public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size, java.util.UUID companyId, String status) {
-        return findBasicDataBySearchTermPaged(searchTerm, page, size, companyId, status, null, null);
+        return findBasicDataBySearchTermPaged(searchTerm, page, size, companyId, status, null, null, null, null, null, null, null);
     }
 
     @Transactional(readOnly = true)
     public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size, java.util.UUID companyId, String status,
             String sortBy, String sortDir) {
         return findBasicDataBySearchTermPaged(searchTerm, page, size, companyId, status, sortBy, sortDir, null, null,
-                null, null);
+                null, null, null);
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "employees", key = "'search-paged-' + #searchTerm + '-' + #page + '-' + #size + '-' + #companyId + '-' + #status + '-' + #sortBy + '-' + #sortDir + '-' + #hireDateFrom + '-' + #hireDateTo + '-' + #terminationDateFrom + '-' + #terminationDateTo")
+    public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size, java.util.UUID companyId, String status,
+            String sortBy, String sortDir, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+        return findBasicDataBySearchTermPaged(searchTerm, page, size, companyId, status, sortBy, sortDir, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, null);
+    }
+
+    @Transactional(readOnly = true)
     public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size, java.util.UUID companyId,
             String status, String sortBy, String sortDir, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
-            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo, String sector) {
         try {
             int pageSize = Math.min(Math.max(size, 1), 500);
             int offset = Math.max(page, 0) * pageSize;
@@ -1700,17 +1784,9 @@ public class EmployeeService {
                     + page + " size=" + pageSize + " offset=" + offset + " companyId=" + companyId + " status="
                     + status + " sortBy=" + sortBy + " sortDir=" + sortDir + " hireDateFrom=" + hireDateFrom
                     + " hireDateTo=" + hireDateTo + " terminationDateFrom=" + terminationDateFrom
-                    + " terminationDateTo=" + terminationDateTo);
-            List<Object[]> data;
-            if (useNativeBasicDataQuery(sortBy, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo)) {
-                data = findBasicDataPagedNative(searchTerm, companyId, status, pageSize, offset, sortBy, sortDir,
-                        hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo);
-            } else {
-                data = companyId == null
-                        ? employeeRepository.findBasicDataBySearchTermPaged(searchTerm, pageSize, offset, status)
-                        : employeeRepository.findBasicDataBySearchTermPagedByCompany(searchTerm, pageSize, offset,
-                                companyId, status);
-            }
+                    + " terminationDateTo=" + terminationDateTo + " sector=" + sector);
+            List<Object[]> data = findBasicDataPagedNative(searchTerm, companyId, status, pageSize, offset, sortBy, sortDir,
+                    hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sector);
             System.out.println(
                     "✅ EmployeeService.findBasicDataBySearchTermPaged - Encontrados " + data.size() + " registros");
             return data;
@@ -2527,13 +2603,51 @@ public class EmployeeService {
 
             try {
                 if (e.getId() != null) {
-                    dto.setPeriodCount(employmentPeriodService.countByEmployeeId(e.getId()));
+                    List<com.z7design.secured_guard.dto.EmployeeEmploymentPeriodDTO> periods = employmentPeriodService.findByEmployeeId(e.getId());
+                    int pCount = periods != null ? periods.size() : 0;
+                    dto.setPeriodCount(pCount);
+                    dto.setIsReadmitido(pCount > 1);
+
+                    if (periods != null && periods.size() > 1) {
+                        com.z7design.secured_guard.dto.EmployeeEmploymentPeriodDTO prev = periods.stream()
+                                .filter(p -> "TERMINATED".equalsIgnoreCase(p.getStatus()) || p.getTerminationDate() != null)
+                                .findFirst()
+                                .orElse(periods.get(1));
+                        if (prev != null) {
+                            dto.setPreviousStatus(prev.getStatus());
+                            dto.setPreviousTerminationDate(prev.getTerminationDate());
+                            dto.setPreviousTerminationReason(prev.getTerminationReason());
+                            String prevWp = prev.getWorkPostName() != null && !prev.getWorkPostName().isBlank()
+                                    ? prev.getWorkPostName()
+                                    : (prev.getDepartmentName() != null ? prev.getDepartmentName() : null);
+                            if (prevWp != null) {
+                                dto.setPreviousWorkPostName(prevWp);
+                            }
+                        }
+                    }
+
+                    if (employeeChangeHistoryRepository != null) {
+                        employeeChangeHistoryRepository
+                                .findFirstByEmployeeIdAndCategoryOrderByChangedAtDesc(e.getId(), com.z7design.secured_guard.model.enums.EmployeeChangeCategory.CARGO)
+                                .ifPresent(history -> {
+                                    if (history.getChangedAt() != null) {
+                                        dto.setLastPromotionDate(history.getChangedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDate());
+                                    }
+                                    String info = "Promovido";
+                                    if (history.getNewValue() != null && !history.getNewValue().isBlank()) {
+                                        info += " para " + history.getNewValue();
+                                    }
+                                    dto.setLastPromotionInfo(info);
+                                });
+                    }
                 } else {
                     dto.setPeriodCount(0);
+                    dto.setIsReadmitido(false);
                 }
             } catch (Exception periodEx) {
-                System.err.println("[WARNING] Erro ao mapear periodCount: " + periodEx.getMessage());
+                System.err.println("[WARNING] Erro ao mapear periodCount e promoções: " + periodEx.getMessage());
                 dto.setPeriodCount(0);
+                dto.setIsReadmitido(false);
             }
 
             System.out.println("[DEBUG] DTO criado com sucesso para: " + dto.getName());
@@ -2600,15 +2714,16 @@ public class EmployeeService {
         if (dto.getHireDate() == null) {
             throw new IllegalArgumentException("Data de admissão é obrigatória");
         }
+        UUID companyId = dto.getCompanyId();
         if (excludeId == null) {
-            // Permite nova admissão se o funcionário anterior com este CPF foi demitido (TERMINATED).
-            // Só bloqueia se existir registro ATIVO (não demitido) com o mesmo CPF.
+            // O mesmo CPF não pode estar ATIVO em mais de uma empresa no sistema.
+            // Só é permitida nova admissão/cadastro se o contrato anterior estiver encerrado (TERMINATED).
             if (documentAlreadyRegisteredAndNotTerminated(dto.getCpf())) {
-                throw new IllegalArgumentException("CPF já cadastrado para funcionário ativo no sistema");
+                throw new IllegalArgumentException("CPF já cadastrado para funcionário ativo no sistema. O mesmo CPF não pode estar ativo em mais de uma empresa simultaneamente.");
             }
         } else if (!isSameDocument(dto.getCpf(), existingDocument)
-                && documentAlreadyRegisteredByOther(dto.getCpf(), excludeId)) {
-            throw new IllegalArgumentException("CPF já cadastrado para outro funcionário");
+                && documentAlreadyRegisteredAndNotTerminatedExcludingId(dto.getCpf(), excludeId)) {
+            throw new IllegalArgumentException("CPF já cadastrado para outro funcionário ativo no sistema. O mesmo CPF não pode estar ativo em mais de uma empresa simultaneamente.");
         }
         if (cpfUsedByDependent(cpfDigits)) {
             throw new IllegalArgumentException("CPF já cadastrado como dependente no sistema");
@@ -2628,8 +2743,8 @@ public class EmployeeService {
     }
 
     /**
-     * Verifica se existe funcionário com este CPF/documento que NÃO esteja demitido.
-     * Permite nova admissão quando o cadastro anterior foi encerrado (TERMINATED).
+     * Verifica se existe funcionário com este CPF/documento que NÃO esteja demitido em qualquer empresa no sistema.
+     * Impede que o mesmo CPF esteja ATIVO em mais de uma empresa simultaneamente.
      */
     private boolean documentAlreadyRegisteredAndNotTerminated(String document) {
         String normalized = normalizeDocumentDigits(document);
@@ -2639,12 +2754,12 @@ public class EmployeeService {
         return employeeRepository.existsByNormalizedDocumentAndNotTerminated(normalized);
     }
 
-    private boolean documentAlreadyRegisteredByOther(String document, UUID excludeId) {
+    private boolean documentAlreadyRegisteredAndNotTerminatedExcludingId(String document, UUID excludeId) {
         String normalized = normalizeDocumentDigits(document);
         if (normalized == null) {
             return false;
         }
-        return employeeRepository.existsByNormalizedDocumentExcludingId(normalized, excludeId);
+        return employeeRepository.existsByNormalizedDocumentAndNotTerminatedExcludingId(normalized, excludeId);
     }
 
     /**
@@ -2768,5 +2883,84 @@ public class EmployeeService {
 
         log.debug("Dados básicos encontrados para funcionário: {}", employee.getName());
         return data;
+    }
+
+    /**
+     * Consulta se um CPF (ou documento equivalente) já possui cadastro prévio no sistema.
+     * Retorna os dados cadastrais pessoais para preenchimento no formulário de admissão.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> checkCpfStatus(String cpf) {
+        Map<String, Object> response = new HashMap<>();
+        if (cpf == null || cpf.trim().isEmpty()) {
+            response.put("exists", false);
+            return response;
+        }
+
+        String normalizedCpf = cpf.replaceAll("[^0-9]", "").trim();
+        if (normalizedCpf.length() < 11) {
+            response.put("exists", false);
+            return response;
+        }
+
+        List<Employee> list = employeeRepository.findAllByNormalizedCpf(normalizedCpf);
+        if (list.isEmpty()) {
+            response.put("exists", false);
+            return response;
+        }
+
+        Employee emp = list.get(0); // Mais recente
+        response.put("exists", true);
+        response.put("employeeId", emp.getId() != null ? emp.getId().toString() : null);
+        response.put("name", emp.getName());
+        response.put("cpf", emp.getCpf() != null ? emp.getCpf() : emp.getDocument());
+        response.put("status", emp.getStatus() != null ? emp.getStatus().name() : "INACTIVE");
+        response.put("currentWorkPostName", emp.getWorkPost() != null ? emp.getWorkPost().getName() : null);
+        response.put("currentPositionName", emp.getPosition() != null ? emp.getPosition().getName() : null);
+        response.put("companyId", emp.getCompany() != null && emp.getCompany().getId() != null ? emp.getCompany().getId().toString() : null);
+        response.put("companyName", emp.getCompany() != null ? (emp.getCompany().getSigla() != null ? emp.getCompany().getSigla() : emp.getCompany().getName()) : null);
+
+        // Dados Pessoais para Reaproveitamento
+        response.put("birthDate", emp.getBirthDate() != null ? emp.getBirthDate().toString() : null);
+        response.put("rg", emp.getRg() != null ? emp.getRg() : emp.getNumeroRg());
+        response.put("motherName", emp.getNomeMae());
+        response.put("fatherName", emp.getNomePai());
+        response.put("email", emp.getEmail());
+        response.put("phone", emp.getPhone() != null ? emp.getPhone() : emp.getTelefoneContato());
+        response.put("sexo", emp.getSexo());
+        response.put("maritalStatus", emp.getMaritalStatus());
+        response.put("grauInstrucao", emp.getGrauInstrucao());
+        response.put("nationality", emp.getNationality());
+
+        // Endereço
+        response.put("enderecoRua", emp.getEnderecoRua());
+        response.put("enderecoNumero", emp.getEnderecoNumero());
+        response.put("enderecoComplemento", emp.getEnderecoComplemento());
+        response.put("enderecoBairro", emp.getEnderecoBairro());
+        response.put("enderecoCidade", emp.getEnderecoCidade());
+        response.put("enderecoEstado", emp.getEnderecoEstado());
+        response.put("enderecoCep", emp.getEnderecoCep());
+
+        // Documentos Adicionais
+        response.put("ctps", emp.getCtps());
+        response.put("ctpsSeries", emp.getCtpsSeries());
+        response.put("pis", emp.getPis());
+        response.put("cbo", emp.getCbo());
+        response.put("cnhNumber", emp.getCnhNumber());
+        response.put("cnhCategory", emp.getCnhCategory());
+        response.put("cnhExpirationDate", emp.getCnhExpirationDate() != null ? emp.getCnhExpirationDate().toString() : null);
+        response.put("matriculaEsocial", emp.getMatriculaEsocial());
+
+        // Dados Bancários
+        Map<String, String> bankInfo = new HashMap<>();
+        bankInfo.put("bank", emp.getBanco());
+        bankInfo.put("agency", emp.getAgencia());
+        bankInfo.put("account", emp.getContaCorrente());
+        bankInfo.put("accountDigit", emp.getContaDigito());
+        bankInfo.put("pixKey", emp.getPixKey());
+        bankInfo.put("accountType", emp.getAccountType());
+        response.put("bankInfo", bankInfo);
+
+        return response;
     }
 }
