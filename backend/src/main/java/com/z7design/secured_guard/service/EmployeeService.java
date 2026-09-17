@@ -1686,12 +1686,12 @@ public class EmployeeService {
     @Transactional(readOnly = true)
     public List<Object[]> findBasicDataByBirthMonth(int month, boolean onlyActive, java.util.UUID companyId) {
         try {
-            Boolean onlyActiveFlag = onlyActive ? Boolean.TRUE : null;
-            java.util.UUID companyFilter = companyId;
+            int onlyActiveFlag = onlyActive ? 1 : 0;
+            int companyFilterFlag = companyId != null ? 1 : 0;
             System.out.println("🔍 EmployeeService.findBasicDataByBirthMonth - month=" + month + " onlyActive="
                     + onlyActive + " companyId=" + companyId);
-            List<Object[]> data = employeeRepository.findBasicDataByBirthMonth(month, onlyActiveFlag, companyFilter,
-                    null);
+            List<Object[]> data = employeeRepository.findBasicDataByBirthMonth(month, onlyActiveFlag, companyFilterFlag,
+                    companyId);
             System.out.println("✅ EmployeeService.findBasicDataByBirthMonth - " + data.size() + " registros");
             return data;
         } catch (Exception e) {
