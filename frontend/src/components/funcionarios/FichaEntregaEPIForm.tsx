@@ -82,6 +82,8 @@ const emptyEpiRow = () => ({
   stockItemId: '',
   dataSubstituicao: '',
   motivoSubstituicao: '',
+  dataDevolucao: '',
+  motivoDevolucao: '',
 });
 
 const MIN_EMPLOYEE_SEARCH_CHARS = 3;
@@ -150,6 +152,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
             stockItemId: item.stockItemId || '',
             dataSubstituicao: (item as any).substitutedDate || '',
             motivoSubstituicao: (item as any).replacementReason || '',
+            dataDevolucao: (item as any).returnedDate || '',
+            motivoDevolucao: (item as any).returnReason || '',
           })));
           
           // Trigger data resolution for employee and company
@@ -651,6 +655,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       stockItemId: epi.stockItemId && epi.stockItemId !== 'none' ? epi.stockItemId : undefined,
       substitutedDate: epi.dataSubstituicao || undefined,
       replacementReason: epi.motivoSubstituicao || undefined,
+      returnedDate: epi.dataDevolucao || undefined,
+      returnReason: epi.motivoDevolucao || undefined,
     }));
 
   /** Na conclusão, todo item deve gerar baixa no estoque. */
@@ -666,6 +672,15 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
     }
     if (source.some(epi => epi.nome === 'Uniforme de Trabalho' && epi.uniformeTipo === 'INDIVIDUAL' && !epi.uniformePeca)) {
       return 'Para Uniforme de Trabalho Individual, selecione a peça específica!';
+    }
+
+    // Se a entrega for de Devolução ou se algum item tiver motivo de devolução, garante a data de devolução
+    for (const epi of source) {
+      if (form.tipoEntrega === 'DEVOLUCAO' || epi.motivoDevolucao || epi.dataDevolucao) {
+        if (!epi.dataDevolucao || !epi.dataDevolucao.trim()) {
+          epi.dataDevolucao = form.dataEntrega || todayIsoDateLocal();
+        }
+      }
     }
 
     // Validação NR-6 Grupo 1 (Colete, Calçado/Bota, Capa de Chuva, Óculos, Protetor, Capacete, Luva)
@@ -1505,8 +1520,50 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                   </div>
 
                   <CardContent className="p-6 pt-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Badge variant="secondary" className="font-mono">#{idx + 1}</Badge>
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="font-mono">#{idx + 1}</Badge>
+                        {epi.dataSubstituicao ? (
+                          <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs">
+                            🔄 Devolvido / Substituído (Estorno no Estoque)
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs">
+                            ✅ Item Entregue / Ativo
+                          </Badge>
+                        )}
+                      </div>
+                      {!epi.dataSubstituicao && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7 gap-1.5 border-amber-500/60 text-amber-300 hover:bg-amber-500/10"
+                          onClick={() => {
+                            handleEpiChange(idx, 'dataSubstituicao', todayIsoDateLocal());
+                            handleEpiChange(idx, 'motivoSubstituicao', 'Devolvido ao Estoque - Tamanho Incorreto');
+                            setEpis(prev => [
+                              ...prev.slice(0, idx + 1),
+                              {
+                                ...emptyEpiRow(),
+                                nome: epi.nome,
+                                ca: epi.ca,
+                                caName: epi.caName,
+                                validade: epi.validade,
+                                uniformeTipo: epi.uniformeTipo,
+                                uniformePeca: epi.uniformePeca,
+                              },
+                              ...prev.slice(idx + 1),
+                            ]);
+                            toast({
+                              title: 'Troca por Tamanho Incorreto Registrada',
+                              description: 'O item foi marcado como devolvido (estorno no estoque). Um novo item foi inserido para selecionar o tamanho correto.',
+                            });
+                          }}
+                        >
+                          🔄 Registrar Troca / Devolução (Tamanho Incorreto)
+                        </Button>
+                      )}
                     </div>
 
                     <div className="space-y-4">
@@ -1885,6 +1942,42 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                           </p>
                         </div>
                       </div>
+
+                      {/* Devolução — preenche colunas DEVOLUÇÃO / MOTIVO DA DEVOLUÇÃO no PDF */}
+                      {(form.tipoEntrega === 'DEVOLUCAO' || epi.dataDevolucao || epi.motivoDevolucao) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                              Data da Devolução
+                              <Badge variant="outline" className="text-[10px] h-4">PDF</Badge>
+                            </Label>
+                            <Input
+                              type="date"
+                              value={epi.dataDevolucao || ''}
+                              onChange={(e) => handleEpiChange(idx, 'dataDevolucao', e.target.value)}
+                              className="bg-background"
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                              Data exibida na coluna DEVOLUÇÃO da ficha.
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                              Motivo da Devolução
+                              <Badge variant="outline" className="text-[10px] h-4">PDF</Badge>
+                            </Label>
+                            <Input
+                              value={epi.motivoDevolucao || ''}
+                              onChange={(e) => handleEpiChange(idx, 'motivoDevolucao', e.target.value)}
+                              placeholder="Ex.: demissão, devolução de equipamento..."
+                              className="bg-background"
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                              Texto da coluna MOTIVO DA DEVOLUÇÃO no PDF.
+                            </p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Observações do Item (sempre visível) */}
                       <div className="space-y-2">

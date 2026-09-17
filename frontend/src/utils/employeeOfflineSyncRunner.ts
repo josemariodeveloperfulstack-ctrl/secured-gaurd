@@ -78,12 +78,20 @@ export async function runPendingEmployeeSync(
         synced.push(item);
         onItemSynced?.({ item, employee: employee || undefined });
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Falha ao sincronizar';
-        await markEmployeeSyncAttempt(userKey, item.id, message);
-        failed.push(item);
+        const responseStatus = (error as any)?.response?.status;
+        const isValidationError = responseStatus === 400 || responseStatus === 409 || responseStatus === 422;
 
-        if (isRetryableConnectionError(error)) {
-          break;
+        if (isValidationError || item.attempts >= 4) {
+          console.warn(`[OfflineSync] Removendo item da fila offline devido a erro definitivo (${responseStatus}):`, error);
+          await removeEmployeeSyncItem(userKey, item.id);
+        } else {
+          const message = (error as any)?.response?.data?.message || (error instanceof Error ? error.message : 'Falha ao sincronizar');
+          await markEmployeeSyncAttempt(userKey, item.id, message);
+          failed.push(item);
+
+          if (isRetryableConnectionError(error)) {
+            break;
+          }
         }
       }
     }

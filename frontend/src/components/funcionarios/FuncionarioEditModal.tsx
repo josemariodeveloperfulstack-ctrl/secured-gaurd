@@ -1468,13 +1468,16 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     }
   };
 
+  const toYyyyMmDdStr = (val: any) => (val ? String(val).trim().split('T')[0] : '');
+
   const handleRehireAdmissionTypeChange = (type: EmploymentAdmissionType) => {
     setRehireAdmissionType(type);
-    const prevHire = eligibleRehireEmployee?.hireDate;
+    const prevHireStr = toYyyyMmDdStr(eligibleRehireEmployee?.hireDate);
+    const currentHireStr = toYyyyMmDdStr(form.hireDate);
     setForm((prev) => ({
       ...prev,
       status: 'ACTIVE',
-      hireDate: prev.hireDate === prevHire ? '' : prev.hireDate,
+      hireDate: currentHireStr === prevHireStr ? '' : prev.hireDate,
     }));
   };
 
@@ -1583,8 +1586,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         setError('Informe a nova data de admissão para a recontratação.');
         return;
       }
-      const prevHire = eligibleRehireEmployee?.hireDate;
-      if (prevHire && form.hireDate === prevHire) {
+      const prevHireStr = toYyyyMmDdStr(eligibleRehireEmployee?.hireDate);
+      const newHireStr = toYyyyMmDdStr(form.hireDate);
+      if (prevHireStr && newHireStr && prevHireStr === newHireStr) {
         setError('A nova data de admissão deve ser diferente da data do vínculo anterior (preservada no histórico).');
         return;
       }

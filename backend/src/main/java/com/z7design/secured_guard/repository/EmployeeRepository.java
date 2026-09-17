@@ -18,7 +18,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
 
         Optional<Employee> findByEmail(String email);
 
-        Optional<Employee> findByUserId(UUID userId);
+        @Query(value = "SELECT * FROM employees WHERE user_id = :userId ORDER BY CASE WHEN status <> 'TERMINATED' THEN 0 ELSE 1 END, created_at DESC LIMIT 1", nativeQuery = true)
+        Optional<Employee> findByUserId(@Param("userId") UUID userId);
 
         List<Employee> findByStatus(EmploymentStatus status);
         long countByStatus(EmploymentStatus status);
@@ -45,6 +46,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         @Param("normalizedDocument") String normalizedDocument,
                         @Param("excludeId") UUID excludeId);
 
+        List<Employee> findAllByUserId(UUID userId);
+
         /**
          * Verifica se existe funcionário com este CPF/documento que NÃO esteja demitido (TERMINATED).
          * Usado para permitir nova admissão quando o cadastro anterior foi encerrado.
@@ -57,6 +60,43 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         nativeQuery = true)
         boolean existsByNormalizedDocumentAndNotTerminated(@Param("normalizedDocument") String normalizedDocument);
 
+        @Query(value = "SELECT EXISTS(" +
+                        "SELECT 1 FROM employees WHERE id != :excludeId AND " +
+                        "(REGEXP_REPLACE(COALESCE(document, ''), '[^0-9]', '', 'g') = :normalizedDocument " +
+                        " OR REGEXP_REPLACE(COALESCE(cpf, ''), '[^0-9]', '', 'g') = :normalizedDocument) " +
+                        "AND CAST(status AS text) <> 'TERMINATED')",
+                        nativeQuery = true)
+        boolean existsByNormalizedDocumentAndNotTerminatedExcludingId(
+                        @Param("normalizedDocument") String normalizedDocument,
+                        @Param("excludeId") UUID excludeId);
+
+        /**
+         * Verifica se existe funcionário ATIVO (não demitido) com este CPF/documento na MESMA empresa.
+         * Permite cadastrar o mesmo CPF em empresas diferentes ou na mesma empresa se o cadastro anterior estiver demitido.
+         */
+        @Query(value = "SELECT EXISTS(" +
+                        "SELECT 1 FROM employees WHERE " +
+                        "(REGEXP_REPLACE(COALESCE(document, ''), '[^0-9]', '', 'g') = :normalizedDocument " +
+                        " OR REGEXP_REPLACE(COALESCE(cpf, ''), '[^0-9]', '', 'g') = :normalizedDocument) " +
+                        "AND CAST(status AS text) <> 'TERMINATED' " +
+                        "AND (CAST(:companyId AS uuid) IS NULL OR company_id = CAST(:companyId AS uuid)))",
+                        nativeQuery = true)
+        boolean existsByNormalizedDocumentAndCompanyIdAndNotTerminated(
+                        @Param("normalizedDocument") String normalizedDocument,
+                        @Param("companyId") UUID companyId);
+
+        @Query(value = "SELECT EXISTS(" +
+                        "SELECT 1 FROM employees WHERE id != :excludeId AND " +
+                        "(REGEXP_REPLACE(COALESCE(document, ''), '[^0-9]', '', 'g') = :normalizedDocument " +
+                        " OR REGEXP_REPLACE(COALESCE(cpf, ''), '[^0-9]', '', 'g') = :normalizedDocument) " +
+                        "AND CAST(status AS text) <> 'TERMINATED' " +
+                        "AND (CAST(:companyId AS uuid) IS NULL OR company_id = CAST(:companyId AS uuid)))",
+                        nativeQuery = true)
+        boolean existsByNormalizedDocumentAndCompanyIdAndNotTerminatedExcludingId(
+                        @Param("normalizedDocument") String normalizedDocument,
+                        @Param("companyId") UUID companyId,
+                        @Param("excludeId") UUID excludeId);
+
         @Query(value = "SELECT * FROM employees WHERE UPPER(TRIM(name)) = UPPER(TRIM(:name)) LIMIT 1", nativeQuery = true)
         Optional<Employee> findByNameIgnoreCase(@Param("name") String name);
 
@@ -66,6 +106,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         // Retorna TODOS os registros com este document (para diagnóstico de duplicatas)
         @Query(value = "SELECT * FROM employees WHERE REGEXP_REPLACE(COALESCE(document, ''), '[^0-9]', '', 'g') = :document", nativeQuery = true)
         List<Employee> findAllByDocument(@Param("document") String document);
+
+        @Query(value = "SELECT * FROM employees WHERE (REGEXP_REPLACE(COALESCE(document, ''), '[^0-9]', '', 'g') = :normalizedDocument OR REGEXP_REPLACE(COALESCE(cpf, ''), '[^0-9]', '', 'g') = :normalizedDocument) ORDER BY created_at DESC", nativeQuery = true)
+        List<Employee> findAllByNormalizedCpf(@Param("normalizedDocument") String normalizedDocument);
 
         // Métodos para envio de holerites
         List<Employee> findByEmailIsNotNullAndEmailNot(String empty);
@@ -135,7 +178,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN companies c ON e.company_id = c.id " +
                         "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
                         "LEFT JOIN departments d ON e.department_id = d.id " +
-                        "WHERE (:status IS NULL OR CAST(e.status AS text) = :status) " +
+                        "WHERE (:status IS NULL OR CAST(e.status AS text) = :status OR (:status = 'TERMINATED' AND EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED'))) " +
                         "ORDER BY e.name ASC " +
                         "LIMIT :limit OFFSET :offset", nativeQuery = true)
         List<Object[]> findBasicDataPaged(@Param("limit") int limit, @Param("offset") int offset, @Param("status") String status);
@@ -149,7 +192,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN companies c ON e.company_id = c.id " +
                         "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
                         "LEFT JOIN departments d ON e.department_id = d.id " +
-                        "WHERE e.company_id = :companyId AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
+                        "WHERE e.company_id = :companyId AND (:status IS NULL OR CAST(e.status AS text) = :status OR (:status = 'TERMINATED' AND EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED'))) " +
                         "ORDER BY e.name ASC " +
                         "LIMIT :limit OFFSET :offset", nativeQuery = true)
         List<Object[]> findBasicDataPagedByCompany(@Param("limit") int limit, @Param("offset") int offset, @Param("companyId") UUID companyId, @Param("status") String status);
@@ -200,7 +243,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "    OR REGEXP_REPLACE(COALESCE(e.registration_number, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
                         ")) " +
                         "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) " +
-                        "AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
+                        "AND (:status IS NULL OR CAST(e.status AS text) = :status OR (:status = 'TERMINATED' AND EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED'))) " +
                         "ORDER BY e.name ASC " +
                         "LIMIT :limit OFFSET :offset", nativeQuery = true)
         List<Object[]> findBasicDataBySearchTermPaged(@Param("searchTerm") String searchTerm,
@@ -229,7 +272,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "    OR REGEXP_REPLACE(COALESCE(e.registration_number, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') " +
                         ")) " +
                         "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) " +
-                        "AND e.company_id = :companyId AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
+                        "AND e.company_id = :companyId AND (:status IS NULL OR CAST(e.status AS text) = :status OR (:status = 'TERMINATED' AND EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED'))) " +
                         "ORDER BY e.name ASC " +
                         "LIMIT :limit OFFSET :offset", nativeQuery = true)
         List<Object[]> findBasicDataBySearchTermPagedByCompany(@Param("searchTerm") String searchTerm,

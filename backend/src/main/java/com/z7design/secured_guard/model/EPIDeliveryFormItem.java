@@ -75,6 +75,14 @@ public class EPIDeliveryFormItem {
     @Column(name = "replacement_reason", length = 255)
     private String replacementReason;
 
+    /** Data em que o EPI foi devolvido. */
+    @Column(name = "returned_date")
+    private LocalDate returnedDate;
+
+    /** Motivo da devolução. */
+    @Column(name = "return_reason", length = 255)
+    private String returnReason;
+
     /** Token do link público /epi-confirm/{token} individual do item (confirmação por item). */
     @Column(name = "confirmation_token")
     private UUID confirmationToken;

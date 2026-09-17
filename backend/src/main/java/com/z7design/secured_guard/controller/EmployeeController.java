@@ -97,13 +97,15 @@ public class EmployeeController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hireDateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hireDateTo,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate terminationDateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate terminationDateTo) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate terminationDateTo,
+            @RequestParam(required = false) String sector) {
         String statusFilter = (status != null && !status.trim().isEmpty() && !"all".equalsIgnoreCase(status.trim()))
                 ? status.trim().toUpperCase()
                 : null;
         String search = (searchTerm != null && !searchTerm.trim().isEmpty()) ? searchTerm.trim() : null;
-        Map<String, Long> stats = employeeService.getStats(companyId, search, statusFilter, hireDateFrom, hireDateTo,
-                terminationDateFrom, terminationDateTo);
+        String sectorFilter = (sector != null && !sector.trim().isEmpty() && !"all".equalsIgnoreCase(sector.trim())) ? sector.trim() : null;
+        Map<String, Long> stats = employeeService.getStatsFiltered(search, companyId, statusFilter, hireDateFrom, hireDateTo,
+                terminationDateFrom, terminationDateTo, sectorFilter);
         return ResponseEntity.ok(stats);
     }
 
@@ -128,6 +130,12 @@ public class EmployeeController {
             e.printStackTrace();
             return ResponseEntity.status(500).body(java.util.Map.of("error", e.getMessage()));
         }
+    }
+
+    @GetMapping("/check-cpf")
+    @Operation(summary = "Verificar existência de CPF", description = "Verifica se já existe cadastro com o CPF informado e retorna os dados para reaproveitamento")
+    public ResponseEntity<Map<String, Object>> checkCpf(@RequestParam String cpf) {
+        return ResponseEntity.ok(employeeService.checkCpfStatus(cpf));
     }
 
     @GetMapping("/simple")
@@ -465,27 +473,30 @@ public class EmployeeController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hireDateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hireDateTo,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate terminationDateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate terminationDateTo) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate terminationDateTo,
+            @RequestParam(required = false) String sector) {
         try {
             int safePage = Math.max(page, 0);
             int safeSize = Math.min(Math.max(size, 1), 500);
             String statusFilter = (status != null && !status.trim().isEmpty() && !"all".equalsIgnoreCase(status.trim())) ? status.trim().toUpperCase() : null;
             String sortByParam = (sortBy != null && !sortBy.trim().isEmpty()) ? sortBy.trim() : null;
             String sortDirParam = (sortDir != null && sortDir.trim().equalsIgnoreCase("desc")) ? "desc" : "asc";
+            String sectorParam = (sector != null && !sector.trim().isEmpty() && !"all".equalsIgnoreCase(sector.trim())) ? sector.trim() : null;
             System.out.println("🔍 EmployeeController.getAllPaged - page=" + safePage + " size=" + safeSize
                     + " searchTerm=" + searchTerm + " companyId=" + companyId + " status=" + statusFilter
                     + " sortBy=" + sortByParam + " sortDir=" + sortDirParam
                     + " hireDateFrom=" + hireDateFrom + " hireDateTo=" + hireDateTo
-                    + " terminationDateFrom=" + terminationDateFrom + " terminationDateTo=" + terminationDateTo);
+                    + " terminationDateFrom=" + terminationDateFrom + " terminationDateTo=" + terminationDateTo
+                    + " sector=" + sectorParam);
 
             List<?> data;
             if (searchTerm != null && !searchTerm.trim().isEmpty()) {
                 data = employeeService.findBasicDataBySearchTermPaged(searchTerm.trim(), safePage, safeSize, companyId,
                         statusFilter, sortByParam, sortDirParam, hireDateFrom, hireDateTo, terminationDateFrom,
-                        terminationDateTo);
+                        terminationDateTo, sectorParam);
             } else {
                 data = employeeService.findBasicDataPaged(safePage, safeSize, companyId, statusFilter, sortByParam,
-                        sortDirParam, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo);
+                        sortDirParam, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sectorParam);
             }
             System.out.println(
                     "🔍 EmployeeController.getAllPaged - Encontrados " + data.size() + " funcionários no banco");
@@ -505,6 +516,7 @@ public class EmployeeController {
                 employee.put("id", idObj);
                 employee.put("name", safeAt(row, 1));
                 employee.put("document", safeAt(row, 2));
+                employee.put("cpf", safeAt(row, 2));
                 employee.put("birthDate", safeAt(row, 3));
                 employee.put("registrationNumber", safeAt(row, 4));
                 employee.put("hireDate", safeAt(row, 5));
@@ -554,6 +566,39 @@ public class EmployeeController {
                     employee.put("department", department);
                 }
                 employees.add(employee);
+            }
+
+            try {
+                List<UUID> empIds = employees.stream()
+                        .map(m -> (UUID) m.get("id"))
+                        .filter(java.util.Objects::nonNull)
+                        .toList();
+                if (!empIds.isEmpty()) {
+                    java.util.Map<UUID, List<EmployeeEmploymentPeriodDTO>> periodsByEmp = employmentPeriodService.findPeriodsForEmployees(empIds);
+                    for (java.util.Map<String, Object> empMap : employees) {
+                        UUID empId = (UUID) empMap.get("id");
+                        List<EmployeeEmploymentPeriodDTO> periods = periodsByEmp.get(empId);
+                        if (periods != null && periods.size() > 1) {
+                            EmployeeEmploymentPeriodDTO prev = periods.stream()
+                                    .filter(p -> "TERMINATED".equalsIgnoreCase(p.getStatus()) || p.getTerminationDate() != null)
+                                    .findFirst()
+                                    .orElse(periods.get(1));
+                            if (prev != null) {
+                                empMap.put("previousStatus", prev.getStatus());
+                                empMap.put("previousTerminationDate", prev.getTerminationDate());
+                                empMap.put("previousTerminationReason", prev.getTerminationReason());
+                                String prevWp = prev.getWorkPostName() != null && !prev.getWorkPostName().isBlank()
+                                        ? prev.getWorkPostName()
+                                        : (prev.getDepartmentName() != null ? prev.getDepartmentName() : null);
+                                if (prevWp != null) {
+                                    empMap.put("previousWorkPostName", prevWp);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception periodEx) {
+                log.warn("Erro ao carregar vínculos anteriores na listagem paginada: {}", periodEx.getMessage());
             }
 
             System.out.println("✅ EmployeeController.getAllPaged - Retornando " + employees.size()

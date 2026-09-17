@@ -18,6 +18,8 @@ public class EPIDeliveryFormItemDTO {
     private UUID stockItemId;
     private LocalDate substitutedDate;
     private String replacementReason;
+    private LocalDate returnedDate;
+    private String returnReason;
     private String confirmationCode;
     private LocalDateTime confirmationExpiresAt;
     private LocalDateTime confirmationSentAt;
@@ -49,6 +51,22 @@ public class EPIDeliveryFormItemDTO {
 
     public void setReplacementReason(String replacementReason) {
         this.replacementReason = replacementReason;
+    }
+
+    public LocalDate getReturnedDate() {
+        return returnedDate;
+    }
+
+    public void setReturnedDate(LocalDate returnedDate) {
+        this.returnedDate = returnedDate;
+    }
+
+    public String getReturnReason() {
+        return returnReason;
+    }
+
+    public void setReturnReason(String returnReason) {
+        this.returnReason = returnReason;
     }
     public UUID getId() {
         return id;

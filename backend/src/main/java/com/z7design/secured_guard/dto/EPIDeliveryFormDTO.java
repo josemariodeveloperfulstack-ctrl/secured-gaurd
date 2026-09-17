@@ -348,6 +348,8 @@ public class EPIDeliveryFormDTO {
                                                 itemDto.setStockItemId(item.getStockItemId());
                                                 itemDto.setSubstitutedDate(item.getSubstitutedDate());
                                                 itemDto.setReplacementReason(item.getReplacementReason());
+                                                itemDto.setReturnedDate(item.getReturnedDate());
+                                                itemDto.setReturnReason(item.getReturnReason());
                                                 itemDto.setConfirmationCode(item.getConfirmationCode());
                                                 itemDto.setConfirmationExpiresAt(item.getConfirmationExpiresAt());
                                                 itemDto.setConfirmationSentAt(item.getConfirmationSentAt());

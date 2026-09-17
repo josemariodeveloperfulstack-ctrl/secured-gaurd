@@ -163,12 +163,19 @@ export function MultiSearchableSelect({
               filteredOptions.map((opt) => {
                 const checked = selectedValues.includes(opt.value);
                 return (
-                  <button
+                  <div
                     key={opt.value}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => toggleSelect(opt.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleSelect(opt.value);
+                      }
+                    }}
                     className={cn(
-                      "w-full flex items-center gap-2.5 px-2.5 py-2 text-xs rounded transition-colors text-left",
+                      "w-full flex items-center gap-2.5 px-2.5 py-2 text-xs rounded transition-colors text-left cursor-pointer select-none",
                       checked
                         ? "bg-seguranca-red/30 text-white font-semibold"
                         : "hover:bg-gray-700/60 text-gray-200"
@@ -176,11 +183,12 @@ export function MultiSearchableSelect({
                   >
                     <Checkbox
                       checked={checked}
+                      tabIndex={-1}
                       onCheckedChange={() => toggleSelect(opt.value)}
-                      className="border-gray-500 data-[state=checked]:bg-seguranca-yellow data-[state=checked]:text-seguranca-black"
+                      className="border-gray-500 data-[state=checked]:bg-seguranca-yellow data-[state=checked]:text-seguranca-black pointer-events-none"
                     />
                     <span className="truncate">{opt.label}</span>
-                  </button>
+                  </div>
                 );
               })
             )}

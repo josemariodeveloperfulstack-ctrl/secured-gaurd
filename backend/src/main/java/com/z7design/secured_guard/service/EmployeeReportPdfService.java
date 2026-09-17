@@ -106,7 +106,7 @@ public class EmployeeReportPdfService {
 
     private byte[] generateWithIText(List<Employee> employees, Company company, List<String> columns,
             ReportGroupBy groupBy, ReportOrderBy orderBy, String filterSummary) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(64 * 1024);
 
         try (PdfWriter writer = new PdfWriter(baos)) {
             ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
@@ -291,6 +291,7 @@ public class EmployeeReportPdfService {
             case "horarioTrabalho" -> "Horário";
             case "bankAccount" -> "Conta Bancária";
             case "pixKey" -> "Chave PIX";
+            case "previousStatus" -> "Status / Vínculo Anterior";
             default -> key;
         };
     }
@@ -305,6 +306,7 @@ public class EmployeeReportPdfService {
             case "workPost" -> resolveWorkPostName(emp);
             case "company" -> emp.getCompany() != null ? (emp.getCompany().getSigla() != null ? emp.getCompany().getSigla() : emp.getCompany().getName()) : null;
             case "status" -> getStatusLabel(emp.getStatus());
+            case "previousStatus" -> formatPreviousStatus(emp);
             case "cpf" -> emp.getCpf() != null ? emp.getCpf() : emp.getDocument();
             case "rg" -> emp.getRg() != null ? emp.getRg() : emp.getNumeroRg();
             case "birthDate" -> emp.getBirthDate() != null ? emp.getBirthDate().format(DATE_FMT) : null;
@@ -378,5 +380,33 @@ public class EmployeeReportPdfService {
         if (EmploymentStatus.ACTIVE.equals(status)) return "Ativo";
         if (EmploymentStatus.TERMINATED.equals(status)) return "Demitido";
         return status.name();
+    }
+
+    private String formatPreviousStatus(Employee emp) {
+        if (emp == null) return "-";
+        String status = emp.getPreviousStatus();
+        String wp = emp.getPreviousWorkPostName();
+        LocalDate termDate = emp.getPreviousTerminationDate();
+
+        if (status == null && wp == null && termDate == null) {
+            return "-";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        if (status != null && !status.isBlank()) {
+            sb.append("TERMINATED".equalsIgnoreCase(status) ? "Demitido" : status);
+        } else {
+            sb.append("Encerrado");
+        }
+
+        if (termDate != null) {
+            sb.append(" em ").append(DATE_FMT.format(termDate));
+        }
+
+        if (wp != null && !wp.isBlank()) {
+            sb.append(" (").append(wp).append(")");
+        }
+
+        return sb.toString();
     }
 }

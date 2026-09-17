@@ -88,16 +88,7 @@ public class EmployeeImportExcelCustomService {
                         continue;
                     }
 
-                    // 2. REGRA 1: Verificar se o CPF JÁ EXISTE no banco de dados (se tiver, NÃO IMPORTE)
-                    boolean cpfExiste = employeeRepository.existsByNormalizedDocument(cpf);
-                    if (cpfExiste) {
-                        log.warn("⚠️ Linha {}: CPF {} já cadastrado na base de dados. Importação ignorada.", rowIdx + 1, cpf);
-                        erros++;
-                        mensagens.add("Linha " + (rowIdx + 1) + " (Funcionário: " + nome + "): CPF " + formatCpf(cpf) + " já cadastrado na base de dados - registro não importado.");
-                        continue;
-                    }
-
-                    // 3. REGRA 2: Verificar se o CNPJ na planilha ESTÁ CADASTRADO no sistema
+                    // 2. REGRA 1: Verificar se o CNPJ na planilha ESTÁ CADASTRADO no sistema
                     String rawCnpj = getMappedValue(row, headerMap, "cnpj");
                     String normalizedCnpj = rawCnpj != null ? rawCnpj.replaceAll("[^0-9]", "") : "";
                     
@@ -113,6 +104,15 @@ public class EmployeeImportExcelCustomService {
                         log.error("❌ Linha {}: Empresa com CNPJ '{}' não cadastrada no sistema.", rowIdx + 1, rawCnpj);
                         erros++;
                         mensagens.add("Linha " + (rowIdx + 1) + " (Funcionário: " + nome + "): Empresa com CNPJ " + (rawCnpj != null && !rawCnpj.isBlank() ? rawCnpj : "ausente") + " não está cadastrada no sistema.");
+                        continue;
+                    }
+
+                    // 3. REGRA 2: Verificar se o CPF JÁ EXISTE como ATIVO na MESMA empresa (permitir re-admissão ou empresa diferente)
+                    boolean cpfExiste = employeeRepository.existsByNormalizedDocumentAndCompanyIdAndNotTerminated(cpf, company.getId());
+                    if (cpfExiste) {
+                        log.warn("⚠️ Linha {}: CPF {} já cadastrado e ativo nesta empresa. Importação ignorada.", rowIdx + 1, cpf);
+                        erros++;
+                        mensagens.add("Linha " + (rowIdx + 1) + " (Funcionário: " + nome + "): CPF " + formatCpf(cpf) + " já cadastrado e ativo nesta empresa - registro não importado.");
                         continue;
                     }
 

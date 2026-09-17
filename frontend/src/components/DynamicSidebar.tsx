@@ -1001,544 +1001,84 @@ export function DynamicSidebar() {
     return roleColors[role] || 'bg-gray-100 text-gray-800';
   };
 
+  const renderMenuSection = (title: string, SectionIcon: LucideIcon, items: MenuItem[]) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <SidebarGroup className="px-2 py-1 group-data-[collapsible=icon]:p-1 group-data-[collapsible=icon]:items-center">
+        <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-1 text-xs font-semibold uppercase tracking-wider flex items-center group-data-[collapsible=icon]:hidden">
+          <SectionIcon size={15} className="mr-2 text-seguranca-yellow flex-shrink-0" />
+          <span className="truncate">{title}</span>
+        </SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu className="space-y-1 group-data-[collapsible=icon]:space-y-1.5 group-data-[collapsible=icon]:items-center">
+            {items.map((item) => {
+              const isActive = getActiveId() === item.id;
+              return (
+                <SidebarMenuItem key={item.id} className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive}
+                    tooltip={item.text}
+                    className={`
+                      flex items-center p-2.5 rounded-lg transition-all duration-200 group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto
+                      ${isActive
+                        ? 'bg-seguranca-black text-seguranca-yellow border border-seguranca-yellow/30 shadow-md'
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow hover:border hover:border-gray-700/50'
+                      }
+                    `}
+                  >
+                    <ScrollPreservingLink to={item.to} className="flex items-center w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:h-full">
+                      <item.icon size={20} className="text-seguranca-yellow flex-shrink-0 group-data-[collapsible=icon]:mx-auto" />
+                      <span className="ml-3 truncate group-data-[collapsible=icon]:hidden">{item.text}</span>
+                      {item.role === 'SUPER_ADMIN' && (
+                        <span className="ml-auto text-xs bg-red-500 text-white px-1 rounded group-data-[collapsible=icon]:hidden">🟥</span>
+                      )}
+                    </ScrollPreservingLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    );
+  };
+
   return (
     <Sidebar className="bg-seguranca-graphite border-r border-gray-700">
-      <SidebarHeader className="p-4 border-b border-gray-700">
-        <Logo />
+      <SidebarHeader className="p-3 border-b border-gray-700 flex items-center justify-center group-data-[collapsible=icon]:p-2">
+        <Logo className="group-data-[collapsible=icon]:max-h-8 group-data-[collapsible=icon]:object-contain" />
       </SidebarHeader>
 
-      <SidebarContent>
-        {/* Debug simples no topo */}
-        <div className="p-2 text-xs text-green-400 bg-green-900/20 rounded mb-4">
-          DEBUG: Sidebar renderizando - User: {user?.name || 'null'}
-        </div>
-
-        {/* Menu Principal */}
-        {menuGroups.principal.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              Menu Principal
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.principal.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                        {item.role === 'SUPER_ADMIN' && (
-                          <span className="ml-auto text-xs bg-red-500 text-white px-1 rounded">🟥</span>
-                        )}
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Financeiro */}
-        {menuGroups.financeiro.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <DollarSign size={16} className="mr-2 text-seguranca-yellow" />
-              Módulo Financeiro
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.financeiro.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-
-
-        {/* Módulo RH */}
-        {menuGroups.rh.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Users size={16} className="mr-2 text-seguranca-yellow" />
-              Recursos Humanos
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.rh.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo SST */}
-        {menuGroups.sst && menuGroups.sst.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Shield size={16} className="mr-2 text-seguranca-yellow" />
-              Saúde e Segurança (SST)
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.sst.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Operacional */}
-        {menuGroups.operacional.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Shield size={16} className="mr-2 text-seguranca-yellow" />
-              Operacional
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.operacional.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Empresas */}
-        {menuGroups.empresas.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Building2 size={16} className="mr-2 text-seguranca-yellow" />
-              Empresas
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.empresas.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Comercial */}
-        {menuGroups.comercial.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Briefcase size={16} className="mr-2 text-seguranca-yellow" />
-              Comercial
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.comercial.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Compras */}
-        {menuGroups.compras.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <ShoppingCart size={16} className="mr-2 text-seguranca-yellow" />
-              Gestão de Compras
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.compras.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Estoque */}
-        {menuGroups.estoque.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Package size={16} className="mr-2 text-seguranca-yellow" />
-              Estoque
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.estoque.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Frota */}
-        {menuGroups.frota.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Truck size={16} className="mr-2 text-seguranca-yellow" />
-              Frota
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.frota.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Holerites */}
-        {menuGroups.holerites.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <FileSpreadsheet size={16} className="mr-2 text-seguranca-yellow" />
-              Holerites
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.holerites.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Mensagens */}
-        {menuGroups.mensagens.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <MessageSquare size={16} className="mr-2 text-seguranca-yellow" />
-              Comunicação
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.mensagens.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Suporte */}
-        {menuGroups.suporte.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Headphones size={16} className="mr-2 text-seguranca-yellow" />
-              Suporte
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.suporte.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Módulo Atendimento */}
-        {menuGroups.atendimento.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Phone size={16} className="mr-2 text-seguranca-yellow" />
-              Atendimento
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.atendimento.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-
-        {/* Módulo Sistema */}
-        {menuGroups.sistema.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Settings size={16} className="mr-2 text-seguranca-yellow" />
-              Sistema
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {menuGroups.sistema.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={getActiveId() === item.id}
-                      className={`
-                        flex items-center p-3 rounded-lg transition-colors
-                        ${getActiveId() === item.id
-                          ? 'bg-seguranca-black text-seguranca-yellow'
-                          : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                        }
-                      `}
-                    >
-                      <ScrollPreservingLink to={item.to} className="flex items-center w-full">
-                        <item.icon size={20} className="text-seguranca-yellow flex-shrink-0" />
-                        <span className="ml-3 truncate">{item.text}</span>
-                      </ScrollPreservingLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-
-
+      <SidebarContent className="space-y-1">
+        {renderMenuSection('Menu Principal', BarChart3, menuGroups.principal)}
+        {renderMenuSection('Módulo Financeiro', DollarSign, menuGroups.financeiro)}
+        {renderMenuSection('Recursos Humanos', Users, menuGroups.rh)}
+        {renderMenuSection('Saúde e Segurança (SST)', Shield, menuGroups.sst)}
+        {renderMenuSection('Operacional', Shield, menuGroups.operacional)}
+        {renderMenuSection('Empresas', Building2, menuGroups.empresas)}
+        {renderMenuSection('Comercial', Briefcase, menuGroups.comercial)}
+        {renderMenuSection('Gestão de Compras', ShoppingCart, menuGroups.compras)}
+        {renderMenuSection('Estoque', Package, menuGroups.estoque)}
+        {renderMenuSection('Frota', Truck, menuGroups.frota)}
+        {renderMenuSection('Holerites', FileSpreadsheet, menuGroups.holerites)}
+        {renderMenuSection('Comunicação', MessageSquare, menuGroups.mensagens)}
+        {renderMenuSection('Suporte', Headphones, menuGroups.suporte)}
+        {renderMenuSection('Atendimento', Phone, menuGroups.atendimento)}
+        {renderMenuSection('Sistema', Settings, menuGroups.sistema)}
       </SidebarContent>
 
-      <SidebarFooter className="p-4 border-t border-gray-700">
-        <div className="flex items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${user?.role === 'SUPER_ADMIN' ? 'bg-red-500' : 'bg-seguranca-red'
-            }`}>
+      <SidebarFooter className="p-3 border-t border-gray-700 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+        <div className="flex items-center group-data-[collapsible=icon]:justify-center">
+          <div
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 group-data-[collapsible=icon]:mx-auto ${
+              user?.role === 'SUPER_ADMIN' ? 'bg-red-500' : 'bg-seguranca-red'
+            }`}
+            title={`${user?.name || 'Usuário'} (${getRoleDisplayName(user?.role || '')})`}
+          >
             {user?.name?.charAt(0) || 'A'}
           </div>
-          <div className="ml-3 min-w-0">
+          <div className="ml-3 min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="text-sm font-medium text-seguranca-lightgray truncate">
               {user?.name || 'Usuário'}
             </div>
