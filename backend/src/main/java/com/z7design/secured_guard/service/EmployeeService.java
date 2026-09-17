@@ -131,8 +131,21 @@ public class EmployeeService {
         boolean hasSearch = searchTerm != null && !searchTerm.trim().isEmpty();
         if (hasSearch) {
             sql.append("AND (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
-                    .append("OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) ")
-                    .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) ");
+                    .append("OR UPPER(COALESCE(e.document, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.cpf, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.matricula_esocial, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.registration_number, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(p.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(wp.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(d.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(u.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND (")
+                    .append("    REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
+                    .append("    OR REGEXP_REPLACE(COALESCE(e.cpf, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
+                    .append("    OR REGEXP_REPLACE(COALESCE(e.matricula_esocial, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
+                    .append("    OR REGEXP_REPLACE(COALESCE(e.registration_number, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')")
+                    .append("))) ");
         }
         if (companyId != null) {
             sql.append("AND e.company_id = :companyId ");
@@ -159,7 +172,12 @@ public class EmployeeService {
                 String pName = "secParam" + i;
                 sql.append("(UPPER(COALESCE(wp.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
                         .append("OR UPPER(COALESCE(d.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
-                        .append("OR UPPER(COALESCE(u.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%'))) ");
+                        .append("OR UPPER(COALESCE(u.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
+                        .append("OR (NULLIF(REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '') IS NOT NULL AND (")
+                        .append("    REGEXP_REPLACE(COALESCE(wp.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%') ")
+                        .append("    OR REGEXP_REPLACE(COALESCE(d.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%') ")
+                        .append("    OR REGEXP_REPLACE(COALESCE(u.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%')")
+                        .append("))) ");
             }
             sql.append(") ");
         }
@@ -1414,13 +1432,17 @@ public class EmployeeService {
                     .append("OR UPPER(COALESCE(e.cpf, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
                     .append("OR UPPER(COALESCE(e.matricula_esocial, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
                     .append("OR UPPER(COALESCE(e.registration_number, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(p.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(wp.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(d.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(u.name, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
                     .append("OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND (")
                     .append("    REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
                     .append("    OR REGEXP_REPLACE(COALESCE(e.cpf, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
                     .append("    OR REGEXP_REPLACE(COALESCE(e.matricula_esocial, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%') ")
                     .append("    OR REGEXP_REPLACE(COALESCE(e.registration_number, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')")
-                    .append(")) ")
-                    .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) ");
+                    .append("))) ");
         }
         if (companyId != null) {
             sql.append("AND e.company_id = :companyId ");
@@ -1445,7 +1467,12 @@ public class EmployeeService {
                 String pName = "secStatsParam" + i;
                 sql.append("(UPPER(COALESCE(wp.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
                         .append("OR UPPER(COALESCE(d.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
-                        .append("OR UPPER(COALESCE(u.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%'))) ");
+                        .append("OR UPPER(COALESCE(u.name, '')) LIKE UPPER(CONCAT('%', :" + pName + ", '%')) ")
+                        .append("OR (NULLIF(REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '') IS NOT NULL AND (")
+                        .append("    REGEXP_REPLACE(COALESCE(wp.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%') ")
+                        .append("    OR REGEXP_REPLACE(COALESCE(d.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%') ")
+                        .append("    OR REGEXP_REPLACE(COALESCE(u.name, ''), '[^a-zA-Z0-9]', '', 'g') ILIKE CONCAT('%', REGEXP_REPLACE(:" + pName + ", '[^a-zA-Z0-9]', '', 'g'), '%')")
+                        .append("))) ");
             }
             sql.append(") ");
         }
@@ -1570,33 +1597,8 @@ public class EmployeeService {
      * Se companyId for null, retorna totais globais. Caso contrário, retorna totais da empresa.
      */
     @Transactional(readOnly = true)
-    public Map<String, Long> getStatsByCompany(UUID companyId) {
-        long total, active, vacation, medicalCertificate, terminated, suspended;
-        if (companyId == null) {
-            total = employeeRepository.count();
-            active = employeeRepository.countByStatus(EmploymentStatus.ACTIVE);
-            vacation = employeeRepository.countByStatus(EmploymentStatus.VACATION);
-            medicalCertificate = employeeRepository.countByStatus(EmploymentStatus.MEDICAL_CERTIFICATE)
-                    + employeeRepository.countByStatus(EmploymentStatus.MATERNITY_LEAVE);
-            terminated = employeeRepository.countByStatus(EmploymentStatus.TERMINATED);
-            suspended = employeeRepository.countByStatus(EmploymentStatus.SUSPENDED);
-        } else {
-            total = employeeRepository.countByCompanyId(companyId);
-            active = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.ACTIVE);
-            vacation = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.VACATION);
-            medicalCertificate = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.MEDICAL_CERTIFICATE)
-                    + employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.MATERNITY_LEAVE);
-            terminated = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.TERMINATED);
-            suspended = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.SUSPENDED);
-        }
-        Map<String, Long> stats = new HashMap<>();
-        stats.put("total", total);
-        stats.put("active", active);
-        stats.put("vacation", vacation);
-        stats.put("medicalCertificate", medicalCertificate);
-        stats.put("terminated", terminated);
-        stats.put("suspended", suspended);
-        return stats;
+    public Map<String, Long> getStats(java.util.UUID companyId) {
+        return getStatsFiltered(null, companyId, null, null, null, null, null, null);
     }
 
     public List<Employee> findByUnit(UUID unitId) {
@@ -1650,7 +1652,6 @@ public class EmployeeService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "employees", key = "'basic-data'")
     public List<Object[]> findBasicData() {
         try {
             System.out.println("🔍 EmployeeService.findBasicData - Buscando dados básicos");
@@ -1665,7 +1666,6 @@ public class EmployeeService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "employees", key = "'search-' + #searchTerm")
     public List<Object[]> findBasicDataBySearchTerm(String searchTerm) {
         try {
             System.out.println("🔍 EmployeeService.findBasicDataBySearchTerm - Buscando por termo: " + searchTerm);
@@ -1684,24 +1684,20 @@ public class EmployeeService {
      * Dados básicos de funcionários com aniversário no mês informado (1–12).
      */
     @Transactional(readOnly = true)
-    @Cacheable(value = "employees", key = "'birthdays-' + #month + '-' + #onlyActive + '-' + #companyId")
     public List<Object[]> findBasicDataByBirthMonth(int month, boolean onlyActive, java.util.UUID companyId) {
-        if (month < 1 || month > 12) {
-            throw new IllegalArgumentException("Mês deve estar entre 1 e 12");
-        }
-        int onlyActiveFlag = onlyActive ? 1 : 0;
-        int companyFilter = companyId != null ? 1 : 0;
         try {
+            Boolean onlyActiveFlag = onlyActive ? Boolean.TRUE : null;
+            java.util.UUID companyFilter = companyId;
             System.out.println("🔍 EmployeeService.findBasicDataByBirthMonth - month=" + month + " onlyActive="
                     + onlyActive + " companyId=" + companyId);
             List<Object[]> data = employeeRepository.findBasicDataByBirthMonth(month, onlyActiveFlag, companyFilter,
-                    companyId);
+                    null);
             System.out.println("✅ EmployeeService.findBasicDataByBirthMonth - " + data.size() + " registros");
             return data;
         } catch (Exception e) {
             System.err.println("❌ EmployeeService.findBasicDataByBirthMonth - Erro: " + e.getMessage());
             e.printStackTrace();
-            throw new RuntimeException("Erro ao buscar aniversariantes: " + e.getMessage(), e);
+            throw new RuntimeException("Erro ao buscar aniversariantes do mês: " + e.getMessage(), e);
         }
     }
 
@@ -1743,15 +1739,8 @@ public class EmployeeService {
                             + " companyId=" + companyId + " status=" + status + " sortBy=" + sortBy + " sortDir="
                             + sortDir + " hireDateFrom=" + hireDateFrom + " hireDateTo=" + hireDateTo
                             + " terminationDateFrom=" + terminationDateFrom + " terminationDateTo=" + terminationDateTo + " sector=" + sector);
-            List<Object[]> data;
-            if (useNativeBasicDataQuery(sortBy, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sector)) {
-                data = findBasicDataPagedNative(null, companyId, status, pageSize, offset, sortBy, sortDir,
-                        hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sector);
-            } else {
-                data = companyId == null
-                        ? employeeRepository.findBasicDataPaged(pageSize, offset, status)
-                        : employeeRepository.findBasicDataPagedByCompany(pageSize, offset, companyId, status);
-            }
+            List<Object[]> data = findBasicDataPagedNative(null, companyId, status, pageSize, offset, sortBy, sortDir,
+                    hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sector);
             System.out.println("✅ EmployeeService.findBasicDataPaged - Encontrados " + data.size() + " registros");
             return data;
         } catch (Exception e) {
@@ -1796,16 +1785,8 @@ public class EmployeeService {
                     + status + " sortBy=" + sortBy + " sortDir=" + sortDir + " hireDateFrom=" + hireDateFrom
                     + " hireDateTo=" + hireDateTo + " terminationDateFrom=" + terminationDateFrom
                     + " terminationDateTo=" + terminationDateTo + " sector=" + sector);
-            List<Object[]> data;
-            if (useNativeBasicDataQuery(sortBy, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sector)) {
-                data = findBasicDataPagedNative(searchTerm, companyId, status, pageSize, offset, sortBy, sortDir,
-                        hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sector);
-            } else {
-                data = companyId == null
-                        ? employeeRepository.findBasicDataBySearchTermPaged(searchTerm, pageSize, offset, status)
-                        : employeeRepository.findBasicDataBySearchTermPagedByCompany(searchTerm, pageSize, offset,
-                                companyId, status);
-            }
+            List<Object[]> data = findBasicDataPagedNative(searchTerm, companyId, status, pageSize, offset, sortBy, sortDir,
+                    hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sector);
             System.out.println(
                     "✅ EmployeeService.findBasicDataBySearchTermPaged - Encontrados " + data.size() + " registros");
             return data;

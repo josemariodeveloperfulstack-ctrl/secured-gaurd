@@ -583,11 +583,29 @@ const Funcionarios: React.FC = () => {
   // Normalizar valor de filtro (vazio ou 'all' = todos)
   const isAll = (v: string) => !v || v === 'all';
   const norm = (s: string | undefined) => (s || '').trim().toLowerCase();
-  const same = (a: string | undefined, b: string | undefined) => norm(a) === norm(b);
+  const cleanNorm = (s: string | undefined) =>
+    (s || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+
+  const same = (a: string | undefined, b: string | undefined) => {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    const na = norm(a);
+    const nb = norm(b);
+    if (na === nb) return true;
+    const ca = cleanNorm(a);
+    const cb = cleanNorm(b);
+    return ca.length > 0 && ca === cb;
+  };
 
   // Filtrar funcionários por todos os critérios (filtro local)
   const normalizedSearch = searchTerm.trim().toLowerCase();
+  const searchClean = cleanNorm(searchTerm);
   const searchDigits = searchTerm.replace(/\D/g, '');
+
   const filteredEmployees = employees.filter(employee => {
     const matchesStatus = isAll(statusFilter) || (employee.status || '').toUpperCase() === (statusFilter || '').toUpperCase();
 
@@ -600,6 +618,7 @@ const Funcionarios: React.FC = () => {
 
     const matchesSector = selectedSectors.length === 0 || selectedSectors.includes('all') || selectedSectors.some(sec => {
       const secNorm = norm(sec);
+      const secClean = cleanNorm(sec);
       const wpName = (employee.workPost as any)?.name;
       const wpId = (employee.workPost as any)?.id;
       const deptName = (employee.department as any)?.name || (employee as any).departmentName;
@@ -615,10 +634,11 @@ const Funcionarios: React.FC = () => {
       if (same(empWorkSec, sec)) return true;
       if (Array.isArray(wps) && wps.some((w: any) => same(w?.name, sec) || String(w?.id) === String(sec))) return true;
 
-      // Suporte a busca por termo parcial
-      if (wpName && norm(wpName).includes(secNorm)) return true;
-      if (deptName && norm(deptName).includes(secNorm)) return true;
-      if (unitName && norm(unitName).includes(secNorm)) return true;
+      // Suporte a busca por termo parcial ou normalizado
+      if (wpName && (norm(wpName).includes(secNorm) || (secClean && cleanNorm(wpName).includes(secClean)))) return true;
+      if (deptName && (norm(deptName).includes(secNorm) || (secClean && cleanNorm(deptName).includes(secClean)))) return true;
+      if (unitName && (norm(unitName).includes(secNorm) || (secClean && cleanNorm(unitName).includes(secClean)))) return true;
+      if (empWorkSec && (norm(empWorkSec).includes(secNorm) || (secClean && cleanNorm(empWorkSec).includes(secClean)))) return true;
 
       return false;
     });
@@ -634,19 +654,34 @@ const Funcionarios: React.FC = () => {
     const matchesTerminationDateTo = !terminationDateTo || (termDate && termDate <= new Date(terminationDateTo + 'T23:59:59'));
 
     const matchesSearch = !normalizedSearch || (() => {
-      const nameMatch = (employee.name || '').toLowerCase().includes(normalizedSearch);
-      const emailMatch = (employee.email || '').toLowerCase().includes(normalizedSearch);
-      const regRaw = employee.registration || (employee as any).registrationNumber || '';
-      const registrationMatch = String(regRaw).toLowerCase().includes(normalizedSearch);
+      const nameRaw = employee.name || '';
+      if (nameRaw.toLowerCase().includes(normalizedSearch) || (searchClean && cleanNorm(nameRaw).includes(searchClean))) return true;
+
+      if ((employee.email || '').toLowerCase().includes(normalizedSearch)) return true;
+
       const docRaw = String(employee.cpf || employee.document || '');
       const docDigits = docRaw.replace(/\D/g, '');
-      const cpfMatch = searchDigits ? docDigits.includes(searchDigits) : false;
-      const docTextMatch = docRaw.toLowerCase().includes(normalizedSearch);
-      const positionMatch = (employee.position?.name || '').toLowerCase().includes(normalizedSearch);
-      const workPostMatch = ((employee.workPost as any)?.name || '').toLowerCase().includes(normalizedSearch);
-      const departmentMatch = ((employee as any).department?.name || '').toLowerCase().includes(normalizedSearch);
+      if (searchDigits && docDigits.includes(searchDigits)) return true;
+      if (docRaw.toLowerCase().includes(normalizedSearch)) return true;
 
-      return nameMatch || emailMatch || registrationMatch || cpfMatch || docTextMatch || positionMatch || workPostMatch || departmentMatch;
+      const regRaw = String(employee.registration || (employee as any).registrationNumber || (employee as any).matriculaEsocial || '');
+      const regDigits = regRaw.replace(/\D/g, '');
+      if (searchDigits && regDigits && regDigits.includes(searchDigits)) return true;
+      if (regRaw.toLowerCase().includes(normalizedSearch)) return true;
+
+      const posName = (employee.position as any)?.name || '';
+      if (posName.toLowerCase().includes(normalizedSearch) || (searchClean && cleanNorm(posName).includes(searchClean))) return true;
+
+      const wpName = (employee.workPost as any)?.name || '';
+      if (wpName.toLowerCase().includes(normalizedSearch) || (searchClean && cleanNorm(wpName).includes(searchClean))) return true;
+
+      const deptName = (employee.department as any)?.name || (employee as any).departmentName || '';
+      if (deptName.toLowerCase().includes(normalizedSearch) || (searchClean && cleanNorm(deptName).includes(searchClean))) return true;
+
+      const unitName = (employee.unit as any)?.name || (employee as any).unitName || '';
+      if (unitName.toLowerCase().includes(normalizedSearch) || (searchClean && cleanNorm(unitName).includes(searchClean))) return true;
+
+      return false;
     })();
 
     return matchesStatus && matchesSearch && matchesCompany && matchesPosition && matchesSector
