@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -384,17 +385,20 @@ public class EmployeeReportPdfService {
 
     private String formatPreviousStatus(Employee emp) {
         if (emp == null) return "-";
-        String status = emp.getPreviousStatus();
-        String wp = emp.getPreviousWorkPostName();
-        LocalDate termDate = emp.getPreviousTerminationDate();
+        LocalDate termDate = emp.getDataRescisao() != null ? emp.getDataRescisao() : emp.getTerminationDate();
+        String status = emp.getStatus() != null ? getStatusLabel(emp.getStatus()) : null;
+        String wp = resolveWorkPostName(emp);
+        String reason = emp.getTerminationReason();
 
-        if (status == null && wp == null && termDate == null) {
+        if (termDate == null && reason == null && emp.getStatus() != EmploymentStatus.TERMINATED) {
             return "-";
         }
 
         StringBuilder sb = new StringBuilder();
-        if (status != null && !status.isBlank()) {
-            sb.append("TERMINATED".equalsIgnoreCase(status) ? "Demitido" : status);
+        if (emp.getStatus() == EmploymentStatus.TERMINATED) {
+            sb.append("Demitido");
+        } else if (status != null) {
+            sb.append(status);
         } else {
             sb.append("Encerrado");
         }
@@ -405,6 +409,10 @@ public class EmployeeReportPdfService {
 
         if (wp != null && !wp.isBlank()) {
             sb.append(" (").append(wp).append(")");
+        }
+
+        if (reason != null && !reason.isBlank()) {
+            sb.append(" - ").append(reason);
         }
 
         return sb.toString();
