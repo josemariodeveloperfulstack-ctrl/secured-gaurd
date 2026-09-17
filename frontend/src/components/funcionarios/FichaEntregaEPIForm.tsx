@@ -1150,12 +1150,12 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                 <HardHat className="h-6 w-6 text-primary" />
                 Ficha de Entrega de EPI Eletrônica
               </CardTitle>
-              <CardDescription className="text-xs text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
+              <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
                 <span>Controle e Registro de Equipamentos de Proteção Individual.</span>
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
                   Amparo Jurídico: NR-6 (Item 6.5.1) • Portaria MTE nº 671/2021 • Lei nº 13.874/2019
                 </Badge>
-              </CardDescription>
+              </div>
             </div>
             {(funcionario && empresa) && (
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 px-3 py-1">
@@ -1523,7 +1523,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                     <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary" className="font-mono">#{idx + 1}</Badge>
-                        {epi.dataSubstituicao ? (
+                        {(epi.dataSubstituicao || epi.dataDevolucao) ? (
                           <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs">
                             🔄 Devolvido / Substituído (Estorno no Estoque)
                           </Badge>
@@ -1533,30 +1533,39 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                           </Badge>
                         )}
                       </div>
-                      {!epi.dataSubstituicao && (
+                      {!epi.dataSubstituicao && !epi.dataDevolucao && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           className="text-xs h-7 gap-1.5 border-amber-500/60 text-amber-300 hover:bg-amber-500/10"
                           onClick={() => {
-                            handleEpiChange(idx, 'dataSubstituicao', todayIsoDateLocal());
-                            handleEpiChange(idx, 'motivoSubstituicao', 'Devolvido ao Estoque - Tamanho Incorreto');
-                            setEpis(prev => [
-                              ...prev.slice(0, idx + 1),
-                              {
+                            const today = todayIsoDateLocal();
+                            const reason = 'Devolvido ao Estoque - Tamanho Incorreto';
+                            setEpis(prev => {
+                              const updated = [...prev];
+                              const currentItem = updated[idx];
+                              updated[idx] = {
+                                ...currentItem,
+                                dataSubstituicao: today,
+                                motivoSubstituicao: reason,
+                                dataDevolucao: today,
+                                motivoDevolucao: reason,
+                              };
+                              const newRow = {
                                 ...emptyEpiRow(),
-                                nome: epi.nome,
-                                ca: epi.ca,
-                                caName: epi.caName,
-                                validade: epi.validade,
-                                uniformeTipo: epi.uniformeTipo,
-                                uniformePeca: epi.uniformePeca,
-                              },
-                              ...prev.slice(idx + 1),
-                            ]);
+                                nome: currentItem.nome,
+                                ca: currentItem.ca,
+                                caName: currentItem.caName,
+                                validade: currentItem.validade,
+                                uniformeTipo: currentItem.uniformeTipo,
+                                uniformePeca: currentItem.uniformePeca,
+                              };
+                              updated.splice(idx + 1, 0, newRow);
+                              return updated;
+                            });
                             toast({
-                              title: 'Troca por Tamanho Incorreto Registrada',
+                              title: 'Troca / Devolução Registrada',
                               description: 'O item foi marcado como devolvido (estorno no estoque). Um novo item foi inserido para selecionar o tamanho correto.',
                             });
                           }}
@@ -1583,6 +1592,19 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                           <SearchableSelect
                             options={stockItemOptions}
                             value={epi.stockItemId || ''}
+                            fallbackLabel={
+                              (() => {
+                                if (epi.stockItemId) {
+                                  const found = stockItems.find((i) => i.id === epi.stockItemId);
+                                  if (found) {
+                                    const code = found.code || found.barcode || '';
+                                    const name = found.fullName || found.name || 'Item sem nome';
+                                    return code ? `${code} — ${name}` : name;
+                                  }
+                                }
+                                return epi.nome ? `EPI: ${epi.nome}` : undefined;
+                              })()
+                            }
                             onChange={(value) => {
                               if (!value || value === 'all' || value === 'none') {
                                 handleEpiChange(idx, 'stockItemId', '');
@@ -1590,24 +1612,32 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                               }
                               handleEpiChange(idx, 'stockItemId', value);
                               const selected = stockItems.find((i) => i.id === value);
-                              if (selected?.sizeVariation && !epi.tamanho) {
-                                handleEpiChange(idx, 'tamanho', selected.sizeVariation);
-                              }
-                              const qty = Number(selected?.currentQuantity) || 0;
-                              if (selected && qty <= 0) {
-                                toast({
-                                  title: 'Item sem estoque',
-                                  description:
-                                    'Este item está com saldo 0. Cadastre entrada no estoque e informe a quantidade mínima antes de concluir a entrega.',
-                                  variant: 'destructive',
-                                });
+                              if (selected) {
+                                if (selected.fullName || selected.name) {
+                                  handleEpiChange(idx, 'nome', selected.fullName || selected.name);
+                                }
+                                if (selected.sizeVariation && !epi.tamanho) {
+                                  handleEpiChange(idx, 'tamanho', selected.sizeVariation);
+                                }
+                                if (selected.caNumber && !epi.ca) {
+                                  handleEpiChange(idx, 'ca', selected.caNumber);
+                                }
+                                const qty = Number(selected.currentQuantity) || 0;
+                                if (qty <= 0) {
+                                  toast({
+                                    title: 'Item sem estoque',
+                                    description:
+                                      'Este item está com saldo 0. Cadastre entrada no estoque e informe a quantidade mínima antes de concluir a entrega.',
+                                    variant: 'destructive',
+                                  });
+                                }
                               }
                             }}
                             placeholder="Digite o código ou nome do item..."
                             searchPlaceholder="Código, nome ou código de barras..."
                             emptyPlaceholder="Nenhum item encontrado."
-                            minSearchChars={3}
-                            minCharsMessage="Digite ao menos 3 caracteres (código ou nome) para buscar..."
+                            minSearchChars={0}
+                            minCharsMessage="Digite para filtrar itens de estoque..."
                             className={cn(
                               "h-10 bg-background border-primary/20 text-foreground hover:bg-background",
                               form.status === 'COMPLETED' && (!epi.stockItemId || epi.stockItemId === 'none')
@@ -1645,9 +1675,10 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                               <Button
                                 variant="outline"
                                 role="combobox"
+                                title={epi.nome || "Selecione ou digite o nome..."}
                                 className="w-full h-10 justify-between font-normal bg-background text-foreground hover:bg-muted hover:text-foreground focus:text-foreground"
                               >
-                                <span className="truncate text-left flex-1">
+                                <span className="truncate text-left flex-1" title={epi.nome || "Selecione ou digite o nome..."}>
                                   {epi.nome || "Selecione ou digite o nome..."}
                                 </span>
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1668,6 +1699,20 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                                           const match = option?.trim().match(/\b(PP|P|M|G|GG|XG|XGG|EG|EGG|EXG|3[3-9]|4[0-9]|5[0-0])\b$/i);
                                           if (match && !epi.tamanho) {
                                             handleEpiChange(idx, 'tamanho', match[1].toUpperCase());
+                                          }
+                                          // Se não possui stockItemId vinculado, tentar auto-vincular se houver correspondência exata de nome no estoque
+                                          if (!epi.stockItemId && stockItems.length > 0) {
+                                            const optLower = option.trim().toLowerCase();
+                                            const matchedStock = stockItems.find(item => {
+                                              const fullName = (item.fullName || item.name || '').trim().toLowerCase();
+                                              return fullName === optLower || fullName.startsWith(optLower);
+                                            });
+                                            if (matchedStock) {
+                                              handleEpiChange(idx, 'stockItemId', matchedStock.id);
+                                              if (matchedStock.caNumber && !epi.ca) {
+                                                handleEpiChange(idx, 'ca', matchedStock.caNumber);
+                                              }
+                                            }
                                           }
                                           // Limpar campos de uniforme se mudar o EPI
                                           if (option !== 'Uniforme de Trabalho') {

@@ -347,7 +347,7 @@ public class EPIDeliveryFormService {
         List<String> missing = new ArrayList<>();
         for (EPIDeliveryFormItem item : form.getItems()) {
             // Itens devolvidos/substituídos não necessitam de vínculo obrigatório para nova baixa
-            if (item.getSubstitutedDate() != null) {
+            if (item.getSubstitutedDate() != null || item.getReturnedDate() != null) {
                 continue;
             }
             String label = item.getEpiName() != null && !item.getEpiName().isBlank()
@@ -406,9 +406,9 @@ public class EPIDeliveryFormService {
 
         for (EPIDeliveryFormItem item : form.getItems()) {
             // Se o item foi devolvido/substituído, o cancelStockRequisition já deu entrada compensatória. Não gera nova baixa.
-            if (item.getSubstitutedDate() != null) {
-                log.info("ℹ️ Item {} marcado como substituído/devolvido em {}; estorno de estoque mantido (sem nova baixa).",
-                        item.getEpiName(), item.getSubstitutedDate());
+            if (item.getSubstitutedDate() != null || item.getReturnedDate() != null) {
+                log.info("ℹ️ Item {} marcado como substituído/devolvido em {} / {}; estorno de estoque mantido (sem nova baixa).",
+                        item.getEpiName(), item.getSubstitutedDate(), item.getReturnedDate());
                 continue;
             }
 
