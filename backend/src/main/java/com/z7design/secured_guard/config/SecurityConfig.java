@@ -161,29 +161,49 @@ public class SecurityConfig {
                                                                 "SUPER_ADMIN", "ADMIN", "HR", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_HR", "ROLE_RH",
                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL")
-                                                // Endpoints de usuários - permitir leitura para usuários autenticados
-                                                // (para
-                                                // chat), escrita requer permissões específicas
-                                                // IMPORTANTE: Regras específicas devem vir ANTES das genéricas
-                                                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users")
-                                                .authenticated()
-                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                                                "/api/users/{id}")
-                                                .authenticated()
-                                                .requestMatchers(org.springframework.http.HttpMethod.POST,
-                                                                "/api/users/**")
-                                                .hasAnyAuthority("USERS_CREATE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
-                                                .requestMatchers(org.springframework.http.HttpMethod.PUT,
-                                                                "/api/users/**")
-                                                .hasAnyAuthority("USERS_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
-                                                .requestMatchers(org.springframework.http.HttpMethod.DELETE,
-                                                                "/api/users/**")
-                                                .hasAnyAuthority("USERS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
-                                                .requestMatchers("/api/users/me/current-role").authenticated()
-                                                .requestMatchers("/api/users/**")
-                                                .hasAnyAuthority("USERS_READ", "USERS_WRITE", "USERS_CREATE",
-                                                                "USERS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
+                                                 // Endpoints de papéis e permissões - leitura para usuários autenticados
+                                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/roles/**")
+                                                 .authenticated()
+                                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/permissions/**")
+                                                 .authenticated()
+                                                 // Endpoints de usuários - permitir leitura para usuários autenticados
+                                                 // (para chat), escrita e consultas para ADMIN, RH, DEPARTAMENTO_PESSOAL, DPE, etc.
+                                                 // IMPORTANTE: Regras específicas devem vir ANTES das genéricas
+                                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users")
+                                                 .authenticated()
+                                                 .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                 "/api/users/{id}")
+                                                 .authenticated()
+                                                 .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                 "/api/users/cpf/**")
+                                                 .hasAnyAuthority("USERS_READ", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
+                                                                 "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "ROLE_DPE", "ROLE_ASSISTENCIA_RH", "ROLE_AUX_DEP", "ROLE_RECURSOS_HUMANOS", "ROLE_HR",
+                                                                 "RH", "DEPARTAMENTO_PESSOAL", "DPE", "ASSISTENCIA_RH", "AUX_DEP", "RECURSOS_HUMANOS", "HR")
+                                                 .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                 "/api/users/search")
+                                                 .hasAnyAuthority("USERS_READ", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
+                                                                 "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "ROLE_DPE", "ROLE_ASSISTENCIA_RH", "ROLE_AUX_DEP", "ROLE_RECURSOS_HUMANOS", "ROLE_HR", "ROLE_GESTOR",
+                                                                 "RH", "DEPARTAMENTO_PESSOAL", "DPE", "ASSISTENCIA_RH", "AUX_DEP", "RECURSOS_HUMANOS", "HR", "GESTOR")
+                                                 .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                                                 "/api/users/**")
+                                                 .hasAnyAuthority("USERS_CREATE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
+                                                                 "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "ROLE_DPE", "ROLE_ASSISTENCIA_RH", "ROLE_AUX_DEP", "ROLE_RECURSOS_HUMANOS", "ROLE_HR",
+                                                                 "RH", "DEPARTAMENTO_PESSOAL", "DPE", "ASSISTENCIA_RH", "AUX_DEP", "RECURSOS_HUMANOS", "HR")
+                                                 .requestMatchers(org.springframework.http.HttpMethod.PUT,
+                                                                 "/api/users/**")
+                                                 .hasAnyAuthority("USERS_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
+                                                                 "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "ROLE_DPE", "ROLE_ASSISTENCIA_RH", "ROLE_AUX_DEP", "ROLE_RECURSOS_HUMANOS", "ROLE_HR",
+                                                                 "RH", "DEPARTAMENTO_PESSOAL", "DPE", "ASSISTENCIA_RH", "AUX_DEP", "RECURSOS_HUMANOS", "HR")
+                                                 .requestMatchers(org.springframework.http.HttpMethod.DELETE,
+                                                                 "/api/users/**")
+                                                 .hasAnyAuthority("USERS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
+                                                 .requestMatchers("/api/users/me/current-role").authenticated()
+                                                 .requestMatchers("/api/users/**")
+                                                 .hasAnyAuthority("USERS_READ", "USERS_WRITE", "USERS_CREATE",
+                                                                 "USERS_DELETE",
+                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
+                                                                 "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "ROLE_DPE", "ROLE_ASSISTENCIA_RH", "ROLE_AUX_DEP", "ROLE_RECURSOS_HUMANOS", "ROLE_HR",
+                                                                 "RH", "DEPARTAMENTO_PESSOAL", "DPE", "ASSISTENCIA_RH", "AUX_DEP", "RECURSOS_HUMANOS", "HR")
                                                 // Endpoints de grupos usados na central de mensagens:
                                                 // qualquer usuário autenticado pode consultar grupos e membros.
                                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/groups")

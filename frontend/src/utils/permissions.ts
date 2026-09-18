@@ -396,6 +396,11 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     case 'RH':
       return {
         ...basePermissions,
+        // Permissões de Usuários (criar usuário padrão para funcionários)
+        USERS_READ: true,
+        USERS_WRITE: true,
+        USERS_CREATE: true,
+
         EMPLOYEES_READ: true,
         EMPLOYEES_WRITE: true,
         EMPLOYEES_CREATE: true,
@@ -629,6 +634,9 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
       return {
         ...basePermissions,
         // Assistente de RH - Permissões de leitura e escrita básica
+        USERS_READ: true,
+        USERS_WRITE: true,
+        USERS_CREATE: true,
         EMPLOYEES_READ: true,
         EMPLOYEES_WRITE: true,
         PAYSLIPS_READ: true,
@@ -646,6 +654,9 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
       return {
         ...basePermissions,
         // Departamento Pessoal - Gestão completa de RH
+        USERS_READ: true,
+        USERS_WRITE: true,
+        USERS_CREATE: true,
         EMPLOYEES_READ: true,
         EMPLOYEES_WRITE: true,
         EMPLOYEES_CREATE: true,
@@ -921,6 +932,9 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
       return {
         ...basePermissions,
         // Auxiliar de Departamento Pessoal - Suporte ao RH
+        USERS_READ: true,
+        USERS_WRITE: true,
+        USERS_CREATE: true,
         EMPLOYEES_READ: true,
         PAYSLIPS_READ: true,
         CONTRACTS_READ: true,
