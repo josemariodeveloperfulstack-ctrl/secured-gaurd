@@ -238,11 +238,6 @@ public class EmployeeService {
 
             validateEmployeeForSave(dto, null, null);
 
-            if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty()
-                    && employeeRepository.existsByEmail(dto.getEmail())) {
-                throw new java.lang.IllegalArgumentException("Email já cadastrado");
-            }
-
             System.out.println("[DEBUG] Validações passaram, convertendo DTO para Entity");
             Employee employee = toEntity(dto);
 
@@ -295,13 +290,6 @@ public class EmployeeService {
             Map<String, String> oldSnapshot = (changedByUserId != null) ? buildOldSnapshot(existingEmployee) : null;
             System.out.println("[DEBUG] Funcionário existente encontrado: " + existingEmployee.getName());
             System.out.println("[DEBUG] Email existente: " + existingEmployee.getEmail());
-
-            // Validar email único (exceto para o próprio funcionário)
-            if (dto.getEmail() != null && existingEmployee.getEmail() != null &&
-                    !existingEmployee.getEmail().equals(dto.getEmail()) &&
-                    employeeRepository.existsByEmail(dto.getEmail())) {
-                throw new IllegalArgumentException("Email já cadastrado");
-            }
 
             validateEmployeeForSave(dto, id, existingEmployee.getDocument());
 
@@ -421,7 +409,7 @@ public class EmployeeService {
                 existingEmployee.setPhone(dto.getPhone());
             }
             if (dto.getEmail() != null) {
-                existingEmployee.setEmail(dto.getEmail());
+                existingEmployee.setEmail(dto.getEmail().trim().isEmpty() ? null : dto.getEmail().trim());
             }
 
             // Atualizar telefone de contato
@@ -1449,7 +1437,7 @@ public class EmployeeService {
         }
         if (status != null && !status.isBlank()) {
             if ("TERMINATED".equalsIgnoreCase(status.trim())) {
-                sql.append("AND (CAST(e.status AS text) = :status OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED')) ");
+                sql.append("AND (CAST(e.status AS text) = :status OR EXISTS (SELECT 1 FROM employee_employment_periods per WHERE per.employee_id = e.id AND per.status = 'TERMINATED')) ");
             } else {
                 sql.append("AND CAST(e.status AS text) = :status ");
             }
@@ -1477,18 +1465,18 @@ public class EmployeeService {
             sql.append(") ");
         }
         if (hireDateFrom != null && hireDateTo != null) {
-            sql.append("AND ((e.hire_date >= :hireDateFrom AND e.hire_date <= :hireDateTo) OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.hire_date >= :hireDateFrom AND p.hire_date <= :hireDateTo)) ");
+            sql.append("AND ((e.hire_date >= :hireDateFrom AND e.hire_date <= :hireDateTo) OR EXISTS (SELECT 1 FROM employee_employment_periods per WHERE per.employee_id = e.id AND per.hire_date >= :hireDateFrom AND per.hire_date <= :hireDateTo)) ");
         } else if (hireDateFrom != null) {
-            sql.append("AND (e.hire_date >= :hireDateFrom OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.hire_date >= :hireDateFrom)) ");
+            sql.append("AND (e.hire_date >= :hireDateFrom OR EXISTS (SELECT 1 FROM employee_employment_periods per WHERE per.employee_id = e.id AND per.hire_date >= :hireDateFrom)) ");
         } else if (hireDateTo != null) {
-            sql.append("AND (e.hire_date <= :hireDateTo OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.hire_date <= :hireDateTo)) ");
+            sql.append("AND (e.hire_date <= :hireDateTo OR EXISTS (SELECT 1 FROM employee_employment_periods per WHERE per.employee_id = e.id AND per.hire_date <= :hireDateTo)) ");
         }
         if (terminationDateFrom != null && terminationDateTo != null) {
-            sql.append("AND ((COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom AND COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo) OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED' AND p.termination_date >= :terminationDateFrom AND p.termination_date <= :terminationDateTo)) ");
+            sql.append("AND ((COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom AND COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo) OR EXISTS (SELECT 1 FROM employee_employment_periods per WHERE per.employee_id = e.id AND per.status = 'TERMINATED' AND per.termination_date >= :terminationDateFrom AND per.termination_date <= :terminationDateTo)) ");
         } else if (terminationDateFrom != null) {
-            sql.append("AND (COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED' AND p.termination_date >= :terminationDateFrom)) ");
+            sql.append("AND (COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom OR EXISTS (SELECT 1 FROM employee_employment_periods per WHERE per.employee_id = e.id AND per.status = 'TERMINATED' AND per.termination_date >= :terminationDateFrom)) ");
         } else if (terminationDateTo != null) {
-            sql.append("AND (COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED' AND p.termination_date <= :terminationDateTo)) ");
+            sql.append("AND (COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo OR EXISTS (SELECT 1 FROM employee_employment_periods per WHERE per.employee_id = e.id AND per.status = 'TERMINATED' AND per.termination_date <= :terminationDateTo)) ");
         }
     }
 
@@ -1547,9 +1535,10 @@ public class EmployeeService {
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'ACTIVE' THEN 1 ELSE 0 END), 0) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'VACATION' THEN 1 ELSE 0 END), 0) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) IN ('MEDICAL_CERTIFICATE', 'MATERNITY_LEAVE') THEN 1 ELSE 0 END), 0) AS bigint), "
-                        + "CAST(COALESCE(SUM(CASE WHEN (CAST(e.status AS text) = 'TERMINATED' OR EXISTS (SELECT 1 FROM employee_employment_periods p WHERE p.employee_id = e.id AND p.status = 'TERMINATED')) THEN 1 ELSE 0 END), 0) AS bigint), "
+                        + "CAST(COALESCE(SUM(CASE WHEN (CAST(e.status AS text) = 'TERMINATED' OR EXISTS (SELECT 1 FROM employee_employment_periods per WHERE per.employee_id = e.id AND per.status = 'TERMINATED')) THEN 1 ELSE 0 END), 0) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'SUSPENDED' THEN 1 ELSE 0 END), 0) AS bigint) "
                         + "FROM employees e "
+                        + "LEFT JOIN positions p ON e.position_id = p.id "
                         + "LEFT JOIN work_posts wp ON e.work_post_id = wp.id "
                         + "LEFT JOIN departments d ON e.department_id = d.id "
                         + "LEFT JOIN units u ON e.unit_id = u.id "
@@ -1930,7 +1919,7 @@ public class EmployeeService {
             System.out.println("[DEBUG] Address salvo: " + e.getAddress());
 
             e.setPhone(dto.getPhone());
-            e.setEmail(dto.getEmail());
+            e.setEmail(dto.getEmail() != null && !dto.getEmail().trim().isEmpty() ? dto.getEmail().trim() : null);
 
             // Mapear telefone de contato
             if (dto.getTelefoneContato() != null) {
