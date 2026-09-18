@@ -108,6 +108,8 @@ export const SystemGeneratedDocumentsSection: React.FC<
   const { toast } = useToast();
   const invalidateDocumentos = useInvalidateDocumentosGerados();
   const [viewingId, setViewingId] = React.useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = React.useState<string | null>(null);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   const handleView = async (doc: DocumentoGerado) => {
     try {
