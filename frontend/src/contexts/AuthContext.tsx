@@ -9,6 +9,7 @@ import { getApiUrl } from '@/config/environment';
 import { SessionTimeoutManager } from '@/components/SessionTimeoutManager';
 import WebSocketConnector from '@/components/WebSocketConnector';
 import { handleConnectionErrorSilently } from '@/utils/connectionError';
+import { useBackendStatusStore } from '@/stores/backendStatusStore';
 
 const sanitizeRole = (roleStr: string): string => {
   if (!roleStr) return '';
@@ -172,6 +173,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const token = localStorage.getItem('token');
       const savedUserStr = localStorage.getItem('user');
       if (!token || !savedUserStr) return;
+
+      // Backend reiniciando/indisponível ou aba em segundo plano: não gerar uma
+      // rajada de requisições falhando (o interceptor do axios já marcou o status).
+      if (useBackendStatusStore.getState().isUnavailable) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
 
       try {
         const response = await api.get('/session/current-role', { silent: true } as Parameters<typeof api.get>[1]);

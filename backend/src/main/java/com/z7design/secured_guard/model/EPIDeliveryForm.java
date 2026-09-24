@@ -128,6 +128,7 @@ public class EPIDeliveryForm {
     private String refusalReason;
 
     @OneToMany(mappedBy = "deliveryForm", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("lineOrder ASC, id ASC")
     @JsonManagedReference
     @Builder.Default
     private List<EPIDeliveryFormItem> items = new ArrayList<>();

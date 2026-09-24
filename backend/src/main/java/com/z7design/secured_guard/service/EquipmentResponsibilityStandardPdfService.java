@@ -387,24 +387,24 @@ public class EquipmentResponsibilityStandardPdfService {
                                         BigDecimal.valueOf(15.00),
                                         "Quinze Reais");
                 }
-                if (normalized.contains("OTIMO")) {
-                        return new ValeTransporteCardInfo(
-                                        "CARTÃO ÓTIMO VALE-TRANSPORTE",
-                                        "O CARTÃO ÓTIMO VALE-TRANSPORTE",
-                                        null,
-                                        null,
-                                        "destinado à utilização no Sistema de Transporte de Passageiros na Região Metropolitana das operadoras pertencentes ao SINTRAM",
-                                        BigDecimal.valueOf(15.00),
-                                        "Quinze Reais");
-                }
-                return new ValeTransporteCardInfo(
-                                "CARTÃO BHBUS VALE-TRANSPORTE",
-                                "O CARTÃO BHBUS VALE-TRANSPORTE",
-                                "Belo Horizonte",
-                                "TRANSFÁCIL",
-                                null,
-                                BigDecimal.valueOf(17.35),
-                                "Dezessete Reais e Trinta e Cinco Centavos");
+				if (normalized.contains("OTIMO")) {
+					return new ValeTransporteCardInfo(
+									"CARTÃO ÓTIMO VALE-TRANSPORTE",
+									"O CARTÃO ÓTIMO VALE-TRANSPORTE",
+									null,
+									null,
+									"destinado à utilização no Sistema de Transporte de Passageiros na Região Metropolitana das operadoras pertencentes ao SINTRAM",
+									BigDecimal.valueOf(17.35),
+									"Dezessete Reais e Trinta e Cinco Centavos");
+				}
+				return new ValeTransporteCardInfo(
+								"CARTÃO BHBUS VALE-TRANSPORTE",
+								"O CARTÃO BHBUS VALE-TRANSPORTE",
+								"Belo Horizonte",
+								"TRANSFÁCIL",
+								null,
+								BigDecimal.valueOf(15.00),
+								"Quinze Reais");
         }
 
         private String normalize(String value) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,7 +36,8 @@ import {
   MapPin,
   Edit,
   FileSpreadsheet,
-  RotateCcw
+  RotateCcw,
+  AlertCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { epiDeliveryFormService, EPIDeliveryForm, EPIDeliveryType } from '@/services/epiDeliveryFormService';
@@ -62,16 +63,6 @@ const DELIVERY_TYPE_COLORS: Record<string, string> = {
   TROCA: 'bg-purple-100 text-purple-800 border-purple-200',
 };
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 export const FichasEntregaEPIContent: React.FC = () => {
   const { toast } = useToast();
@@ -96,7 +87,10 @@ export const FichasEntregaEPIContent: React.FC = () => {
   
   // Estados para o Modal de Exclusão
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [fichaToDelete, setFichaToDelete] = useState<string | null>(null);
+  const [fichaToDelete, setFichaToDelete] = useState<EPIDeliveryForm | null>(null);
+  const [deletingFicha, setDeletingFicha] = useState(false);
+  /** Assinatura da busca em andamento — evita disparar a mesma requisição duas vezes. */
+  const inFlightLoadRef = useRef<string | null>(null);
 
   useEffect(() => {
     loadFichas();
@@ -124,29 +118,37 @@ export const FichasEntregaEPIContent: React.FC = () => {
   }, [page, employeeFilter, companyFilter, startDateFilter, endDateFilter]);
 
   const loadFichas = async () => {
+    const filters: any = {
+      page,
+      size: 10,
+      sortBy: 'createdAt',
+      sortDir: 'DESC'
+    };
+
+    // Apenas adicionar filtros se tiverem valor
+    if (employeeFilter && employeeFilter.trim()) {
+      filters.employeeId = employeeFilter;
+    }
+    if (companyFilter && companyFilter.trim()) {
+      filters.companyId = companyFilter;
+    }
+    if (startDateFilter && startDateFilter.trim()) {
+      filters.startDate = startDateFilter;
+    }
+    if (endDateFilter && endDateFilter.trim()) {
+      filters.endDate = endDateFilter;
+    }
+
+    // 'focus' e 'visibilitychange' disparam juntos ao voltar para a aba; sem este
+    // guarda a mesma busca era disparada duas vezes (requisição duplicada no console).
+    const requestSignature = JSON.stringify(filters);
+    if (inFlightLoadRef.current === requestSignature) {
+      return;
+    }
+    inFlightLoadRef.current = requestSignature;
+
     try {
       setLoading(true);
-      
-      const filters: any = {
-        page,
-        size: 10,
-        sortBy: 'createdAt',
-        sortDir: 'DESC'
-      };
-
-      // Apenas adicionar filtros se tiverem valor
-      if (employeeFilter && employeeFilter.trim()) {
-        filters.employeeId = employeeFilter;
-      }
-      if (companyFilter && companyFilter.trim()) {
-        filters.companyId = companyFilter;
-      }
-      if (startDateFilter && startDateFilter.trim()) {
-        filters.startDate = startDateFilter;
-      }
-      if (endDateFilter && endDateFilter.trim()) {
-        filters.endDate = endDateFilter;
-      }
 
       const response = await epiDeliveryFormService.search(filters);
       setFichas(response.content || []);
@@ -164,6 +166,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
       setTotalPages(0);
       setTotalElements(0);
     } finally {
+      inFlightLoadRef.current = null;
       setLoading(false);
     }
   };
@@ -193,9 +196,10 @@ export const FichasEntregaEPIContent: React.FC = () => {
       });
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
+      const err = error as { message?: string; response?: { data?: { message?: string } } };
       toast({
         title: 'Erro',
-        description: 'Não foi possível gerar o PDF da ficha.',
+        description: err?.message || err?.response?.data?.message || 'Não foi possível gerar o PDF da ficha.',
         variant: 'destructive'
       });
     } finally {
@@ -203,8 +207,8 @@ export const FichasEntregaEPIContent: React.FC = () => {
     }
   };
 
-  const handleDelete = (id: string) => {
-    setFichaToDelete(id);
+  const handleDelete = (ficha: EPIDeliveryForm) => {
+    setFichaToDelete(ficha);
     setDeleteDialogOpen(true);
   };
 
@@ -212,20 +216,22 @@ export const FichasEntregaEPIContent: React.FC = () => {
     if (!fichaToDelete) return;
 
     try {
-      await epiDeliveryFormService.delete(fichaToDelete);
+      setDeletingFicha(true);
+      await epiDeliveryFormService.delete(fichaToDelete.id);
       toast({
-        title: 'Sucesso',
-        description: 'Ficha excluída com sucesso!',
+        title: 'Ficha excluída',
+        description: 'Ficha excluída e quantidades devolvidas ao estoque (material não entregue).',
       });
       loadFichas();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir ficha:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível excluir a ficha.',
+        description: error?.message || error?.response?.data?.message || 'Não foi possível excluir a ficha.',
         variant: 'destructive'
       });
     } finally {
+      setDeletingFicha(false);
       setFichaToDelete(null);
       setDeleteDialogOpen(false);
     }
@@ -529,9 +535,9 @@ export const FichasEntregaEPIContent: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleDelete(ficha.id)}
+                                  onClick={() => handleDelete(ficha)}
                                   className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                  title="Excluir"
+                                  title="Excluir (devolve itens ao estoque)"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -728,34 +734,149 @@ export const FichasEntregaEPIContent: React.FC = () => {
             )}
           </DialogContent>
         </Dialog>
-        {/* Modal de Confirmação de Exclusão */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent className="bg-slate-900 border-seguranca-yellow/20 max-w-[400px]">
-            <AlertDialogHeader className="flex flex-col items-center justify-center text-center space-y-4">
-              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
-                <Trash2 className="h-6 w-6 text-destructive" />
+        {/* Modal de Confirmação de Exclusão — mostra a ficha para o usuário conferir antes de excluir */}
+        <Dialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) setFichaToDelete(null); }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                Excluir Ficha de Entrega de EPI
+              </DialogTitle>
+              <DialogDescription>
+                Confira abaixo a ficha que será excluída. Ao excluir, todas as quantidades lançadas nesta ficha serão <strong>devolvidas ao estoque</strong> (material não entregue).
+              </DialogDescription>
+            </DialogHeader>
+            {fichaToDelete && (
+              <div className="space-y-6">
+                {/* Tipo de entrega badge e status */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  {getDeliveryTypeBadge(fichaToDelete.deliveryType)}
+                  {getStatusBadge(fichaToDelete.status)}
+                  {fichaToDelete.employeeWorkSector && (
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {fichaToDelete.employeeWorkSector}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Funcionário</Label>
+                    <p className="font-medium">{fichaToDelete.employeeName}</p>
+                    {fichaToDelete.employeeCpf && (
+                      <p className="text-sm text-muted-foreground">CPF: {fichaToDelete.employeeCpf}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Empresa</Label>
+                    <p className="font-medium">{fichaToDelete.companyName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Data de Entrega</Label>
+                    <p className="font-medium">
+                      {fichaToDelete.deliveryDate ? formatAdmissionDateBr(fichaToDelete.deliveryDate) : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Responsável</Label>
+                    <p className="font-medium">{fichaToDelete.responsibleEmployeeName || fichaToDelete.createdByName || '-'}</p>
+                  </div>
+                </div>
+
+                {fichaToDelete.observations && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Observações</Label>
+                    <p className="text-sm">{fichaToDelete.observations}</p>
+                  </div>
+                )}
+
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Itens que voltarão ao estoque</Label>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>EPI</TableHead>
+                          <TableHead>Nº</TableHead>
+                          <TableHead>Quantidade</TableHead>
+                          <TableHead>CA</TableHead>
+                          <TableHead>Situação</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(fichaToDelete.items || []).map((item, idx) => {
+                          const devolvido = !!item.substitutedDate || !!item.returnedDate;
+                          return (
+                            <TableRow key={item.id || idx}>
+                              <TableCell className="font-medium">{item.epiName}</TableCell>
+                              <TableCell>{item.sizeNumber || item.uniformPiece || '-'}</TableCell>
+                              <TableCell>{item.quantity}</TableCell>
+                              <TableCell>{item.ca || '-'}</TableCell>
+                              <TableCell>
+                                {devolvido ? (
+                                  <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-200">
+                                    Já devolvido/substituído (sem novo estorno)
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs bg-emerald-100 text-emerald-800 border-emerald-200">
+                                    Volta ao estoque
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {(fichaToDelete.items || []).length === 0 && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Esta ficha não possui itens lançados.
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-destructive" />
+                  <span>
+                    Esta ação não poderá ser desfeita. A ficha será removida definitivamente.
+                  </span>
+                </div>
               </div>
-              <AlertDialogTitle className="text-xl font-bold text-white">
-                Confirmar Exclusão
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-slate-400 text-base">
-                Tem certeza que deseja excluir esta ficha? <br />
-                Esta ação não poderá ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="flex flex-row gap-3 mt-6 sm:justify-center">
-              <AlertDialogCancel className="flex-1 bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
-                Cancelar
-              </AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={confirmDelete}
-                className="flex-1 bg-destructive hover:bg-destructive/90 text-white font-bold transition-all"
+            )}
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setFichaToDelete(null);
+                }}
+                disabled={deletingFicha}
               >
-                Sim, Excluir
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deletingFicha}
+                className="flex items-center gap-2"
+              >
+                {deletingFicha ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Confirmar Exclusão
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         {/* Modal de Geração de Ficha de EPI Manual (PDF) */}
         <Dialog open={manualBlankPdfModalOpen} onOpenChange={setManualBlankPdfModalOpen}>
           <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 bg-seguranca-graphite border-gray-700 text-white rounded-xl">

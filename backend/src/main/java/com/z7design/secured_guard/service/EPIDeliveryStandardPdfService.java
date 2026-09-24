@@ -174,6 +174,14 @@ public class EPIDeliveryStandardPdfService {
                         employee = employeeRepository.findById(employee.getId()).orElse(employee);
                 }
                 Company company = form.getCompany();
+                if (company == null || company.getId() == null) {
+                        throw new IllegalArgumentException(
+                                        "Empresa não vinculada à ficha de entrega de EPI. Edite a ficha e informe a empresa antes de gerar o PDF.");
+                }
+                if (employee == null || employee.getId() == null) {
+                        throw new IllegalArgumentException(
+                                        "Funcionário não vinculado à ficha de entrega de EPI. Edite a ficha e informe o funcionário antes de gerar o PDF.");
+                }
 
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 DocumentWithPdf docWithPdf = null;
@@ -811,7 +819,15 @@ public class EPIDeliveryStandardPdfService {
                 LocalDate formDeliveryDate = form.getDeliveryDate();
                 EPIDeliveryType deliveryType = form.getDeliveryType();
 
-                for (EPIDeliveryFormItem item : form.getItems()) {
+                // Ordem determinística: line_order (novos itens sempre na linha de baixo),
+                // com fallback por id para itens legados sem ordem definida.
+                List<EPIDeliveryFormItem> orderedItems = form.getItems().stream()
+                                .sorted(java.util.Comparator
+                                                .comparing((EPIDeliveryFormItem i) -> i.getLineOrder() != null ? i.getLineOrder() : 0)
+                                                .thenComparing(i -> i.getId() != null ? i.getId().toString() : ""))
+                                .collect(java.util.stream.Collectors.toList());
+
+                for (EPIDeliveryFormItem item : orderedItems) {
                         int qty = item.getQuantity() != null && item.getQuantity() > 0 ? item.getQuantity() : 1;
 
                         LocalDate itemDeliveryDate = item.getConfirmedAt() != null

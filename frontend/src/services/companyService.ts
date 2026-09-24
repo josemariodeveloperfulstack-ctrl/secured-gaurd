@@ -33,8 +33,8 @@ export interface CreateCompanyRequest {
 
 export const DEFAULT_GROUP_COMPANIES = [
   { id: '8b63e5ce-0a98-490d-b11f-82990b3dc5be', name: 'PROMOVER TERCEIRIZAÇÃO & SERVIÇOS LTDA', sigla: 'TERC', status: 'ACTIVE' },
-  { id: '9c74f6df-1b09-501e-c22g-93001c4ed6cf', name: 'PROMOVER VIGILÂNCIA PATRIMONIAL LTDA', sigla: 'VIG', status: 'ACTIVE' },
-  { id: '0d85a7ee-2c10-612f-d33h-04112d5fe7da', name: 'PROMOVER ADMINISTRAÇÃO & GESTÃO LTDA', sigla: 'ADM', status: 'ACTIVE' }
+  { id: '9c74f6df-1b09-501e-c22f-93001c4ed6cf', name: 'PROMOVER VIGILÂNCIA PATRIMONIAL LTDA', sigla: 'VIG', status: 'ACTIVE' },
+  { id: '0d85a7ee-2c10-612f-d33a-04112d5fe7da', name: 'PROMOVER ADMINISTRAÇÃO & GESTÃO LTDA', sigla: 'ADM', status: 'ACTIVE' }
 ];
 
 export const companyService = {

@@ -18,6 +18,7 @@ import { EmployeeCombobox } from '../ui/employee-combobox';
 
 import { epiDeliveryFormService, EPIDeliveryType, EPIDeliveryFormItem, EpiItemConfirmation } from '@/services/epiDeliveryFormService';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
+import { buildInsufficientStockMessage, findInsufficientStockRows, sumActiveStockQuantities } from '@/utils/epiStockBalance';
 import { employeeAdmissionIsoDateOrToday, formatAdmissionDateBr, todayIsoDateLocal } from '@/utils/employeeAdmissionDate';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -138,7 +139,9 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
           setCurrentFichaId(ficha.id);
           setConfirmationPending(!!ficha.confirmationPending);
           setItemConfirmations(ficha.items || []);
-          setEpis(ficha.items.map(item => ({
+          // Itens já cadastrados aparecem primeiro (ordem da ficha) e a linha
+          // vazia para o próximo item fica na linha de baixo, após os salvos.
+          const savedEpis = ficha.items.map(item => ({
             id: item.id || '',
             nome: item.epiName,
             tamanho: item.sizeNumber || '',
@@ -154,7 +157,14 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
             motivoSubstituicao: (item as any).replacementReason || '',
             dataDevolucao: (item as any).returnedDate || '',
             motivoDevolucao: (item as any).returnReason || '',
-          })));
+          }));
+          setEpis([...savedEpis, emptyEpiRow()]);
+
+          // Estado gravado no backend: base para validar o saldo disponível no formulário.
+          persistedStatusRef.current = ficha.status || 'DRAFT';
+          persistedStockQuantitiesRef.current = persistedStatusRef.current === 'COMPLETED'
+            ? sumActiveStockQuantities(ficha.items)
+            : {};
           
           // Trigger data resolution for employee and company
           const emp = await employeeService.getEmployeeById(ficha.employeeId);
@@ -236,6 +246,15 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
   });
 
   const [currentFichaId, setCurrentFichaId] = useState<string | undefined>(fichaId);
+  /**
+   * Quantidades que ESTA ficha já baixou no estoque (a REQ-EPI gerada por ela).
+   * O backend estorna e baixa tudo de novo a cada gravação, então o saldo disponível
+   * para um item já lançado é `saldo atual + quantidade já baixada` — sem isso, itens
+   * da própria ficha apareceriam como "sem saldo".
+   */
+  const persistedStockQuantitiesRef = useRef<Record<string, number>>({});
+  /** Status gravado no backend (o preview/PDF grava mantendo este status). */
+  const persistedStatusRef = useRef<string>('DRAFT');
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [whatsappResult, setWhatsappResult] = useState<{
     confirmationCode: string;
@@ -641,7 +660,9 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
   const getFilledEpis = () => epis.filter(isEpiRowFilled);
 
   const mapEpisToFormItems = (source = getFilledEpis()) =>
-    source.map(epi => ({
+    // A ordem do array é preservada: itens já cadastrados primeiro,
+    // novos itens por último (lineOrder garante que o novo fique na linha de baixo).
+    source.map((epi, idx) => ({
       id: epi.id || undefined,
       epiName: epi.nome,
       sizeNumber: epi.tamanho || undefined,
@@ -653,11 +674,37 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       uniformPiece: epi.uniformePeca || undefined,
       observations: epi.observacoes || undefined,
       stockItemId: epi.stockItemId && epi.stockItemId !== 'none' ? epi.stockItemId : undefined,
+      lineOrder: idx,
       substitutedDate: epi.dataSubstituicao || undefined,
       replacementReason: epi.motivoSubstituicao || undefined,
       returnedDate: epi.dataDevolucao || undefined,
       returnReason: epi.motivoDevolucao || undefined,
     }));
+
+  /**
+   * Guarda o estado que o backend passou a ter depois de gravar a ficha:
+   * status final e quantidades efetivamente baixadas por ela.
+   */
+  const syncPersistedStockState = (
+    status: string,
+    items: Array<{ stockItemId?: string; quantity?: number; substitutedDate?: string; returnedDate?: string }>,
+  ) => {
+    persistedStatusRef.current = status;
+    persistedStockQuantitiesRef.current = status === 'COMPLETED' ? sumActiveStockQuantities(items) : {};
+  };
+
+  /**
+   * Saldo disponível item a item, antes de enviar.
+   * Evita o 400 "Quantidade insuficiente em estoque" que o backend devolve ao dar baixa.
+   */
+  const validateStockBalance = (source = getFilledEpis()): string | null =>
+    buildInsufficientStockMessage(
+      findInsufficientStockRows(
+        source,
+        stockItems,
+        currentFichaId ? persistedStockQuantitiesRef.current : {},
+      ),
+    );
 
   /** Na conclusão, todo item deve gerar baixa no estoque. */
   const validateEpisForCompletion = (source = getFilledEpis()): string | null => {
@@ -732,6 +779,16 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       return;
     }
 
+    // O preview também grava a ficha; se ela já está concluída no servidor a baixa de
+    // estoque é refeita, então o saldo precisa ser validado antes de enviar.
+    if (persistedStatusRef.current === 'COMPLETED') {
+      const balanceError = validateStockBalance();
+      if (balanceError) {
+        toast({ title: 'Saldo insuficiente', description: balanceError, variant: 'destructive' });
+        return;
+      }
+    }
+
     if (epis.some(epi => !epi.nome)) {
       toast({
         title: 'Atenção',
@@ -789,6 +846,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
         return;
       }
 
+      const items = mapEpisToFormItems();
       const formData = {
         id: currentFichaId || undefined,
         employeeId: form.funcionarioId,
@@ -797,10 +855,13 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
         responsibleEmployeeId: form.responsavelEntregaId || undefined,
         observations: form.observacoes || undefined,
         employeeWorkSector: form.employeeWorkSector,
-        items: mapEpisToFormItems(),
+        items,
       };
 
+      // O preview não envia status: o backend mantém o status atual da ficha.
+      const statusAfterSave = persistedStatusRef.current;
       const blob = await epiDeliveryFormService.generateAndSavePdf(formData);
+      syncPersistedStockState(statusAfterSave, items);
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
@@ -809,7 +870,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       console.error('Erro ao gerar preview:', err);
       toast({
         title: 'Erro',
-        description: err.response?.data?.message || 'Erro ao gerar preview da ficha. Tente novamente.',
+        description: err.message || err.response?.data?.message || 'Erro ao gerar preview da ficha. Tente novamente.',
         variant: 'destructive'
       });
     } finally {
@@ -833,6 +894,12 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       const completionError = validateEpisForCompletion();
       if (completionError) {
         toast({ title: 'Atenção', description: completionError, variant: 'destructive' });
+        return;
+      }
+      // Bloqueia aqui: o backend recusa a baixa com 400 quando falta saldo.
+      const balanceError = validateStockBalance();
+      if (balanceError) {
+        toast({ title: 'Saldo insuficiente', description: balanceError, variant: 'destructive' });
         return;
       }
     } else if (epis.some(epi => !epi.nome)) {
@@ -860,6 +927,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
         throw new Error('Funcionário não encontrado');
       }
 
+      const items = mapEpisToFormItems();
       const buildEpiFormData = () => ({
         id: currentFichaId || undefined,
         employeeId: form.funcionarioId,
@@ -872,7 +940,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
         signatureType: form.signatureType,
         employeeWorkSector: form.employeeWorkSector || undefined,
         status: form.status,
-        items: mapEpisToFormItems(),
+        items,
       });
 
       const blob = await epiDeliveryFormService.generateAndSavePdf(buildEpiFormData());
@@ -886,6 +954,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       a.remove();
       window.URL.revokeObjectURL(url);
 
+      syncPersistedStockState(form.status, items);
+
       toast({
         title: 'Sucesso',
         description: 'Ficha de Entrega de EPI gerada e salva com sucesso!',
@@ -895,7 +965,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       console.error('Erro ao gerar PDF:', err);
       toast({
         title: 'Erro',
-        description: err.response?.data?.message || 'Erro ao gerar PDF. Tente novamente.',
+        description: err.message || err.response?.data?.message || 'Erro ao gerar PDF. Tente novamente.',
         variant: 'destructive'
       });
     } finally {
@@ -929,6 +999,12 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
         toast({ title: 'Atenção', description: completionError, variant: 'destructive' });
         return;
       }
+      // Bloqueia aqui: o backend recusa a baixa com 400 quando falta saldo.
+      const balanceError = validateStockBalance(filledEpis);
+      if (balanceError) {
+        toast({ title: 'Saldo insuficiente', description: balanceError, variant: 'destructive' });
+        return;
+      }
     } else if (filledEpis.some(epi => !epi.nome?.trim())) {
       toast({
         title: 'Atenção',
@@ -958,6 +1034,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
 
     setLoading(true);
     try {
+      const items = mapEpisToFormItems(filledEpis);
       const formData = {
         id: currentFichaId || undefined,
         employeeId: form.funcionarioId,
@@ -970,7 +1047,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
         signatureBase64: form.signatureBase64 || undefined,
         employeeWorkSector: form.employeeWorkSector || undefined,
         deliveryType: form.tipoEntrega || 'PRIMEIRA_ENTREGA',
-        items: mapEpisToFormItems(filledEpis),
+        items,
       };
 
       const saved = currentFichaId
@@ -978,6 +1055,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
         : await epiDeliveryFormService.create(formData);
 
       setCurrentFichaId(saved.id);
+      syncPersistedStockState(form.status, items);
 
       // Mantém a lista salva e deixa uma linha vazia para continuar adicionando
       const persistedEpis = filledEpis.map((epi) => ({ ...epi }));
@@ -1009,7 +1087,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       console.error('❌ Erro ao salvar ficha de EPI:', err);
       toast({
         title: 'Erro',
-        description: err.response?.data?.message || 'Erro ao salvar a ficha. Tente novamente.',
+        description: err.message || err.response?.data?.message || 'Erro ao salvar a ficha. Tente novamente.',
         variant: 'destructive'
       });
     } finally {
@@ -1051,6 +1129,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
 
     setCurrentFichaId(saved.id);
     setForm(prev => ({ ...prev, status: 'DRAFT', signatureType: 'WHATSAPP_CONFIRM' }));
+    // Rascunho não baixa estoque no backend.
+    syncPersistedStockState('DRAFT', formData.items);
     return saved.id;
   };
 
@@ -1123,6 +1203,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
         setConfirmationPending(false);
         setForm(prev => ({ ...prev, status: 'COMPLETED' }));
       }
+      // A confirmação conclui a ficha e dá baixa no estoque no backend.
+      syncPersistedStockState(finalStatus, mapEpisToFormItems());
       setWhatsappResult(null);
       toast({
         title: 'Recebimento confirmado',

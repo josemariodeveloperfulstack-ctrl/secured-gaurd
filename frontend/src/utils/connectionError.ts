@@ -85,7 +85,10 @@ export function isConnectionError(error: any): boolean {
     error?.code === 'ERR_CONNECTION_REFUSED' ||
     error?.code === 'ERR_NETWORK' ||
     error?.code === 'ERR_CONNECTION_CLOSED' ||
+    error?.code === 'ECONNABORTED' ||
+    error?.code === 'ETIMEDOUT' ||
     error?.message?.includes('ERR_CONNECTION_CLOSED') ||
+    error?.message?.includes('timeout of') ||
     error?.code === 'ERR_TOO_MANY_REDIRECTS' ||
     error?.message?.includes('too many redirects') ||
     error?.message?.includes('Network Error') ||
@@ -170,4 +173,35 @@ export function handleConnectionErrorSilently(error: any, context?: string): boo
     return true;
   }
   return false;
+}
+
+/**
+ * Extrai message de erro JSON recebido como Blob (responseType: 'blob').
+ * Retorna null quando não for JSON/erro legível.
+ */
+export async function extractMessageFromBlobError(error: unknown): Promise<string | null> {
+  const data = (error as { response?: { data?: unknown } } | null)?.response?.data;
+  if (!(data instanceof Blob)) {
+    if (data && typeof data === 'object') {
+      const obj = data as { message?: string; error?: string };
+      return obj.message || obj.error || null;
+    }
+    return null;
+  }
+  try {
+    const type = (data.type || '').toLowerCase();
+    if (type && !type.includes('json') && !type.includes('text')) {
+      return null;
+    }
+    const text = await data.text();
+    if (!text) return null;
+    try {
+      const parsed = JSON.parse(text) as { message?: string; error?: string };
+      return parsed.message || parsed.error || null;
+    } catch {
+      return null;
+    }
+  } catch {
+    return null;
+  }
 }
