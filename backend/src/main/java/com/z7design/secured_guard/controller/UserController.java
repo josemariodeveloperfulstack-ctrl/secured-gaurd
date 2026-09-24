@@ -183,7 +183,7 @@ public class UserController {
     }
 
     @GetMapping("/username/{username}")
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('DPE') or hasRole('ASSISTENCIA_RH') or hasRole('AUX_DEP') or hasRole('RECURSOS_HUMANOS') or hasRole('HR') or hasAuthority('ROLE_RH') or hasAuthority('ROLE_DEPARTAMENTO_PESSOAL') or hasAuthority('ROLE_DPE') or hasAuthority('ROLE_ASSISTENCIA_RH') or hasAuthority('ROLE_AUX_DEP') or hasAuthority('ROLE_RECURSOS_HUMANOS') or hasAuthority('ROLE_HR')")
     @Operation(summary = "Buscar usuário por username", description = "Retorna um usuário específico pelo username")
     public ResponseEntity<UserListResponseDTO> getUserByUsername(@PathVariable String username) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -202,7 +202,7 @@ public class UserController {
     }
 
     @GetMapping("/email/{email}")
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('DPE') or hasRole('ASSISTENCIA_RH') or hasRole('AUX_DEP') or hasRole('RECURSOS_HUMANOS') or hasRole('HR') or hasAuthority('ROLE_RH') or hasAuthority('ROLE_DEPARTAMENTO_PESSOAL') or hasAuthority('ROLE_DPE') or hasAuthority('ROLE_ASSISTENCIA_RH') or hasAuthority('ROLE_AUX_DEP') or hasAuthority('ROLE_RECURSOS_HUMANOS') or hasAuthority('ROLE_HR')")
     @Operation(summary = "Buscar usuário por email", description = "Retorna um usuário específico pelo email")
     public ResponseEntity<UserListResponseDTO> getUserByEmail(@PathVariable String email) {
         User user = userService.findByEmail(email)
@@ -212,7 +212,7 @@ public class UserController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('GESTOR') or hasRole('ASSISTENCIA_RH')")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('DPE') or hasRole('ASSISTENCIA_RH') or hasRole('AUX_DEP') or hasRole('RECURSOS_HUMANOS') or hasRole('HR') or hasRole('GESTOR') or hasAuthority('ROLE_RH') or hasAuthority('ROLE_DEPARTAMENTO_PESSOAL') or hasAuthority('ROLE_DPE') or hasAuthority('ROLE_ASSISTENCIA_RH') or hasAuthority('ROLE_AUX_DEP') or hasAuthority('ROLE_RECURSOS_HUMANOS') or hasAuthority('ROLE_HR') or hasAuthority('ROLE_GESTOR')")
     @Operation(summary = "Buscar usuários", description = "Busca usuários por nome, email ou username com filtro dinâmico")
     public ResponseEntity<List<UserListResponseDTO>> searchUsers(
             @RequestParam(value = "query", required = false) String query) {
@@ -233,7 +233,7 @@ public class UserController {
     }
 
     @GetMapping("/cpf/{cpf}")
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('DPE') or hasRole('ASSISTENCIA_RH') or hasRole('AUX_DEP') or hasRole('RECURSOS_HUMANOS') or hasRole('HR') or hasAuthority('ROLE_RH') or hasAuthority('ROLE_DEPARTAMENTO_PESSOAL') or hasAuthority('ROLE_DPE') or hasAuthority('ROLE_ASSISTENCIA_RH') or hasAuthority('ROLE_AUX_DEP') or hasAuthority('ROLE_RECURSOS_HUMANOS') or hasAuthority('ROLE_HR')")
     @Operation(summary = "Buscar usuário por CPF", description = "Busca usuário através do CPF do funcionário associado")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
@@ -248,7 +248,7 @@ public class UserController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USERS_CREATE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('USERS_CREATE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('DPE') or hasRole('ASSISTENCIA_RH') or hasRole('AUX_DEP') or hasRole('RECURSOS_HUMANOS') or hasRole('HR') or hasAuthority('ROLE_RH') or hasAuthority('ROLE_DEPARTAMENTO_PESSOAL') or hasAuthority('ROLE_DPE') or hasAuthority('ROLE_ASSISTENCIA_RH') or hasAuthority('ROLE_AUX_DEP') or hasAuthority('ROLE_RECURSOS_HUMANOS') or hasAuthority('ROLE_HR')")
     @Operation(summary = "Criar usuário", description = "Cria um novo usuário no sistema")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Usuário criado com sucesso"),
@@ -276,7 +276,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('DPE') or hasRole('ASSISTENCIA_RH') or hasRole('AUX_DEP') or hasRole('RECURSOS_HUMANOS') or hasRole('HR') or hasAuthority('ROLE_RH') or hasAuthority('ROLE_DEPARTAMENTO_PESSOAL') or hasAuthority('ROLE_DPE') or hasAuthority('ROLE_ASSISTENCIA_RH') or hasAuthority('ROLE_AUX_DEP') or hasAuthority('ROLE_RECURSOS_HUMANOS') or hasAuthority('ROLE_HR')")
     @Operation(summary = "Atualizar usuário", description = "Atualiza os dados de um usuário existente")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário atualizado com sucesso"),
@@ -451,7 +451,7 @@ public class UserController {
     }
 
     @PostMapping("/{id}/permissions")
-    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('DPE') or hasRole('ASSISTENCIA_RH') or hasRole('AUX_DEP') or hasRole('RECURSOS_HUMANOS') or hasRole('HR') or hasAuthority('ROLE_RH') or hasAuthority('ROLE_DEPARTAMENTO_PESSOAL') or hasAuthority('ROLE_DPE') or hasAuthority('ROLE_ASSISTENCIA_RH') or hasAuthority('ROLE_AUX_DEP') or hasAuthority('ROLE_RECURSOS_HUMANOS') or hasAuthority('ROLE_HR')")
     @Operation(summary = "Adicionar permissões ao usuário", description = "Adiciona permissões individuais ao usuário. Aceita UUIDs ou nomes de permissões.")
     public ResponseEntity<?> addUserPermissions(@PathVariable String id, @RequestBody List<String> permissionIdentifiers) {
         try {
@@ -476,7 +476,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}/permissions")
-    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('DPE') or hasRole('ASSISTENCIA_RH') or hasRole('AUX_DEP') or hasRole('RECURSOS_HUMANOS') or hasRole('HR') or hasAuthority('ROLE_RH') or hasAuthority('ROLE_DEPARTAMENTO_PESSOAL') or hasAuthority('ROLE_DPE') or hasAuthority('ROLE_ASSISTENCIA_RH') or hasAuthority('ROLE_AUX_DEP') or hasAuthority('ROLE_RECURSOS_HUMANOS') or hasAuthority('ROLE_HR')")
     @Operation(summary = "Remover permissões do usuário", description = "Remove permissões individuais do usuário. Aceita UUIDs ou nomes de permissões.")
     public ResponseEntity<?> removeUserPermissions(@PathVariable String id, @RequestBody List<String> permissionIdentifiers) {
         try {

@@ -5,15 +5,17 @@ import {
 } from '@/utils/employeeOfflineSync';
 import {
   EmployeeSyncResult,
+  FailedEmployeeSyncResult,
   runPendingEmployeeSync,
   subscribeEmployeeSyncRefresh,
   SyncedEmployeeResult,
 } from '@/utils/employeeOfflineSyncRunner';
 
-export type { EmployeeSyncResult, SyncedEmployeeResult };
+export type { EmployeeSyncResult, SyncedEmployeeResult, FailedEmployeeSyncResult };
 
 interface UseEmployeeOfflineSyncOptions {
   onItemSynced?: (result: SyncedEmployeeResult) => void;
+  onItemRejected?: (result: FailedEmployeeSyncResult) => void;
   employeeId?: string | null;
 }
 
@@ -23,6 +25,8 @@ export function useEmployeeOfflineSync(
 ) {
   const onItemSyncedRef = useRef(options?.onItemSynced);
   onItemSyncedRef.current = options?.onItemSynced;
+  const onItemRejectedRef = useRef(options?.onItemRejected);
+  onItemRejectedRef.current = options?.onItemRejected;
   const employeeId = options?.employeeId;
 
   const [pendingItems, setPendingItems] = useState<PendingEmployeeSyncItem[]>([]);
@@ -40,12 +44,21 @@ export function useEmployeeOfflineSync(
   const syncPending = useCallback(async (): Promise<EmployeeSyncResult> => {
     setIsSyncing(true);
     try {
-      const result = await runPendingEmployeeSync(userKey, (syncedResult) => {
-        if (employeeId && syncedResult.item.employeeId !== employeeId) {
-          return;
-        }
-        onItemSyncedRef.current?.(syncedResult);
-      });
+      const result = await runPendingEmployeeSync(
+        userKey,
+        (syncedResult) => {
+          if (employeeId && syncedResult.item.employeeId !== employeeId) {
+            return;
+          }
+          onItemSyncedRef.current?.(syncedResult);
+        },
+        (rejectedResult) => {
+          if (employeeId && rejectedResult.item.employeeId !== employeeId) {
+            return;
+          }
+          onItemRejectedRef.current?.(rejectedResult);
+        },
+      );
       await refreshPending();
       return result;
     } finally {

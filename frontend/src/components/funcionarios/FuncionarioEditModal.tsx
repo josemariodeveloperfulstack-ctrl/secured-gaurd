@@ -1658,12 +1658,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       console.error('Erro ao atualizar funcionário:', err);
       
       // Tratar erros específicos
-      if (err.message.includes('CPF já cadastrado')) {
-        setError('CPF já cadastrado no sistema');
-        setCpfError('CPF já cadastrado');
+      if (err.message.includes('CPF já cadastrado') || err.message.includes('não pode estar ativo') || err.message.includes('não pode ser admitido')) {
+        setError(err.message);
+        setCpfError('CPF com vínculo ativo em outra empresa');
         toast({
-          title: "CPF Duplicado",
-          description: "Este CPF já está cadastrado no sistema.",
+          title: "CPF com vínculo ativo",
+          description: (err.message.includes('não pode estar ativo') || err.message.includes('não pode ser admitido') || err.message.includes('Demita'))
+            ? err.message
+            : "O funcionário não pode ser admitido ou readmitido. Ele não pode estar ativo em duas empresas ao mesmo tempo. Faça a demissão do funcionário e depois faça a nova admissão.",
           variant: "destructive"
         });
       } else if (err.message.includes('Data de admissão')) {
@@ -3701,7 +3703,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Dados do Cadastro / Admissão</h3>
                       </div>
-                      {wasDismissedAtLeastOnce && (
+                      {/* Seção permanece visível enquanto a recontratação estiver habilitada,
+                          mesmo que wasDismissedAtLeastOnce recompute para false ao selecionar
+                          o tipo de admissão (status muda para ACTIVE). */}
+                      {(wasDismissedAtLeastOnce || rehireEnabled) && (
                         <div className="rounded-lg border border-gray-600 bg-gray-900/50 p-4 space-y-3">
                           <div className="flex items-start sm:items-center justify-between gap-3">
                             <div className="min-w-0 flex-1">

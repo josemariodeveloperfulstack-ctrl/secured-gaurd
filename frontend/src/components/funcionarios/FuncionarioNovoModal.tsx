@@ -392,12 +392,33 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     [draftStorageKey, offlineQueueId, onCreated, toast],
   );
 
+  const handleOfflineItemRejected = useCallback(
+    ({ item, message }: { item: { id: string }; message: string }) => {
+      if (offlineQueueId && item.id !== offlineQueueId) {
+        return;
+      }
+
+      setOfflineQueueId(null);
+
+      const isCpfConflict = message.includes('CPF já cadastrado') || message.includes('não pode estar ativo');
+      toast({
+        title: 'Alterações offline descartadas',
+        description: isCpfConflict
+          ? `${message} Corrija o cadastro e salve novamente.`
+          : message,
+        variant: 'destructive',
+      });
+    },
+    [offlineQueueId, toast],
+  );
+
   const {
     pendingCount,
     isSyncing,
     syncPending,
   } = useEmployeeOfflineSync(user?.id || user?.username, {
     onItemSynced: handleOfflineItemSynced,
+    onItemRejected: handleOfflineItemRejected,
   });
 
   // Estados para médicos
@@ -537,6 +558,15 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   // Estados para empresas
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
+  // Garante que a empresa selecionada (edição) apareça no select mesmo se
+  // ainda não estiver em `companies` (carregamento assíncrono ou id divergente).
+  const companyOptions = useMemo(() => {
+    if (selectedCompany?.id && !companies.some((c) => c.id === selectedCompany.id)) {
+      return [...companies, selectedCompany];
+    }
+    return companies;
+  }, [companies, selectedCompany]);
+
   // Estados para dependentes
   const [employeeDependents, setEmployeeDependents] = useState<Dependent[]>([]);
   const [pendingDependents, setPendingDependents] = useState<DependentCreateRequest[]>([]); // Dependentes pendentes para salvar após criar funcionário
@@ -671,6 +701,27 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       setActiveTab('cadastro');
     }
   }, [open, showHistoryTab, activeTab]);
+
+  // Carregar períodos de vínculo ao abrir em modo edição.
+  // Necessário para wasDismissedAtLeastOnce considerar demissões antigas mesmo
+  // sem abrir a aba Histórico (ex.: funcionário reativado que já foi demitido).
+  useEffect(() => {
+    if (!open || !isEditMode || !currentEmployeeId) {
+      return;
+    }
+    let cancelled = false;
+    employeeEmploymentPeriodService
+      .getEmploymentPeriods(currentEmployeeId)
+      .then((periods) => {
+        if (!cancelled) setEmploymentPeriods(periods);
+      })
+      .catch(() => {
+        if (!cancelled) setEmploymentPeriods([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isEditMode, currentEmployeeId]);
 
   // Carregar histórico de mudanças quando abrir a aba Histórico (modo edição)
   useEffect(() => {
@@ -1368,42 +1419,31 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
   const loadSelectData = async () => {
     setLoadingData(true);
+    // Cada lista aplica o resultado assim que resolve — não bloquear empresas
+    // atrás de /positions/search (ERR_CONNECTION_CLOSED + retries atrasavam o select).
+    const tasks: Promise<void>[] = [
+      companyService.getAllCompanies()
+        .then((list) => setCompanies(list))
+        .catch((err) => console.warn('Erro ao carregar empresas:', err)),
+      positionService.searchPositions()
+        .then((list) => {
+          setPositions(list);
+          setFilteredPositions(list);
+        })
+        .catch((err) => console.warn('Erro ao carregar cargos:', err)),
+      unitService.getAllUnits()
+        .then((list) => setUnits(list))
+        .catch((err) => console.warn('Erro ao carregar unidades:', err)),
+      userService.searchUsers()
+        .then((list) => {
+          setUsers(list);
+          setFilteredUsers(list);
+        })
+        .catch((err) => console.warn('Erro ao carregar usuários:', err)),
+    ];
+
     try {
-      const results = await Promise.allSettled([
-        positionService.searchPositions(),
-        unitService.getAllUnits(),
-        companyService.getAllCompanies()
-      ]);
-
-      const [positionsResult, unitsResult, companiesResult] = results;
-
-      if (positionsResult.status === 'fulfilled') {
-        setPositions(positionsResult.value);
-        setFilteredPositions(positionsResult.value);
-      } else {
-        console.warn('Erro ao carregar cargos:', positionsResult.reason);
-      }
-
-      if (unitsResult.status === 'fulfilled') {
-        setUnits(unitsResult.value);
-      } else {
-        console.warn('Erro ao carregar unidades:', unitsResult.reason);
-      }
-
-      if (companiesResult.status === 'fulfilled') {
-        setCompanies(companiesResult.value);
-      } else {
-        console.warn('Erro ao carregar empresas:', companiesResult.reason);
-      }
-
-      // Carregar usuários iniciais (sem filtro)
-      try {
-        const usersData = await userService.searchUsers();
-        setUsers(usersData);
-        setFilteredUsers(usersData);
-      } catch (err) {
-        console.warn('Erro ao carregar usuários:', err);
-      }
+      await Promise.allSettled(tasks);
     } catch (err) {
       console.error('Erro ao carregar dados dos selects:', err);
     } finally {
@@ -1457,10 +1497,11 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const handleConfirmReuseCpfData = () => {
     if (!existingCpfData) return;
 
-    if (existingCpfData.status === 'ACTIVE') {
+    if (existingCpfData.status === 'ACTIVE' || existingCpfData.hasActiveEmployment) {
+      const identificacao = existingCpfData.name || `CPF ${existingCpfData.cpf}`;
       toast({
         title: "Funcionário já Ativo",
-        description: `O CPF ${existingCpfData.cpf} já possui um cadastro ATIVO no sistema. O mesmo CPF não pode estar ativo em mais de uma empresa simultaneamente.`,
+        description: `O funcionário ${identificacao} não pode ser admitido ou readmitido. Ele não pode estar ativo em duas empresas ao mesmo tempo. Faça a demissão do funcionário e depois faça a nova admissão.`,
         variant: "destructive"
       });
       setCpfConfirmModalOpen(false);
@@ -2043,12 +2084,14 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
       const message = err instanceof Error ? err.message : '';
 
-      if (message.includes('CPF já cadastrado') || message.includes('CPF já cadastrado no sistema')) {
-        setError('CPF já cadastrado no sistema');
-        setCpfError('CPF já cadastrado');
+      if (message.includes('CPF já cadastrado') || message.includes('não pode estar ativo') || message.includes('não pode ser admitido')) {
+        setError(message || 'CPF com vínculo ativo em outra empresa');
+        setCpfError('CPF com vínculo ativo em outra empresa');
         toast({
-          title: 'CPF já cadastrado',
-          description: 'Este CPF já está cadastrado no sistema.',
+          title: 'CPF com vínculo ativo',
+          description: (message.includes('não pode estar ativo') || message.includes('não pode ser admitido') || message.includes('Demita'))
+            ? message
+            : 'O funcionário não pode ser admitido ou readmitido. Ele não pode estar ativo em duas empresas ao mesmo tempo. Faça a demissão do funcionário e depois faça a nova admissão.',
           variant: 'destructive',
         });
       } else if (message.includes('Data de admissão')) {
@@ -2442,7 +2485,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       console.error('❌ Erro ao gerar ficha de EPI:', error);
       toast({
         title: "Erro",
-        description: error.message || "Não foi possível gerar a ficha de EPI.",
+        description: error.message || error.response?.data?.message || "Não foi possível gerar a ficha de EPI.",
         variant: "destructive"
       });
     } finally {
@@ -2826,13 +2869,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               onValueChange={handleCompanySelect}
                             >
                               <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                                <SelectValue placeholder="Selecione uma empresa" />
+                                <SelectValue placeholder={loadingData ? 'Carregando empresas...' : 'Selecione uma empresa'} />
                               </SelectTrigger>
                               <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
                                 <SelectItem value="none" className="hover:bg-gray-700">
                                   <span className="text-gray-400">Nenhuma empresa</span>
                                 </SelectItem>
-                                {companies.map((company) => (
+                                {loadingData && companies.length === 0 && (
+                                  <div className="p-2 text-center text-sm text-gray-500">Carregando empresas...</div>
+                                )}
+                                {!loadingData && companies.length === 0 && (
+                                  <div className="p-2 text-center text-sm text-gray-500">Nenhuma empresa encontrada</div>
+                                )}
+                                {companyOptions.map((company) => (
                                   <SelectItem
                                     key={company.id}
                                     value={company.id}
@@ -4160,7 +4209,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Dados do Cadastro / Admissão</h3>
                       </div>
-                      {isEditMode && wasDismissedAtLeastOnce && (
+                      {/* Seção permanece visível enquanto a recontratação estiver habilitada,
+                          mesmo que wasDismissedAtLeastOnce recompute para false ao selecionar
+                          o tipo de admissão (status muda para ACTIVE). */}
+                      {isEditMode && (wasDismissedAtLeastOnce || rehireEnabled) && (
                         <div className="rounded-lg border border-gray-600 bg-gray-900/50 p-4 space-y-3">
                           <div className="flex items-start sm:items-center justify-between gap-3">
                             <div className="min-w-0 flex-1">
@@ -5558,30 +5610,31 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
             <div className="space-y-3 py-2 text-xs text-gray-300">
               <div className="p-3 rounded bg-gray-800/80 border border-gray-700 space-y-1">
+                <p><strong>Empresa:</strong> {existingCpfData?.companyName || 'Não informada'}</p>
                 <p><strong>Cargo Anterior/Registrado:</strong> {existingCpfData?.currentPositionName || 'Não informado'}</p>
                 <p><strong>Setor de Trabalho:</strong> {existingCpfData?.currentWorkPostName || 'Não informado'}</p>
                 <p>
                   <strong>Status Atual:</strong>{' '}
-                  <span className={existingCpfData?.status === 'ACTIVE' ? 'text-green-400 font-bold' : 'text-red-400'}>
-                    {existingCpfData?.status === 'ACTIVE' ? 'Ativo' : 'Inativo / Demitido'}
+                  <span className={(existingCpfData?.status === 'ACTIVE' || existingCpfData?.hasActiveEmployment) ? 'text-green-400 font-bold' : 'text-red-400'}>
+                    {(existingCpfData?.status === 'ACTIVE' || existingCpfData?.hasActiveEmployment) ? 'Ativo' : 'Inativo / Demitido'}
                   </span>
                 </p>
               </div>
 
-              {existingCpfData?.status === 'ACTIVE' && (
+              {(existingCpfData?.status === 'ACTIVE' || existingCpfData?.hasActiveEmployment) ? (
                 <div className="p-3 rounded bg-orange-950/60 border border-orange-500/40 text-orange-200">
                   <p className="font-semibold flex items-center gap-1 text-orange-300">
                     <AlertCircle className="h-4 w-4" /> Funcionário atualmente ATIVO!
                   </p>
                   <p className="text-[11px] mt-1">
-                    Ao confirmar a nova admissão, os dados pessoais serão reaproveitados para registrar o novo contrato/cargo, mantendo a rastreabilidade do vínculo anterior.
+                    O funcionário não pode ser admitido ou readmitido. Ele não pode estar ativo em duas empresas ao mesmo tempo. Faça a demissão do funcionário e depois faça a nova admissão.
                   </p>
                 </div>
+              ) : (
+                <p className="text-gray-300">
+                  Deseja reaproveitar os dados pessoais (Nome, RG, Data Nasc., Endereço, Documentos, etc.) para registrar esta nova admissão?
+                </p>
               )}
-
-              <p className="text-gray-300">
-                Deseja reaproveitar os dados pessoais (Nome, RG, Data Nasc., Endereço, Documentos, etc.) para registrar esta nova admissão?
-              </p>
             </div>
 
             <DialogFooter className="gap-2">
@@ -5594,15 +5647,17 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                 }}
                 className="border-gray-600 text-gray-300 hover:bg-gray-800"
               >
-                Cancelar
+                {(existingCpfData?.status === 'ACTIVE' || existingCpfData?.hasActiveEmployment) ? 'Fechar' : 'Cancelar'}
               </Button>
-              <Button
-                type="button"
-                onClick={handleConfirmReuseCpfData}
-                className="bg-seguranca-red hover:bg-red-700 text-white font-semibold"
-              >
-                Reaproveitar Dados Pessoais
-              </Button>
+              {!(existingCpfData?.status === 'ACTIVE' || existingCpfData?.hasActiveEmployment) && (
+                <Button
+                  type="button"
+                  onClick={handleConfirmReuseCpfData}
+                  className="bg-seguranca-red hover:bg-red-700 text-white font-semibold"
+                >
+                  Reaproveitar Dados Pessoais
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

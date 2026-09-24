@@ -30,7 +30,7 @@ public class ContactValidationController {
      * Valida contatos de funcionários para envio
      */
     @PostMapping("/validate")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'HR', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'HR', 'RH', 'DEPARTAMENTO_PESSOAL', 'DPE', 'ASSISTENCIA_RH', 'AUX_DEP', 'RECURSOS_HUMANOS', 'MANAGER', 'GESTOR') or hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'HR', 'RH', 'DEPARTAMENTO_PESSOAL', 'DPE', 'ASSISTENCIA_RH', 'AUX_DEP', 'RECURSOS_HUMANOS', 'ROLE_HR', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL', 'ROLE_DPE', 'ROLE_ASSISTENCIA_RH', 'ROLE_AUX_DEP', 'ROLE_RECURSOS_HUMANOS')")
     public ResponseEntity<ContactValidationResponse> validateContacts(
             @Valid @RequestBody ContactValidationRequest request) {
         
@@ -54,7 +54,7 @@ public class ContactValidationController {
      * Cria usuário rapidamente para um funcionário
      */
     @PostMapping("/quick-create-user")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'HR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'HR', 'RH', 'DEPARTAMENTO_PESSOAL', 'DPE', 'ASSISTENCIA_RH', 'AUX_DEP', 'RECURSOS_HUMANOS') or hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'HR', 'RH', 'DEPARTAMENTO_PESSOAL', 'DPE', 'ASSISTENCIA_RH', 'AUX_DEP', 'RECURSOS_HUMANOS', 'ROLE_HR', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL', 'ROLE_DPE', 'ROLE_ASSISTENCIA_RH', 'ROLE_AUX_DEP', 'ROLE_RECURSOS_HUMANOS', 'EMPLOYEES_WRITE', 'USERS_CREATE')")
     public ResponseEntity<Map<String, Object>> quickCreateUser(
             @Valid @RequestBody QuickUserCreateRequest request) {
         
@@ -94,7 +94,7 @@ public class ContactValidationController {
      * Atualiza número de WhatsApp de um usuário
      */
     @PatchMapping("/users/{userId}/whatsapp")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'HR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'HR', 'RH', 'DEPARTAMENTO_PESSOAL', 'DPE', 'ASSISTENCIA_RH', 'AUX_DEP', 'RECURSOS_HUMANOS') or hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'HR', 'RH', 'DEPARTAMENTO_PESSOAL', 'DPE', 'ASSISTENCIA_RH', 'AUX_DEP', 'RECURSOS_HUMANOS', 'ROLE_HR', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL', 'ROLE_DPE', 'ROLE_ASSISTENCIA_RH', 'ROLE_AUX_DEP', 'ROLE_RECURSOS_HUMANOS', 'EMPLOYEES_WRITE', 'USERS_CREATE')")
     public ResponseEntity<Map<String, Object>> updateUserWhatsApp(
             @PathVariable UUID userId,
             @Valid @RequestBody UpdateWhatsAppRequest request) {
@@ -132,7 +132,7 @@ public class ContactValidationController {
      * Atualiza email de um usuário
      */
     @PatchMapping("/users/{userId}/email")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'HR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'HR', 'RH', 'DEPARTAMENTO_PESSOAL', 'DPE', 'ASSISTENCIA_RH', 'AUX_DEP', 'RECURSOS_HUMANOS') or hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'HR', 'RH', 'DEPARTAMENTO_PESSOAL', 'DPE', 'ASSISTENCIA_RH', 'AUX_DEP', 'RECURSOS_HUMANOS', 'ROLE_HR', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL', 'ROLE_DPE', 'ROLE_ASSISTENCIA_RH', 'ROLE_AUX_DEP', 'ROLE_RECURSOS_HUMANOS', 'EMPLOYEES_WRITE', 'USERS_CREATE')")
     public ResponseEntity<Map<String, Object>> updateUserEmail(
             @PathVariable UUID userId,
             @Valid @RequestBody UpdateEmailRequest request) {

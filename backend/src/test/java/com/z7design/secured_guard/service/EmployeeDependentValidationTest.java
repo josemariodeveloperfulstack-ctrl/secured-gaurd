@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -56,7 +57,7 @@ class EmployeeDependentValidationTest {
         dto.setHireDate(null);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, null, null));
+                () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, null));
 
         assertEquals("Data de admissão é obrigatória", ex.getMessage());
     }
@@ -67,7 +68,7 @@ class EmployeeDependentValidationTest {
         dto.setCpf("");
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, null, null));
+                () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, null));
 
         assertEquals("CPF é obrigatório", ex.getMessage());
     }
@@ -75,13 +76,54 @@ class EmployeeDependentValidationTest {
     @Test
     void employeeValidation_rejectsDuplicateCpf() {
         EmployeeDTO dto = baseEmployeeDto();
-        // Cadastro novo (excludeId null): bloqueia quando existe funcionário ATIVO (não demitido) com o CPF
+        // Cadastro novo (existing null): bloqueia quando existe funcionário ATIVO (não demitido) com o CPF
         when(employeeRepository.existsByNormalizedDocumentAndNotTerminated("52998224725")).thenReturn(true);
+        when(employeeRepository.findAllByNormalizedCpf("52998224725"))
+                .thenReturn(List.of(activeEmployee("52998224725", "Maria Souza")));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, null, null));
+                () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, null));
 
-        assertEquals("CPF já cadastrado para funcionário ativo no sistema", ex.getMessage());
+        assertTrue(ex.getMessage().startsWith("O funcionário Maria Souza não pode ser admitido ou readmitido"));
+        assertTrue(ex.getMessage().contains("não pode estar ativo em duas empresas ao mesmo tempo"));
+        assertTrue(ex.getMessage().contains("Faça a demissão do funcionário e depois faça a nova admissão"));
+    }
+
+    @Test
+    void employeeValidation_rejectsReactivationWhenCpfActiveInOtherCompany() {
+        EmployeeDTO dto = baseEmployeeDto();
+        dto.setStatus("ACTIVE");
+        UUID id = UUID.randomUUID();
+        Employee existing = new Employee();
+        existing.setId(id);
+        existing.setDocument("52998224725");
+        existing.setCpf(null);
+        existing.setStatus(com.z7design.secured_guard.model.enums.EmploymentStatus.TERMINATED);
+
+        when(employeeRepository.existsByNormalizedDocumentAndNotTerminatedExcludingId("52998224725", id))
+                .thenReturn(true);
+        when(employeeRepository.findAllByNormalizedCpf("52998224725"))
+                .thenReturn(List.of(activeEmployee("52998224725", "João Ativo")));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, existing));
+
+        assertTrue(ex.getMessage().startsWith("O funcionário João Ativo não pode ser admitido ou readmitido"));
+        assertTrue(ex.getMessage().contains("Faça a demissão do funcionário e depois faça a nova admissão"));
+    }
+
+    @Test
+    void employeeValidation_allowsUpdateWhenCpfMatchesCpfColumnNotDocument() {
+        EmployeeDTO dto = baseEmployeeDto();
+        UUID id = UUID.randomUUID();
+        Employee existing = new Employee();
+        existing.setId(id);
+        existing.setDocument(null);
+        existing.setCpf("52998224725");
+        existing.setStatus(com.z7design.secured_guard.model.enums.EmploymentStatus.ACTIVE);
+
+        // Não deve consultar duplicidade ativa se o CPF é o mesmo do próprio registro (coluna cpf)
+        assertDoesNotThrow(() -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, existing));
     }
 
     @Test
@@ -91,7 +133,7 @@ class EmployeeDependentValidationTest {
         when(dependentRepository.findIdsByCpfDigitsNormalized("52998224725")).thenReturn(List.of(UUID.randomUUID()));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, null, null));
+                () -> ReflectionTestUtils.invokeMethod(employeeService, "validateEmployeeForSave", dto, null));
 
         assertEquals("CPF já cadastrado como dependente no sistema", ex.getMessage());
     }
@@ -151,6 +193,15 @@ class EmployeeDependentValidationTest {
                 .hireDate(LocalDate.of(2024, 1, 10))
                 .status("ACTIVE")
                 .build();
+    }
+
+    private static Employee activeEmployee(String cpf, String name) {
+        Employee employee = new Employee();
+        employee.setId(UUID.randomUUID());
+        employee.setCpf(cpf);
+        employee.setName(name);
+        employee.setStatus(com.z7design.secured_guard.model.enums.EmploymentStatus.ACTIVE);
+        return employee;
     }
 
     private static DependentDTO.CreateRequest baseDependentRequest(UUID employeeId, String relationship, String cpf) {

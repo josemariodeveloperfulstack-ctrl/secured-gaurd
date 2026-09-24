@@ -228,6 +228,9 @@ public class GlobalExceptionHandler {
             message = "Um dos campos do cliente excede o tamanho permitido (verifique UF com 2 letras, telefone e CEP).";
         } else if (isClientsPath) {
             message = "Não foi possível salvar o cliente. Verifique CNPJ, empresa vinculada e demais campos obrigatórios.";
+        } else if (path.contains("/employees") && (fullMsg.contains("document") || fullMsg.contains("uk_employees_one_active_cpf")
+                || (fullMsg.contains("duplicate") && (fullMsg.contains("cpf") || fullMsg.contains("document"))))) {
+            message = "O funcionário não pode ser admitido ou readmitido. Ele não pode estar ativo em duas empresas ao mesmo tempo. Faça a demissão do funcionário e depois faça a nova admissão.";
         } else if (fullMsg.contains("username") || (fullMsg.contains("uk_") && fullMsg.contains("username"))) {
             message = "Nome de usuário já está em uso";
         } else if (emailUniqueViolation) {
