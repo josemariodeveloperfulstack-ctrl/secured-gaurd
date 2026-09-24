@@ -236,7 +236,7 @@ public class EmployeeService {
             System.out.println("[DEBUG] EmployeeService.create - Iniciando criação de funcionário");
             System.out.println("[DEBUG] DTO recebido: " + dto.getName() + " - " + dto.getCpf());
 
-            validateEmployeeForSave(dto, null, null);
+            validateEmployeeForSave(dto, null);
 
             System.out.println("[DEBUG] Validações passaram, convertendo DTO para Entity");
             Employee employee = toEntity(dto);
@@ -291,7 +291,7 @@ public class EmployeeService {
             System.out.println("[DEBUG] Funcionário existente encontrado: " + existingEmployee.getName());
             System.out.println("[DEBUG] Email existente: " + existingEmployee.getEmail());
 
-            validateEmployeeForSave(dto, id, existingEmployee.getDocument());
+            validateEmployeeForSave(dto, existingEmployee);
 
             System.out.println("[DEBUG] Atualizando campos do funcionário existente...");
 
@@ -883,6 +883,15 @@ public class EmployeeService {
             throw new IllegalArgumentException("Somente funcionários demitidos podem ser recontratados.");
         }
 
+        String cpfForActiveCheck = existing.getDocument() != null && !existing.getDocument().isBlank()
+                ? existing.getDocument()
+                : existing.getCpf();
+        if (cpfForActiveCheck != null
+                && documentAlreadyRegisteredAndNotTerminatedExcludingId(cpfForActiveCheck, id)) {
+            throw new IllegalArgumentException(
+                    buildActiveEmploymentConflictMessage(cpfForActiveCheck, id, existing.getName()));
+        }
+
         EmploymentAdmissionType admissionType = employmentPeriodService.parseAdmissionType(dto.getAdmissionType());
         employmentPeriodService.validateRehireAdmissionType(admissionType);
         employmentPeriodService.validateNewHireDate(dto.getHireDate());
@@ -955,6 +964,15 @@ public class EmployeeService {
             throw new IllegalArgumentException(
                     "Somente funcionários com status Demitido podem ter a demissão cancelada. "
                             + "Se o colaborador já foi readmitido, o vínculo anterior permanece no histórico.");
+        }
+
+        String cpfForActiveCheck = employee.getDocument() != null && !employee.getDocument().isBlank()
+                ? employee.getDocument()
+                : employee.getCpf();
+        if (cpfForActiveCheck != null && documentAlreadyRegisteredAndNotTerminatedExcludingId(cpfForActiveCheck, id)) {
+            throw new IllegalArgumentException(
+                    "Não é possível cancelar a demissão: este CPF já está ativo em outra empresa. "
+                            + "Demita o vínculo ativo antes de reativar este cadastro.");
         }
 
         LocalDate prevTermination = employee.getTerminationDate() != null
@@ -2692,7 +2710,13 @@ public class EmployeeService {
         return normalizedLeft.equals(normalizedRight);
     }
 
-    private void validateEmployeeForSave(EmployeeDTO dto, UUID excludeId, String existingDocument) {
+    /**
+     * Regra de negócio do CPF:
+     * - Pode haver vários cadastros do mesmo CPF em empresas diferentes.
+     * - Só pode existir UM vínculo não demitido (ativo) por CPF no sistema.
+     * - Para admitir em outra empresa, o vínculo anterior precisa estar TERMINATED.
+     */
+    private void validateEmployeeForSave(EmployeeDTO dto, Employee existingOrNull) {
         if (dto.getCpf() == null || dto.getCpf().trim().isEmpty()) {
             throw new IllegalArgumentException("CPF é obrigatório");
         }
@@ -2700,23 +2724,47 @@ public class EmployeeService {
         if (cpfDigits.length() != 11 || !CpfValidationUtils.isValid(cpfDigits)) {
             throw new IllegalArgumentException("CPF inválido. Verifique os dígitos informados.");
         }
-        if (dto.getHireDate() == null) {
+        if (dto.getHireDate() == null && existingOrNull == null) {
             throw new IllegalArgumentException("Data de admissão é obrigatória");
         }
-        UUID companyId = dto.getCompanyId();
-        if (excludeId == null) {
-            // O mesmo CPF não pode estar ATIVO em mais de uma empresa no sistema.
-            // Só é permitida nova admissão/cadastro se o contrato anterior estiver encerrado (TERMINATED).
-            if (documentAlreadyRegisteredAndNotTerminated(dto.getCpf())) {
-                throw new IllegalArgumentException("CPF já cadastrado para funcionário ativo no sistema. O mesmo CPF não pode estar ativo em mais de uma empresa simultaneamente.");
-            }
-        } else if (!isSameDocument(dto.getCpf(), existingDocument)
-                && documentAlreadyRegisteredAndNotTerminatedExcludingId(dto.getCpf(), excludeId)) {
-            throw new IllegalArgumentException("CPF já cadastrado para outro funcionário ativo no sistema. O mesmo CPF não pode estar ativo em mais de uma empresa simultaneamente.");
+        if (dto.getHireDate() == null && existingOrNull != null && existingOrNull.getHireDate() == null) {
+            throw new IllegalArgumentException("Data de admissão é obrigatória");
         }
-        if (cpfUsedByDependent(cpfDigits)) {
+
+        UUID excludeId = existingOrNull != null ? existingOrNull.getId() : null;
+        boolean sameCpf = existingOrNull != null && (
+                isSameDocument(dto.getCpf(), existingOrNull.getDocument())
+                        || isSameDocument(dto.getCpf(), existingOrNull.getCpf()));
+        boolean becomingActiveFromTerminated = existingOrNull != null
+                && existingOrNull.getStatus() == EmploymentStatus.TERMINATED
+                && !isDtoTerminated(dto);
+
+        if (excludeId == null) {
+            // Novo cadastro: permitido se o CPF só existir em vínculos demitidos (outra empresa / histórico).
+            if (documentAlreadyRegisteredAndNotTerminated(dto.getCpf())) {
+                throw new IllegalArgumentException(
+                        buildActiveEmploymentConflictMessage(dto.getCpf(), null, dto.getName()));
+            }
+        } else if ((!sameCpf || becomingActiveFromTerminated)
+                && documentAlreadyRegisteredAndNotTerminatedExcludingId(dto.getCpf(), excludeId)) {
+            throw new IllegalArgumentException(
+                    buildActiveEmploymentConflictMessage(dto.getCpf(), excludeId, dto.getName()));
+        }
+
+        // Dependente: só bloqueia em criação ou troca de CPF (edição do próprio CPF não deve falhar).
+        if ((excludeId == null || !sameCpf) && cpfUsedByDependent(cpfDigits)) {
             throw new IllegalArgumentException("CPF já cadastrado como dependente no sistema");
         }
+    }
+
+    private boolean isDtoTerminated(EmployeeDTO dto) {
+        if (dto == null) {
+            return false;
+        }
+        if (dto.getStatus() != null && "TERMINATED".equalsIgnoreCase(dto.getStatus().trim())) {
+            return true;
+        }
+        return dto.getTerminationDate() != null || dto.getDataRescisao() != null;
     }
 
     private boolean cpfUsedByDependent(String cpfDigits) {
@@ -2749,6 +2797,35 @@ public class EmployeeService {
             return false;
         }
         return employeeRepository.existsByNormalizedDocumentAndNotTerminatedExcludingId(normalized, excludeId);
+    }
+
+    /**
+     * Mensagem padrão quando o CPF já possui vínculo ativo (não demitido) em outra empresa.
+     * Usa o nome do funcionário ativo encontrado (fallback: nome informado no cadastro).
+     */
+    private String buildActiveEmploymentConflictMessage(String document, UUID excludeId, String fallbackName) {
+        String name = findActiveEmployeeNameByDocument(document, excludeId);
+        if (name == null || name.isBlank()) {
+            name = fallbackName;
+        }
+        String who = (name != null && !name.isBlank()) ? name : "com este CPF";
+        return "O funcionário " + who + " não pode ser admitido ou readmitido. "
+                + "Ele não pode estar ativo em duas empresas ao mesmo tempo. "
+                + "Faça a demissão do funcionário e depois faça a nova admissão.";
+    }
+
+    private String findActiveEmployeeNameByDocument(String document, UUID excludeId) {
+        String normalized = normalizeDocumentDigits(document);
+        if (normalized == null) {
+            return null;
+        }
+        return employeeRepository.findAllByNormalizedCpf(normalized).stream()
+                .filter(e -> e.getStatus() != null && e.getStatus() != EmploymentStatus.TERMINATED)
+                .filter(e -> excludeId == null || !excludeId.equals(e.getId()))
+                .map(Employee::getName)
+                .filter(n -> n != null && !n.isBlank())
+                .findFirst()
+                .orElse(null);
     }
 
     /**
@@ -2898,8 +2975,17 @@ public class EmployeeService {
             return response;
         }
 
-        Employee emp = list.get(0); // Mais recente
+        // Preferir vínculo ativo (não demitido) para a regra "só um CPF ativo no sistema"
+        Employee emp = list.stream()
+                .filter(e -> e.getStatus() != null && e.getStatus() != EmploymentStatus.TERMINATED)
+                .findFirst()
+                .orElse(list.get(0));
+
+        boolean hasActive = list.stream()
+                .anyMatch(e -> e.getStatus() != null && e.getStatus() != EmploymentStatus.TERMINATED);
+
         response.put("exists", true);
+        response.put("hasActiveEmployment", hasActive);
         response.put("employeeId", emp.getId() != null ? emp.getId().toString() : null);
         response.put("name", emp.getName());
         response.put("cpf", emp.getCpf() != null ? emp.getCpf() : emp.getDocument());

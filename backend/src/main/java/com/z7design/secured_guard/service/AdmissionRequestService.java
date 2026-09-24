@@ -65,7 +65,25 @@ public class AdmissionRequestService {
     
     public AdmissionRequestDTO create(CreateAdmissionRequestDTO dto) {
         log.info("Criando nova solicitação de admissão/demissão: {}", dto);
-        
+
+        if (dto.getType() == AdmissionRequestType.ADMISSION) {
+            UUID excludeId = dto.getEmployeeId();
+            String cpf = dto.getEmployeeCpf();
+            String fallbackName = dto.getEmployeeName();
+            if ((cpf == null || cpf.isBlank()) && excludeId != null) {
+                Employee linked = employeeRepository.findById(excludeId).orElse(null);
+                if (linked != null) {
+                    cpf = linked.getDocument() != null && !linked.getDocument().isBlank()
+                            ? linked.getDocument()
+                            : linked.getCpf();
+                    if (fallbackName == null || fallbackName.isBlank()) {
+                        fallbackName = linked.getName();
+                    }
+                }
+            }
+            validateCpfNotActiveInAnotherCompany(cpf, excludeId, fallbackName);
+        }
+
         AdmissionRequest request = AdmissionRequest.builder()
                 .type(dto.getType())
                 .employeeName(dto.getEmployeeName())
@@ -212,6 +230,10 @@ public class AdmissionRequestService {
         }
         Employee emp = resolved.get();
         if (request.getType() == AdmissionRequestType.ADMISSION) {
+            String cpf = emp.getDocument() != null && !emp.getDocument().isBlank()
+                    ? emp.getDocument()
+                    : emp.getCpf();
+            validateCpfNotActiveInAnotherCompany(cpf, emp.getId(), emp.getName());
             emp.setStatus(EmploymentStatus.ACTIVE);
             LocalDate hire = request.getStartDate() != null ? request.getStartDate() : request.getCompletionDate();
             if (hire != null) {
@@ -229,6 +251,36 @@ public class AdmissionRequestService {
         }
         employeeRepository.save(emp);
         log.info("Cadastro do funcionário {} sincronizado após conclusão da solicitação {}", emp.getId(), request.getId());
+    }
+
+    /**
+     * Impede admissão/readmissão quando o CPF já possui vínculo ativo (não demitido)
+     * em qualquer empresa do sistema.
+     */
+    private void validateCpfNotActiveInAnotherCompany(String cpf, UUID excludeEmployeeId, String fallbackName) {
+        if (cpf == null || cpf.isBlank()) {
+            return;
+        }
+        String digits = cpf.replaceAll("[^0-9]", "");
+        if (digits.length() != 11) {
+            return;
+        }
+        Employee conflict = employeeRepository.findAllByNormalizedCpf(digits).stream()
+                .filter(e -> e.getStatus() != null && e.getStatus() != EmploymentStatus.TERMINATED)
+                .filter(e -> excludeEmployeeId == null || !excludeEmployeeId.equals(e.getId()))
+                .findFirst()
+                .orElse(null);
+        if (conflict == null) {
+            return;
+        }
+        String name = conflict.getName() != null && !conflict.getName().isBlank()
+                ? conflict.getName()
+                : fallbackName;
+        String who = (name != null && !name.isBlank()) ? name : "com este CPF";
+        throw new IllegalArgumentException(
+                "O funcionário " + who + " não pode ser admitido ou readmitido. "
+                        + "Ele não pode estar ativo em duas empresas ao mesmo tempo. "
+                        + "Faça a demissão do funcionário e depois faça a nova admissão.");
     }
 
     private Optional<Employee> resolveEmployeeForRequest(AdmissionRequest request) {

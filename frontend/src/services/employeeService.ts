@@ -241,6 +241,33 @@ function rethrowIfConnectionError(error: unknown): void {
   }
 }
 
+/**
+ * Relança erro de API preservando `response`/`status` — o offline runner
+ * precisa de `error.response.status` (400/409/422) para descartar itens inválidos.
+ */
+function rethrowApiError(error: unknown, fallback: string): never {
+  const err = error as {
+    response?: { status?: number; data?: unknown };
+    status?: number;
+    message?: string;
+  };
+  const wrapped = new Error(getApiErrorMessage(error, fallback)) as Error & {
+    response?: unknown;
+    status?: number;
+    isConnectionError?: boolean;
+  };
+  if (err?.response) {
+    wrapped.response = err.response;
+    wrapped.status = err.response.status ?? err?.status;
+  } else if (err?.status != null) {
+    wrapped.status = err.status;
+  }
+  if ((error as { isConnectionError?: boolean })?.isConnectionError) {
+    wrapped.isConnectionError = true;
+  }
+  throw wrapped;
+}
+
 export interface EmployeeWorkPost {
   id: string;
   name?: string;
@@ -812,7 +839,7 @@ export const employeeService = {
     } catch (error: any) {
       console.error('Erro ao criar funcionário:', error);
       rethrowIfConnectionError(error);
-      throw new Error(getApiErrorMessage(error, 'Erro ao criar funcionário'));
+      rethrowApiError(error, 'Erro ao criar funcionário');
     }
   },
 
@@ -827,7 +854,7 @@ export const employeeService = {
     } catch (error: any) {
       console.error('Erro ao atualizar funcionário:', error);
       rethrowIfConnectionError(error);
-      throw new Error(getApiErrorMessage(error, 'Erro ao atualizar funcionário'));
+      rethrowApiError(error, 'Erro ao atualizar funcionário');
     }
   },
 
@@ -842,7 +869,7 @@ export const employeeService = {
     } catch (error: any) {
       console.error('Erro ao recontratar funcionário:', error);
       rethrowIfConnectionError(error);
-      throw new Error(getApiErrorMessage(error, 'Erro ao recontratar funcionário'));
+      rethrowApiError(error, 'Erro ao recontratar funcionário');
     }
   },
 
@@ -863,7 +890,7 @@ export const employeeService = {
     } catch (error: any) {
       console.error('Erro ao cancelar demissão:', error);
       rethrowIfConnectionError(error);
-      throw new Error(getApiErrorMessage(error, 'Erro ao cancelar demissão'));
+      rethrowApiError(error, 'Erro ao cancelar demissão');
     }
   },
 
@@ -1199,6 +1226,7 @@ export const employeeService = {
    */
   async checkCpf(cpf: string): Promise<{
     exists: boolean;
+    hasActiveEmployment?: boolean;
     employeeId?: string;
     name?: string;
     cpf?: string;
