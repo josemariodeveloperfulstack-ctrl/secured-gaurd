@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.dto;
 
 import com.z7design.secured_guard.model.EPIDeliveryForm;
+import com.z7design.secured_guard.model.EPIDeliveryFormItem;
 import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -333,6 +334,9 @@ public class EPIDeliveryFormDTO {
 
                 if (form.getItems() != null) {
                         dto.setItems(form.getItems().stream()
+                                        .sorted(java.util.Comparator
+                                                        .comparing((EPIDeliveryFormItem i) -> i.getLineOrder() != null ? i.getLineOrder() : 0)
+                                                        .thenComparing(i -> i.getId() != null ? i.getId().toString() : ""))
                                         .map(item -> {
                                                 EPIDeliveryFormItemDTO itemDto = new EPIDeliveryFormItemDTO();
                                                 itemDto.setId(item.getId());
@@ -346,6 +350,7 @@ public class EPIDeliveryFormDTO {
                                                 itemDto.setSizeNumber(item.getSizeNumber());
                                                 itemDto.setObservations(item.getObservations());
                                                 itemDto.setStockItemId(item.getStockItemId());
+                                                itemDto.setLineOrder(item.getLineOrder());
                                                 itemDto.setSubstitutedDate(item.getSubstitutedDate());
                                                 itemDto.setReplacementReason(item.getReplacementReason());
                                                 itemDto.setReturnedDate(item.getReturnedDate());

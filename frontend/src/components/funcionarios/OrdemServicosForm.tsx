@@ -135,14 +135,14 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
         funcionario?.departmentName ??
         '';
       return {
-        positionName: overrides?.positionName ?? form.position ?? funcionario?.positionName,
+        positionName: overrides?.positionName || form.position || funcionario?.positionName || '',
         companyName: overrides?.companyName ?? empresa?.name,
         companySigla: overrides?.companySigla ?? empresa?.sigla,
         sector: sectorName,
         clientName:
-          overrides?.clientName ??
-          clienteExibicao?.name ??
-          selectedWorkPost?.clientName ??
+          overrides?.clientName ||
+          clienteExibicao?.name ||
+          selectedWorkPost?.clientName ||
           '',
       };
     },
@@ -384,7 +384,10 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     if (funcionario) {
       setForm(prev => ({
         ...prev,
-        position: (funcionario as any).position?.name || prev.position
+        position:
+          (funcionario as any).position?.name ||
+          funcionario.positionName ||
+          prev.position
       }));
     }
   }, [funcionario]);
@@ -625,10 +628,11 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
   };
 
   const handlePreviewOrder = async () => {
-    if (!funcionario || !empresa || !clienteExibicao) {
+    if (!funcionario || !empresa || !clienteExibicao || !form.activities?.trim()) {
       toast({
         title: 'Atenção',
-        description: 'Selecione funcionário e empresa com posto de trabalho vinculado a um cliente!',
+        description:
+          'Preencha funcionário, empresa, posto com cliente e as atividades habituais (NR-01).',
         variant: 'destructive',
       });
       return;

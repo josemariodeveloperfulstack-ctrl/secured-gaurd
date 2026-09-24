@@ -67,6 +67,11 @@ public class EPIDeliveryFormItem {
     @Column(name = "stock_item_id")
     private UUID stockItemId;
 
+    /** Ordem de exibição na ficha (0 = primeiro; novos itens ficam no final). */
+    @Column(name = "line_order", nullable = false)
+    @Builder.Default
+    private Integer lineOrder = 0;
+
     /** Data em que o EPI foi substituído (coluna SUBSTITUÍDO no PDF). */
     @Column(name = "substituted_date")
     private LocalDate substitutedDate;

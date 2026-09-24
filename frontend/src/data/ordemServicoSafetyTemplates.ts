@@ -259,6 +259,22 @@ Riscos de Acidentes: Quedas em piso escorregadio.`,
     mandatoryTrainings: NR01_TRAININGS,
   },
   {
+    id: 'controlador-acesso',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: ['CONTROLADOR DE ACESSO', 'CONTROLE DE ACESSO', 'CONTROLADOR'],
+    label: 'Controlador de Acesso',
+    responsibility: 'CONTROLE DE ACESSO',
+    uniformSectionTitle: 'EPI DE USO OBRIGATÓRIO',
+    activities:
+      'Controlar o acesso de pessoas e veículos às dependências, identificando e conferindo credenciais; registrar entradas e saídas de visitantes, fornecedores e veículos; orientar e encaminhar visitantes aos destinatários; monitorar câmeras e sistemas de segurança do posto; atender chamadas telefônicas e comunicar ocorrências; manter a ordem e a segurança nas áreas de acesso.',
+    risks: `Riscos Ergonômicos: Postura inadequada; Trabalho em pé; Monotonia.
+Riscos Físicos: Ruído; Radiação não-ionizante.
+Riscos Mecânico: Agressão; Queda do mesmo nível; Batidas-contra.`,
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform: '- Calçado de segurança.\n- Uniforme completo (Calça, camisa, blusa, cinto).\n- Crachá de identificação.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  {
     id: 'recepcionista',
     layoutType: 'STANDARD_NR01',
     matchKeywords: ['RECEPCIONISTA'],

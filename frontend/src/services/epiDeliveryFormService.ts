@@ -1,4 +1,20 @@
 import api from '@/lib/axios';
+import { extractMessageFromBlobError } from '@/utils/connectionError';
+
+async function rethrowBlobError(error: unknown, fallback: string): Promise<never> {
+  const blobMessage = await extractMessageFromBlobError(error);
+  if (blobMessage) {
+    const err = error as { message?: string; response?: unknown };
+    err.message = blobMessage;
+    if (err.response && typeof err.response === 'object') {
+      const response = err.response as { data?: unknown };
+      if (response.data instanceof Blob) {
+        response.data = { message: blobMessage };
+      }
+    }
+  }
+  throw error;
+}
 
 export interface EPIDeliveryFormItem {
   id?: string;
@@ -13,6 +29,8 @@ export interface EPIDeliveryFormItem {
   sizeNumber?: string;
   observations?: string;
   stockItemId?: string; // ID do item no estoque para baixa automática
+  /** Ordem de exibição na ficha (0 = primeiro; novos itens ficam na linha de baixo) */
+  lineOrder?: number;
   /** Data da substituição — coluna SUBSTITUÍDO no PDF */
   substitutedDate?: string;
   /** Motivo da substituição — coluna MOTIVO DA SUBST. no PDF */
@@ -335,10 +353,13 @@ export const epiDeliveryFormService = {
       const response = await api.get(`/epi-delivery-forms/${id}/generate-pdf`, {
         responseType: 'blob'
       });
+      if (response.data instanceof Blob && response.data.type.includes('json')) {
+        await rethrowBlobError({ response }, 'Erro ao gerar PDF da ficha de entrega de EPI.');
+      }
       return response.data;
     } catch (error) {
       console.error('Erro ao gerar PDF da ficha de entrega de EPI:', error);
-      throw error;
+      await rethrowBlobError(error, 'Erro ao gerar PDF da ficha de entrega de EPI.');
     }
   },
 
@@ -350,10 +371,13 @@ export const epiDeliveryFormService = {
       const response = await api.post('/epi-delivery-forms/generate-pdf', data, {
         responseType: 'blob'
       });
+      if (response.data instanceof Blob && response.data.type.includes('json')) {
+        await rethrowBlobError({ response }, 'Erro ao gerar PDF da ficha de entrega de EPI.');
+      }
       return response.data;
     } catch (error) {
       console.error('Erro ao gerar PDF da ficha de entrega de EPI:', error);
-      throw error;
+      await rethrowBlobError(error, 'Erro ao gerar PDF da ficha de entrega de EPI.');
     }
   },
 
@@ -365,10 +389,13 @@ export const epiDeliveryFormService = {
       const response = await api.post('/epi-delivery-forms/generate-excel', data, {
         responseType: 'blob'
       });
+      if (response.data instanceof Blob && response.data.type.includes('json')) {
+        await rethrowBlobError({ response }, 'Erro ao gerar Excel da ficha de entrega de EPI.');
+      }
       return response.data;
     } catch (error) {
       console.error('Erro ao gerar Excel da ficha de entrega de EPI:', error);
-      throw error;
+      await rethrowBlobError(error, 'Erro ao gerar Excel da ficha de entrega de EPI.');
     }
   },
 
@@ -384,10 +411,13 @@ export const epiDeliveryFormService = {
         params,
         responseType: 'blob'
       });
+      if (response.data instanceof Blob && response.data.type.includes('json')) {
+        await rethrowBlobError({ response }, 'Erro ao gerar PDF em branco da ficha de entrega de EPI.');
+      }
       return response.data;
     } catch (error) {
       console.error('Erro ao gerar PDF em branco da ficha de entrega de EPI:', error);
-      throw error;
+      await rethrowBlobError(error, 'Erro ao gerar PDF em branco da ficha de entrega de EPI.');
     }
   },
 

@@ -162,7 +162,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                         description: selectedDocType?.label || '',
                         identifier: form.identificador,
                         state: 'BOM',
-                        value: form.documentTypeId === 'BH_BUS' ? 17.35 : 0.0
+                        value: form.documentTypeId === 'BH_BUS' ? 15.00 : form.documentTypeId === 'OTIMO' ? 17.35 : 0.0
                     }
                 ],
                 city: emp.city || '',

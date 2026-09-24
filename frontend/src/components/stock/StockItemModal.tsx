@@ -353,18 +353,6 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
       nameUpper.includes('PROTETOR AURICULAR') || nameUpper.includes('CAPACETE') || nameUpper.includes('LUVA');
 
     const isGroup1Epi = formData.category === StockCategory.EPI || formData.requiresCa || isEpiNameMatch;
-    const isNewItem = !item || !item.id;
-    const hasExistingCa = item && item.caNumber && item.caNumber.trim().length > 0;
-
-    // Obrigatoriedade de CA apenas no CADASTRO de novos EPIs (Grupo 1) ou se o item nunca teve CA cadastrado
-    if (isNewItem && isGroup1Epi && (!formData.caNumber || !formData.caNumber.trim())) {
-      toast({
-        title: 'CA Obrigatório (NR-6 Grupo 1)',
-        description: 'No cadastro de novos itens de EPI (Grupo 1: Colete, Calçado, Capa de Chuva, Óculos, Protetor, Capacete, Luva), é obrigatório informar o número do CA válido.',
-        variant: 'destructive'
-      });
-      return;
-    }
 
     setLoading(true);
     try {
@@ -553,7 +541,7 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                         <Tag className={`h-4 w-4 ${isGroup1 ? 'text-yellow-400' : 'text-blue-400'}`} />
                         <span className="text-sm font-semibold text-white">Classificação NR-6:</span>
                         <Badge className={`${isGroup1 ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' : 'bg-blue-500/20 text-blue-400 border-blue-500/40'}`}>
-                          {isGroup1 ? 'Grupo 1: EPI (Exige CA = SIM)' : 'Grupo 2: Uniforme / Acessório (Exige CA = NÃO)'}
+                          {isGroup1 ? 'Grupo 1: EPI (CA opcional)' : 'Grupo 2: Uniforme / Acessório (CA opcional)'}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2">
@@ -573,17 +561,17 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                     {isGroup1 ? (
                       <div className="space-y-2 pt-1">
                         <Label htmlFor="caNumber" className="text-yellow-400 flex items-center gap-2 text-sm font-semibold">
-                          Número do CA (Certificado de Aprovação - NR-6) *
+                          Número do CA (Certificado de Aprovação - NR-6)
                         </Label>
                         <Input
                           id="caNumber"
                           value={formData.caNumber || ''}
                           onChange={(e) => handleInputChange('caNumber', e.target.value)}
-                          placeholder="Digite o número do CA válido (Ex: 12345)"
+                          placeholder="Opcional (Ex: 12345)"
                           className="bg-seguranca-black/50 border-yellow-500/50 text-white placeholder-gray-400 focus:border-yellow-400 focus:ring-yellow-400/20 h-10 text-sm font-mono"
                         />
                         <p className="text-[11px] text-yellow-300/80">
-                          ⚠️ <strong>Trava de Segurança:</strong> O sistema exige o número do CA para salvar o cadastro e dar entrada na nota fiscal. Este CA virá preenchido automaticamente ao gerar a Ficha de EPI do funcionário.
+                          Opcional no cadastro. Se informado, este CA será preenchido automaticamente ao gerar a Ficha de EPI do funcionário.
                         </p>
                       </div>
                     ) : (

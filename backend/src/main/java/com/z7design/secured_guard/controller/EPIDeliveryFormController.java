@@ -5,6 +5,8 @@ import com.z7design.secured_guard.dto.CreateEPIDeliveryFormDTO;
 import com.z7design.secured_guard.dto.EPIDeliveryFormDTO;
 import com.z7design.secured_guard.dto.EpiConfirmationSendResponseDTO;
 import com.z7design.secured_guard.dto.SendEpiConfirmationRequestDTO;
+import com.z7design.secured_guard.exception.BusinessException;
+import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
@@ -360,6 +362,9 @@ public class EPIDeliveryFormController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
                     .body(pdf);
+        } catch (IllegalArgumentException | ResourceNotFoundException | BusinessException e) {
+            log.warn("⚠️ Falha de regra ao gerar PDF da ficha de entrega de EPI {}: {}", id, e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("❌ Erro ao gerar PDF da ficha de entrega de EPI {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -409,6 +414,9 @@ public class EPIDeliveryFormController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
                     .body(pdf);
+        } catch (IllegalArgumentException | ResourceNotFoundException | BusinessException e) {
+            log.warn("⚠️ Falha de regra ao gerar PDF de ficha de entrega de EPI: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("❌ Erro ao gerar PDF de ficha de entrega de EPI: {}", e.getMessage(), e);
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -442,6 +450,9 @@ public class EPIDeliveryFormController {
                     .header(HttpHeaders.CONTENT_TYPE,
                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                     .body(excel);
+        } catch (IllegalArgumentException | ResourceNotFoundException | BusinessException e) {
+            log.warn("⚠️ Falha de regra ao gerar Excel de ficha de entrega de EPI: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("❌ Erro ao gerar Excel de ficha de entrega de EPI: {}", e.getMessage(), e);
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();

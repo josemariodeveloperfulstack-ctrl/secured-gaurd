@@ -20,23 +20,24 @@ export const useGSAP = () => {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
-    console.log('🎬 GSAP: Inicializando animações...');
-
     // Aguardar o DOM estar pronto
     const timer = setTimeout(() => {
       // Selecionar todos os elementos com data-animate
       const elements = document.querySelectorAll('[data-animate]');
-      console.log(`🎬 GSAP: ${elements.length} elementos encontrados para animar`);
-      
+
       elementsRef.current = Array.from(elements);
 
-      // Se não houver elementos, garantir que tudo está visível
+      // Sem elementos: comportamento normal em páginas internas (que não usam
+      // animações de entrada). Nada a fazer e nada a avisar no console.
       if (elements.length === 0) {
-        console.warn('⚠️ GSAP: Nenhum elemento [data-animate] encontrado!');
         return;
       }
 
-      elements.forEach((element, index) => {
+      if (import.meta.env.DEV) {
+        console.debug(`🎬 GSAP: ${elements.length} elemento(s) com [data-animate] animado(s)`);
+      }
+
+      elements.forEach((element) => {
         const animationType = element.getAttribute('data-animate') || 'fadeUp';
         const delay = parseFloat(element.getAttribute('data-delay') || '0');
         const duration = parseFloat(element.getAttribute('data-duration') || '0.8');
@@ -54,9 +55,6 @@ export const useGSAP = () => {
             start: 'top 95%', // Inicia quando o elemento está 95% visível (mais cedo)
             toggleActions: 'play none none none',
             once: true,
-            onEnter: () => {
-              console.log(`✨ Animando elemento ${index + 1}:`, animationType);
-            },
           },
         };
 
@@ -118,8 +116,6 @@ export const useGSAP = () => {
             });
         }
       });
-
-      console.log('✅ GSAP: Animações configuradas!');
     }, 100);
 
     return () => {

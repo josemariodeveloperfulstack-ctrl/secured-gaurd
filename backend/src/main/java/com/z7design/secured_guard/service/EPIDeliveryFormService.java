@@ -150,6 +150,7 @@ public class EPIDeliveryFormService {
                 .build();
 
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+            int lineOrder = 0;
             for (EPIDeliveryFormItemDTO itemDto : dto.getItems()) {
                 EPIDeliveryFormItem item = EPIDeliveryFormItem.builder()
                         .deliveryForm(form)
@@ -162,6 +163,7 @@ public class EPIDeliveryFormService {
                         .uniformPiece(itemDto.getUniformPiece())
                         .observations(itemDto.getObservations())
                         .stockItemId(itemDto.getStockItemId())
+                        .lineOrder(itemDto.getLineOrder() != null ? itemDto.getLineOrder() : lineOrder)
                         .sizeNumber(resolveSizeNumber(itemDto.getSizeNumber(), itemDto.getStockItemId(), itemDto.getEpiName()))
                         .substitutedDate(itemDto.getSubstitutedDate())
                         .replacementReason(itemDto.getReplacementReason())
@@ -169,6 +171,7 @@ public class EPIDeliveryFormService {
                         .returnReason(itemDto.getReturnReason())
                         .build();
                 form.getItems().add(item);
+                lineOrder++;
             }
         }
 
@@ -230,6 +233,7 @@ public class EPIDeliveryFormService {
         }
         form.getItems().clear();
         if (dto.getItems() != null) {
+            int lineOrder = 0;
             for (EPIDeliveryFormItemDTO itemDto : dto.getItems()) {
                 EPIDeliveryFormItem existing = itemDto.getId() != null ? existingItemsById.get(itemDto.getId()) : null;
                 EPIDeliveryFormItem item = EPIDeliveryFormItem.builder()
@@ -244,6 +248,7 @@ public class EPIDeliveryFormService {
                         .uniformPiece(itemDto.getUniformPiece())
                         .observations(itemDto.getObservations())
                         .stockItemId(itemDto.getStockItemId())
+                        .lineOrder(itemDto.getLineOrder() != null ? itemDto.getLineOrder() : lineOrder)
                         .sizeNumber(resolveSizeNumber(itemDto.getSizeNumber(), itemDto.getStockItemId(), itemDto.getEpiName()))
                         .substitutedDate(itemDto.getSubstitutedDate())
                         .replacementReason(itemDto.getReplacementReason())
@@ -260,6 +265,7 @@ public class EPIDeliveryFormService {
                     item.setSignatureBase64(existing.getSignatureBase64());
                 }
                 form.getItems().add(item);
+                lineOrder++;
             }
         }
 
@@ -368,10 +374,72 @@ public class EPIDeliveryFormService {
         }
     }
 
+    /**
+     * A baixa de estoque já reflete exatamente os itens ativos da ficha?
+     * Compara o mapa item de estoque -> quantidade da REQ-EPI vinculada
+     * (ou da requisição legada pelo número base) com os itens ativos atuais.
+     */
+    private boolean isStockDeductionUpToDate(EPIDeliveryForm form) {
+        Map<UUID, Integer> expected = activeItemsStockQuantities(form);
+        if (expected.isEmpty()) {
+            return false;
+        }
+
+        StockRequisition requisition = form.getStockRequisitionId() != null
+                ? stockRequisitionRepository.findById(form.getStockRequisitionId()).orElse(null)
+                : null;
+        if (requisition == null) {
+            String baseNumber = "REQ-EPI-" + form.getId().toString().substring(0, 8).toUpperCase();
+            requisition = stockRequisitionRepository.findByRequisitionNumber(baseNumber).orElse(null);
+        }
+        if (requisition == null
+                || requisition.getRequisitionNumber() == null
+                || !requisition.getRequisitionNumber().startsWith("REQ-EPI-")) {
+            return false;
+        }
+
+        Map<UUID, Integer> current = new HashMap<>();
+        for (StockRequisitionLine line : requisition.getLines()) {
+            if (line.getStockItem() == null || line.getStockItem().getId() == null) {
+                return false;
+            }
+            int qty = line.getQuantity() != null && line.getQuantity() > 0 ? line.getQuantity() : 1;
+            current.merge(line.getStockItem().getId(), qty, Integer::sum);
+        }
+        return expected.equals(current);
+    }
+
+    /** Item de estoque -> quantidade somada dos itens ativos (não devolvidos/substituídos). */
+    private Map<UUID, Integer> activeItemsStockQuantities(EPIDeliveryForm form) {
+        Map<UUID, Integer> quantities = new HashMap<>();
+        if (form.getItems() == null) {
+            return quantities;
+        }
+        for (EPIDeliveryFormItem item : form.getItems()) {
+            // Itens devolvidos/substituídos não geram nova baixa.
+            if (item.getStockItemId() == null
+                    || item.getSubstitutedDate() != null
+                    || item.getReturnedDate() != null) {
+                continue;
+            }
+            int qty = item.getQuantity() != null && item.getQuantity() > 0 ? item.getQuantity() : 1;
+            quantities.merge(item.getStockItemId(), qty, Integer::sum);
+        }
+        return quantities;
+    }
+
     private void syncWithStockRequisition(EPIDeliveryForm form, UUID userId) {
         log.info("📦 Sincronizando ficha EPI {} com requisição de estoque (baixa de todos os itens ativos)", form.getId());
 
         validateAllItemsLinkedToStock(form);
+
+        // A baixa já corresponde aos itens ativos (ex.: salvar/visualizar a mesma ficha de novo):
+        // não estornar nem rebaixar. Sem isso, o cancelamento + nova baixa podia estourar
+        // "Quantidade insuficiente em estoque" e gerava movimentações duplicadas a cada salvamento.
+        if (isStockDeductionUpToDate(form)) {
+            log.info("♻️ Ficha EPI {} já está com a baixa de estoque sincronizada com os itens atuais; nenhuma movimentação gerada.", form.getId());
+            return;
+        }
 
         // Se já existe uma REQ-EPI vinculada, cancelar movimentações e gerar nova (reflete alterações na lista)
         if (form.getStockRequisitionId() != null) {
@@ -516,7 +584,7 @@ public class EPIDeliveryFormService {
             storno.setMovementType(MovementType.ENTRADA);
             storno.setReason(MovementReason.AJUSTE_ENTRADA);
             storno.setQuantity(m.getQuantity());
-            storno.setNotes("Estorno automático por alteração na Ficha de EPI: " + form.getId());
+            storno.setNotes("Estorno automático por exclusão/alteração da Ficha de EPI: " + form.getId());
             stockService.createMovement(storno, effectiveUserId);
             
             stockMovementRepository.delete(m);
@@ -742,12 +810,63 @@ public class EPIDeliveryFormService {
     public void delete(UUID id, UUID actingUserId) {
         EPIDeliveryForm form = epiDeliveryFormRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
-        
-        // Devolver itens ao estoque via cancelamento de requisição (exige usuário para movimentação)
-        cancelStockRequisition(form, actingUserId);
-        
+
+        // Estorna ao estoque tudo que foi baixado por esta ficha (material não entregue / exclusão).
+        reverseStockOnFormDeletion(form, actingUserId);
+
         epiDeliveryFormRepository.deleteById(id);
-        log.info("🗑️ Ficha de entrega de EPI deletada: {}", id);
+        log.info("🗑️ Ficha de entrega de EPI deletada com estorno de estoque: {}", id);
+    }
+
+    /**
+     * Devolve ao estoque as quantidades lançadas na ficha.
+     * Preferencialmente cancela a REQ-EPI vinculada (estorna SAIDAs); se não houver,
+     * cria ENTRADA compensatória para cada item ativo com stockItemId.
+     */
+    private void reverseStockOnFormDeletion(EPIDeliveryForm form, UUID actingUserId) {
+        if (form.getStockRequisitionId() != null) {
+            if (isEpiGeneratedRequisition(form.getStockRequisitionId())) {
+                cancelStockRequisition(form, actingUserId);
+                return;
+            }
+            log.warn("Ficha EPI {} vinculada à requisição externa {}; estorno automático de estoque não aplicado na exclusão.",
+                    form.getId(), form.getStockRequisitionId());
+            return;
+        }
+
+        if (form.getStatus() != EPIDeliveryFormStatus.COMPLETED
+                || form.getItems() == null
+                || form.getItems().isEmpty()) {
+            return;
+        }
+
+        UUID effectiveUserId = actingUserId;
+        if (effectiveUserId == null && form.getCreatedBy() != null) {
+            effectiveUserId = form.getCreatedBy().getId();
+        }
+        if (effectiveUserId == null) {
+            throw new IllegalArgumentException(
+                    "Não foi possível identificar o usuário para registrar o estorno de estoque ao excluir a ficha EPI. "
+                            + "Faça login novamente.");
+        }
+
+        for (EPIDeliveryFormItem item : form.getItems()) {
+            if (item.getStockItemId() == null) {
+                continue;
+            }
+            if (item.getSubstitutedDate() != null || item.getReturnedDate() != null) {
+                continue;
+            }
+            int qty = item.getQuantity() != null && item.getQuantity() > 0 ? item.getQuantity() : 1;
+            com.z7design.secured_guard.dto.StockMovementDTO storno = new com.z7design.secured_guard.dto.StockMovementDTO();
+            storno.setStockItemId(item.getStockItemId());
+            storno.setMovementType(MovementType.ENTRADA);
+            storno.setReason(MovementReason.AJUSTE_ENTRADA);
+            storno.setQuantity(qty);
+            storno.setNotes("Estorno por exclusão da Ficha de EPI (material não entregue): " + form.getId());
+            stockService.createMovement(storno, effectiveUserId);
+            log.info("📈 Estorno direto na exclusão: {} x {} (ficha {})", qty, item.getEpiName(), form.getId());
+        }
     }
 
     /**

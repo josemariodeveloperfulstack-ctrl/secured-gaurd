@@ -16,6 +16,7 @@ public class EPIDeliveryFormItemDTO {
     private String sizeNumber;
     private String observations;
     private UUID stockItemId;
+    private Integer lineOrder;
     private LocalDate substitutedDate;
     private String replacementReason;
     private LocalDate returnedDate;
@@ -35,6 +36,14 @@ public class EPIDeliveryFormItemDTO {
 
     public void setStockItemId(UUID stockItemId) {
         this.stockItemId = stockItemId;
+    }
+
+    public Integer getLineOrder() {
+        return lineOrder;
+    }
+
+    public void setLineOrder(Integer lineOrder) {
+        this.lineOrder = lineOrder;
     }
 
     public LocalDate getSubstitutedDate() {

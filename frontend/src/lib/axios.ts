@@ -10,6 +10,9 @@ import { useBackendStatusStore } from '../stores/backendStatusStore';
 
 const api = axios.create({
   baseURL: getApiUrl(),
+  // Evita travar em conexões mornas (ERR_CONNECTION_CLOSED sem timeout do browser)
+  // e alimenta o retry de conexão do interceptor.
+  timeout: 30000,
 });
 
 // Request interceptor
@@ -109,7 +112,9 @@ api.interceptors.response.use(
 
       if (originalRequest) {
         const retryCount = originalRequest.__connectionRetryCount ?? 0;
-        const maxRetries = originalRequest.silent ? 3 : 2;
+        // Requisições de background (silent: polling, etc.) falham rápido: 1 retry.
+        // Antes eram 3, o que gerava uma rajada de requisições falhando a cada reinício do backend.
+        const maxRetries = originalRequest.silent ? 1 : 2;
         if (retryCount < maxRetries) {
           originalRequest.__connectionRetryCount = retryCount + 1;
           const delay = 350 * (retryCount + 1);
