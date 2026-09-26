@@ -18,10 +18,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
-interface Option {
+export interface Option {
   value: string;
   label: string;
   description?: string;
+  searchTerms?: string[];
 }
 
 interface SearchableSelectProps {
@@ -81,19 +82,22 @@ export function SearchableSelect({
   const filteredOptions = React.useMemo(() => {
     if (!showOptions) return [] as Option[]
     if (!search) return options
-    const q = search.toLowerCase()
+    const q = search.toLowerCase().trim()
     const qClean = q.replace(/[^a-zA-Z0-9]/g, '')
     return options.filter((o) => {
       if (!o) return false
       const label = (o.label || "").toLowerCase()
       const desc = o.description ? o.description.toLowerCase() : ""
+      const terms = Array.isArray(o.searchTerms) ? o.searchTerms.join(' ').toLowerCase() : ""
       
       const labelClean = label.replace(/[^a-zA-Z0-9]/g, '')
       const descClean = desc.replace(/[^a-zA-Z0-9]/g, '')
+      const termsClean = terms.replace(/[^a-zA-Z0-9]/g, '')
       
       const labelMatch = label.includes(q) || (qClean !== '' && labelClean.includes(qClean))
       const descMatch = desc.includes(q) || (qClean !== '' && descClean.includes(qClean))
-      return labelMatch || descMatch
+      const termsMatch = terms.includes(q) || (qClean !== '' && termsClean.includes(qClean))
+      return labelMatch || descMatch || termsMatch
     })
   }, [options, search, showOptions])
 
