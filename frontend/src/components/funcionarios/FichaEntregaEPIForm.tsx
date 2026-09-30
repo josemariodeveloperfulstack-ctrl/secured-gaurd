@@ -107,6 +107,91 @@ function buildWorkSectorSnapshot(emp: SimpleEmployee | null): string {
 }
 
 
+
+/**
+ * Verifica se um item de estoque é relacionado a EPI/Uniforme/Proteção.
+ * Permite filtrar para que apenas itens de EPI apareçam na Ficha de Entrega de EPI.
+ */
+const isEpiStockItem = (item: StockItem): boolean => {
+  if (!item) return false;
+
+  // Se possui número de CA cadastrado ou exige CA obrigatoriamente
+  if (item.requiresCa || (item.caNumber && item.caNumber.trim() !== '')) {
+    return true;
+  }
+
+  // Categoria de EPI, Calçados ou Uniformes
+  const cat = String(item.category || '').toUpperCase();
+  if (
+    cat === 'EPI' ||
+    cat === 'CALCADOS' ||
+    cat.startsWith('UNIFORME') ||
+    cat.includes('SEGURANCA') ||
+    cat.includes('PROTECAO')
+  ) {
+    return true;
+  }
+
+  // Palavras-chave no nome, nome completo, descrição ou categoria
+  const textToSearch = [
+    item.name,
+    item.fullName,
+    item.description,
+    cat,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  const epiKeywords = [
+    'epi',
+    'capacete',
+    'óculos',
+    'oculos',
+    'protetor auditivo',
+    'protetor auricular',
+    'protetor facial',
+    'protetor solar',
+    'máscara',
+    'mascara',
+    'respirador',
+    'luva',
+    'calçado',
+    'calcado',
+    'bota',
+    'botina',
+    'sapato',
+    'cinto de segurança',
+    'cinto',
+    'talabarte',
+    'avental',
+    'colete',
+    'colete refletivo',
+    'colete balístico',
+    'balístico',
+    'balistico',
+    'perneira',
+    'luminária de cabeça',
+    'luminaria de cabeca',
+    'detector de gás',
+    'detector de gas',
+    'abafador',
+    'uniforme',
+    'jaleco',
+    'macacão',
+    'macacao',
+    'camisa',
+    'calça',
+    'calca',
+    'jaqueta',
+    'blaser',
+    'segurança do trabalho',
+    'equipamento de proteção',
+    'proteção auditiva',
+    'proteção visual',
+    'proteção respiratória'
+  ];
+
+  return epiKeywords.some((kw) => textToSearch.includes(kw));
+};
+
 const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
   employeeId,
   companyId,
@@ -114,7 +199,21 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
   onSuccess,
 }) => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, empresa: authEmpresa } = useAuth();
+
+  const userCompanyId = useMemo(() => {
+    return (
+      companyId ||
+      authEmpresa?.id ||
+      user?.companyId ||
+      (user as any)?.empresaId ||
+      (user as any)?.company?.id ||
+      localStorage.getItem('companyId') ||
+      localStorage.getItem('empresaId') ||
+      localStorage.getItem('selectedCompanyId') ||
+      ''
+    );
+  }, [companyId, authEmpresa?.id, user?.companyId, (user as any)?.empresaId, (user as any)?.company?.id]);
 
   // Load ficha data if editing
   useEffect(() => {
@@ -233,7 +332,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
   // 1. All State and Ref declarations first
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
-    empresaId: companyId || '',
+    empresaId: userCompanyId || companyId || '',
     dataEntrega: todayIsoDateLocal(),
     responsavelEntregaId: '',
     observacoes: '',
@@ -309,20 +408,48 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
 
   const stockItemOptions = useMemo(
     () =>
-      stockItems.map((item) => {
-        const code = item.code || item.barcode || '';
-        const name = item.fullName || item.name || 'Item sem nome';
-        const qty = Number(item.currentQuantity) || 0;
-        const minQty = Number(item.minimumQuantity) || 0;
-        return {
-          value: item.id,
-          label: code ? `${code} — ${name}` : name,
-          description:
-            qty <= 0
-              ? `Saldo: 0 · SEM ESTOQUE — cadastre entrada e informe quantidade mínima${minQty > 0 ? ` (mín: ${minQty})` : ''}`
-              : `Saldo: ${qty}${minQty > 0 ? ` · Mín: ${minQty}` : ''}${item.barcode && item.barcode !== code ? ` · Cód. barras: ${item.barcode}` : ''}`,
-        };
-      }),
+      stockItems
+        .filter(isEpiStockItem)
+        .map((item) => {
+          const code = item.code || item.barcode || '';
+          const name = item.fullName || item.name || 'Item sem nome';
+          const qty = Number(item.currentQuantity) || 0;
+          const minQty = Number(item.minimumQuantity) || 0;
+          const desc = item.description ? item.description.trim() : '';
+          const ca = item.caNumber ? `CA: ${item.caNumber}` : '';
+
+          const searchTerms = [
+            name,
+            item.name || '',
+            item.fullName || '',
+            item.code || '',
+            item.barcode || '',
+            desc,
+            item.caNumber || '',
+            item.sizeVariation || '',
+            item.category || '',
+          ].filter(Boolean);
+
+          const descParts: string[] = [];
+          if (desc) descParts.push(desc);
+          if (ca) descParts.push(ca);
+          if (qty <= 0) {
+            descParts.push(
+              `Saldo: 0 • SEM ESTOQUE • cadastre entrada e informe quantidade mínima${minQty > 0 ? ` (mín: ${minQty})` : ''}`
+            );
+          } else {
+            descParts.push(
+              `Saldo: ${qty}${minQty > 0 ? ` • Mín: ${minQty}` : ''}${item.barcode && item.barcode !== code ? ` • Cód. barras: ${item.barcode}` : ''}`
+            );
+          }
+
+          return {
+            value: item.id,
+            label: code ? `${code} — ${name}` : name,
+            description: descParts.join(' • '),
+            searchTerms,
+          };
+        }),
     [stockItems],
   );
 
@@ -425,8 +552,22 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
     }));
   }, [employeeId, companyId]);
 
+  // Mantém form.empresaId sincronizado com a empresa do usuário logado
+  useEffect(() => {
+    if (userCompanyId && (!form.empresaId || form.empresaId !== userCompanyId)) {
+      setForm((prev) => ({ ...prev, empresaId: userCompanyId }));
+    }
+  }, [userCompanyId]);
+
   useEffect(() => {
     if (!selectedEmployeeData) return;
+    if (userCompanyId) {
+      // Usuário pertence a uma empresa: não deve alterar para outra empresa
+      if (form.empresaId !== userCompanyId) {
+        setForm((prev) => ({ ...prev, empresaId: userCompanyId }));
+      }
+      return;
+    }
     if (companyId) return;
     const cid = resolveCompanyIdFromEmployee(selectedEmployeeData);
     if (!cid) return;
@@ -439,7 +580,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
       if (!prev.empresaId) return { ...prev, empresaId: cid };
       return prev;
     });
-  }, [form.funcionarioId, selectedEmployeeData, companyId]);
+  }, [form.funcionarioId, selectedEmployeeData, companyId, userCompanyId]);
 
   useEffect(() => {
     if (form.funcionarioId && !selectedEmployeeData) {
@@ -550,12 +691,39 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
     setLoadingData(true);
     try {
       const companiesData = await companyService.getAllCompanies();
-      setCompanies(companiesData);
+      const allCompanies = Array.isArray(companiesData) ? companiesData : [];
+
+      if (userCompanyId) {
+        // Filtrar estritamente para a empresa à qual o usuário logado pertence
+        const userMatched = allCompanies.filter(
+          (c) =>
+            c.id === userCompanyId ||
+            (c.id && c.id.toLowerCase() === userCompanyId.toLowerCase()) ||
+            (authEmpresa?.nome && c.name?.toLowerCase() === authEmpresa.nome.toLowerCase()) ||
+            (user?.companyName && c.name?.toLowerCase() === user.companyName.toLowerCase())
+        );
+
+        if (userMatched.length > 0) {
+          setCompanies(userMatched);
+        } else {
+          // Fallback garantido para exibir a empresa do usuário logado
+          setCompanies([
+            {
+              id: userCompanyId,
+              name: authEmpresa?.nome || user?.companyName || 'Empresa do Usuário',
+              sigla: authEmpresa?.sigla || '',
+              cnpj: (authEmpresa as any)?.cnpj || '',
+            },
+          ]);
+        }
+      } else {
+        setCompanies(allCompanies);
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível carregar funcionários e empresas.',
+        description: 'Não foi possível carregar empresas.',
         variant: 'destructive'
       });
     } finally {
@@ -1307,7 +1475,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                 <Select
                   value={form.empresaId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
-                  disabled={loadingData}
+                  disabled={loadingData || Boolean(userCompanyId && companies.length <= 1)}
                 >
                   <SelectTrigger className="h-11 bg-background border-2 border-gray-600 focus:border-seguranca-yellow">
                     <SelectValue placeholder="Selecione a empresa" />
@@ -1715,9 +1883,9 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                                 }
                               }
                             }}
-                            placeholder="Digite o código ou nome do item..."
-                            searchPlaceholder="Código, nome ou código de barras..."
-                            emptyPlaceholder="Nenhum item encontrado."
+                            placeholder="Buscar por código, nome ou descrição do item..."
+                            searchPlaceholder="Buscar por código, nome ou descrição..."
+                            emptyPlaceholder="Nenhum item de EPI encontrado."
                             minSearchChars={0}
                             minCharsMessage="Digite para filtrar itens de estoque..."
                             className={cn(

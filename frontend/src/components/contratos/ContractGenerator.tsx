@@ -20,6 +20,12 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Contract, contractService } from '@/services/contractService';
+import {
+  companyContractTemplateService,
+  CONTRACT_TEMPLATE_LABELS,
+  ContractTemplateKey,
+  getAllowedTemplateKeysForCompany,
+} from '@/services/companyContractTemplateService';
 import { companyConfigService, CompanyConfig } from '@/services/companyConfigService';
 import { clientService } from '@/services/clientService';
 import { companyService } from '@/services/companyService';
@@ -94,6 +100,10 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [workPostsLoading, setWorkPostsLoading] = useState(false);
   const [selectedWorkPostIds, setSelectedWorkPostIds] = useState<string[]>([]);
+
+  // Modelo da minuta de contrato (14 cláusulas)
+  const TEMPLATE_KEYS: ContractTemplateKey[] = ['ARMADA', 'DESARMADA', 'PORTARIA'];
+  const [contractTemplateKey, setContractTemplateKey] = useState<ContractTemplateKey>('ARMADA');
 
   useEffect(() => {
     if (open) {
@@ -253,12 +263,30 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
 
   const handleSelectCompany = (id: string) => {
     setSelectedCompanyId(id);
+    const comp = companiesList.find((c) => c.id === id);
+    const allowed = getAllowedTemplateKeysForCompany(comp);
+    if (!allowed.includes(contractTemplateKey)) {
+      setContractTemplateKey(allowed[0]);
+    }
     void loadCompanyConfig(id);
   };
 
   const selectedCompany = selectedCompanyId
     ? companiesList.find((c) => c.id === selectedCompanyId)
     : companiesList[0];
+
+  const allowedTemplateKeys = getAllowedTemplateKeysForCompany(selectedCompany);
+  const isVigCompany = allowedTemplateKeys.includes('ARMADA');
+
+  // Ajusta o template selecionado caso a empresa atual não suporte o modelo ativo
+  useEffect(() => {
+    if (selectedCompany) {
+      const allowed = getAllowedTemplateKeysForCompany(selectedCompany);
+      if (!allowed.includes(contractTemplateKey)) {
+        setContractTemplateKey(allowed[0]);
+      }
+    }
+  }, [selectedCompany, contractTemplateKey]);
 
   // Para preview: empresa (cabeçalho) vem da tabela Companies; termos (cláusulas, rodapé) de CompanyConfig
   const configForContract = selectedCompany
@@ -431,7 +459,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
             font-size: 10px;
           }
           .layout-footer {
-            margin-top: 50px;
+            margin-top: 70px; /* 50px + 20px de espaçamento no topo do rodapé */
             font-size: 10px;
             text-align: center;
             background: #fafafa;
@@ -441,7 +469,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
             background: linear-gradient(90deg, #FFCC00, #FF9900, #FF3333);
             margin-bottom: 15px;
           }
-          .layout-footer-text { padding: 0 50px 30px; }
+          .layout-footer-text { padding: 20px 50px 30px; /* 20px de espaçamento no topo do rodapé */ }
           .table {
             width: 100%;
             border-collapse: collapse;
@@ -658,6 +686,8 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
       city: configForContract?.city || '',
       contractDate: new Date().toISOString().split('T')[0],
       workPostIds: selectedWorkPostIds || [],
+      // Minuta de 14 cláusulas (ARMADA, DESARMADA ou PORTARIA)
+      contractTemplateKey: contractTemplateKey || null,
     };
   };
 
@@ -830,6 +860,39 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
                 </CardContent>
               </Card>
             )}
+
+            {/* Modelo da Minuta (14 cláusulas) */}
+            <Card className="bg-seguranca-black border-gray-600">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-4">
+                <CardTitle className="text-seguranca-lightgray text-xs sm:text-sm flex items-center gap-2">
+                  <FileText size={16} />
+                  Modelo do Contrato (Minuta de 14 Cláusulas) — {selectedCompany?.sigla || selectedCompany?.name || 'Empresa'}
+                </CardTitle>
+                <p className="text-xs text-gray-400 mt-1">
+                  {isVigCompany
+                    ? 'Modelos oficiais para empresa de Vigilância (Armada ou Desarmada).'
+                    : 'Modelo oficial de Portaria e Controle de Acesso para esta empresa.'}
+                </p>
+              </CardHeader>
+              <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4">
+                <div className="flex flex-wrap gap-2">
+                  {allowedTemplateKeys.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setContractTemplateKey(key)}
+                      className={`px-3 py-2 rounded-lg border text-xs sm:text-sm font-medium transition-colors ${
+                        contractTemplateKey === key
+                          ? 'bg-seguranca-yellow text-black border-seguranca-yellow'
+                          : 'bg-seguranca-graphite text-seguranca-lightgray border-gray-600 hover:border-seguranca-yellow/50'
+                      }`}
+                    >
+                      {CONTRACT_TEMPLATE_LABELS[key]}
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Dados do Cliente - seleção obrigatória */}
             <Card className="bg-seguranca-black border-gray-600">

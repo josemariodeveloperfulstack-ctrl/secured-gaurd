@@ -12,7 +12,7 @@ import { FileText, Download, Filter, Columns, Loader2, Calendar, Building2, Tag,
 import { contasAPagarService, CustomContasAPagarReportRequest, Supplier } from '@/services/contasAPagarService';
 import { formatDateForBackend } from '@/utils/dateUtils';
 import api from '@/lib/axios';
-import departmentService from '@/services/departmentService';
+import departmentService, { filterCompanyDepartments, isValidSectorName } from '@/services/departmentService';
 
 interface ContasAPagarReportCustomModalProps {
   open: boolean;
@@ -89,22 +89,23 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
         departmentService.listActive(),
         api.get('/work-posts/all').catch(() => api.get('/work-posts'))
       ]).then(([deptResult, postsResult]) => {
-        const deptNames: string[] = [];
-        if (deptResult.status === 'fulfilled' && Array.isArray(deptResult.value)) {
-          deptResult.value.forEach((d: any) => {
-            if (d?.name && typeof d.name === 'string') {
-              deptNames.push(d.name.trim());
-            }
-          });
-        }
+        // Departamentos: aplicar filtro para remover dados inválidos (estado civil, etc.)
+        const rawDepts = deptResult.status === 'fulfilled' && Array.isArray(deptResult.value)
+          ? deptResult.value
+          : [];
+        const deptNames: string[] = filterCompanyDepartments(rawDepts)
+          .map((d: any) => d.name?.trim())
+          .filter(Boolean);
 
+        // Postos de Trabalho: usar apenas o campo "name" do posto, filtrar inválidos
         const postNames: string[] = [];
         if (postsResult.status === 'fulfilled') {
           const raw = postsResult.value?.data;
           const list = Array.isArray(raw) ? raw : (raw?.content || []);
           list.forEach((p: any) => {
-            if (p?.name && typeof p.name === 'string') {
-              postNames.push(p.name.trim());
+            const n = p?.name?.trim();
+            if (n && typeof n === 'string' && isValidSectorName(n)) {
+              postNames.push(n);
             }
           });
         }

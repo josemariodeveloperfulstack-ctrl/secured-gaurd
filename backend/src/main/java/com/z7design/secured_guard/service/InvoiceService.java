@@ -579,6 +579,27 @@ public class InvoiceService {
                     throw new IllegalArgumentException(
                             "Informe a empresa (SIGLA) quando o pagamento estiver vinculado a um funcionário.");
                 }
+                // Auto-preenche o setor de trabalho a partir do posto/departamento do funcionário
+                // se o workSector não foi informado explicitamente pelo frontend
+                if (dto.getWorkSector() == null || dto.getWorkSector().isBlank()) {
+                    String autoSector = null;
+                    try {
+                        if (employee.getWorkPost() != null) {
+                            autoSector = employee.getWorkPost().getName();
+                        }
+                    } catch (Exception ignored) {}
+                    if (autoSector == null || autoSector.isBlank()) {
+                        try {
+                            if (employee.getDepartment() != null) {
+                                autoSector = employee.getDepartment().getName();
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                    if (autoSector != null && !autoSector.isBlank()) {
+                        invoice.setWorkSector(autoSector);
+                        log.debug("workSector auto-preenchido do funcionário: {}", autoSector);
+                    }
+                }
             } else {
                 invoice.setEmployee(null);
             }

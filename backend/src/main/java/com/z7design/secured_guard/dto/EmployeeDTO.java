@@ -108,6 +108,19 @@ public class EmployeeDTO {
     // private String anoReferencia;
     private String notes;
     private String status;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate judicialProcessStartDate;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate judicialProcessEndDate;
+    private String judicialProcessNotes;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate inssStartDate;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate inssEndDate;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate absenceStartDate;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate absenceEndDate;
 
     // Dados do cônjuge
     private String spouseName;

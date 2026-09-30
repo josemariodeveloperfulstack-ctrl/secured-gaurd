@@ -7,6 +7,8 @@ export interface FeriasPeriodo {
   employeeId: string;
   employeeName: string;
   periodoAquisitivo: string; // ex: "2024/2025"
+  empresa?: string; // sigla da empresa: VIG, ADM ou TERC
+  setor?: string; // setor de trabalho (department)
   dataInicio: string;
   dataFim: string;
   status: FeriasStatus;
@@ -74,6 +76,8 @@ export interface FeriasFilters {
   status?: FeriasStatus;
   tipo?: FeriasTipo;
   periodoAquisitivo?: string;
+  /** Sigla da empresa: VIG, ADM ou TERC */
+  empresa?: string;
   dataInicio?: string;
   dataFim?: string;
 }

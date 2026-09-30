@@ -40,6 +40,8 @@ import {
     Brain,
     History,
     ArrowLeftRight,
+    Gavel,
+    Scale,
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
 import type { Dependent } from '@/types/dependent';
@@ -57,6 +59,9 @@ import { employeeChangeHistoryService, EmployeeChangeHistoryItem } from '@/servi
 import { employeeEmploymentPeriodService, EmployeeEmploymentPeriod } from '@/services/employeeEmploymentPeriodService';
 import { format } from 'date-fns';
 import { formatCPF, formatRG, formatPhone, formatDate as formatSystemDate } from '@/utils/formatters';
+import { EmployeeAnalyticsChart } from './EmployeeAnalyticsChart';
+import { EmployeeSummaryKpis } from './EmployeeSummaryKpis';
+import { EmployeeUnifiedTimeline } from './EmployeeUnifiedTimeline';
 
 const EXAM_TYPE_LABELS: Record<string, string> = {
     ADMISSIONAL: 'Admissional',
@@ -206,6 +211,112 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
             cancelled = true;
         };
     }, [open, employeeIdForRequests, activeTab]);
+
+    // Carregar indicadores rápidos (atestados, advertências e férias) imediatamente na abertura do modal
+    useEffect(() => {
+        if (!open || !employee?.id) return;
+        let cancelled = false;
+
+        const loadQuickKpis = async () => {
+            try {
+                const [medDocsRes, abs, occs, vacs] = await Promise.all([
+                    medicalDocumentService.getMedicalDocuments({ employeeId: employee.id, page: 0, size: 100 }).catch(() => null),
+                    feriasService.getAfastamentos({ employeeId: employee.id }).catch(() => []),
+                    occurrenceService.getOccurrences({ employeeId: employee.id }).catch(() => []),
+                    feriasService.getFeriasByEmployee(employee.id).catch(() => []),
+                ]);
+
+                if (cancelled) return;
+
+                // Processar atestados
+                const fromAfastamentos = (Array.isArray(abs) ? abs : [])
+                    .filter((a: any) => a.absenceType === 'SICK_LEAVE' || a.tipo === 'ATESTADO')
+                    .map((a: any) => ({
+                        id: `afastamento-${a.id}`,
+                        source: 'AFASTAMENTOS',
+                        title: a.motivo || 'Atestado Médico',
+                        dataInicio: a.dataInicio || a.startDate,
+                        dataFim: a.dataFim || a.endDate,
+                        dias: a.dias || a.days,
+                        cidCode: a.cid,
+                        documentoUrl: a.documento || a.documentUrl,
+                        observations: a.observacoes || a.notes,
+                    }));
+
+                const fromMedDocs = (Array.isArray(medDocsRes?.content) ? medDocsRes.content : [])
+                    .map((doc: any) => ({
+                        id: `med-doc-${doc.id}`,
+                        source: 'GESTÃO DE ATESTADOS',
+                        title: MEDICAL_TYPE_LABELS[doc.documentType as MedicalDocumentType] || doc.documentType || 'Atestado Médico',
+                        dataInicio: doc.startDate,
+                        dataFim: doc.endDate,
+                        dias: doc.days,
+                        horas: doc.hours,
+                        cidCode: doc.cidCode,
+                        cidDescription: doc.cidDescription,
+                        doctorName: doc.doctorName,
+                        crm: doc.crm,
+                        documentoUrl: doc.documentUrl,
+                        observations: doc.observations,
+                    }));
+
+                const atestadoOccurrences = (Array.isArray(occs) ? occs : [])
+                    .filter((o: any) => {
+                        const t = String(o.type || '').toUpperCase();
+                        const title = String(o.title || '').toUpperCase();
+                        const cat = String(o.category || '').toUpperCase();
+                        return t === 'MEDICAL_CERTIFICATE' || t === 'ATESTADO' || t === 'ATESTADO_MEDICO' ||
+                            title.includes('ATESTADO') || cat.includes('ATESTADO');
+                    })
+                    .map((o: any) => ({
+                        id: `ocorrencia-${o.id}`,
+                        source: 'OCORRÊNCIAS',
+                        title: o.title || 'Atestado Médico (Ocorrência)',
+                        dataInicio: o.startDate || o.date,
+                        dataFim: o.endDate || o.date,
+                        description: o.description || o.reason,
+                        status: o.status,
+                        documentoUrl: o.documentUrl || o.attachmentUrl || o.documento,
+                    }));
+
+                const combined = [...fromMedDocs, ...fromAfastamentos, ...atestadoOccurrences];
+                const unique = combined.filter((item, index, self) =>
+                    index === self.findIndex((t) => (
+                        t.id === item.id ||
+                        (t.dataInicio === item.dataInicio && t.title === item.title && t.source === item.source)
+                    ))
+                );
+
+                unique.sort((a, b) => {
+                    const dateA = new Date(a.dataInicio || 0).getTime();
+                    const dateB = new Date(b.dataInicio || 0).getTime();
+                    return dateB - dateA;
+                });
+
+                setAbsences(unique);
+
+                // Processar advertências e suspensões
+                const discOccs = (Array.isArray(occs) ? occs : []).filter(o => 
+                    o.type === 'ADVERTENCIA' || o.type === 'SUSPENSAO' || o.type === 'PUNICAO' ||
+                    o.title?.toUpperCase().includes('ADVERTÊNCIA') || o.title?.toUpperCase().includes('ADVERTENCIA')
+                );
+                setOccurrences(discOccs);
+
+                // Processar férias
+                if (Array.isArray(vacs)) {
+                    setVacations(vacs);
+                }
+            } catch (err) {
+                console.error('Erro ao carregar KPIs do funcionário:', err);
+            }
+        };
+
+        loadQuickKpis();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [open, employee?.id]);
 
     useEffect(() => {
         if (open && employee?.id && activeTab !== 'dependentes') {
@@ -516,11 +627,13 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                             className={`
                     ${displayEmployee.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' :
                                             displayEmployee.status === 'TERMINATED' ? 'bg-red-500/20 text-red-400' :
+                                            displayEmployee.status === 'SUB_JUDICE' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' :
                                                 'bg-yellow-500/20 text-yellow-400'}
                   `}
                                         >
                                             {displayEmployee.status === 'ACTIVE' ? 'Ativo' :
-                                                displayEmployee.status === 'TERMINATED' ? 'Demitido' : 'Outro'}
+                                                displayEmployee.status === 'TERMINATED' ? 'Demitido' :
+                                                displayEmployee.status === 'SUB_JUDICE' ? '⚖️ Sub Júdice' : (displayEmployee.status || 'Outro')}
                                         </Badge>
                                     </div>
                                 </DialogDescription>
@@ -542,6 +655,16 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                         )}
                     </div>
                 </DialogHeader>
+
+                {/* KPI Cards: Atestados Entregues, Advertências, Situação Funcional e Férias */}
+                <EmployeeSummaryKpis
+                    employee={displayEmployee}
+                    totalAtestados={absences.length}
+                    totalDiasAfastado={absences.reduce((acc, curr) => acc + (Number(curr.dias) || 1), 0)}
+                    totalAdvertencias={occurrences.filter(o => o.type === 'ADVERTENCIA' || !o.type || o.type.includes('ADVERTENCIA') || o.title?.toUpperCase().includes('ADVERT')).length}
+                    totalSuspensoes={occurrences.filter(o => o.type === 'SUSPENSAO' || o.type?.includes('SUSPENSAO')).length}
+                    onNavigateTab={setActiveTab}
+                />
 
                 <Tabs
                     value={activeTab}
@@ -587,6 +710,53 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                     <ScrollArea className="flex-1 p-4 md:p-6">
                         {/* Aba Dados */}
                         <TabsContent value="dados" className="mt-0 space-y-4 md:space-y-6">
+                            {/* Card de Afastamento por Processo Judicial (RF07) */}
+                            {(displayEmployee.judicialProcessStartDate || displayEmployee.status === 'SUB_JUDICE') && (
+                                <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-800 border-amber-500/40 shadow-md overflow-hidden">
+                                    <div className="bg-amber-500/10 px-4 py-2.5 border-b border-amber-500/30 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Gavel size={16} className="text-amber-400" />
+                                            <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Histórico de Processo Judicial</span>
+                                        </div>
+                                        <Badge className={`text-xs ${
+                                            !displayEmployee.judicialProcessEndDate
+                                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                                : displayEmployee.status === 'TERMINATED'
+                                                    ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                                                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                        }`}>
+                                            {!displayEmployee.judicialProcessEndDate
+                                                ? '⚖️ Sub Júdice (Em Andamento)'
+                                                : displayEmployee.status === 'TERMINATED'
+                                                    ? 'Encerrado (Demissão)'
+                                                    : 'Encerrado (Reintegrado / Ativo)'}
+                                        </Badge>
+                                    </div>
+                                    <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-gray-400 uppercase font-bold">Início do Afastamento Judicial</span>
+                                            <span className="text-sm font-semibold text-white mt-0.5">
+                                                {formatDate(displayEmployee.judicialProcessStartDate)}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-gray-400 uppercase font-bold">Fim do Processo Judicial</span>
+                                            <span className="text-sm font-semibold text-white mt-0.5">
+                                                {displayEmployee.judicialProcessEndDate
+                                                    ? formatDate(displayEmployee.judicialProcessEndDate)
+                                                    : 'Em aberto (Processo em curso)'}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-gray-400 uppercase font-bold">Observações / Sentença</span>
+                                            <span className="text-sm text-gray-300 mt-0.5">
+                                                {displayEmployee.judicialProcessNotes || 'Nenhuma observação registrada.'}
+                                            </span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                                 <Card className="bg-seguranca-black/40 border-gray-700/50 overflow-hidden">
                                     <div className="bg-seguranca-red/10 px-4 py-2 border-b border-gray-700/50 flex items-center gap-2">
@@ -1072,8 +1242,18 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                         {/* Aba Atestados */}
                         <TabsContent value="atestados" className="mt-0">
                             {loading ? renderLoading() : (
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold text-white mb-2">Histórico de Atestados Médicos</h3>
+                                <div className="space-y-5">
+                                    {/* Gráfico de Análise Visual de Atestados & Afastamentos */}
+                                    <EmployeeAnalyticsChart
+                                        absences={absences}
+                                        occurrences={occurrences}
+                                        employeeName={displayEmployee.name}
+                                    />
+
+                                    <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                                        <Stethoscope size={20} className="text-blue-400" />
+                                        Histórico de Atestados Médicos
+                                    </h3>
 
                                     {absences.length === 0 ? renderEmpty('Nenhum atestado médico registrado.') : (
                                         <div className="space-y-3">
@@ -1081,7 +1261,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                                 <Card key={abs.id} className="bg-seguranca-black/40 border-gray-700/50 p-4">
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex items-start gap-3">
-                                                            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 shrink-0">
+                                                            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 shrink-0">
                                                                 <Stethoscope size={18} />
                                                             </div>
                                                             <div>
@@ -1106,7 +1286,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                                                     {abs.horas ? <span className="text-gray-300">• {abs.horas} hora(s)</span> : null}
                                                                 </div>
                                                                 {abs.cidCode && (
-                                                                    <p className="text-xs text-purple-300 mt-1 font-mono">
+                                                                    <p className="text-xs text-blue-300 mt-1 font-mono">
                                                                         CID: {abs.cidCode} {abs.cidDescription ? `- ${abs.cidDescription}` : ''}
                                                                     </p>
                                                                 )}
@@ -1220,6 +1400,27 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                         <TabsContent value="historico" className="mt-0 space-y-6">
                             {loading ? renderLoading() : (
                                 <div className="space-y-6">
+                                    {/* Linha do Tempo Funcional & Disciplinar Unificada */}
+                                    <div className="space-y-3 pb-6 border-b border-gray-800">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Calendar size={18} className="text-seguranca-yellow" />
+                                                <h3 className="text-base font-semibold text-white">Linha do Tempo Funcional & Disciplinar</h3>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-gray-400">
+                                            Histórico cronológico completo unificando admissão, atestados médicos entregues, advertências/suspensões disciplinares e alterações.
+                                        </p>
+                                        <EmployeeUnifiedTimeline
+                                            employee={displayEmployee}
+                                            absences={absences}
+                                            occurrences={occurrences}
+                                            vacations={vacations}
+                                            historyItems={historyItems}
+                                            employmentPeriods={employmentPeriods}
+                                        />
+                                    </div>
+
                                     {/* Seção 1: Períodos / Vínculos Empregatícios */}
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">

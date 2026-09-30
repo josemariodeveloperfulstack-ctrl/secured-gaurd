@@ -15,7 +15,7 @@ import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/axios';
-import departmentService from '@/services/departmentService';
+import departmentService, { filterCompanyDepartments, isValidSectorName } from '@/services/departmentService';
 
 export interface ContaAPagar {
   id?: string;
@@ -75,6 +75,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   const [siglas, setSiglas] = useState<string[]>([]);
   const [unidades, setUnidades] = useState<any[]>([]);
   const [setoresSugeridos, setSetoresSugeridos] = useState<string[]>([]);
+  const [workSectorAutoFilled, setWorkSectorAutoFilled] = useState(false);
   
   const [formData, setFormData] = useState<ContaAPagar>({
     dataEmissao: new Date(),
@@ -279,32 +280,35 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           setUnidades([]);
         });
 
-      // Carregar Setores de Trabalho do banco de dados (Departamentos + Postos de Trabalho)
+      // Carregar Setores de Trabalho do banco de dados (apenas Postos de Trabalho e Departamentos válidos)
       Promise.allSettled([
         departmentService.listActive(),
         api.get('/work-posts/all').catch(() => api.get('/work-posts'))
       ]).then(([deptResult, postsResult]) => {
-        const deptNames: string[] = [];
-        if (deptResult.status === 'fulfilled' && Array.isArray(deptResult.value)) {
-          deptResult.value.forEach((d: any) => {
-            if (d?.name && typeof d.name === 'string') {
-              deptNames.push(d.name.trim());
-            }
-          });
-        }
+        // Departamentos: aplicar filtro para remover dados inválidos (estado civil, etc.)
+        const rawDepts = deptResult.status === 'fulfilled' && Array.isArray(deptResult.value)
+          ? deptResult.value
+          : [];
+        const deptNames: string[] = filterCompanyDepartments(rawDepts)
+          .map((d: any) => d.name?.trim())
+          .filter(Boolean);
 
+        // Postos de Trabalho: usar apenas o campo "name" do posto, filtrar inválidos
         const postNames: string[] = [];
         if (postsResult.status === 'fulfilled') {
           const raw = postsResult.value?.data;
           const list = Array.isArray(raw) ? raw : (raw?.content || []);
           list.forEach((p: any) => {
-            if (p?.name && typeof p.name === 'string') {
-              postNames.push(p.name.trim());
+            const n = p?.name?.trim();
+            if (n && typeof n === 'string' && isValidSectorName(n)) {
+              postNames.push(n);
             }
           });
         }
 
-        const combined = Array.from(new Set([...deptNames, ...postNames])).filter(Boolean).sort((a, b) => a.localeCompare(b));
+        const combined = Array.from(new Set([...deptNames, ...postNames]))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b, 'pt-BR'));
         setSetoresSugeridos(combined);
       }).catch(err => {
         console.warn('Erro ao carregar setores de trabalho:', err);
@@ -391,6 +395,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
         setSelectedSubcategoria(null);
         setValorDisplay('R$ 0,00');
         setPaymentConfirmDate(new Date());
+        setWorkSectorAutoFilled(false);
       }
     }
   }, [editMode, initialData, open]);
@@ -704,17 +709,23 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
             {/* Setor de Trabalho */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+              <label className={`text-sm font-medium flex items-center gap-2 ${workSectorAutoFilled ? 'text-emerald-400' : 'text-seguranca-lightgray'}`}>
                 <Tag size={14} />
                 Setor de Trabalho
+                {workSectorAutoFilled && formData.workSector && (
+                  <span className="text-xs bg-emerald-400/10 border border-emerald-400/30 text-emerald-400 px-2 py-0.5 rounded-full font-normal">
+                    Auto-preenchido
+                  </span>
+                )}
               </label>
               <Select
                 value={formData.workSector || 'none'}
                 onValueChange={(value) => {
                   handleInputChange('workSector', value === 'none' ? '' : value);
+                  setWorkSectorAutoFilled(false); // usuário alterou manualmente
                 }}
               >
-                <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                <SelectTrigger className={`border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow ${workSectorAutoFilled ? 'border-emerald-400/40' : ''}`}>
                   <SelectValue placeholder="Selecione o setor de trabalho" />
                 </SelectTrigger>
                 <SelectContent className="bg-seguranca-black border-gray-600 max-h-60">
@@ -734,6 +745,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 </SelectContent>
               </Select>
             </div>
+
 
             {/* Tipo */}
             <div className="space-y-2">
@@ -908,11 +920,18 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                   )}
                   <EmployeeCombobox
                     value={formData.employeeId || ''}
-                    onChange={(value) => handleInputChange('employeeId', value)}
+                    onChange={(value) => {
+                      handleInputChange('employeeId', value);
+                      // Se limpar o funcionário, remove o setor auto-preenchido
+                      if (!value) {
+                        setWorkSectorAutoFilled(false);
+                      }
+                    }}
                     companyId={formData.empresaId || undefined}
                     placeholder="Busque o funcionário pelo nome"
                     onEmployeeSelect={(emp) => {
                       handleInputChange('employeeId', emp.id);
+                      // Preencher empresa automaticamente se não estiver definida
                       if (emp.companyId && !formData.empresaId) {
                         const match = empresas.find((e: any) => String(e.id) === String(emp.companyId));
                         if (match) {
@@ -921,14 +940,25 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                           handleInputChange('companySigla', match.sigla || match.name);
                         }
                       }
-                      if (!formData.workSector) {
-                        const suggestedSector = (emp as any).workPostName || (emp as any).workPost?.name || (emp as any).departmentName || (emp as any).department?.name;
-                        if (suggestedSector) {
-                          handleInputChange('workSector', suggestedSector);
-                        }
+                      // SEMPRE sobrescreve o setor de trabalho com o do funcionário selecionado
+                      const suggestedSector = (emp as any).workPostName
+                        || (emp as any).workPost?.name
+                        || (emp as any).departmentName
+                        || (emp as any).department?.name;
+                      if (suggestedSector) {
+                        handleInputChange('workSector', suggestedSector);
+                        setWorkSectorAutoFilled(true);
+                      } else {
+                        setWorkSectorAutoFilled(false);
                       }
                     }}
                   />
+                  {workSectorAutoFilled && formData.workSector && (
+                    <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+                      <CheckCircle size={12} />
+                      Setor de trabalho preenchido automaticamente do cadastro do funcionário.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

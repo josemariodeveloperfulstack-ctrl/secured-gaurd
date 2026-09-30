@@ -161,6 +161,7 @@ export function EmployeeCombobox({
             registrationNumber: emp.registrationNumber,
             hireDate: emp.hireDate,
             companyId: emp.company?.id,
+            companyName: emp.company?.name,
             companySigla: emp.company?.sigla,
             positionName: emp.position?.name,
             unitName: emp.unit?.name,

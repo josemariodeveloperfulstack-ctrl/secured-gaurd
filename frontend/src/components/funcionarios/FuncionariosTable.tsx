@@ -85,6 +85,18 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
       'SUSPENDED': {
         label: 'Suspenso',
         className: 'bg-orange-500/20 text-orange-300 border-orange-500/30'
+      },
+      'SUB_JUDICE': {
+        label: 'Sub Júdice',
+        className: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+      },
+      'INSS_LEAVE': {
+        label: 'Afastamento INSS',
+        className: 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+      },
+      'UNEXCUSED_ABSENCE': {
+        label: 'Abandono / Falta',
+        className: 'bg-red-600/30 text-red-300 border-red-500/50'
       }
     };
 

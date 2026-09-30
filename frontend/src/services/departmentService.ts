@@ -29,6 +29,31 @@ export function filterCompanyDepartments(departments: Department[]): Department[
   });
 }
 
+/**
+ * Valida se um nome é um setor de trabalho legítimo.
+ * Rejeita: estado civil, nomes de empresa (CNPJ/SA/LTDA), strings muito longas.
+ */
+export function isValidSectorName(name: string): boolean {
+  if (!name || name.trim().length === 0) return false;
+  const upper = name.trim().toUpperCase();
+
+  // Rejeitar estado civil e outros dados inválidos conhecidos
+  if (INVALID_DEPARTMENT_NAMES.has(upper)) return false;
+
+  // Rejeitar strings que parecem nomes de empresa (contêm padrões de CNPJ / sufixos jurídicos)
+  const empresaSuffixes = [' SA', ' S.A', ' S/A', ' LTDA', ' ME ', ' EPP', ' EIRELI', ' SS '];
+  if (empresaSuffixes.some(s => upper.includes(s))) return false;
+
+  // Rejeitar strings muito longas (setores geralmente são curtos)
+  if (name.trim().length > 60) return false;
+
+  // Rejeitar se contiver números de CNPJ (padrão: XX.XXX.XXX/XXXX-XX)
+  if (/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/.test(name)) return false;
+
+  return true;
+}
+
+
 export const departmentService = {
   async listActive(): Promise<Department[]> {
     const { data } = await api.get('/api/departments/active');

@@ -9,13 +9,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.Vacation;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.VacationStatus;
 import com.z7design.secured_guard.model.enums.VacationType;
+import com.z7design.secured_guard.model.Holiday;
 import com.z7design.secured_guard.repository.VacationRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.HolidayRepository;
+import com.z7design.secured_guard.util.PeriodoAquisitivoUtil;
+import com.z7design.secured_guard.util.BrazilianHolidaysUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,10 +31,12 @@ public class VacationService {
     private final VacationRepository vacationRepository;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
+    private final HolidayRepository holidayRepository;
     
     @Transactional
     public Vacation create(Vacation vacation) {
         validateVacationDates(vacation);
+        validatePeriodoAquisitivo(vacation);
         calculateVacationDays(vacation);
         if (vacation.getStatus() == null) {
             vacation.setStatus(VacationStatus.PENDING);
@@ -37,7 +44,34 @@ public class VacationService {
         if (vacation.getVacationType() == null) {
             vacation.setVacationType(VacationType.NORMAL);
         }
+        if (vacation.getPeriodoAquisitivo() == null || vacation.getPeriodoAquisitivo().isBlank()) {
+            vacation.setPeriodoAquisitivo(calcularPeriodoAquisitivo(vacation));
+        }
         return vacationRepository.save(vacation);
+    }
+
+    /**
+     * O sistema informa quando o funcionário ainda não completou o período
+     * aquisitivo (admissão + 12 meses) e impede o lançamento antes dessa data.
+     */
+    private void validatePeriodoAquisitivo(Vacation vacation) {
+        Employee employee = vacation.getEmployee();
+        if (employee == null || employee.getHireDate() == null) {
+            return;
+        }
+        LocalDate disponivelEm = employee.getHireDate().plusYears(1);
+        if (vacation.getStartDate().isBefore(disponivelEm)) {
+            throw new IllegalArgumentException(
+                "O funcionário " + employee.getName() + " ainda não possui período aquisitivo de férias. "
+                    + "Período disponível a partir de " + PeriodoAquisitivoUtil.formatar(disponivelEm) + ".");
+        }
+    }
+
+    /** Período aquisitivo derivado da admissão, considerando a data de início das férias. */
+    private String calcularPeriodoAquisitivo(Vacation vacation) {
+        Employee employee = vacation.getEmployee();
+        LocalDate hireDate = employee != null ? employee.getHireDate() : null;
+        return PeriodoAquisitivoUtil.calcular(hireDate, vacation.getStartDate());
     }
     
     @Transactional
@@ -133,6 +167,24 @@ public class VacationService {
         
         if (vacation.getStartDate().isBefore(LocalDate.now())) {
             throw new IllegalArgumentException("Data de início não pode ser anterior à data atual");
+        }
+
+        // Validação rigorosa do Art. 134, § 3º da CLT (Bloqueio DSR e 2 dias antes de feriados)
+        List<Holiday> dbHolidays = holidayRepository.findByDateBetween(
+            vacation.getStartDate().minusDays(3), 
+            vacation.getStartDate().plusDays(4)
+        );
+        List<BrazilianHolidaysUtil.HolidayInfo> customList = dbHolidays.stream()
+            .map(h -> new BrazilianHolidaysUtil.HolidayInfo(h.getDate(), h.getName(), h.getType() != null ? h.getType().name() : "CUSTOM"))
+            .toList();
+
+        BrazilianHolidaysUtil.ValidationResult result = BrazilianHolidaysUtil.validateStartDateCLT(
+            vacation.getStartDate(), 
+            customList
+        );
+
+        if (!result.valid()) {
+            throw new IllegalArgumentException(result.reason());
         }
     }
     

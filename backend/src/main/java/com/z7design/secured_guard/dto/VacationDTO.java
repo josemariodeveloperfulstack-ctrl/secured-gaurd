@@ -1,8 +1,10 @@
 package com.z7design.secured_guard.dto;
 
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.Vacation;
 import com.z7design.secured_guard.model.enums.VacationStatus;
 import com.z7design.secured_guard.model.enums.VacationType;
+import com.z7design.secured_guard.util.PeriodoAquisitivoUtil;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,6 +28,9 @@ public class VacationDTO {
     private Integer remainingDays;
     private VacationStatus status;
     private VacationType vacationType;
+    private String periodoAquisitivo;
+    private String empresa;
+    private String setor;
     private UUID approvedById;
     private String approvedByName;
     private LocalDate approvalDate;
@@ -33,16 +38,22 @@ public class VacationDTO {
     private LocalDateTime updatedAt;
 
     public static VacationDTO fromEntity(Vacation vacation) {
+        Employee employee = vacation.getEmployee();
         return VacationDTO.builder()
                 .id(vacation.getId())
-                .employeeId(vacation.getEmployee() != null ? vacation.getEmployee().getId() : null)
-                .employeeName(vacation.getEmployee() != null ? vacation.getEmployee().getName() : "Funcionário removido")
+                .employeeId(employee != null ? employee.getId() : null)
+                .employeeName(employee != null ? employee.getName() : "Funcionário removido")
                 .startDate(vacation.getStartDate())
                 .endDate(vacation.getEndDate())
                 .daysTaken(vacation.getDaysTaken())
                 .remainingDays(vacation.getRemainingDays())
                 .status(vacation.getStatus())
                 .vacationType(vacation.getVacationType())
+                .periodoAquisitivo(vacation.getPeriodoAquisitivo() != null ? vacation.getPeriodoAquisitivo()
+                        : PeriodoAquisitivoUtil.calcular(employee != null ? employee.getHireDate() : null,
+                                vacation.getStartDate()))
+                .empresa(safeCompanySigla(employee))
+                .setor(safeDepartmentName(employee))
                 .approvedById(vacation.getApprovedBy() != null ? vacation.getApprovedBy().getId() : null)
                 .approvedByName(vacation.getApprovedBy() != null ? vacation.getApprovedBy().getName() : null)
                 .approvalDate(vacation.getApprovalDate())
@@ -60,7 +71,30 @@ public class VacationDTO {
                 .remainingDays(this.remainingDays)
                 .status(this.status)
                 .vacationType(this.vacationType != null ? this.vacationType : VacationType.NORMAL)
+                .periodoAquisitivo(this.periodoAquisitivo)
                 .approvalDate(this.approvalDate)
                 .build();
+    }
+
+    private static String safeCompanySigla(Employee employee) {
+        if (employee == null) {
+            return null;
+        }
+        try {
+            return employee.getCompany() != null ? employee.getCompany().getSigla() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String safeDepartmentName(Employee employee) {
+        if (employee == null) {
+            return null;
+        }
+        try {
+            return employee.getDepartment() != null ? employee.getDepartment().getName() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

@@ -76,6 +76,9 @@ public class Vacation {
     @Column(name = "vacation_type")
     @Builder.Default
     private VacationType vacationType = VacationType.NORMAL;
+
+    @Column(name = "periodo_aquisitivo", length = 20)
+    private String periodoAquisitivo;
     
     @ManyToOne
     @NotFound(action = NotFoundAction.IGNORE)

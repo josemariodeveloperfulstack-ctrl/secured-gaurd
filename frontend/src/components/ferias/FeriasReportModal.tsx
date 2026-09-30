@@ -30,15 +30,23 @@ interface FeriasReportModalProps {
 
 interface ReportFilters {
   employeeId: string;
+  empresa: string;
   status: string;
   tipo: string;
   dataInicio: string;
   dataFim: string;
 }
 
+const EMPRESAS = [
+  { value: 'VIG', label: 'VIG - Vigilância Patrimonial' },
+  { value: 'ADM', label: 'ADM - Administração & Gestão' },
+  { value: 'TERC', label: 'TERC - Terceirização & Serviços' },
+];
+
 const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }) => {
   const [filters, setFilters] = useState<ReportFilters>({
     employeeId: '',
+    empresa: '',
     status: '',
     tipo: '',
     dataInicio: '',
@@ -73,6 +81,7 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
 
       const reportFilters = {
         employeeId: filters.employeeId || undefined,
+        empresa: filters.empresa || undefined,
         status: filters.status || undefined,
         tipo: filters.tipo || undefined,
         dataInicio: filters.dataInicio || undefined,
@@ -243,6 +252,30 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="empresa" className="text-gray-300 text-sm">
+                    Empresa
+                  </Label>
+                  <Select
+                    value={filters.empresa || 'all'}
+                    onValueChange={(value) => handleFilterChange('empresa', value === 'all' ? '' : value)}
+                  >
+                    <SelectTrigger className="bg-gray-900/50 border-gray-600 text-white">
+                      <SelectValue placeholder="Todas as empresas" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-900 border-gray-600">
+                      <SelectItem value="all" className="text-white hover:bg-gray-700">
+                        Todas as empresas (VIG, ADM e TERC)
+                      </SelectItem>
+                      {EMPRESAS.map((empresa) => (
+                        <SelectItem key={empresa.value} value={empresa.value} className="text-white hover:bg-gray-700">
+                          {empresa.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="employeeId" className="text-gray-300 text-sm">
                     Funcionário

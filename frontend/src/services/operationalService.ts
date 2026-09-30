@@ -25,6 +25,8 @@ export interface VacationCoverage {
 }
 
 export interface CreateVacationCoverageDTO {
+  /** Vincula a cobertura a um lançamento de férias já existente */
+  vacationId?: string;
   employeeId: string;
   substituteEmployeeId?: string;
   startDate: string;
@@ -177,6 +179,7 @@ class OperationalService {
   async createVacationCoverage(data: CreateVacationCoverageDTO): Promise<VacationCoverage> {
     // Enviar DTO simples com IDs
     const payload = {
+      vacationId: data.vacationId || null,
       employeeId: data.employeeId,
       substituteEmployeeId: data.substituteEmployeeId || null,
       startDate: data.startDate,

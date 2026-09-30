@@ -3,9 +3,49 @@ import api from '@/lib/axios';
 export type MedicalDocumentType =
   | 'ATESTADO'
   | 'DECLARACAO_COMPARECIMENTO'
+  | 'ATESTADO_ACOMPANHAMENTO'
+  | 'ATESTADO_APTIDAO_SANIDADE'
+  | 'AFASTAMENTO_DOENCA_ACIDENTE'
+  | 'AFASTAMENTO_INSS'
+  | 'ACIDENTE_TRABALHO'
+  | 'LICENCA_MATERNIDADE_PATERNIDADE'
+  | 'LICENCA_GALA_MATRIMONIAL'
+  | 'TESTEMUNHA_JUDICIAL'
+  | 'PROCESSO_TRABALHISTA'
   | 'DECLARACAO_MEDICA'
   | 'CAT'
   | 'AFASTAMENTO';
+
+export const MEDICAL_FORM_TYPES: { value: MedicalDocumentType; label: string }[] = [
+  { value: 'ATESTADO', label: 'Atestado de Afastamento / Doença' },
+  { value: 'DECLARACAO_COMPARECIMENTO', label: 'Declaração de Comparecimento' },
+  { value: 'ATESTADO_ACOMPANHAMENTO', label: 'Atestado de Acompanhamento' },
+  { value: 'ATESTADO_APTIDAO_SANIDADE', label: 'Atestado de Aptidão Física ou Sanidade' },
+  { value: 'AFASTAMENTO_DOENCA_ACIDENTE', label: 'Afastamento por Doença ou Acidente' },
+  { value: 'AFASTAMENTO_INSS', label: 'Afastamento pelo INSS' },
+  { value: 'ACIDENTE_TRABALHO', label: 'Acidente de Trabalho' },
+  { value: 'LICENCA_MATERNIDADE_PATERNIDADE', label: 'Licença-Maternidade e Paternidade' },
+  { value: 'LICENCA_GALA_MATRIMONIAL', label: 'Licença Gala ou Matrimonial' },
+  { value: 'TESTEMUNHA_JUDICIAL', label: 'Afastamento como Testemunha Judicial' },
+  { value: 'PROCESSO_TRABALHISTA', label: 'Processo Trabalhista' },
+];
+
+export const MEDICAL_TYPE_LABELS: Record<MedicalDocumentType, string> = {
+  ATESTADO: 'Atestado de Afastamento / Doença',
+  DECLARACAO_COMPARECIMENTO: 'Declaração de Comparecimento',
+  ATESTADO_ACOMPANHAMENTO: 'Atestado de Acompanhamento',
+  ATESTADO_APTIDAO_SANIDADE: 'Atestado de Aptidão Física ou Sanidade',
+  AFASTAMENTO_DOENCA_ACIDENTE: 'Afastamento por Doença ou Acidente',
+  AFASTAMENTO_INSS: 'Afastamento pelo INSS',
+  ACIDENTE_TRABALHO: 'Acidente de Trabalho',
+  LICENCA_MATERNIDADE_PATERNIDADE: 'Licença-Maternidade e Paternidade',
+  LICENCA_GALA_MATRIMONIAL: 'Licença Gala ou Matrimonial',
+  TESTEMUNHA_JUDICIAL: 'Afastamento como Testemunha Judicial',
+  PROCESSO_TRABALHISTA: 'Processo Trabalhista',
+  DECLARACAO_MEDICA: 'Declaração Médica',
+  CAT: 'CAT',
+  AFASTAMENTO: 'Afastamento',
+};
 
 export interface MedicalDocument {
   id: string;
@@ -60,14 +100,6 @@ export interface MedicalDashboard {
   cidMaisRecorrente?: string;
   porTipo?: Record<string, number>;
 }
-
-export const MEDICAL_TYPE_LABELS: Record<MedicalDocumentType, string> = {
-  ATESTADO: 'Atestado Médico',
-  DECLARACAO_COMPARECIMENTO: 'Declaração de Comparecimento',
-  DECLARACAO_MEDICA: 'Declaração Médica',
-  CAT: 'CAT',
-  AFASTAMENTO: 'Afastamento',
-};
 
 export interface CidSuggestion {
   code: string;

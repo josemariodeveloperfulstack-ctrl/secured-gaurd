@@ -87,3 +87,16 @@ payslips_output/
 
 # Docker
 .dockerignore
+
+# Backups & Temporary scripts
+backups/
+backend/backups/
+scratch/
+*.token.json
+token.json
+backend/token.json
+backend_cmdline.txt
+test_post_vacations.js
+task_*.md
+
+

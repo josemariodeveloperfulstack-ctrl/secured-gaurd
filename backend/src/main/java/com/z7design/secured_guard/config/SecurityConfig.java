@@ -326,6 +326,13 @@ public class SecurityConfig {
                                                                 "CONTRACTS_CREATE", "CONTRACTS_DELETE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_GESTOR",
                                                                 "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL")
+                                                // Templates (minutas) de contrato com 14 cláusulas - mesmas permissões
+                                                // de contratos
+                                                .requestMatchers("/api/company-contract-templates/**")
+                                                .hasAnyAuthority("CONTRACTS_READ", "CONTRACTS_WRITE",
+                                                                "CONTRACTS_CREATE", "CONTRACTS_DELETE",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_GESTOR",
+                                                                "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL")
                                                 // Endpoints de estoque - requerem permissões específicas ou
                                                 // autenticação
                                                 .requestMatchers("/api/stock/**")

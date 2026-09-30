@@ -3,12 +3,15 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.dto.FeriasReportDTO;
 import com.z7design.secured_guard.model.Absence;
 import com.z7design.secured_guard.model.Vacation;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.enums.VacationStatus;
+import com.z7design.secured_guard.model.enums.VacationType;
 import com.z7design.secured_guard.repository.AbsenceRepository;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.VacationRepository;
+import com.z7design.secured_guard.util.PeriodoAquisitivoUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -24,15 +27,27 @@ import com.z7design.secured_guard.dto.ReportLayoutConfig;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class FeriasReportService {
+
+    /** Tipos de afastamento do frontend (PT) mapeados para os enums do backend. */
+    private static final Map<String, List<String>> TIPOS_AFASTAMENTO_FRONTEND = Map.of(
+            "ATESTADO", List.of("SICK_LEAVE", "MEDICAL_APPOINTMENT"),
+            "LICENCA_MEDICA", List.of("PERSONAL_LEAVE"),
+            "LICENCA_MATERNIDADE", List.of("PERSONAL_LEAVE"),
+            "LICENCA_PATERNIDADE", List.of("PERSONAL_LEAVE"),
+            "SUSPENSAO", List.of("UNAUTHORIZED"),
+            "OUTROS", List.of("OTHER", "WEDDING", "FAMILY_EMERGENCY"));
 
     private final VacationRepository vacationRepository;
     private final AbsenceRepository absenceRepository;
@@ -110,7 +125,7 @@ public class FeriasReportService {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Relatório de Férias");
             Company company = resolveCompany();
-            int lastColumn = 7;
+            int lastColumn = 9;
             int rowIndex = excelReportLayoutService.addHeader(sheet, workbook, company, "RELATÓRIO DE FÉRIAS",
                     lastColumn);
 
@@ -124,7 +139,7 @@ public class FeriasReportService {
             fillFeriasData(sheet, workbook, vacations, dataStartRow);
 
             // Auto-size columns
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0; i < 10; i++) {
                 sheet.autoSizeColumn(i);
             }
 
@@ -176,7 +191,7 @@ public class FeriasReportService {
 
             // Aba de Férias
             Sheet feriasSheet = workbook.createSheet("Férias");
-            int feriasLastColumn = 7;
+            int feriasLastColumn = 9;
             int feriasRowIndex = excelReportLayoutService.addHeader(feriasSheet, workbook, company,
                     "RELATÓRIO DE FÉRIAS", feriasLastColumn);
             int feriasDataStart = createFeriasHeader(feriasSheet, workbook, feriasRowIndex);
@@ -204,7 +219,7 @@ public class FeriasReportService {
 
             // Auto-size columns
             for (Sheet sheet : workbook) {
-                for (int i = 0; i < 8; i++) {
+                for (int i = 0; i < 10; i++) {
                     sheet.autoSizeColumn(i);
                 }
             }
@@ -227,8 +242,8 @@ public class FeriasReportService {
         headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
         headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
-        String[] headers = { "ID", "Funcionário", "Período Aquisitivo", "Data Início", "Data Fim", "Dias", "Status",
-                "Observações" };
+        String[] headers = { "ID", "Funcionário", "Empresa", "Setor de Trabalho", "Período Aquisitivo",
+                "Data Início", "Data Fim", "Dias", "Status", "Data Aprovação" };
 
         for (int i = 0; i < headers.length; i++) {
             Cell cell = headerRow.createCell(i);
@@ -266,26 +281,63 @@ public class FeriasReportService {
         int rowNum = startRow;
         for (Vacation vacation : vacations) {
             Row row = sheet.createRow(rowNum++);
+            Employee employee = vacation.getEmployee();
 
             row.createCell(0).setCellValue(vacation.getId().toString());
-            row.createCell(1).setCellValue(vacation.getEmployee().getName());
-            row.createCell(2)
-                    .setCellValue(vacation.getStartDate().getYear() + "/" + (vacation.getStartDate().getYear() + 1));
+            row.createCell(1).setCellValue(employee != null ? employee.getName() : "Funcionário removido");
+            row.createCell(2).setCellValue(safeCompanySigla(employee));
+            row.createCell(3).setCellValue(safeDepartmentName(employee));
+            row.createCell(4).setCellValue(periodoAquisitivo(vacation));
 
-            Cell startDateCell = row.createCell(3);
+            Cell startDateCell = row.createCell(5);
             startDateCell.setCellValue(vacation.getStartDate());
             startDateCell.setCellStyle(dateStyle);
 
-            Cell endDateCell = row.createCell(4);
+            Cell endDateCell = row.createCell(6);
             endDateCell.setCellValue(vacation.getEndDate());
             endDateCell.setCellStyle(dateStyle);
 
-            row.createCell(5).setCellValue(vacation.getDaysTaken());
-            row.createCell(6).setCellValue(vacation.getStatus().toString());
-            row.createCell(7)
+            row.createCell(7).setCellValue(vacation.getDaysTaken());
+            row.createCell(8).setCellValue(vacation.getStatus().toString());
+            row.createCell(9)
                     .setCellValue(vacation.getApprovalDate() != null
                             ? vacation.getApprovalDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                             : "");
+        }
+    }
+
+    private String periodoAquisitivo(Vacation vacation) {
+        if (vacation.getPeriodoAquisitivo() != null && !vacation.getPeriodoAquisitivo().isBlank()) {
+            return vacation.getPeriodoAquisitivo();
+        }
+        Employee employee = vacation.getEmployee();
+        return PeriodoAquisitivoUtil.calcular(employee != null ? employee.getHireDate() : null,
+                vacation.getStartDate());
+    }
+
+    private String safeCompanySigla(Employee employee) {
+        if (employee == null) {
+            return "";
+        }
+        try {
+            return employee.getCompany() != null && employee.getCompany().getSigla() != null
+                    ? employee.getCompany().getSigla()
+                    : "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private String safeDepartmentName(Employee employee) {
+        if (employee == null) {
+            return "";
+        }
+        try {
+            return employee.getDepartment() != null && employee.getDepartment().getName() != null
+                    ? employee.getDepartment().getName()
+                    : "";
+        } catch (Exception e) {
+            return "";
         }
     }
 
@@ -388,8 +440,10 @@ public class FeriasReportService {
                 document.add(
                         new Paragraph("Nenhum registro de férias encontrado.").setTextAlignment(TextAlignment.CENTER));
             } else {
-                Table table = new Table(new float[] { 3, 2, 2, 2, 2 }).useAllAvailableWidth();
+                Table table = new Table(new float[] { 2.5f, 1.2f, 1.5f, 1.5f, 1.5f, 1, 1.3f }).useAllAvailableWidth();
                 table.addHeaderCell(createPDFHeaderCell("Funcionário"));
+                table.addHeaderCell(createPDFHeaderCell("Empresa"));
+                table.addHeaderCell(createPDFHeaderCell("Setor"));
                 table.addHeaderCell(createPDFHeaderCell("Data Início"));
                 table.addHeaderCell(createPDFHeaderCell("Data Fim"));
                 table.addHeaderCell(createPDFHeaderCell("Dias"));
@@ -397,7 +451,10 @@ public class FeriasReportService {
 
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
                 for (Vacation v : vacations) {
-                    table.addCell(createPDFCell(v.getEmployee().getName()));
+                    Employee employee = v.getEmployee();
+                    table.addCell(createPDFCell(employee != null ? employee.getName() : "Funcionário removido"));
+                    table.addCell(createPDFCell(safeCompanySigla(employee)));
+                    table.addCell(createPDFCell(safeDepartmentName(employee)));
                     table.addCell(createPDFCell(v.getStartDate().format(formatter)));
                     table.addCell(createPDFCell(v.getEndDate().format(formatter)));
                     table.addCell(createPDFCell(String.valueOf(v.getDaysTaken())));
@@ -468,12 +525,86 @@ public class FeriasReportService {
     }
 
     private List<Vacation> getFeriasData(FeriasReportDTO filters) {
-        // ... (existing logic or improvement)
-        return vacationRepository.findAll();
+        List<Vacation> vacations = vacationRepository.findAllWithEmployee();
+        if (filters == null) {
+            return vacations;
+        }
+
+        UUID employeeId = filters.getEmployeeId();
+        String status = normalizar(filters.getStatus());
+        String tipo = normalizar(filters.getTipo());
+        String empresa = normalizar(filters.getEmpresa());
+        LocalDate dataInicio = filters.getDataInicio();
+        LocalDate dataFim = filters.getDataFim();
+
+        return vacations.stream()
+                .filter(v -> employeeId == null
+                        || (v.getEmployee() != null && employeeId.equals(v.getEmployee().getId())))
+                .filter(v -> status == null || status.equalsIgnoreCase("TODOS")
+                        || (v.getStatus() != null && status.equalsIgnoreCase(v.getStatus().name())))
+                .filter(v -> tipo == null || tipo.equalsIgnoreCase("TODOS") || tipoFeriasMatches(v, tipo))
+                .filter(v -> dataInicio == null || !v.getStartDate().isBefore(dataInicio))
+                .filter(v -> dataFim == null || !v.getStartDate().isAfter(dataFim))
+                .filter(v -> empresa == null || empresa.equalsIgnoreCase("TODAS")
+                        || empresa.equalsIgnoreCase(safeCompanySigla(v.getEmployee())))
+                .collect(Collectors.toList());
     }
 
     private List<Absence> getAfastamentosData(FeriasReportDTO filters) {
-        // ... (existing logic or improvement)
-        return absenceRepository.findAll();
+        List<Absence> absences = absenceRepository.findAllWithRelationships();
+        if (filters == null) {
+            return absences;
+        }
+
+        UUID employeeId = filters.getEmployeeId();
+        String status = normalizar(filters.getStatus());
+        String tipo = normalizar(filters.getTipo());
+        String empresa = normalizar(filters.getEmpresa());
+        LocalDate dataInicio = filters.getDataInicio();
+        LocalDate dataFim = filters.getDataFim();
+
+        return absences.stream()
+                .filter(a -> employeeId == null
+                        || (a.getEmployee() != null && employeeId.equals(a.getEmployee().getId())))
+                .filter(a -> status == null || status.equalsIgnoreCase("TODOS")
+                        || (a.getStatus() != null && status.equalsIgnoreCase(a.getStatus().name())))
+                .filter(a -> tipo == null || tipo.equalsIgnoreCase("TODOS") || tipoAfastamentoMatches(a, tipo))
+                .filter(a -> dataInicio == null || !a.getAbsenceDate().isBefore(dataInicio))
+                .filter(a -> dataFim == null || !a.getAbsenceDate().isAfter(dataFim))
+                .filter(a -> empresa == null || empresa.equalsIgnoreCase("TODAS")
+                        || empresa.equalsIgnoreCase(safeCompanySigla(a.getEmployee())))
+                .collect(Collectors.toList());
+    }
+
+    private boolean tipoFeriasMatches(Vacation vacation, String tipoFiltro) {
+        VacationType type = vacation.getVacationType();
+        if (type == null) {
+            return tipoFiltro.equalsIgnoreCase("FERIAS_NORMAIS") || tipoFiltro.equalsIgnoreCase("NORMAL");
+        }
+        if (tipoFiltro.equalsIgnoreCase(type.name())) {
+            return true;
+        }
+        return switch (type) {
+            case SOLD -> tipoFiltro.equalsIgnoreCase("FERIAS_VENDIDAS");
+            case PECUNIARY_BONUS -> tipoFiltro.equalsIgnoreCase("ABONO_PECUNIARIO");
+            default -> tipoFiltro.equalsIgnoreCase("FERIAS_NORMAIS");
+        };
+    }
+
+    private boolean tipoAfastamentoMatches(Absence absence, String tipoFiltro) {
+        String atual = absence.getAbsenceType() != null ? absence.getAbsenceType().name() : "";
+        if (tipoFiltro.equalsIgnoreCase(atual)) {
+            return true;
+        }
+        List<String> equivalentes = TIPOS_AFASTAMENTO_FRONTEND.get(tipoFiltro.toUpperCase());
+        return equivalentes != null && equivalentes.contains(atual);
+    }
+
+    private String normalizar(String valor) {
+        if (valor == null) {
+            return null;
+        }
+        String trimmed = valor.trim();
+        return trimmed.isEmpty() || trimmed.equalsIgnoreCase("all") ? null : trimmed;
     }
 }
