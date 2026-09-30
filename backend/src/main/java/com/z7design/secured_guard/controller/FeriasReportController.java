@@ -76,7 +76,8 @@ public class FeriasReportController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) LocalDate dataInicio,
-            @RequestParam(required = false) LocalDate dataFim) {
+            @RequestParam(required = false) LocalDate dataFim,
+            @RequestParam(required = false) String empresa) {
 
         try {
             log.info("Gerando relatório Excel de férias");
@@ -87,6 +88,7 @@ public class FeriasReportController {
                     .tipo(tipo)
                     .dataInicio(dataInicio)
                     .dataFim(dataFim)
+                    .empresa(empresa)
                     .build();
 
             byte[] excelBytes = feriasReportService.generateFeriasExcelReport(filters);
@@ -112,7 +114,8 @@ public class FeriasReportController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) LocalDate dataInicio,
-            @RequestParam(required = false) LocalDate dataFim) {
+            @RequestParam(required = false) LocalDate dataFim,
+            @RequestParam(required = false) String empresa) {
 
         try {
             log.info("Gerando relatório Excel de afastamentos");
@@ -123,6 +126,7 @@ public class FeriasReportController {
                     .tipo(tipo)
                     .dataInicio(dataInicio)
                     .dataFim(dataFim)
+                    .empresa(empresa)
                     .build();
 
             byte[] excelBytes = feriasReportService.generateAfastamentosExcelReport(filters);
@@ -146,7 +150,8 @@ public class FeriasReportController {
     public ResponseEntity<ByteArrayResource> generateConsolidadoExcelReport(
             @RequestParam(required = false) UUID employeeId,
             @RequestParam(required = false) LocalDate dataInicio,
-            @RequestParam(required = false) LocalDate dataFim) {
+            @RequestParam(required = false) LocalDate dataFim,
+            @RequestParam(required = false) String empresa) {
 
         try {
             log.info("Gerando relatório Excel consolidado");
@@ -155,6 +160,7 @@ public class FeriasReportController {
                     .employeeId(employeeId)
                     .dataInicio(dataInicio)
                     .dataFim(dataFim)
+                    .empresa(empresa)
                     .build();
 
             byte[] excelBytes = feriasReportService.generateConsolidadoExcelReport(filters);
@@ -181,7 +187,8 @@ public class FeriasReportController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) LocalDate dataInicio,
-            @RequestParam(required = false) LocalDate dataFim) {
+            @RequestParam(required = false) LocalDate dataFim,
+            @RequestParam(required = false) String empresa) {
 
         try {
             log.info("Gerando relatório PDF de férias");
@@ -192,6 +199,7 @@ public class FeriasReportController {
                     .tipo(tipo)
                     .dataInicio(dataInicio)
                     .dataFim(dataFim)
+                    .empresa(empresa)
                     .build();
 
             byte[] pdfBytes = feriasReportService.generateFeriasPDFReport(filters);
@@ -215,7 +223,8 @@ public class FeriasReportController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) LocalDate dataInicio,
-            @RequestParam(required = false) LocalDate dataFim) {
+            @RequestParam(required = false) LocalDate dataFim,
+            @RequestParam(required = false) String empresa) {
 
         try {
             log.info("Gerando relatório PDF de afastamentos");
@@ -226,6 +235,7 @@ public class FeriasReportController {
                     .tipo(tipo)
                     .dataInicio(dataInicio)
                     .dataFim(dataFim)
+                    .empresa(empresa)
                     .build();
 
             byte[] pdfBytes = feriasReportService.generateAfastamentosPDFReport(filters);

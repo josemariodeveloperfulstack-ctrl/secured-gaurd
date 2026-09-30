@@ -19,6 +19,8 @@ public class FeriasReportDTO {
     private LocalDate dataInicio;
     private LocalDate dataFim;
     private String periodoAquisitivo;
+    /** Sigla da empresa: VIG, ADM ou TERC */
+    private String empresa;
     private Boolean incluirDetalhes;
     private Boolean incluirEstatisticas;
     private String formato; // EXCEL, PDF

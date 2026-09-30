@@ -17,7 +17,9 @@ import { userService } from '@/services/userService';
 import { User } from '@/types/user';
 import { companyService } from '@/services/companyService';
 import { Company } from '@/types/company';
-import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield, Eye, FileSpreadsheet, History, ChevronLeft, ChevronRight, Download, Loader2, Stethoscope, HeartPulse } from 'lucide-react';
+import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield, Eye, FileSpreadsheet, History, ChevronLeft, ChevronRight, Download, Loader2, Stethoscope, HeartPulse, Scale, Gavel } from 'lucide-react';
+import { HistoricoProcessoJudicialCard } from './HistoricoProcessoJudicialCard';
+import { AfastamentoStatusFields } from './AfastamentoStatusFields';
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
@@ -103,6 +105,13 @@ const initialState: CreateEmployeeDTO = {
   registrationNumber: '',
   hireDate: '',
   status: 'ACTIVE',
+  judicialProcessStartDate: '',
+  judicialProcessEndDate: '',
+  judicialProcessNotes: '',
+  inssStartDate: '',
+  inssEndDate: '',
+  absenceStartDate: '',
+  absenceEndDate: '',
   position: {
     id: ''
   },
@@ -4691,16 +4700,41 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <SelectItem value="VACATION" className="hover:bg-gray-700">Férias</SelectItem>
                               <SelectItem value="MATERNITY_LEAVE" className="hover:bg-gray-700">Licença Maternidade</SelectItem>
                               <SelectItem value="MEDICAL_CERTIFICATE" className="hover:bg-gray-700">Atestado</SelectItem>
+                              <SelectItem value="INSS_LEAVE" className="hover:bg-gray-700 text-blue-300 font-medium">🏥 Afastamento INSS</SelectItem>
+                              <SelectItem value="UNEXCUSED_ABSENCE" className="hover:bg-gray-700 text-red-400 font-medium">⚠️ Abandono/Falta</SelectItem>
                               <SelectItem value="TERMINATED" className="hover:bg-gray-700">Demitido</SelectItem>
                               <SelectItem value="SUSPENDED" className="hover:bg-gray-700">Suspenso</SelectItem>
+                              <SelectItem value="SUB_JUDICE" className="hover:bg-gray-700 text-amber-300 font-medium">⚖️ Sub Júdice / Processo Judicial</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
+                        {/* Seletor condicional de Afastamento INSS e Abandono / Faltas */}
+                        <AfastamentoStatusFields
+                          status={form.status || ''}
+                          inssStartDate={form.inssStartDate}
+                          inssEndDate={form.inssEndDate}
+                          absenceStartDate={form.absenceStartDate}
+                          absenceEndDate={form.absenceEndDate}
+                          employeeName={form.name}
+                          employeeCpf={form.cpf}
+                          employeeRegistration={form.registrationNumber}
+                          companyName={form.empresaNome || 'Secured Guard'}
+                          onChange={(updates) => setForm(prev => ({ ...prev, ...updates }))}
+                        />
+
                         {form.status === 'TERMINATED' && (
                           <div className="md:col-span-3 bg-red-900/20 border border-red-500/40 rounded-lg p-3 sm:p-4">
                             <p className="text-red-300 text-sm sm:text-base flex items-center gap-2">
                               <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                               Ao definir o status como Demitido, é obrigatório informar a Data de Demissão na seção de Dados de Cadastro / Admissão.
+                            </p>
+                          </div>
+                        )}
+                        {form.status === 'SUB_JUDICE' && (
+                          <div className="md:col-span-3 bg-amber-950/25 border border-amber-500/40 rounded-lg p-3 sm:p-4">
+                            <p className="text-amber-300 text-sm sm:text-base flex items-center gap-2">
+                              <Scale className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 text-amber-400" />
+                              Ao definir o status como <strong>Sub Júdice / Processo Judicial</strong>, gerencie as datas e a resolução do afastamento no card <strong>Histórico de Processo Judicial</strong> abaixo.
                             </p>
                           </div>
                         )}
@@ -4763,6 +4797,66 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                       </div>
                     </div>
                   </Card>
+
+                  {/* Card de Histórico de Processo Judicial (RF07) */}
+                  <HistoricoProcessoJudicialCard
+                    startDate={form.judicialProcessStartDate}
+                    endDate={form.judicialProcessEndDate}
+                    notes={form.judicialProcessNotes}
+                    status={form.status}
+                    dataRescisao={(form as any).dataRescisao}
+                    onChangeStartDate={(date) => {
+                      setForm(prev => ({
+                        ...prev,
+                        judicialProcessStartDate: date,
+                        ...(date && prev.status !== 'SUB_JUDICE' && prev.status !== 'TERMINATED'
+                          ? { status: 'SUB_JUDICE' }
+                          : {})
+                      }));
+                    }}
+                    onChangeEndDate={(date) => {
+                      setForm(prev => ({
+                        ...prev,
+                        judicialProcessEndDate: date,
+                      }));
+                    }}
+                    onChangeNotes={(notes) => {
+                      setForm(prev => ({
+                        ...prev,
+                        judicialProcessNotes: notes,
+                      }));
+                    }}
+                    onApplyJudicialResolution={({ endDate, isTermination }) => {
+                      if (isTermination) {
+                        setForm(prev => ({
+                          ...prev,
+                          judicialProcessEndDate: endDate,
+                          dataRescisao: endDate,
+                          terminationDate: endDate as any,
+                          status: 'TERMINATED',
+                          terminationReason: (prev as any).terminationReason || 'Demissão pós-decisão judicial',
+                        }));
+                      } else {
+                        setForm(prev => ({
+                          ...prev,
+                          judicialProcessEndDate: endDate,
+                          dataRescisao: '',
+                          terminationDate: undefined as any,
+                          status: 'ACTIVE',
+                          terminationReason: undefined,
+                        }));
+                      }
+                    }}
+                    onClearJudicialProcess={() => {
+                      setForm(prev => ({
+                        ...prev,
+                        judicialProcessStartDate: '',
+                        judicialProcessEndDate: '',
+                        judicialProcessNotes: '',
+                        ...(prev.status === 'SUB_JUDICE' ? { status: 'ACTIVE' } : {})
+                      }));
+                    }}
+                  />
 
                   {/* Seção: FGTS */}
                   <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">

@@ -229,13 +229,17 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({ isOpen, onClose, item, ty
               {action && (
                 <div className="space-y-2">
                   <Label htmlFor="observacoes" className="text-gray-300">
-                    Observações da {action === 'approve' ? 'aprovação' : 'rejeição'}:
+                    {action === 'approve'
+                      ? 'Observações da aprovação (opcional):'
+                      : 'Observações da rejeição:'}
                   </Label>
                   <Textarea
                     id="observacoes"
                     value={observacoes}
                     onChange={(e) => setObservacoes(e.target.value)}
-                    placeholder={`Digite suas observações sobre a ${action === 'approve' ? 'aprovação' : 'rejeição'}...`}
+                    placeholder={action === 'approve'
+                      ? 'A aprovação de férias não exige justificativa. Adicione uma observação apenas se desejar.'
+                      : 'Digite o motivo da rejeição...'}
                     className="bg-gray-900/50 border-gray-600 text-white min-h-[100px]"
                   />
                 </div>
@@ -261,7 +265,7 @@ const ApprovalModal: React.FC<ApprovalModalProps> = ({ isOpen, onClose, item, ty
                       ? 'bg-green-600 hover:bg-green-700' 
                       : 'bg-red-600 hover:bg-red-700'
                     } text-white`}
-                    disabled={loading || !observacoes.trim()}
+                    disabled={loading || (action === 'reject' && !observacoes.trim())}
                   >
                     {loading ? 'Processando...' : 
                       action === 'approve' ? 'Confirmar Aprovação' : 'Confirmar Rejeição'

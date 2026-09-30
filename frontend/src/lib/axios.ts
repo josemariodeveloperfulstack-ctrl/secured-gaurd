@@ -224,7 +224,10 @@ api.interceptors.response.use(
     if (!silent) {
       if (isDebugMode()) {
         console.error('❌ Axios Response Error:', status, error.config?.url);
-        console.error('❌ Error details:', errorData);
+        console.error('❌ Error details:', errorData?.message || errorData?.error || errorData);
+        if (errorData && typeof errorData === 'object') {
+          console.error('❌ Error payload:', JSON.stringify(errorData, null, 2));
+        }
       } else if (status && status >= 400 && status < 500 && errorData && typeof errorData === 'object') {
         const msg =
           (errorData as { message?: string }).message ||

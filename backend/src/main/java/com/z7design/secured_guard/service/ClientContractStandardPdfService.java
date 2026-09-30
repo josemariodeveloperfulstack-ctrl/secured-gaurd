@@ -13,6 +13,7 @@ import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.CompanyConfig;
+import com.z7design.secured_guard.model.CompanyContractTemplate;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.CompanyConfigRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
@@ -42,6 +43,7 @@ public class ClientContractStandardPdfService {
         private final CompanyRepository companyRepository;
         private final CompanyConfigRepository companyConfigRepository;
         private final WorkPostRepository workPostRepository;
+        private final CompanyContractTemplateService companyContractTemplateService;
 
         private static final String DEFAULT_REPORT_TITLE = "Contrato de Prestação de Serviços";
 
@@ -79,7 +81,7 @@ public class ClientContractStandardPdfService {
                                         .companyId(companyId)
                                         .reportTitle(reportTitle)
                                         .topMargin(100f)
-                                        .bottomMargin(50f)
+                                        .bottomMargin(65f) // 50pt + 15pt (20px) de espaçamento adicionado ao topo do rodapé
                                         .includeEmailInFooter(true)
                                         .landscape(false)
                                         .build();
@@ -196,6 +198,12 @@ public class ClientContractStandardPdfService {
                 Company company = companyRepository.findById(companyId)
                                 .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
 
+                // Preview da minuta de 14 cláusulas (ARMADA/DESARMADA/PORTARIA)
+                if (previewRequest.getContractTemplateKey() != null
+                                && !previewRequest.getContractTemplateKey().isBlank()) {
+                        return generateTemplatePreviewPdf(previewRequest, company);
+                }
+
                 CompanyConfig companyConfig = resolveCompanyConfig(previewRequest, company);
 
                 ClientContractRequest request = ClientContractRequest.builder()
@@ -225,7 +233,7 @@ public class ClientContractStandardPdfService {
                                         .companyId(companyId)
                                         .reportTitle(reportTitle)
                                         .topMargin(100f)
-                                        .bottomMargin(50f)
+                                        .bottomMargin(65f) // 50pt + 15pt (20px) de espaçamento adicionado ao topo do rodapé
                                         .includeEmailInFooter(true)
                                         .landscape(false)
                                         .build();
@@ -244,6 +252,117 @@ public class ClientContractStandardPdfService {
                         log.error("Erro ao gerar PDF de preview do template", e);
                         throw new RuntimeException("Erro ao gerar PDF de preview do template", e);
                 }
+        }
+
+        /**
+         * Preview da minuta de 14 cláusulas com placeholders, usando overrides
+         * das cláusulas quando o usuário está editando e ainda não salvou.
+         */
+        private byte[] generateTemplatePreviewPdf(ContractTemplatePreviewRequest previewRequest, Company company) {
+                try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                        PdfWriter writer = new PdfWriter(outputStream);
+
+                        String rawKey = previewRequest.getContractTemplateKey();
+                        String templateKey = (rawKey != null && !rawKey.isBlank())
+                                        ? rawKey.trim().toUpperCase()
+                                        : "ARMADA";
+
+                        CompanyContractTemplate template = companyContractTemplateService
+                                        .resolveEntity(company.getId(), templateKey)
+                                        .orElse(null);
+
+                        // Aplica overrides de cláusulas não salvas (índice 0 = cláusula 1)
+                        CompanyContractTemplate effective = template;
+                        if (previewRequest.getClauses() != null && !previewRequest.getClauses().isEmpty()) {
+                                CompanyContractTemplate base = template != null ? template
+                                                : CompanyContractTemplate.builder()
+                                                                .companyId(company.getId())
+                                                                .templateKey(templateKey)
+                                                                .title(CompanyContractTemplateService.defaultTitle(templateKey))
+                                                                .build();
+                                effective = CompanyContractTemplate.builder()
+                                                .companyId(base.getCompanyId())
+                                                .templateKey(base.getTemplateKey())
+                                                .title(base.getTitle() != null ? base.getTitle() : CompanyContractTemplateService.defaultTitle(templateKey))
+                                                .clause1(getOverride(previewRequest.getClauses(), 0, base.getClause1()))
+                                                .clause2(getOverride(previewRequest.getClauses(), 1, base.getClause2()))
+                                                .clause3(getOverride(previewRequest.getClauses(), 2, base.getClause3()))
+                                                .clause4(getOverride(previewRequest.getClauses(), 3, base.getClause4()))
+                                                .clause5(getOverride(previewRequest.getClauses(), 4, base.getClause5()))
+                                                .clause6(getOverride(previewRequest.getClauses(), 5, base.getClause6()))
+                                                .clause7(getOverride(previewRequest.getClauses(), 6, base.getClause7()))
+                                                .clause8(getOverride(previewRequest.getClauses(), 7, base.getClause8()))
+                                                .clause9(getOverride(previewRequest.getClauses(), 8, base.getClause9()))
+                                                .clause10(getOverride(previewRequest.getClauses(), 9, base.getClause10()))
+                                                .clause11(getOverride(previewRequest.getClauses(), 10, base.getClause11()))
+                                                .clause12(getOverride(previewRequest.getClauses(), 11, base.getClause12()))
+                                                .clause13(getOverride(previewRequest.getClauses(), 12, base.getClause13()))
+                                                .clause14(getOverride(previewRequest.getClauses(), 13, base.getClause14()))
+                                                .build();
+                        } else if (effective == null) {
+                                effective = CompanyContractTemplate.builder()
+                                                .companyId(company.getId())
+                                                .templateKey(templateKey)
+                                                .title(CompanyContractTemplateService.defaultTitle(templateKey))
+                                                .build();
+                        }
+
+                        final CompanyContractTemplate eff = effective;
+                        String signingCity = CompanyDataFormatter.resolveContractSigningCity(company);
+                        if (signingCity == null || signingCity.isBlank()) {
+                                signingCity = company.getCity() != null ? company.getCity() : "";
+                        }
+
+                        ClientContractRequest request = ClientContractRequest.builder()
+                                        .companyId(company.getId())
+                                        .contractTemplateKey(templateKey)
+                                        .clientName("[NOME DO CLIENTE]")
+                                        .clientDocument("[CNPJ/CPF DO CLIENTE]")
+                                        .clientAddress("[ENDEREÇO DO CLIENTE]")
+                                        .contractNumber("PREVIEW")
+                                        .description("[DESCRIÇÃO DOS SERVIÇOS]")
+                                        .value(BigDecimal.ZERO)
+                                        .startDate(LocalDate.now())
+                                        .city(signingCity)
+                                        .contractDate(LocalDate.now())
+                                        .build();
+
+                        String reportTitle = (eff != null && eff.getTitle() != null && !eff.getTitle().isBlank())
+                                        ? eff.getTitle()
+                                        : CompanyContractTemplateService.defaultTitle(templateKey);
+
+                        ReportLayoutConfig config = ReportLayoutConfig.builder()
+                                        .companyId(company.getId())
+                                        .reportTitle(reportTitle)
+                                        .topMargin(100f)
+                                        .bottomMargin(65f) // 50pt + 15pt (20px) de espaçamento adicionado ao topo do rodapé
+                                        .includeEmailInFooter(true)
+                                        .landscape(false)
+                                        .build();
+
+                        DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
+                        Document document = docWithPdf.getDocument();
+
+                        CompanyConfig companyConfig = resolveCompanyConfig(previewRequest, company);
+                        addCompanyContractTemplateContent(document, request, company, companyConfig, eff);
+
+                        return docWithPdf.closeAndGetPdfBytes(outputStream, pdfLayoutService);
+                } catch (ResourceNotFoundException e) {
+                        throw e;
+                } catch (IllegalArgumentException e) {
+                        throw e;
+                } catch (Exception e) {
+                        log.error("Erro ao gerar preview da minuta de 14 cláusulas", e);
+                        throw new RuntimeException("Erro ao gerar preview da minuta", e);
+                }
+        }
+
+        private static String getOverride(java.util.List<String> overrides, int index, String fallback) {
+                if (overrides != null && index < overrides.size()) {
+                        String value = overrides.get(index);
+                        return value != null ? value : fallback;
+                }
+                return fallback;
         }
 
         private CompanyConfig resolveCompanyConfig(ContractTemplatePreviewRequest req, Company company) {
@@ -276,12 +395,162 @@ public class ClientContractStandardPdfService {
         private void addContent(Document document, ClientContractRequest request, Company company,
                         CompanyConfig config) {
                 
+                // Minutas oficiais de 14 cláusulas (ARMADA, DESARMADA, PORTARIA)
+                if (request.getContractTemplateKey() != null && !request.getContractTemplateKey().isBlank()) {
+                        log.info("Gerando contrato com a minuta de 14 cláusulas: {}", request.getContractTemplateKey());
+                        addCompanyContractTemplateContent(document, request, company, config);
+                        return;
+                }
                 if (request.getContractTemplate() != null && !request.getContractTemplate().isBlank()) {
                         log.info("Gerando contrato comercial baseado no template: {}", request.getContractTemplate());
                         addCommercialTemplateContent(document, request, company, config);
                 } else {
                         log.info("Gerando contrato com layout padrão genérico.");
                         generateDefaultLayoutContent(document, request, company, config);
+                }
+        }
+
+        /**
+         * Renderiza a minuta oficial (ARMADA/DESARMADA/PORTARIA) com as 14 cláusulas
+         * do template resolvido para a empresa, qualificação das partes e assinaturas.
+         */
+        private void addCompanyContractTemplateContent(Document document, ClientContractRequest request, Company company,
+                        CompanyConfig config) {
+                addCompanyContractTemplateContent(document, request, company, config, null);
+        }
+
+        private void addCompanyContractTemplateContent(Document document, ClientContractRequest request, Company company,
+                        CompanyConfig config, CompanyContractTemplate templateOverride) {
+                String rawKey = request != null ? request.getContractTemplateKey() : null;
+                String templateKey = (rawKey != null && !rawKey.isBlank())
+                                ? rawKey.trim().toUpperCase()
+                                : "ARMADA";
+                CompanyContractTemplate template = templateOverride != null ? templateOverride
+                                : companyContractTemplateService
+                                                .resolveEntity(request != null ? request.getCompanyId() : company.getId(), templateKey)
+                                                .orElse(null);
+
+                document.add(new Paragraph("").setMarginBottom(10f));
+
+                // Título
+                String title = template != null && template.getTitle() != null && !template.getTitle().isBlank()
+                                ? template.getTitle()
+                                : CompanyContractTemplateService.defaultTitle(templateKey);
+                document.add(new Paragraph(title)
+                                .setBold().setFontSize(13f)
+                                .setTextAlignment(TextAlignment.CENTER)
+                                .setMarginBottom(15f));
+
+                // Qualificação das Partes
+                document.add(new Paragraph("CONTRATANTE:").setBold().setFontSize(10f).setMarginBottom(2f));
+                document.add(new Paragraph(String.format(
+                                "%s%s%s%s%s",
+                                request != null && request.getClientName() != null ? request.getClientName() : "[RAZÃO SOCIAL / NOME]",
+                                request != null && request.getClientDocument() != null ? " — CNPJ/CPF: " + request.getClientDocument() : "",
+                                request != null && request.getClientAddress() != null ? " — Endereço: " + request.getClientAddress() : "",
+                                request != null && request.getClientPhone() != null ? " — Tel: " + request.getClientPhone() : "",
+                                request != null && request.getClientEmail() != null ? " — E-mail: " + request.getClientEmail() : ""))
+                                .setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(8f));
+
+                document.add(new Paragraph("CONTRATADA:").setBold().setFontSize(10f).setMarginBottom(2f));
+                document.add(new Paragraph(String.format(
+                                "%s — CNPJ: %s — Endereço: %s — Tel: %s — E-mail: %s",
+                                company.getName() != null ? company.getName() : "-",
+                                CompanyDataFormatter.formatCnpj(company.getCnpj()),
+                                CompanyDataFormatter.formatFullAddress(company),
+                                company.getPhone() != null ? company.getPhone() : "-",
+                                company.getEmail() != null ? company.getEmail() : "-"))
+                                .setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(12f));
+
+                // Preâmbulo
+                document.add(new Paragraph(
+                                "As PARTES acima qualificadas, por seus representantes legais ao final identificados e assinados, têm entre si justo e acertado o presente Contrato de Prestação de Serviços, que se regerá pelas disposições do Código Civil brasileiro, pelas normas laborais vigentes e pelas seguintes cláusulas e condições pactuadas de comum acordo:")
+                                .setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(12f));
+
+                // Postos de trabalho vinculados (se houver)
+                if (request != null) {
+                        addWorkPostsTable(document, request);
+                }
+
+                // As 14 cláusulas do template
+                if (template != null) {
+                        String[] clauses = {
+                                        template.getClause1(), template.getClause2(), template.getClause3(),
+                                        template.getClause4(), template.getClause5(), template.getClause6(),
+                                        template.getClause7(), template.getClause8(), template.getClause9(),
+                                        template.getClause10(), template.getClause11(), template.getClause12(),
+                                        template.getClause13(), template.getClause14()
+                        };
+                        boolean hasAnyClause = false;
+                        for (String clause : clauses) {
+                                if (clause == null || clause.isBlank()) {
+                                        continue;
+                                }
+                                hasAnyClause = true;
+                                document.add(new Paragraph(clause)
+                                                .setFontSize(9f)
+                                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                                .setMarginBottom(10f));
+                        }
+                        if (!hasAnyClause) {
+                                document.add(new Paragraph("[Nenhuma cláusula cadastrada no modelo: " + templateKey + "]")
+                                                .setFontSize(9f).setItalic());
+                        }
+                } else {
+                        document.add(new Paragraph("[Modelo de contrato não encontrado: " + templateKey + "]")
+                                        .setFontSize(9f).setItalic());
+                }
+
+                // Fechamento e assinaturas
+                document.add(new Paragraph(
+                                "E, por estarem assim justas e contratadas, as PARTES firmam o presente instrumento em 02 (duas) vias de igual teor e forma para um só efeito, perante as duas testemunhas abaixo qualificadas, ou realizam a sua assinatura digital integrada.")
+                                .setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginTop(10f));
+
+                addSignatures(document, request, company, config, company.getName());
+        }
+
+        /**
+         * Tabela de postos de trabalho vinculados (usada nas minutas de 14 cláusulas).
+         */
+        private void addWorkPostsTable(Document document, ClientContractRequest request) {
+                if (request.getWorkPostIds() == null || request.getWorkPostIds().isEmpty()) {
+                        return;
+                }
+                try {
+                        List<WorkPost> posts = workPostRepository.findAllById(request.getWorkPostIds());
+                        if (posts.isEmpty()) {
+                                return;
+                        }
+                        document.add(new Paragraph("Relação de Setores de Trabalho Contratados:").setBold()
+                                        .setFontSize(9f).setMarginBottom(4f));
+                        Table postsTable = new Table(UnitValue.createPercentArray(new float[] { 25, 20, 20, 20, 15 }))
+                                        .useAllAvailableWidth().setMarginBottom(10f);
+                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Setor / Código").setBold().setFontSize(8f)));
+                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Escala / Turno").setBold().setFontSize(8f)));
+                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Posto").setBold().setFontSize(8f)));
+                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Cidade/UF").setBold().setFontSize(8f)));
+                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Efetivo").setBold().setFontSize(8f)));
+                        for (WorkPost post : posts) {
+                                postsTable.addCell(new Cell().add(new Paragraph(post.getName() + " ("
+                                                + (post.getPostCode() != null ? post.getPostCode() : "N/D") + ")")
+                                                .setFontSize(8f)));
+                                postsTable.addCell(new Cell().add(new Paragraph(
+                                                (post.getWorkSchedule() != null ? post.getWorkSchedule() : "-") + "\n"
+                                                                + (post.getShiftDescription() != null ? post.getShiftDescription() : "-"))
+                                                .setFontSize(8f)));
+                                postsTable.addCell(new Cell().add(new Paragraph(
+                                                post.getType() != null ? post.getType().toString() : "-").setFontSize(8f)));
+                                postsTable.addCell(new Cell().add(new Paragraph(
+                                                (post.getCity() != null ? post.getCity() : "-") + "/"
+                                                                + (post.getState() != null ? post.getState() : "-"))
+                                                .setFontSize(8f)));
+                                postsTable.addCell(new Cell().add(new Paragraph(
+                                                post.getRequiredVigilantes() != null ? post.getRequiredVigilantes().toString() : "1")
+                                                .setFontSize(8f)));
+                        }
+                        document.add(postsTable);
+                } catch (Exception e) {
+                        log.error("Erro ao buscar setores de trabalho para o PDF", e);
                 }
         }
 
@@ -578,10 +847,15 @@ public class ClientContractStandardPdfService {
 
         private void addSignatures(Document document, ClientContractRequest request, Company company,
                         CompanyConfig config, String contractorNameOverride) {
-                String city = request.getCity() != null ? request.getCity()
-                                : (config.getCity() != null ? config.getCity() : "_______________");
+                String city = (request != null && request.getCity() != null && !request.getCity().isBlank())
+                                ? request.getCity()
+                                : (config != null && config.getCity() != null && !config.getCity().isBlank())
+                                                ? config.getCity()
+                                                : (company != null && company.getCity() != null && !company.getCity().isBlank())
+                                                                ? company.getCity()
+                                                                : "_______________";
                 String date = formatDateExtended(
-                                request.getContractDate() != null ? request.getContractDate() : LocalDate.now());
+                                request != null && request.getContractDate() != null ? request.getContractDate() : LocalDate.now());
 
                 Paragraph dateLoc = new Paragraph(city + ", " + date)
                                 .setTextAlignment(TextAlignment.RIGHT)

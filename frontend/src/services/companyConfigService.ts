@@ -155,10 +155,35 @@ class CompanyConfigService {
    * Retorna o blob do PDF para abrir em nova aba.
    */
   async generatePreviewPdf(request: ContractTemplatePreviewRequest): Promise<Blob> {
-    const response = await api.post(`${API_BASE_URL}/preview-pdf`, request, {
-      responseType: 'blob',
-    });
-    return response.data;
+    try {
+      const response = await api.post(`${API_BASE_URL}/preview-pdf`, request, {
+        responseType: 'blob',
+      });
+      return response.data;
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as { response?: { data?: unknown } }).response?.data instanceof Blob
+      ) {
+        const axiosErr = error as { response?: { data: Blob }; message?: string };
+        try {
+          const text = await axiosErr.response.data.text();
+          if (text) {
+            try {
+              const json = JSON.parse(text);
+              axiosErr.message = json.message || json.error || text;
+            } catch {
+              axiosErr.message = text;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+      throw error;
+    }
   }
 
   /**

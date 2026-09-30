@@ -89,7 +89,7 @@ const Funcionarios: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE' | 'VACATION' | 'MATERNITY_LEAVE' | 'MEDICAL_CERTIFICATE' | 'TERMINATED' | 'SUSPENDED'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE' | 'VACATION' | 'MATERNITY_LEAVE' | 'MEDICAL_CERTIFICATE' | 'TERMINATED' | 'SUSPENDED' | 'SUB_JUDICE'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [documentsModalOpen, setDocumentsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -998,6 +998,7 @@ Para excluir este funcionário:
       case 'MEDICAL_CERTIFICATE': return 'bg-blue-100 text-blue-800';
       case 'TERMINATED': return 'bg-gray-100 text-gray-800';
       case 'SUSPENDED': return 'bg-orange-100 text-orange-800';
+      case 'SUB_JUDICE': return 'bg-amber-100 text-amber-800 border-amber-300';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -1011,6 +1012,7 @@ Para excluir este funcionário:
       case 'MEDICAL_CERTIFICATE': return 'Atestado';
       case 'TERMINATED': return 'Demitido';
       case 'SUSPENDED': return 'Suspenso';
+      case 'SUB_JUDICE': return 'Sub Júdice / Judicial';
       default: return 'Desconhecido';
     }
   };
@@ -1446,6 +1448,7 @@ Para excluir este funcionário:
                   <option value="MEDICAL_CERTIFICATE">🏥 Atestado</option>
                   <option value="TERMINATED">❌ Demitido</option>
                   <option value="SUSPENDED">⏸️ Suspenso</option>
+                  <option value="SUB_JUDICE">⚖️ Sub Júdice / Judicial</option>
                 </select>
 
                 <SearchableSelect

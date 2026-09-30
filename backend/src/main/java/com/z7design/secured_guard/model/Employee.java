@@ -84,6 +84,33 @@ public class Employee {
     @Column(length = 500)
     private String notes;
 
+    @Column(name = "judicial_process_start_date")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate judicialProcessStartDate;
+
+    @Column(name = "judicial_process_end_date")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate judicialProcessEndDate;
+
+    @Column(name = "judicial_process_notes", length = 500)
+    private String judicialProcessNotes;
+
+    @Column(name = "inss_start_date")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate inssStartDate;
+
+    @Column(name = "inss_end_date")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate inssEndDate;
+
+    @Column(name = "absence_start_date")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate absenceStartDate;
+
+    @Column(name = "absence_end_date")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate absenceEndDate;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 

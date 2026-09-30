@@ -644,8 +644,9 @@ public class StandardReportLayoutService {
             leftBlock.add(addressText);
         }
 
-        // Adiciona o bloco na posição yPosition + 28.35f (1cm de margem inferior para impressão sem cortes).
-        canvas.add(leftBlock.setFixedPosition(leftFooterX, yPosition + 28.35f, leftFooterWidth));
+        // Adiciona o bloco em yPosition + 43.35f: 1cm de margem inferior + 15pt (20px) de espaçamento
+        // entre o topo da linha gradiente e o início do texto do rodapé.
+        canvas.add(leftBlock.setFixedPosition(leftFooterX, yPosition + 43.35f, leftFooterWidth));
 
         // Bloco direito: apenas numeração de página (em applyPageNumbers).
         // Usuário e data do relatório removidos do rodapé.
@@ -665,7 +666,8 @@ public class StandardReportLayoutService {
                 .setTextAlignment(TextAlignment.RIGHT)
                 .setFontColor(pageNumColor)
                 .setMarginBottom(0f);
-        canvas.add(pageNumFooter.setFixedPosition(rightFooterX, yPosition + 28.35f, rightFooterWidth));
+        // Mesmo deslocamento do bloco esquerdo (+15pt / 20px) para manter alinhamento entre as colunas.
+        canvas.add(pageNumFooter.setFixedPosition(rightFooterX, yPosition + 43.35f, rightFooterWidth));
     }
 
     /**

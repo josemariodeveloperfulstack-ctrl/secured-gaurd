@@ -7,5 +7,8 @@ public enum EmploymentStatus {
     MATERNITY_LEAVE,
     MEDICAL_CERTIFICATE,
     TERMINATED,
-    SUSPENDED
+    SUSPENDED,
+    SUB_JUDICE,
+    INSS_LEAVE,
+    UNEXCUSED_ABSENCE
 }

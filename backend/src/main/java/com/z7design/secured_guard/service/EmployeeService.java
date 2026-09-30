@@ -374,6 +374,27 @@ public class EmployeeService {
             if (dto.getNotes() != null) {
                 existingEmployee.setNotes(dto.getNotes());
             }
+            if (dto.getJudicialProcessStartDate() != null) {
+                existingEmployee.setJudicialProcessStartDate(dto.getJudicialProcessStartDate());
+            }
+            if (dto.getJudicialProcessEndDate() != null) {
+                existingEmployee.setJudicialProcessEndDate(dto.getJudicialProcessEndDate());
+            }
+            if (dto.getJudicialProcessNotes() != null) {
+                existingEmployee.setJudicialProcessNotes(dto.getJudicialProcessNotes());
+            }
+            if (dto.getInssStartDate() != null) {
+                existingEmployee.setInssStartDate(dto.getInssStartDate());
+            }
+            if (dto.getInssEndDate() != null) {
+                existingEmployee.setInssEndDate(dto.getInssEndDate());
+            }
+            if (dto.getAbsenceStartDate() != null) {
+                existingEmployee.setAbsenceStartDate(dto.getAbsenceStartDate());
+            }
+            if (dto.getAbsenceEndDate() != null) {
+                existingEmployee.setAbsenceEndDate(dto.getAbsenceEndDate());
+            }
             // Atualizar campo address (compatibilidade) e campos separados
             if (dto.getEnderecoRua() != null && !dto.getEnderecoRua().trim().isEmpty()) {
                 existingEmployee.setAddress(dto.getEnderecoRua());
@@ -1029,6 +1050,14 @@ public class EmployeeService {
         }
 
         if (dto != null) {
+            if (dto.getStatus() != null && !dto.getStatus().trim().isEmpty() && !"TERMINATED".equalsIgnoreCase(dto.getStatus())) {
+                if (dto.getTerminationDate() == null && dto.getDataRescisao() == null) {
+                    employee.setTerminationDate(null);
+                    employee.setDataRescisao(null);
+                    employee.setTerminationReason(null);
+                    return;
+                }
+            }
             // data_rescisao é o campo usado na ficha/edição; manter termination_date alinhado para listagens e relatórios
             if (dto.getDataRescisao() != null) {
                 employee.setDataRescisao(dto.getDataRescisao());
@@ -1900,8 +1929,14 @@ public class EmployeeService {
             // e.setPossuiWhatsapp(dto.getPossuiWhatsapp());
             // e.setCaminhoPdf(dto.getCaminhoPdf());
             // e.setMesReferencia(dto.getMesReferencia());
-            // e.setAnoReferencia(dto.getAnoReferencia());
             e.setNotes(dto.getNotes());
+            e.setJudicialProcessStartDate(dto.getJudicialProcessStartDate());
+            e.setJudicialProcessEndDate(dto.getJudicialProcessEndDate());
+            e.setJudicialProcessNotes(dto.getJudicialProcessNotes());
+            e.setInssStartDate(dto.getInssStartDate());
+            e.setInssEndDate(dto.getInssEndDate());
+            e.setAbsenceStartDate(dto.getAbsenceStartDate());
+            e.setAbsenceEndDate(dto.getAbsenceEndDate());
 
             // Processar endereço - usar campos separados se disponíveis, senão usar campo
             // address antigo
@@ -2277,6 +2312,27 @@ public class EmployeeService {
             }
             if (e.getTerminationReason() != null) {
                 dto.setTerminationReason(e.getTerminationReason());
+            }
+            if (e.getJudicialProcessStartDate() != null) {
+                dto.setJudicialProcessStartDate(e.getJudicialProcessStartDate());
+            }
+            if (e.getJudicialProcessEndDate() != null) {
+                dto.setJudicialProcessEndDate(e.getJudicialProcessEndDate());
+            }
+            if (e.getJudicialProcessNotes() != null) {
+                dto.setJudicialProcessNotes(e.getJudicialProcessNotes());
+            }
+            if (e.getInssStartDate() != null) {
+                dto.setInssStartDate(e.getInssStartDate());
+            }
+            if (e.getInssEndDate() != null) {
+                dto.setInssEndDate(e.getInssEndDate());
+            }
+            if (e.getAbsenceStartDate() != null) {
+                dto.setAbsenceStartDate(e.getAbsenceStartDate());
+            }
+            if (e.getAbsenceEndDate() != null) {
+                dto.setAbsenceEndDate(e.getAbsenceEndDate());
             }
 
             // Address - usar campos separados se disponíveis, senão usar campo address

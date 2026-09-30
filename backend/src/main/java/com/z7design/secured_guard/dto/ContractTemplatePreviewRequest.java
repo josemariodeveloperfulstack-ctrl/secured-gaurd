@@ -25,4 +25,13 @@ public class ContractTemplatePreviewRequest {
     private String headerText;
     private String footerText;
     private String contractTerms;
+
+    /**
+     * Modelo da minuta para preview das 14 cláusulas (ARMADA, DESARMADA, PORTARIA).
+     * Quando informado, o PDF de preview renderiza a minuta completa.
+     */
+    private String contractTemplateKey;
+
+    /** Overrides das cláusulas para preview com alterações não salvas (índice 1..14). */
+    private java.util.List<String> clauses;
 }

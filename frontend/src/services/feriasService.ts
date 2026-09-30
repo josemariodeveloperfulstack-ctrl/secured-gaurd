@@ -25,7 +25,10 @@ export const feriasService = {
       id: vacation.id,
       employeeId: vacation.employeeId,
       employeeName: vacation.employeeName || 'Funcionário não encontrado',
-      periodoAquisitivo: `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
+      periodoAquisitivo: vacation.periodoAquisitivo ||
+        `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
+      empresa: vacation.empresa || '',
+      setor: vacation.setor || '',
       dataInicio: vacation.startDate,
       dataFim: vacation.endDate,
       status: (vacation.status === 'PENDING' ? 'PENDENTE' :
@@ -48,7 +51,10 @@ export const feriasService = {
       id: vacation.id,
       employeeId: vacation.employeeId || vacation.employee?.id,
       employeeName: vacation.employeeName || vacation.employee?.name || 'Funcionário não encontrado',
-      periodoAquisitivo: `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
+      periodoAquisitivo: vacation.periodoAquisitivo ||
+        `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
+      empresa: vacation.empresa || '',
+      setor: vacation.setor || '',
       dataInicio: vacation.startDate,
       dataFim: vacation.endDate,
       status: (vacation.status === 'PENDING' ? 'PENDENTE' :
@@ -70,8 +76,8 @@ export const feriasService = {
 
   async createFerias(data: CreateFeriasRequest): Promise<FeriasPeriodo> {
     // Converter dados do frontend para o formato esperado pelo backend
-    const startDate = new Date(data.dataInicio).toISOString().split('T')[0];
-    const endDate = new Date(data.dataFim).toISOString().split('T')[0];
+    const startDate = data.dataInicio?.includes('T') ? data.dataInicio.split('T')[0] : data.dataInicio;
+    const endDate = data.dataFim?.includes('T') ? data.dataFim.split('T')[0] : data.dataFim;
 
     // Mapear tipo do frontend para o backend
     const tipoMap: Record<string, string> = {
@@ -87,6 +93,7 @@ export const feriasService = {
       daysTaken: Math.ceil((new Date(data.dataFim).getTime() - new Date(data.dataInicio).getTime()) / (1000 * 60 * 60 * 24)) + 1,
       remainingDays: 30, // Valor padrão - será recalculado pelo backend
       status: 'PENDING',
+      periodoAquisitivo: data.periodoAquisitivo || undefined,
       vacationType: tipoMap[data.tipo] || 'NORMAL'
     };
     const response = await api.post('/api/vacations', backendData);
@@ -152,7 +159,10 @@ export const feriasService = {
       id: vacation.id,
       employeeId: vacation.employeeId || vacation.employee?.id,
       employeeName: vacation.employeeName || vacation.employee?.name || 'Funcionário não encontrado',
-      periodoAquisitivo: `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
+      periodoAquisitivo: vacation.periodoAquisitivo ||
+        `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
+      empresa: vacation.empresa || '',
+      setor: vacation.setor || '',
       dataInicio: vacation.startDate,
       dataFim: vacation.endDate,
       status: (vacation.status === 'PENDING' ? 'PENDENTE' :

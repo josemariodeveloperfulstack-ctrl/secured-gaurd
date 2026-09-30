@@ -51,12 +51,21 @@ import {
   Download,
   Building2,
   Users,
+  Eye,
+  ChevronDown,
+  ChevronUp,
+  Briefcase,
+  MapPin,
+  Clock,
+  User,
+  X,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { SimpleEmployee } from '@/services/employeeService';
 import departmentService, { Department } from '@/services/departmentService';
 import {
+  MEDICAL_FORM_TYPES,
   MEDICAL_TYPE_LABELS,
   MedicalDocument,
   MedicalDocumentType,
@@ -110,6 +119,17 @@ const SORT_API_FIELD: Record<SortKey, string> = {
   createdAt: 'createdAt',
 };
 
+// ────────────────────────────────────────
+// Dados do colaborador/empresa/setor para o modal
+// ────────────────────────────────────────
+interface EmployeeInfo {
+  companyName?: string;
+  companySigla?: string;
+  departmentName?: string;
+  positionName?: string;
+  unitName?: string;
+}
+
 const GestaoAtestados: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -142,6 +162,16 @@ const GestaoAtestados: React.FC = () => {
   const [reportEmployeeId, setReportEmployeeId] = useState('ALL');
   const [reportType, setReportType] = useState('ALL');
 
+  // Estados para visualizar atestado
+  const [viewDoc, setViewDoc] = useState<MedicalDocument | null>(null);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+
+  // Estados para expandir/recolher alertas
+  const [alertsExpanded, setAlertsExpanded] = useState(false);
+
+  // Info do empregado para o formulário (empresa/setor)
+  const [employeeInfo, setEmployeeInfo] = useState<EmployeeInfo>({});
+
   useEffect(() => {
     departmentService.listActive().then(setDepartments).catch(() => []);
   }, []);
@@ -164,6 +194,7 @@ const GestaoAtestados: React.FC = () => {
       employeeName: string;
       employeePosition?: string;
       employeeDepartment?: string;
+      companyName?: string;
       totalDays: number;
       totalCount: number;
       documents: MedicalDocument[];
@@ -177,12 +208,13 @@ const GestaoAtestados: React.FC = () => {
           employeeName: item.employeeName || 'Colaborador',
           employeePosition: item.employeePosition,
           employeeDepartment: item.employeeDepartment,
+          companyName: item.companyName,
           totalDays: 0,
           totalCount: 0,
           documents: []
         };
       }
-      if (item.documentType === 'ATESTADO' || item.documentType === 'AFASTAMENTO') {
+      if (item.documentType !== 'DECLARACAO_COMPARECIMENTO' && item.documentType !== 'DECLARACAO_MEDICA') {
         map[item.employeeId].totalDays += item.days || 0;
       }
       map[item.employeeId].totalCount += 1;
@@ -218,9 +250,10 @@ const GestaoAtestados: React.FC = () => {
       toast({ title: 'Atenção', description: 'Nenhum atestado para exportar.', variant: 'destructive' });
       return;
     }
-    const headers = ['Funcionário', 'Setor', 'Tipo', 'Data Início', 'Data Fim', 'Dias', 'CID', 'Descrição CID'];
+    const headers = ['Funcionário', 'Empresa', 'Setor', 'Tipo', 'Data Início', 'Data Fim', 'Dias', 'CID', 'Descrição CID'];
     const rows = reportFilteredItems.map((doc) => [
       `"${(doc.employeeName || '').replace(/"/g, '""')}"`,
+      `"${(doc.companyName || '').replace(/"/g, '""')}"`,
       `"${(doc.employeeDepartment || '').replace(/"/g, '""')}"`,
       `"${MEDICAL_TYPE_LABELS[doc.documentType] || doc.documentType}"`,
       `"${doc.startDate || ''}"`,
@@ -371,6 +404,7 @@ const GestaoAtestados: React.FC = () => {
     setEditing(null);
     setForm(emptyForm());
     setSelectedEmployee(null);
+    setEmployeeInfo({});
     setCidSuggestions([]);
     setCidMenuOpen(false);
     setCidSelected(false);
@@ -400,10 +434,20 @@ const GestaoAtestados: React.FC = () => {
       departmentName: doc.employeeDepartment,
       positionName: doc.employeePosition,
     } as SimpleEmployee);
+    setEmployeeInfo({
+      companyName: doc.companyName,
+      departmentName: doc.employeeDepartment,
+      positionName: doc.employeePosition,
+    });
     setCidSuggestions([]);
     setCidMenuOpen(false);
     setCidSelected(true);
     setModalOpen(true);
+  };
+
+  const openView = (doc: MedicalDocument) => {
+    setViewDoc(doc);
+    setViewModalOpen(true);
   };
 
   const onStartOrDaysChange = (field: 'startDate' | 'endDate' | 'days', value: string) => {
@@ -545,6 +589,11 @@ const GestaoAtestados: React.FC = () => {
 
   const kpis = useMemo(() => dashboard, [dashboard]);
 
+  // Alertas para o modal de visualização do funcionário
+  const getEmployeeAlert = (employeeId: string) => {
+    return inssAlertSummary.map[employeeId] || null;
+  };
+
   return (
     <StandardLayout title="Gestão de Atestados">
       <div className="space-y-6 p-4 md:p-6">
@@ -558,41 +607,43 @@ const GestaoAtestados: React.FC = () => {
               Atestados, declarações, CID, dias/horas de ausência e alerta INSS (15 dias / 60 dias).
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => void load()} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void load()} disabled={loading} size="sm">
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
             <Button
               variant="outline"
               onClick={() => setReportModalOpen(true)}
               className="border-emerald-600/50 text-emerald-400 hover:bg-emerald-950/40"
+              size="sm"
             >
-              <BarChart2 className="h-4 w-4 mr-2 text-emerald-400" />
+              <BarChart2 className="h-4 w-4 mr-1.5 text-emerald-400" />
               Relatórios
             </Button>
-            <Button onClick={openCreate} className="bg-seguranca-red hover:bg-seguranca-red/90">
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={openCreate} className="bg-seguranca-red hover:bg-seguranca-red/90" size="sm">
+              <Plus className="h-4 w-4 mr-1.5" />
               Novo lançamento
             </Button>
           </div>
         </div>
 
+        {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { label: 'Total', value: kpis?.total ?? 0 },
-            { label: 'Atestados', value: kpis?.atestados ?? 0 },
-            { label: 'Declarações', value: kpis?.declaracoes ?? 0 },
-            { label: 'Dias afastados', value: kpis?.diasAfastados ?? 0 },
-            { label: 'Horas', value: kpis?.horasAusentes ?? 0 },
-            { label: 'Alertas INSS', value: kpis?.alertasInss ?? 0 },
+            { label: 'Total', value: kpis?.total ?? 0, color: 'text-white' },
+            { label: 'Atestados', value: kpis?.atestados ?? 0, color: 'text-blue-400' },
+            { label: 'Declarações', value: kpis?.declaracoes ?? 0, color: 'text-cyan-400' },
+            { label: 'Dias afastados', value: kpis?.diasAfastados ?? 0, color: 'text-amber-400' },
+            { label: 'Horas', value: kpis?.horasAusentes ?? 0, color: 'text-emerald-400' },
+            { label: 'Alertas INSS', value: kpis?.alertasInss ?? 0, color: 'text-red-400' },
           ].map((kpi) => (
-            <Card key={kpi.label} className="bg-seguranca-graphite/60 border-gray-700">
-              <CardHeader className="pb-2 pt-3 px-3">
-                <CardTitle className="text-xs text-muted-foreground font-medium">{kpi.label}</CardTitle>
+            <Card key={kpi.label} className="bg-seguranca-graphite/60 border-gray-700/60 hover:border-gray-600 transition-colors">
+              <CardHeader className="pb-1.5 pt-3 px-3">
+                <CardTitle className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{kpi.label}</CardTitle>
               </CardHeader>
               <CardContent className="px-3 pb-3">
-                <div className="text-2xl font-bold text-white">{kpi.value}</div>
+                <div className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</div>
               </CardContent>
             </Card>
           ))}
@@ -605,98 +656,144 @@ const GestaoAtestados: React.FC = () => {
           </p>
         )}
 
-        {/* Banner de Alertas CLT / INSS (15 Dias de Atestado) */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* Banner de Alertas CLT / INSS — Expandível                        */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
         {(inssAlertSummary.criticalINSS.length > 0 || inssAlertSummary.warningINSS.length > 0) && (
-          <Card className="bg-gradient-to-r from-red-950/70 via-amber-950/50 to-seguranca-graphite border-red-700/60 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-bold text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-red-600/30 rounded-lg text-red-400">
-                    <AlertOctagon className="h-5 w-5 animate-pulse" />
+          <Card className="bg-gradient-to-br from-red-950/60 via-amber-950/30 to-seguranca-graphite/80 border-red-700/50 shadow-xl overflow-hidden">
+            <CardHeader className="pb-0">
+              <button
+                type="button"
+                onClick={() => setAlertsExpanded(!alertsExpanded)}
+                className="w-full"
+              >
+                <CardTitle className="text-base font-bold text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-red-600/30 rounded-lg text-red-400">
+                      <AlertOctagon className="h-5 w-5 animate-pulse" />
+                    </div>
+                    <div className="text-left">
+                      <span className="block text-sm sm:text-base">Alertas de Afastamento CLT & Encaminhamento INSS</span>
+                      <span className="block text-[11px] text-gray-400 font-normal mt-0.5">Lei 8.213/91 — Clique para {alertsExpanded ? 'recolher' : 'expandir'}</span>
+                    </div>
                   </div>
-                  <span>Alertas de Afastamento CLT & Encaminhamento INSS (Lei 8.213/91)</span>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {inssAlertSummary.criticalINSS.length > 0 && (
-                    <Badge variant="destructive" className="bg-red-600 font-bold px-2.5 py-1 text-xs">
-                      🚨 {inssAlertSummary.criticalINSS.length} Alerta(s) INSS (15+ dias)
-                    </Badge>
-                  )}
-                  {inssAlertSummary.warningINSS.length > 0 && (
-                    <Badge className="bg-amber-600 text-white font-bold px-2.5 py-1 text-xs">
-                      ⚠️ {inssAlertSummary.warningINSS.length} Próximo(s) do limite (12-14 dias)
-                    </Badge>
-                  )}
-                </div>
-              </CardTitle>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {inssAlertSummary.criticalINSS.length > 0 && (
+                      <Badge variant="destructive" className="bg-red-600 font-bold px-2.5 py-1 text-xs">
+                        🚨 {inssAlertSummary.criticalINSS.length} INSS (15+ dias)
+                      </Badge>
+                    )}
+                    {inssAlertSummary.warningINSS.length > 0 && (
+                      <Badge className="bg-amber-600 text-white font-bold px-2.5 py-1 text-xs">
+                        ⚠️ {inssAlertSummary.warningINSS.length} Próximo (12-14d)
+                      </Badge>
+                    )}
+                    {alertsExpanded ? (
+                      <ChevronUp className="h-5 w-5 text-gray-400 shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-gray-400 shrink-0" />
+                    )}
+                  </div>
+                </CardTitle>
+              </button>
             </CardHeader>
-            <CardContent className="space-y-3 pt-2">
-              <p className="text-xs text-gray-300">
-                De acordo com a <strong>CLT (Art. 476)</strong> e a <strong>Lei nº 8.213/91 (Art. 60)</strong>, a empresa arca com os primeiros 15 dias de afastamento. Ao atingir ou ultrapassar 15 dias de atestado, o funcionário deve ser encaminhado para <strong>Perícia Médica do INSS</strong>.
-              </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Funcionários Críticos (15+ dias) */}
-                {inssAlertSummary.criticalINSS.map((emp) => (
-                  <div
-                    key={emp.employeeId}
-                    className="p-3 bg-red-950/60 border border-red-600/70 rounded-lg flex flex-col justify-between space-y-2 shadow"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="font-bold text-red-100 text-sm flex items-center gap-1.5">
-                          <ShieldAlert className="h-4 w-4 text-red-400 shrink-0" />
-                          {emp.employeeName}
-                        </span>
-                        <span className="text-xs text-red-300/80 block mt-0.5">
-                          {[emp.employeePosition, emp.employeeDepartment].filter(Boolean).join(' · ') || 'Setor não informado'}
-                        </span>
-                      </div>
-                      <Badge className="bg-red-600 text-white font-bold whitespace-nowrap">
-                        {emp.totalDays} dias acumulados
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-red-200/90 pt-1.5 border-t border-red-800/40">
-                      <span>📋 <strong>{emp.totalCount} atestado(s)</strong> entregue(s)</span>
-                      <span className="text-red-300 font-bold">🚨 Ação: Encaminhar para Perícia Médica INSS</span>
-                    </div>
-                  </div>
-                ))}
+            {alertsExpanded && (
+              <CardContent className="space-y-3 pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                <p className="text-xs text-gray-300 bg-black/20 rounded-md px-3 py-2">
+                  De acordo com a <strong>CLT (Art. 476)</strong> e a <strong>Lei nº 8.213/91 (Art. 60)</strong>, a empresa arca com os primeiros 15 dias de afastamento. Ao atingir ou ultrapassar 15 dias de atestado, o funcionário deve ser encaminhado para <strong>Perícia Médica do INSS</strong>.
+                </p>
 
-                {/* Funcionários em Alerta (12-14 dias) */}
-                {inssAlertSummary.warningINSS.map((emp) => (
-                  <div
-                    key={emp.employeeId}
-                    className="p-3 bg-amber-950/50 border border-amber-600/60 rounded-lg flex flex-col justify-between space-y-2 shadow"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="font-bold text-amber-100 text-sm flex items-center gap-1.5">
-                          <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
-                          {emp.employeeName}
-                        </span>
-                        <span className="text-xs text-amber-300/80 block mt-0.5">
-                          {[emp.employeePosition, emp.employeeDepartment].filter(Boolean).join(' · ') || 'Setor não informado'}
-                        </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Funcionários Críticos (15+ dias) */}
+                  {inssAlertSummary.criticalINSS.map((emp) => (
+                    <div
+                      key={emp.employeeId}
+                      className="p-3 bg-red-950/50 border border-red-600/50 rounded-xl flex flex-col justify-between space-y-2.5 shadow-lg hover:border-red-500/60 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="font-bold text-red-100 text-sm flex items-center gap-1.5">
+                            <ShieldAlert className="h-4 w-4 text-red-400 shrink-0" />
+                            <span className="truncate">{emp.employeeName}</span>
+                          </span>
+                          <div className="text-[11px] text-red-300/70 mt-1 space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <Briefcase className="h-3 w-3 shrink-0" />
+                              <span>{emp.employeePosition || 'Cargo não informado'}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="h-3 w-3 shrink-0" />
+                              <span>{emp.employeeDepartment || 'Setor não informado'}</span>
+                            </div>
+                            {emp.companyName && (
+                              <div className="flex items-center gap-1.5">
+                                <Building2 className="h-3 w-3 shrink-0" />
+                                <span>{emp.companyName}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Badge className="bg-red-600 text-white font-bold whitespace-nowrap text-xs shrink-0">
+                          {emp.totalDays} dias
+                        </Badge>
                       </div>
-                      <Badge className="bg-amber-600 text-white font-bold whitespace-nowrap">
-                        {emp.totalDays} dias acumulados
-                      </Badge>
+                      <div className="flex items-center justify-between text-[11px] text-red-200/80 pt-2 border-t border-red-800/30">
+                        <span>📋 <strong>{emp.totalCount} atestado(s)</strong> entregue(s)</span>
+                        <span className="text-red-300 font-bold text-[10px]">🚨 Encaminhar para Perícia INSS</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-amber-200/90 pt-1.5 border-t border-amber-800/40">
-                      <span>📋 <strong>{emp.totalCount} atestado(s)</strong> entregue(s)</span>
-                      <span className="text-amber-300 font-bold">⚠️ Próximo ao limite CLT (15 dias)</span>
+                  ))}
+
+                  {/* Funcionários em Alerta (12-14 dias) */}
+                  {inssAlertSummary.warningINSS.map((emp) => (
+                    <div
+                      key={emp.employeeId}
+                      className="p-3 bg-amber-950/40 border border-amber-600/40 rounded-xl flex flex-col justify-between space-y-2.5 shadow-lg hover:border-amber-500/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="font-bold text-amber-100 text-sm flex items-center gap-1.5">
+                            <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                            <span className="truncate">{emp.employeeName}</span>
+                          </span>
+                          <div className="text-[11px] text-amber-300/70 mt-1 space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <Briefcase className="h-3 w-3 shrink-0" />
+                              <span>{emp.employeePosition || 'Cargo não informado'}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="h-3 w-3 shrink-0" />
+                              <span>{emp.employeeDepartment || 'Setor não informado'}</span>
+                            </div>
+                            {emp.companyName && (
+                              <div className="flex items-center gap-1.5">
+                                <Building2 className="h-3 w-3 shrink-0" />
+                                <span>{emp.companyName}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Badge className="bg-amber-600 text-white font-bold whitespace-nowrap text-xs shrink-0">
+                          {emp.totalDays} dias
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-amber-200/80 pt-2 border-t border-amber-800/30">
+                        <span>📋 <strong>{emp.totalCount} atestado(s)</strong> entregue(s)</span>
+                        <span className="text-amber-300 font-bold text-[10px]">⚠️ Próximo ao limite CLT (15 dias)</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
+                  ))}
+                </div>
+              </CardContent>
+            )}
           </Card>
         )}
 
-        <Card className="bg-seguranca-graphite/40 border-gray-700">
-          <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
-            <div className="md:col-span-2 relative">
+        {/* Filtros */}
+        <Card className="bg-seguranca-graphite/40 border-gray-700/50">
+          <CardContent className="pt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="sm:col-span-2 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 className="pl-9"
@@ -711,9 +808,9 @@ const GestaoAtestados: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">Todos os tipos</SelectItem>
-                {Object.entries(MEDICAL_TYPE_LABELS).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v}
+                {MEDICAL_FORM_TYPES.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -726,118 +823,263 @@ const GestaoAtestados: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite/40 border-gray-700">
-          <CardContent className="pt-4 overflow-x-auto">
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* Tabela de Atestados — Desktop                                     */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        <Card className="bg-seguranca-graphite/40 border-gray-700/50">
+          <CardContent className="pt-4">
             {loading ? (
               <div className="flex justify-center py-10">
                 <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <SortableHead column="employeeName">Funcionário</SortableHead>
-                    <SortableHead column="documentType">Tipo</SortableHead>
-                    <SortableHead column="startDate">Período</SortableHead>
-                    <SortableHead column="createdAt">Cadastro</SortableHead>
-                    <SortableHead column="days">Dias/Horas</SortableHead>
-                    <SortableHead column="cidCode">CID</SortableHead>
-                    <TableHead>Alerta INSS / CLT</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-gray-700/50 hover:bg-transparent">
+                        <SortableHead column="employeeName">Funcionário</SortableHead>
+                        <SortableHead column="documentType">Tipo</SortableHead>
+                        <SortableHead column="startDate">Período</SortableHead>
+                        <SortableHead column="createdAt">Cadastro</SortableHead>
+                        <SortableHead column="days">Dias/Horas</SortableHead>
+                        <SortableHead column="cidCode">CID</SortableHead>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead>Alerta INSS / CLT</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedItems.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                            Nenhum documento encontrado no período.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        sortedItems.map((doc) => {
+                          const empData = doc.employeeId ? inssAlertSummary.map[doc.employeeId] : null;
+                          const totalEmpDays = empData?.totalDays ?? doc.relatedDaysInWindow ?? doc.days ?? 0;
+                          return (
+                            <TableRow key={doc.id} className="border-gray-700/30 hover:bg-white/[0.02] transition-colors">
+                              <TableCell>
+                                <div className="font-medium text-sm">{doc.employeeName}</div>
+                                <div className="text-[11px] text-muted-foreground">
+                                  {[doc.employeePosition, doc.employeeDepartment].filter(Boolean).join(' · ') || '—'}
+                                </div>
+                                {employeeCertificateCounts[doc.employeeId] ? (
+                                  <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-300 border-blue-500/30 mt-1">
+                                    {employeeCertificateCounts[doc.employeeId]} atestado(s)
+                                  </Badge>
+                                ) : null}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-[11px]">{MEDICAL_TYPE_LABELS[doc.documentType]}</Badge>
+                              </TableCell>
+                              <TableCell className="text-sm whitespace-nowrap">
+                                {formatAdmissionDateBr(doc.startDate)}
+                                {doc.endDate ? ` → ${formatAdmissionDateBr(doc.endDate)}` : ''}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {doc.createdAt ? formatAdmissionDateBr(doc.createdAt.slice(0, 10)) : '—'}
+                              </TableCell>
+                              <TableCell className="text-sm font-semibold">
+                                {doc.days != null ? `${doc.days}d` : '-'}
+                                {doc.hours != null ? ` / ${doc.hours}h` : ''}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {doc.cidCode || '-'}
+                                {doc.cidDescription ? (
+                                  <div className="text-[11px] text-muted-foreground truncate max-w-[160px]">
+                                    {doc.cidDescription}
+                                  </div>
+                                ) : null}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {doc.companyName ? (
+                                  <div className="flex items-center gap-1 text-[11px] text-gray-300">
+                                    <Building2 className="h-3 w-3 shrink-0 text-gray-500" />
+                                    <span className="truncate max-w-[120px]">{doc.companyName}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {totalEmpDays >= 15 ? (
+                                  <Badge variant="destructive" className="bg-red-600 font-bold flex items-center gap-1 w-fit text-[11px]">
+                                    <ShieldAlert className="h-3 w-3 shrink-0" />
+                                    <span>15+ dias (INSS)</span>
+                                  </Badge>
+                                ) : totalEmpDays >= 12 ? (
+                                  <Badge className="bg-amber-600 text-white font-bold flex items-center gap-1 w-fit text-[11px]">
+                                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                                    <span>Alerta ({totalEmpDays}d)</span>
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">{totalEmpDays > 0 ? `${totalEmpDays}d acum.` : '—'}</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300 h-8 px-2"
+                                    onClick={() => openView(doc)}
+                                    title="Visualizar detalhes do atestado"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-blue-500/40 text-blue-400 hover:bg-blue-950/40 hover:text-blue-300 h-8 px-2"
+                                    onClick={() => openEdit(doc)}
+                                    title="Editar lançamento de atestado"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-red-400 hover:text-red-300 hover:bg-red-950/30 h-8 px-2"
+                                    onClick={() => void handleDelete(doc.id)}
+                                    title="Cancelar atestado"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile Cards */}
+                <div className="md:hidden space-y-3">
                   {sortedItems.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                        Nenhum documento encontrado no período.
-                      </TableCell>
-                    </TableRow>
+                    <p className="text-center text-muted-foreground py-8 text-sm">
+                      Nenhum documento encontrado no período.
+                    </p>
                   ) : (
                     sortedItems.map((doc) => {
                       const empData = doc.employeeId ? inssAlertSummary.map[doc.employeeId] : null;
                       const totalEmpDays = empData?.totalDays ?? doc.relatedDaysInWindow ?? doc.days ?? 0;
                       return (
-                        <TableRow key={doc.id}>
-                          <TableCell>
-                            <div className="font-medium">{doc.employeeName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {[doc.employeePosition, doc.employeeDepartment].filter(Boolean).join(' · ') || '—'}
+                        <div
+                          key={doc.id}
+                          className="bg-seguranca-graphite/60 border border-gray-700/40 rounded-xl p-4 space-y-3 hover:border-gray-600/60 transition-colors"
+                        >
+                          {/* Header — Nome + Badge */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h3 className="font-semibold text-white text-sm truncate">{doc.employeeName}</h3>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                {[doc.employeePosition, doc.employeeDepartment].filter(Boolean).join(' · ') || '—'}
+                              </p>
+                              {doc.companyName && (
+                                <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                  <Building2 className="h-3 w-3" /> {doc.companyName}
+                                </p>
+                              )}
                             </div>
-                            {employeeCertificateCounts[doc.employeeId] ? (
-                              <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-300 border-blue-500/30 mt-1">
-                                {employeeCertificateCounts[doc.employeeId]} atestado(s) entregue(s)
-                              </Badge>
-                            ) : null}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{MEDICAL_TYPE_LABELS[doc.documentType]}</Badge>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {formatAdmissionDateBr(doc.startDate)}
-                            {doc.endDate ? ` → ${formatAdmissionDateBr(doc.endDate)}` : ''}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {doc.createdAt ? formatAdmissionDateBr(doc.createdAt.slice(0, 10)) : '—'}
-                          </TableCell>
-                          <TableCell className="text-sm font-semibold">
-                            {doc.days != null ? `${doc.days}d` : '-'}
-                            {doc.hours != null ? ` / ${doc.hours}h` : ''}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {doc.cidCode || '-'}
-                            {doc.cidDescription ? (
-                              <div className="text-xs text-muted-foreground truncate max-w-[180px]">
-                                {doc.cidDescription}
+                            <Badge variant="secondary" className="text-[10px] shrink-0">
+                              {MEDICAL_TYPE_LABELS[doc.documentType]}
+                            </Badge>
+                          </div>
+
+                          {/* Dados */}
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                              <span className="text-muted-foreground">Período:</span>
+                              <div className="text-white font-medium">
+                                {formatAdmissionDateBr(doc.startDate)}
+                                {doc.endDate ? ` → ${formatAdmissionDateBr(doc.endDate)}` : ''}
                               </div>
-                            ) : null}
-                          </TableCell>
-                          <TableCell>
-                            {totalEmpDays >= 15 ? (
-                              <Badge variant="destructive" className="bg-red-600 font-bold flex items-center gap-1 w-fit text-[11px]">
-                                <ShieldAlert className="h-3 w-3 shrink-0" />
-                                <span>15+ dias (INSS)</span>
-                              </Badge>
-                            ) : totalEmpDays >= 12 ? (
-                              <Badge className="bg-amber-600 text-white font-bold flex items-center gap-1 w-fit text-[11px]">
-                                <AlertTriangle className="h-3 w-3 shrink-0" />
-                                <span>Alerta ({totalEmpDays}d)</span>
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">{totalEmpDays > 0 ? `${totalEmpDays}d acum.` : '—'}</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right space-x-1.5 whitespace-nowrap">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-blue-500/50 text-blue-400 hover:bg-blue-950/40 hover:text-blue-300 h-8 px-2.5"
-                              onClick={() => openEdit(doc)}
-                              title="Editar lançamento de atestado"
-                            >
-                              <Pencil className="h-3.5 w-3.5 mr-1 text-blue-400" />
-                              Editar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-400 hover:text-red-300 hover:bg-red-950/30 h-8 px-2"
-                              onClick={() => void handleDelete(doc.id)}
-                              title="Cancelar atestado"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Dias/Horas:</span>
+                              <div className="text-white font-semibold">
+                                {doc.days != null ? `${doc.days}d` : '-'}
+                                {doc.hours != null ? ` / ${doc.hours}h` : ''}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">CID:</span>
+                              <div className="text-white">
+                                {doc.cidCode || '-'}
+                                {doc.cidDescription ? (
+                                  <span className="text-muted-foreground ml-1 text-[10px]">({doc.cidDescription})</span>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Cadastro:</span>
+                              <div className="text-white">
+                                {doc.createdAt ? formatAdmissionDateBr(doc.createdAt.slice(0, 10)) : '—'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Alerta + Ações */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-700/30">
+                            <div>
+                              {totalEmpDays >= 15 ? (
+                                <Badge variant="destructive" className="bg-red-600 font-bold text-[10px] gap-1">
+                                  <ShieldAlert className="h-3 w-3" /> INSS (15+d)
+                                </Badge>
+                              ) : totalEmpDays >= 12 ? (
+                                <Badge className="bg-amber-600 text-white font-bold text-[10px] gap-1">
+                                  <AlertTriangle className="h-3 w-3" /> Alerta ({totalEmpDays}d)
+                                </Badge>
+                              ) : totalEmpDays > 0 ? (
+                                <span className="text-[10px] text-muted-foreground">{totalEmpDays}d acum.</span>
+                              ) : null}
+                              {employeeCertificateCounts[doc.employeeId] && (
+                                <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-300 border-blue-500/30 ml-1.5">
+                                  {employeeCertificateCounts[doc.employeeId]} atestado(s)
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button size="sm" variant="outline" className="h-7 w-7 p-0 border-emerald-500/40 text-emerald-400" onClick={() => openView(doc)} title="Visualizar">
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7 w-7 p-0 border-blue-500/40 text-blue-400" onClick={() => openEdit(doc)} title="Editar">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:bg-red-950/30" onClick={() => void handleDelete(doc.id)} title="Cancelar">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
                       );
                     })
                   )}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Rodapé com contagem */}
+                {sortedItems.length > 0 && (
+                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-700/30">
+                    <p className="text-xs text-muted-foreground">
+                      {sortedItems.length} registro(s) encontrado(s)
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
 
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* Modal — Novo / Editar                                            */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-700 text-white">
             <DialogHeader>
@@ -857,30 +1099,60 @@ const GestaoAtestados: React.FC = () => {
                   value={form.employeeId}
                   onChange={(value) => {
                     setForm((p) => ({ ...p, employeeId: value }));
-                    if (!value) setSelectedEmployee(null);
+                    if (!value) {
+                      setSelectedEmployee(null);
+                      setEmployeeInfo({});
+                    }
                   }}
-                  onEmployeeSelect={(emp) => setSelectedEmployee(emp)}
+                  onEmployeeSelect={(emp) => {
+                    setSelectedEmployee(emp);
+                    setEmployeeInfo({
+                      companyName: emp.companyName || emp.companySigla,
+                      companySigla: emp.companySigla,
+                      departmentName: emp.departmentName,
+                      positionName: emp.positionName,
+                      unitName: emp.unitName,
+                    });
+                  }}
                   placeholder="Selecione o funcionário"
                   initialDisplayName={selectedEmployee?.name || editing?.employeeName}
                 />
-                {selectedEmployee && (selectedEmployee.departmentName || selectedEmployee.positionName) && (
-                  <div className="rounded-md border border-gray-600 bg-seguranca-black/40 px-3 py-2 text-sm">
-                    <div className="text-muted-foreground text-xs mb-1">Dados do colaborador</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-muted-foreground">Setor: </span>
-                        <span className="text-white font-medium">
-                          {selectedEmployee.departmentName || selectedEmployee.unitName || '—'}
-                        </span>
+              </div>
+
+              {/* Empresa / Setor / Cargo — Preenchimento automático */}
+              {(selectedEmployee || editing) && (
+                <div className="md:col-span-2">
+                  <div className="rounded-lg border border-gray-600/60 bg-seguranca-black/40 px-4 py-3">
+                    <div className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wider font-medium">Dados do colaborador</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <Building2 className="h-3 w-3" /> Empresa
+                        </div>
+                        <div className="text-sm text-white font-medium">
+                          {employeeInfo.companyName || employeeInfo.companySigla || '—'}
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Cargo: </span>
-                        <span className="text-white font-medium">{selectedEmployee.positionName || '—'}</span>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <MapPin className="h-3 w-3" /> Setor de Trabalho
+                        </div>
+                        <div className="text-sm text-white font-medium">
+                          {employeeInfo.departmentName || employeeInfo.unitName || '—'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <Briefcase className="h-3 w-3" /> Cargo
+                        </div>
+                        <div className="text-sm text-white font-medium">
+                          {employeeInfo.positionName || '—'}
+                        </div>
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Tipo *</Label>
@@ -901,11 +1173,16 @@ const GestaoAtestados: React.FC = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(MEDICAL_TYPE_LABELS).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v}
+                    {MEDICAL_FORM_TYPES.map(({ value, label }) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
                       </SelectItem>
                     ))}
+                    {form.documentType && !MEDICAL_FORM_TYPES.some(t => t.value === form.documentType) && (
+                      <SelectItem key={form.documentType} value={form.documentType}>
+                        {MEDICAL_TYPE_LABELS[form.documentType] || form.documentType}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -1089,7 +1366,262 @@ const GestaoAtestados: React.FC = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Modal de Relatórios de Atestados Médicos */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* Modal — Visualizar Atestado                                      */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-700 text-white">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5 text-emerald-400" />
+                Detalhes do Atestado
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Visualização completa do documento médico e alertas do funcionário.
+              </DialogDescription>
+            </DialogHeader>
+
+            {viewDoc && (
+              <div className="space-y-4 py-2">
+                {/* Dados do Colaborador */}
+                <div className="rounded-xl border border-gray-600/50 bg-seguranca-black/40 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <User className="h-4 w-4 text-blue-400" />
+                    Dados do Colaborador
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider">Nome</div>
+                      <div className="text-sm text-white font-medium">{viewDoc.employeeName || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider">CPF</div>
+                      <div className="text-sm text-white">{viewDoc.employeeCpf || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <Building2 className="h-3 w-3" /> Empresa
+                      </div>
+                      <div className="text-sm text-white font-medium">{viewDoc.companyName || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> Setor de Trabalho
+                      </div>
+                      <div className="text-sm text-white font-medium">{viewDoc.employeeDepartment || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <Briefcase className="h-3 w-3" /> Cargo / Função
+                      </div>
+                      <div className="text-sm text-white font-medium">{viewDoc.employeePosition || '—'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dados do Atestado */}
+                <div className="rounded-xl border border-gray-600/50 bg-seguranca-black/40 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <FileText className="h-4 w-4 text-amber-400" />
+                    Dados do Documento
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider">Tipo</div>
+                      <Badge variant="secondary" className="mt-1">{MEDICAL_TYPE_LABELS[viewDoc.documentType]}</Badge>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider">Período</div>
+                      <div className="text-sm text-white">
+                        {formatAdmissionDateBr(viewDoc.startDate)}
+                        {viewDoc.endDate ? ` → ${formatAdmissionDateBr(viewDoc.endDate)}` : ''}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider">Dias</div>
+                      <div className="text-sm text-white font-semibold">{viewDoc.days != null ? `${viewDoc.days} dia(s)` : '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider">Horas</div>
+                      <div className="text-sm text-white">{viewDoc.hours != null ? `${viewDoc.hours}h` : '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider">CID</div>
+                      <div className="text-sm text-white">{viewDoc.cidCode || '—'}</div>
+                      {viewDoc.cidDescription && (
+                        <div className="text-[11px] text-muted-foreground mt-0.5">{viewDoc.cidDescription}</div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider">Data de Cadastro</div>
+                      <div className="text-sm text-white">
+                        {viewDoc.createdAt ? formatAdmissionDateBr(viewDoc.createdAt.slice(0, 10)) : '—'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dados do médico */}
+                  {(viewDoc.doctorName || viewDoc.crm || viewDoc.specialty) && (
+                    <div className="pt-3 border-t border-gray-700/30">
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">Médico</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground text-[11px]">Nome: </span>
+                          <span className="text-white">{viewDoc.doctorName || '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground text-[11px]">CRM: </span>
+                          <span className="text-white">{viewDoc.crm || '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground text-[11px]">Especialidade: </span>
+                          <span className="text-white">{viewDoc.specialty || '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Observações */}
+                  {viewDoc.observations && (
+                    <div className="pt-3 border-t border-gray-700/30">
+                      <div className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Observações</div>
+                      <p className="text-sm text-gray-300 whitespace-pre-wrap">{viewDoc.observations}</p>
+                    </div>
+                  )}
+
+                  {/* Anexo */}
+                  {viewDoc.documentUrl && (
+                    <div className="pt-3 border-t border-gray-700/30">
+                      <a
+                        href={viewDoc.documentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm text-seguranca-yellow hover:underline"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Ver anexo do documento
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* ─── Alertas CLT/INSS do funcionário ─── */}
+                {viewDoc.employeeId && (() => {
+                  const empAlert = getEmployeeAlert(viewDoc.employeeId);
+                  if (!empAlert) return null;
+
+                  const isCritical = empAlert.totalDays >= 15;
+                  const isWarning = empAlert.totalDays >= 12 && empAlert.totalDays < 15;
+
+                  return (
+                    <div className={cn(
+                      'rounded-xl border p-4 space-y-3',
+                      isCritical
+                        ? 'border-red-600/50 bg-red-950/30'
+                        : isWarning
+                        ? 'border-amber-600/50 bg-amber-950/30'
+                        : 'border-gray-600/50 bg-seguranca-black/40'
+                    )}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                          {isCritical ? (
+                            <ShieldAlert className="h-4 w-4 text-red-400" />
+                          ) : isWarning ? (
+                            <AlertTriangle className="h-4 w-4 text-amber-400" />
+                          ) : (
+                            <Clock className="h-4 w-4 text-gray-400" />
+                          )}
+                          Alerta INSS / CLT do Funcionário
+                        </div>
+                        <Badge className={cn(
+                          'font-bold text-xs',
+                          isCritical ? 'bg-red-600 text-white' : isWarning ? 'bg-amber-600 text-white' : 'bg-gray-600 text-white'
+                        )}>
+                          {empAlert.totalDays} dia(s) acumulado(s)
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground text-[11px]">Total de atestados: </span>
+                          <span className="text-white font-semibold">{empAlert.totalCount}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground text-[11px]">Status: </span>
+                          {isCritical ? (
+                            <span className="text-red-400 font-bold text-xs">🚨 Encaminhar para Perícia INSS</span>
+                          ) : isWarning ? (
+                            <span className="text-amber-400 font-bold text-xs">⚠️ Próximo ao limite CLT (15 dias)</span>
+                          ) : (
+                            <span className="text-green-400 text-xs">✅ Dentro do limite</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Histórico de atestados deste funcionário */}
+                      {empAlert.documents.length > 1 && (
+                        <div className="pt-3 border-t border-gray-700/30">
+                          <div className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">
+                            Histórico de Atestados ({empAlert.documents.length})
+                          </div>
+                          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                            {empAlert.documents.map((d) => (
+                              <div
+                                key={d.id}
+                                className={cn(
+                                  'flex items-center justify-between rounded-md px-2.5 py-1.5 text-[11px]',
+                                  d.id === viewDoc.id ? 'bg-white/10 border border-white/10' : 'bg-black/20'
+                                )}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Badge variant="outline" className="text-[9px] shrink-0">
+                                    {MEDICAL_TYPE_LABELS[d.documentType]?.split(' ')[0] || d.documentType}
+                                  </Badge>
+                                  <span className="text-gray-300 truncate">
+                                    {formatAdmissionDateBr(d.startDate)}
+                                    {d.endDate ? ` → ${formatAdmissionDateBr(d.endDate)}` : ''}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="font-semibold text-white">{d.days != null ? `${d.days}d` : '-'}</span>
+                                  {d.cidCode && <span className="text-muted-foreground">{d.cidCode}</span>}
+                                  {d.id === viewDoc.id && <span className="text-emerald-400">● atual</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setViewModalOpen(false)}>
+                Fechar
+              </Button>
+              {viewDoc && (
+                <Button
+                  variant="outline"
+                  className="border-blue-500/50 text-blue-400 hover:bg-blue-950/40"
+                  onClick={() => {
+                    setViewModalOpen(false);
+                    openEdit(viewDoc);
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Editar
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* Modal de Relatórios de Atestados Médicos                         */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
         <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-700 text-white">
             <DialogHeader>
@@ -1136,9 +1668,9 @@ const GestaoAtestados: React.FC = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ALL">📋 Todos os Tipos</SelectItem>
-                      {Object.entries(MEDICAL_TYPE_LABELS).map(([k, v]) => (
-                        <SelectItem key={k} value={k}>
-                          {v}
+                      {MEDICAL_FORM_TYPES.map(({ value, label }) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1166,6 +1698,7 @@ const GestaoAtestados: React.FC = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Funcionário</TableHead>
+                      <TableHead>Empresa</TableHead>
                       <TableHead>Setor</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Período</TableHead>
@@ -1176,7 +1709,7 @@ const GestaoAtestados: React.FC = () => {
                   <TableBody>
                     {reportFilteredItems.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
                           Nenhum atestado encontrado para os filtros selecionados.
                         </TableCell>
                       </TableRow>
@@ -1184,6 +1717,7 @@ const GestaoAtestados: React.FC = () => {
                       reportFilteredItems.map((doc) => (
                         <TableRow key={doc.id}>
                           <TableCell className="font-medium text-xs">{doc.employeeName}</TableCell>
+                          <TableCell className="text-xs text-gray-300">{doc.companyName || '—'}</TableCell>
                           <TableCell className="text-xs text-gray-300">{doc.employeeDepartment || '—'}</TableCell>
                           <TableCell className="text-xs">
                             <Badge variant="outline">{MEDICAL_TYPE_LABELS[doc.documentType] || doc.documentType}</Badge>

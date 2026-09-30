@@ -56,6 +56,13 @@ export interface Employee {
   terminationReason?: string;
   status?: string;
   notes?: string;
+  judicialProcessStartDate?: string;
+  judicialProcessEndDate?: string;
+  judicialProcessNotes?: string;
+  inssStartDate?: string;
+  inssEndDate?: string;
+  absenceStartDate?: string;
+  absenceEndDate?: string;
   periodCount?: number;
   isReadmitido?: boolean;
   admissionType?: string;
@@ -357,6 +364,13 @@ export interface CreateEmployeeDTO {
   admissionType?: string;
   status?: string;
   notes?: string;
+  judicialProcessStartDate?: string;
+  judicialProcessEndDate?: string;
+  judicialProcessNotes?: string;
+  inssStartDate?: string;
+  inssEndDate?: string;
+  absenceStartDate?: string;
+  absenceEndDate?: string;
 
   // Campos adicionais
   tituloEleitor?: string;

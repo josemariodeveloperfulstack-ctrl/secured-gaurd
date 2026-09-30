@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { employeeService, Employee } from '@/services/employeeService';
 import { feriasService } from '@/services/feriasService';
+import { calcularPeriodoAquisitivo, formatBr } from '@/utils/feriasPeriodo';
 import FeriasFormModal from '@/components/ferias/FeriasFormModal';
 import AfastamentoFormModal from '@/components/ferias/AfastamentoFormModal';
 import FeriasReportModal from '@/components/ferias/FeriasReportModal';
@@ -36,6 +37,8 @@ interface FeriasPeriodo {
   employeeId: string;
   employeeName: string;
   periodoAquisitivo: string; // ex: "2024/2025"
+  empresa?: string; // sigla: VIG, ADM ou TERC
+  setor?: string; // setor de trabalho
   dataInicio: string;
   dataFim: string;
   status: 'PENDENTE' | 'APROVADO' | 'EM_ANDAMENTO' | 'CONCLUIDO' | 'CANCELADO';
@@ -58,6 +61,20 @@ interface Afastamento {
   createdAt: string;
 }
 
+const isFeriasPeriodo = (item: FeriasPeriodo | Afastamento | null): item is FeriasPeriodo => {
+  if (!item) return false;
+  return 'periodoAquisitivo' in item || (
+    'tipo' in item && (item.tipo === 'FERIAS_NORMAIS' || item.tipo === 'FERIAS_VENDIDAS' || item.tipo === 'ABONO_PECUNIARIO')
+  );
+};
+
+const isAfastamento = (item: FeriasPeriodo | Afastamento | null): item is Afastamento => {
+  if (!item) return false;
+  return 'motivo' in item || (
+    'tipo' in item && item.tipo !== 'FERIAS_NORMAIS' && item.tipo !== 'FERIAS_VENDIDAS' && item.tipo !== 'ABONO_PECUNIARIO'
+  );
+};
+
 const FeriasPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('ferias');
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,6 +84,8 @@ const FeriasPage: React.FC = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+  const [empresaFilter, setEmpresaFilter] = useState('');
+  const [agendarEmployeeId, setAgendarEmployeeId] = useState<string | undefined>(undefined);
   const [selectedItem, setSelectedItem] = useState<FeriasPeriodo | Afastamento | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const queryClient = useQueryClient();
@@ -93,6 +112,63 @@ const FeriasPage: React.FC = () => {
     queryKey: ['employees'],
     queryFn: () => employeeService.getAllEmployees(),
   });
+
+  const employeesById = useMemo(() => {
+    const map: Record<string, Employee> = {};
+    (employees || []).forEach(emp => {
+      if (emp?.id) map[emp.id] = emp;
+    });
+    return map;
+  }, [employees]);
+
+  const empresaOf = (ferias: FeriasPeriodo) =>
+    ferias.empresa || employeesById[ferias.employeeId]?.company?.sigla || '';
+
+  const setorOf = (ferias: FeriasPeriodo) =>
+    ferias.setor || employeesById[ferias.employeeId]?.department?.name || '';
+
+  // Filtros da lista de férias (busca por nome + empresa VIG/ADM/TERC)
+  const filteredFerias = useMemo(() => {
+    const termo = searchTerm.trim().toLowerCase();
+    return feriasPeriodos.filter(ferias => {
+      const empresa = ferias.empresa || employeesById[ferias.employeeId]?.company?.sigla || '';
+      const matchBusca = !termo || ferias.employeeName.toLowerCase().includes(termo);
+      const matchEmpresa = !empresaFilter || empresa === empresaFilter;
+      return matchBusca && matchEmpresa;
+    });
+  }, [feriasPeriodos, searchTerm, empresaFilter, employeesById]);
+
+  // Alertas de período aquisitivo: quem ainda não tem e quem está com o período a vencer
+  const alertasPeriodo = useMemo(() => {
+    if (!employees?.length) return [];
+
+    const feriasPorFuncionario: Record<string, { dataInicio?: string; status?: string }[]> = {};
+    feriasPeriodos.forEach(f => {
+      if (!feriasPorFuncionario[f.employeeId]) feriasPorFuncionario[f.employeeId] = [];
+      feriasPorFuncionario[f.employeeId].push({ dataInicio: f.dataInicio, status: f.status });
+    });
+
+    return employees
+      .filter(emp => {
+        if (!emp?.id || !emp.hireDate) return false;
+        if (emp.terminationDate) return false;
+        const status = String(emp.status || '').toUpperCase();
+        return status !== 'TERMINATED' && status !== 'INACTIVE';
+      })
+      .map(emp => ({
+        emp,
+        info: calcularPeriodoAquisitivo(emp.hireDate, feriasPorFuncionario[emp.id] || [])
+      }))
+      .filter(a => a.info.status === 'SEM_PERIODO' || a.info.status === 'VENCENDO')
+      .sort((a, b) => {
+        const peso = (s: string) => (s === 'VENCENDO' ? 0 : 1);
+        const diff = peso(a.info.status) - peso(b.info.status);
+        if (diff !== 0) return diff;
+        return (a.info.diasParaDisponibilizar ?? a.info.diasParaVencer ?? 0) -
+          (b.info.diasParaDisponibilizar ?? b.info.diasParaVencer ?? 0);
+      })
+      .slice(0, 8);
+  }, [employees, feriasPeriodos]);
 
   // Calcular estatísticas dos dados carregados
   const feriasPendentes = feriasPeriodos.filter(f => f.status === 'PENDENTE').length;
@@ -137,10 +213,20 @@ const FeriasPage: React.FC = () => {
   };
 
   const handleOpenFeriasModal = () => {
+    setSelectedItem(null);
+    setAgendarEmployeeId(undefined);
+    setFeriasModalOpen(true);
+  };
+
+  const handleAgendar = (employeeId: string) => {
+    setSelectedItem(null);
+    setAgendarEmployeeId(employeeId);
     setFeriasModalOpen(true);
   };
 
   const handleOpenAfastamentoModal = () => {
+    setSelectedItem(null);
+    setAgendarEmployeeId(undefined);
     setAfastamentoModalOpen(true);
   };
 
@@ -153,6 +239,7 @@ const FeriasPage: React.FC = () => {
     setReportModalOpen(false);
     setApprovalModalOpen(false);
     setSelectedItem(null);
+    setAgendarEmployeeId(undefined);
     // Recarregar dados após criar/editar
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     queryClient.invalidateQueries({ queryKey: ['afastamentos'] });
@@ -166,6 +253,7 @@ const FeriasPage: React.FC = () => {
   const handleEdit = (item: FeriasPeriodo | Afastamento) => {
     console.log('Editando item:', item);
     setSelectedItem(item);
+    setAgendarEmployeeId(undefined);
     
     // Determinar qual modal abrir baseado no tipo do item
     if ('tipo' in item && (item.tipo === 'FERIAS_NORMAIS' || item.tipo === 'FERIAS_VENDIDAS' || item.tipo === 'ABONO_PECUNIARIO')) {
@@ -338,6 +426,54 @@ const FeriasPage: React.FC = () => {
 
           {/* Tab Férias */}
           <TabsContent value="ferias" className="space-y-4">
+            {/* Alertas de período aquisitivo */}
+            {alertasPeriodo.length > 0 && (
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-seguranca-yellow" />
+                    Alertas de Período Aquisitivo
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {alertasPeriodo.map(({ emp, info }) => (
+                    <div
+                      key={emp.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-gray-700 rounded p-3 bg-seguranca-black"
+                    >
+                      <div className="flex items-start gap-2">
+                        {info.status === 'VENCENDO'
+                          ? <Clock className="h-4 w-4 mt-0.5 text-orange-400 shrink-0" />
+                          : <AlertTriangle className="h-4 w-4 mt-0.5 text-yellow-400 shrink-0" />}
+                        <div>
+                          <p className="text-sm text-seguranca-lightgray font-medium">
+                            {emp.name}
+                            <span className="text-gray-500 font-normal">
+                              {' '}({emp.company?.sigla || 'S/I'} / {emp.department?.name || 'S/SETOR'})
+                            </span>
+                          </p>
+                          <p className={`text-xs ${info.status === 'VENCENDO' ? 'text-orange-400' : 'text-yellow-400'}`}>
+                            {info.status === 'VENCENDO'
+                              ? `Período ${info.periodo} vence em ${formatBr(info.fim)} (faltam ${info.diasParaVencer} dias) — programe as férias.`
+                              : `Ainda sem período aquisitivo de férias. Disponível a partir de ${formatBr(info.disponivelEm)} (faltam ${info.diasParaDisponibilizar} dias).`}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black self-start sm:self-auto"
+                        onClick={() => handleAgendar(emp.id)}
+                      >
+                        <Calendar className="h-3 w-3 mr-1" />
+                        Agendar
+                      </Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Filtros */}
             <Card className="bg-seguranca-graphite border-gray-600">
               <CardContent className="p-4">
@@ -354,10 +490,20 @@ const FeriasPage: React.FC = () => {
                       />
                     </div>
                   </div>
-                  <Button variant="outline" className="border-gray-600 text-seguranca-lightgray">
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filtros
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-gray-400" />
+                    <select
+                      value={empresaFilter}
+                      onChange={(e) => setEmpresaFilter(e.target.value)}
+                      aria-label="Filtrar por empresa"
+                      className="py-2 px-3 bg-seguranca-black border border-gray-600 rounded text-seguranca-lightgray focus:border-seguranca-yellow focus:outline-none"
+                    >
+                      <option value="">Todas as empresas</option>
+                      <option value="VIG">VIG</option>
+                      <option value="ADM">ADM</option>
+                      <option value="TERC">TERC</option>
+                    </select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -384,6 +530,8 @@ const FeriasPage: React.FC = () => {
                       <thead>
                         <tr className="text-seguranca-yellow text-left border-b border-gray-700">
                           <th className="p-3 text-sm">Funcionário</th>
+                          <th className="p-3 text-sm">Empresa</th>
+                          <th className="p-3 text-sm">Setor de Trabalho</th>
                           <th className="p-3 text-sm">Período Aquisitivo</th>
                           <th className="p-3 text-sm">Data Início</th>
                           <th className="p-3 text-sm">Data Fim</th>
@@ -394,16 +542,22 @@ const FeriasPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {feriasPeriodos.length === 0 ? (
+                        {filteredFerias.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="p-8 text-center text-gray-400">
+                            <td colSpan={10} className="p-8 text-center text-gray-400">
                               Nenhuma solicitação de férias encontrada.
                             </td>
                           </tr>
                         ) : (
-                          feriasPeriodos.map((ferias) => (
+                          filteredFerias.map((ferias) => (
                             <tr key={ferias.id} className="border-b border-gray-700 text-seguranca-lightgray hover:bg-seguranca-black transition-colors">
                               <td className="p-3 text-sm">{ferias.employeeName}</td>
+                              <td className="p-3 text-sm">
+                                <Badge className="bg-seguranca-graphite text-seguranca-yellow border border-gray-600">
+                                  {empresaOf(ferias) || '-'}
+                                </Badge>
+                              </td>
+                              <td className="p-3 text-sm">{setorOf(ferias) || '-'}</td>
                               <td className="p-3 text-sm">{ferias.periodoAquisitivo}</td>
                               <td className="p-3 text-sm">{formatDate(ferias.dataInicio)}</td>
                               <td className="p-3 text-sm">{formatDate(ferias.dataFim)}</td>
@@ -440,7 +594,7 @@ const FeriasPage: React.FC = () => {
                                     <Button 
                                       size="sm" 
                                       variant="outline" 
-                                      className="text-purple-400 border-purple-400 hover:bg-purple-400 hover:text-seguranca-black"
+                                      className="text-amber-400 border-amber-400 hover:bg-amber-400 hover:text-seguranca-black"
                                       onClick={() => handleApprove(ferias)}
                                       title="Aprovar/Rejeitar"
                                     >
@@ -573,7 +727,7 @@ const FeriasPage: React.FC = () => {
                                     <Button 
                                       size="sm" 
                                       variant="outline" 
-                                      className="text-purple-400 border-purple-400 hover:bg-purple-400 hover:text-seguranca-black"
+                                      className="text-amber-400 border-amber-400 hover:bg-amber-400 hover:text-seguranca-black"
                                       onClick={() => handleApprove(afastamento)}
                                       title="Aprovar/Rejeitar"
                                     >
@@ -609,8 +763,9 @@ const FeriasPage: React.FC = () => {
         <FeriasFormModal
           onSuccess={handleCloseModals}
           onClose={handleCloseModals}
-          editingId={selectedItem && 'tipo' in selectedItem ? selectedItem.id : undefined}
-          initialData={selectedItem && 'tipo' in selectedItem ? {
+          editingId={isFeriasPeriodo(selectedItem) ? selectedItem.id : undefined}
+          initialEmployeeId={agendarEmployeeId}
+          initialData={isFeriasPeriodo(selectedItem) ? {
             employeeId: selectedItem.employeeId,
             periodoAquisitivo: selectedItem.periodoAquisitivo || '',
             dataInicio: selectedItem.dataInicio,
@@ -625,8 +780,8 @@ const FeriasPage: React.FC = () => {
         <AfastamentoFormModal
           onSuccess={handleCloseModals}
           onClose={handleCloseModals}
-          editingId={selectedItem && 'motivo' in selectedItem ? selectedItem.id : undefined}
-          initialData={selectedItem && 'motivo' in selectedItem ? {
+          editingId={isAfastamento(selectedItem) ? selectedItem.id : undefined}
+          initialData={isAfastamento(selectedItem) ? {
             employeeId: selectedItem.employeeId,
             tipo: selectedItem.tipo as any,
             dataInicio: selectedItem.dataInicio,

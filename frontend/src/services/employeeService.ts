@@ -334,6 +334,7 @@ export interface SimpleEmployee {
   terminationDate?: string;
   rg?: string;
   companyId?: string;
+  companyName?: string;
   companySigla?: string;
   positionName?: string;
   unitName?: string;
@@ -362,6 +363,7 @@ export function employeeToSimpleEmployee(emp: Employee): SimpleEmployee {
     terminationDate: emp.terminationDate,
     rg: emp.rg,
     companyId: emp.company?.id,
+    companyName: emp.company?.name,
     companySigla: emp.company?.sigla,
     positionName: emp.position?.name,
     unitName: emp.unit?.name,

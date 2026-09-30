@@ -182,14 +182,12 @@ public class MedicalDocumentService {
         });
 
         long atestados = docs.stream()
-                .filter(d -> d.getDocumentType() == MedicalDocumentType.ATESTADO)
+                .filter(d -> d.getDocumentType() != null && !d.getDocumentType().isDeclaration())
                 .count();
         long declaracoes = docs.stream().filter(d ->
-                d.getDocumentType() == MedicalDocumentType.DECLARACAO_COMPARECIMENTO
-                        || d.getDocumentType() == MedicalDocumentType.DECLARACAO_MEDICA).count();
+                d.getDocumentType() != null && d.getDocumentType().isDeclaration()).count();
         int dias = docs.stream()
-                .filter(d -> d.getDocumentType() == MedicalDocumentType.ATESTADO
-                        || d.getDocumentType() == MedicalDocumentType.AFASTAMENTO)
+                .filter(d -> d.getDocumentType() != null && !d.getDocumentType().isDeclaration())
                 .mapToInt(d -> d.getDays() != null ? d.getDays() : 0).sum();
         BigDecimal horas = docs.stream()
                 .map(d -> d.getHours() != null ? d.getHours() : BigDecimal.ZERO)
@@ -276,8 +274,7 @@ public class MedicalDocumentService {
             throw new BusinessException("Data inicial não pode ser futura");
         }
 
-        if (doc.getDocumentType() == MedicalDocumentType.DECLARACAO_COMPARECIMENTO
-                || doc.getDocumentType() == MedicalDocumentType.DECLARACAO_MEDICA) {
+        if (doc.getDocumentType() != null && doc.getDocumentType().isDeclaration()) {
             doc.setDays(0);
             if (doc.getEndDate() == null) {
                 doc.setEndDate(doc.getStartDate());
@@ -305,8 +302,7 @@ public class MedicalDocumentService {
             }
         } else if (doc.getHours() == null || doc.getHours().compareTo(BigDecimal.ZERO) <= 0) {
             // Comparecimento sem dias: default 1 dia
-            if (doc.getDocumentType() == MedicalDocumentType.ATESTADO
-                    || doc.getDocumentType() == MedicalDocumentType.AFASTAMENTO) {
+            if (doc.getDocumentType() != null && !doc.getDocumentType().isDeclaration()) {
                 doc.setDays(1);
                 doc.setEndDate(doc.getStartDate());
             }
@@ -325,8 +321,7 @@ public class MedicalDocumentService {
         if (doc.getCidCode() == null || doc.getCidCode().isBlank()) {
             return;
         }
-        if (doc.getDocumentType() != MedicalDocumentType.ATESTADO
-                && doc.getDocumentType() != MedicalDocumentType.AFASTAMENTO) {
+        if (doc.getDocumentType() == null || !doc.getDocumentType().countsTowardsInssAlert()) {
             return;
         }
 

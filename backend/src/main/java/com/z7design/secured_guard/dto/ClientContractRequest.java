@@ -45,7 +45,7 @@ public class ClientContractRequest {
     private LocalDate contractDate; // Data do contrato
 
     // Campos das Minutas Comerciais
-    private String contractTemplate; // ADMINISTRATIVO, VIGILANCIA_PATRIMONIAL, COMBINADO
+    private String contractTemplate; // ADMINISTRATIVO, VIGILANCIA_PATRIMONIAL, COMBINADO ou ARMADA/DESARMADA/PORTARIA (minutas de 14 cláusulas)
     private String contractedCompanyCnpj; // CNPJ da empresa promotora
     private Integer replacementTimeHours; // Tempo de reposição de efetivo
     private Integer maxAbsenceMinutes; // Ausência máxima permitida
@@ -55,5 +55,12 @@ public class ClientContractRequest {
     private String penalties; // Penalidades
     private List<UUID> workPostIds; // IDs dos postos de trabalho a vincular
     private BigDecimal monthlyValue; // Valor mensal do contrato
+
+    /**
+     * Minuta de contrato com 14 cláusulas (ARMADA, DESARMADA ou PORTARIA).
+     * Quando informada, o PDF usa o texto integral das cláusulas do template
+     * (resolvido pela empresa) em vez do layout resumido antigo.
+     */
+    private String contractTemplateKey; // ARMADA, DESARMADA, PORTARIA
 }
 
