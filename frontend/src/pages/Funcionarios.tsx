@@ -530,7 +530,13 @@ const Funcionarios: React.FC = () => {
 
       // Verificar se os dados foram recebidos corretamente
       if (!fullEmployeeData || !fullEmployeeData.id) {
-        throw new Error('Dados do funcionário não foram retornados corretamente');
+        toast({
+          title: 'Funcionário não encontrado',
+          description: 'O funcionário não foi encontrado no sistema ou foi excluído. A lista de funcionários foi atualizada.',
+          variant: 'destructive',
+        });
+        queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+        return;
       }
 
       // Garantir workPost: se a API não retornou mas a lista tem (paged inclui work_post)

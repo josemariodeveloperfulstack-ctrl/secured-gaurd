@@ -41,6 +41,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '@/lib/axios';
 import { DatePicker } from '@/components/ui/date-picker';
+import ImportInvoicesModal from './ImportInvoicesModal';
 
 interface Invoice {
   id: string;
@@ -111,6 +112,7 @@ const FaturasTab: React.FC = () => {
   });
   const [showFormModal, setShowFormModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   
@@ -362,6 +364,15 @@ const FaturasTab: React.FC = () => {
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
+          </Button>
+          <Button 
+            onClick={() => setShowImportModal(true)}
+            variant="outline"
+            size="sm"
+            className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow/10"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Importar Planilha
           </Button>
           <Button 
             onClick={handleNovoFatura}
@@ -829,6 +840,12 @@ const FaturasTab: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ImportInvoicesModal
+        open={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={carregarDados}
+      />
     </div>
   );
 };

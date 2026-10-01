@@ -748,7 +748,6 @@ public class EmployeeController {
             @ApiResponse(responseCode = "404", description = "Funcionário não encontrado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @Transactional(readOnly = true)
     public ResponseEntity<Object> getById(@PathVariable String id) {
         try {
             System.out.println("🔍 EmployeeController.getById - Buscando funcionário ID: " + id);
@@ -777,7 +776,11 @@ public class EmployeeController {
 
         } catch (com.z7design.secured_guard.exception.ResourceNotFoundException e) {
             System.err.println("❌ Funcionário não encontrado: " + id);
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(java.util.Map.of(
+                    "status", 404,
+                    "error", "RESOURCE_NOT_FOUND",
+                    "message", "Funcionário não encontrado com id: " + id
+            ));
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getById - Erro: " + e.getMessage());
             e.printStackTrace();

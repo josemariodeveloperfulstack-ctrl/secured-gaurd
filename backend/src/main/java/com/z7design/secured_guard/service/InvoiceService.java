@@ -1,6 +1,8 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.InvoiceDTO;
+import com.z7design.secured_guard.dto.InvoiceImportItemDTO;
+import com.z7design.secured_guard.dto.InvoiceImportResultDTO;
 import com.z7design.secured_guard.model.Invoice;
 import com.z7design.secured_guard.model.enums.ExpenseStatus;
 import com.z7design.secured_guard.model.enums.ExpenseType;
@@ -29,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -656,5 +660,152 @@ public class InvoiceService {
     // Buscar todos os centros de custo da tabela cost_centers
     public List<String> getAllCostCenterNames() {
         return invoiceRepository.findAllCostCenterNames();
+    }
+
+    @Transactional
+    public InvoiceImportResultDTO importInvoicesFromExcel(List<InvoiceImportItemDTO> items) {
+        if (items == null || items.isEmpty()) {
+            return InvoiceImportResultDTO.builder()
+                    .totalRows(0)
+                    .importedCount(0)
+                    .newSuppliersCreatedCount(0)
+                    .totalAmount(BigDecimal.ZERO)
+                    .createdSupplierNames(List.of())
+                    .importedInvoices(List.of())
+                    .build();
+        }
+
+        int importedCount = 0;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<String> createdSupplierNames = new java.util.ArrayList<>();
+        List<InvoiceDTO> importedDtos = new java.util.ArrayList<>();
+
+        // Buscar unidade padrão com fallback seguro
+        Unit defaultUnit = unitRepository.findByNameContainingIgnoreCase("Uberl")
+                .stream().findFirst()
+                .orElseGet(() -> unitRepository.findAll().stream().findFirst().orElse(null));
+
+        if (defaultUnit == null) {
+            Unit newUnit = new Unit();
+            newUnit.setName("Uberlândia");
+            newUnit.setActive(true);
+            defaultUnit = unitRepository.save(newUnit);
+        }
+
+        // Cache local de fornecedores para evitar duplicidade e excesso de queries no mesmo lote
+        Map<String, Supplier> supplierCache = new java.util.HashMap<>();
+
+        for (InvoiceImportItemDTO item : items) {
+            if (item == null) continue;
+            BigDecimal amount = item.getAmount();
+            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            LocalDate dueDate = item.getDueDate() != null ? item.getDueDate() : LocalDate.now();
+
+            // Tratar Fornecedor
+            Supplier supplier = null;
+            String rawSupplierName = item.getSupplierName() != null ? item.getSupplierName().trim() : "";
+            if (!rawSupplierName.isEmpty()) {
+                String supplierName = rawSupplierName.length() > 250 ? rawSupplierName.substring(0, 250) : rawSupplierName;
+                final String finalSupplierName = supplierName;
+                String cacheKey = finalSupplierName.toLowerCase();
+
+                if (supplierCache.containsKey(cacheKey)) {
+                    supplier = supplierCache.get(cacheKey);
+                } else {
+                    Optional<Supplier> existingOpt = supplierRepository.findFirstByNameIgnoreCase(finalSupplierName);
+                    if (existingOpt.isPresent()) {
+                        supplier = existingOpt.get();
+                    } else {
+                        Supplier newSupplier = new Supplier();
+                        newSupplier.setName(finalSupplierName);
+                        newSupplier.setIsActive(true);
+                        supplier = supplierRepository.saveAndFlush(newSupplier);
+                        if (!createdSupplierNames.contains(finalSupplierName)) {
+                            createdSupplierNames.add(finalSupplierName);
+                        }
+                    }
+                    supplierCache.put(cacheKey, supplier);
+                }
+            }
+
+            // Tratar Unidade
+            Unit unit = null;
+            if (item.getUnitName() != null && !item.getUnitName().isBlank()) {
+                String searchUnit = item.getUnitName().trim();
+                unit = unitRepository.findByNameContainingIgnoreCase(searchUnit)
+                        .stream().findFirst().orElse(defaultUnit);
+            }
+            if (unit == null) {
+                unit = defaultUnit;
+            }
+
+            // Normalizar Sigla Empresa (VIG, TERC, ADM, UBERL)
+            String sigla = item.getCompanySigla();
+            if (sigla == null || sigla.isBlank()) {
+                sigla = "VIG";
+            } else if (sigla.length() > 10) {
+                sigla = sigla.substring(0, 10);
+            }
+
+            Invoice invoice = new Invoice();
+            invoice.setInvoiceNumber("IMP-" + System.currentTimeMillis() + "-" + (importedCount + 1));
+            
+            String desc = item.getDescription() != null && !item.getDescription().isBlank() 
+                    ? item.getDescription() 
+                    : (rawSupplierName.isEmpty() ? "Pagamento Importado" : rawSupplierName);
+            if (desc.length() > 500) {
+                desc = desc.substring(0, 497) + "...";
+            }
+            invoice.setDescription(desc);
+            invoice.setAmount(amount);
+            
+            ExpenseType type = ExpenseType.VARIAVEL;
+            if (item.getType() != null && item.getType().toUpperCase().contains("FIXA")) {
+                type = ExpenseType.FIXA;
+            }
+            invoice.setType(type);
+
+            ExpenseStatus status = ExpenseStatus.PENDENTE;
+            if (item.getStatus() != null && item.getStatus().toUpperCase().contains("PAG")) {
+                status = ExpenseStatus.PAGA;
+            }
+            invoice.setStatus(status);
+
+            invoice.setDueDate(dueDate);
+            invoice.setIssueDate(item.getIssueDate() != null ? item.getIssueDate() : LocalDate.now());
+            if (status == ExpenseStatus.PAGA) {
+                invoice.setPaymentDate(dueDate);
+            }
+
+            invoice.setCompanySigla(sigla.trim().toUpperCase());
+            invoice.setSupplier(supplier);
+            invoice.setUnit(unit);
+            
+            String barcode = item.getBarcode();
+            if (barcode != null && barcode.length() > 255) {
+                barcode = barcode.substring(0, 250);
+            }
+            invoice.setBarcode(barcode);
+
+            String notes = item.getNotes();
+            if (notes != null && notes.length() > 1000) {
+                notes = notes.substring(0, 997) + "...";
+            }
+            invoice.setNotes(notes);
+
+            invoiceRepository.save(invoice);
+            totalAmount = totalAmount.add(amount);
+            importedCount++;
+        }
+
+        return InvoiceImportResultDTO.builder()
+                .totalRows(items.size())
+                .importedCount(importedCount)
+                .newSuppliersCreatedCount(createdSupplierNames.size())
+                .totalAmount(totalAmount)
+                .createdSupplierNames(createdSupplierNames)
+                .importedInvoices(List.of())
+                .build();
     }
 } 
