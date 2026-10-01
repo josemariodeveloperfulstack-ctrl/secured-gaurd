@@ -1,6 +1,8 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.InvoiceDTO;
+import com.z7design.secured_guard.dto.InvoiceImportItemDTO;
+import com.z7design.secured_guard.dto.InvoiceImportResultDTO;
 import com.z7design.secured_guard.dto.ClientDTO;
 import com.z7design.secured_guard.dto.ClientSelectDTO;
 import com.z7design.secured_guard.model.Invoice;
@@ -71,9 +73,14 @@ public class InvoiceController {
     @GetMapping("/all")
     @Operation(summary = "Listar todas as faturas (sem paginação)", description = "Retorna uma lista completa de todas as faturas")
     public ResponseEntity<List<InvoiceDTO>> getAllWithoutPagination() {
-        List<Invoice> invoices = invoiceService.findAll();
-        List<InvoiceDTO> dtos = invoices.stream().map(InvoiceDTO::fromEntity).collect(Collectors.toList());
-        return ResponseEntity.ok(dtos);
+        try {
+            List<Invoice> invoices = invoiceService.findAll();
+            List<InvoiceDTO> dtos = invoices.stream().map(InvoiceDTO::fromEntity).collect(Collectors.toList());
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            log.error("❌ Erro em GET /api/invoices/all", e);
+            return ResponseEntity.ok(List.of());
+        }
     }
     
     @GetMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
@@ -649,5 +656,22 @@ public class InvoiceController {
             return user.getId();
         }
         return null;
+    }
+
+    @PostMapping("/import/excel")
+    @Operation(summary = "Importar faturas da planilha em lote", description = "Cadastra faturas extraídas da planilha e auto-cadastra fornecedores se inexistentes")
+    public ResponseEntity<InvoiceImportResultDTO> importFromExcel(@RequestBody List<InvoiceImportItemDTO> items) {
+        try {
+            log.info("POST /api/invoices/import/excel - Recebidos {} itens para importação", items != null ? items.size() : 0);
+            InvoiceImportResultDTO result = invoiceService.importInvoicesFromExcel(items);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Erro ao importar faturas da planilha: {}", e.getMessage(), e);
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, 
+                "Falha ao importar faturas: " + e.getMessage(), 
+                e
+            );
+        }
     }
 } 

@@ -29,13 +29,15 @@ import {
   ArrowLeft,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Search
 } from 'lucide-react';
 import { ContasAPagarFormModal, ContaAPagar } from '@/components/financeiro/ContasAPagarFormModal';
 import { ContasAPagarTable } from '@/components/financeiro/ContasAPagarTable';
 import { ContasAPagarDashboard } from '@/components/financeiro/ContasAPagarDashboard';
 import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewModal';
 import { ContasAPagarReportCustomModal } from '@/components/financeiro/ContasAPagarReportCustomModal';
+import ImportInvoicesModal from '@/components/financeiro/ImportInvoicesModal';
 import { contasAPagarService, formatContaPlanoDeContas } from '@/services/contasAPagarService';
 import { format, addDays, isBefore, parseISO } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -49,6 +51,7 @@ const ContasAPagar: React.FC = () => {
   const [showFormModal, setShowFormModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showCustomReportModal, setShowCustomReportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingConta, setEditingConta] = useState<ContaAPagar | null>(null);
   const [viewingConta, setViewingConta] = useState<ContaAPagar | null>(null);
   const [alertasVencimento, setAlertasVencimento] = useState<ContaAPagar[]>([]);
@@ -945,6 +948,14 @@ const ContasAPagar: React.FC = () => {
             </Button>
             <Button
               variant="outline"
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2 border-green-500/60 text-green-400 hover:bg-green-500/10 font-semibold shadow-sm"
+            >
+              <FileSpreadsheet size={16} />
+              Importar Planilha (.xlsx)
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => setShowDashboard(!showDashboard)}
               className="flex items-center gap-2"
             >
@@ -1098,52 +1109,61 @@ const ContasAPagar: React.FC = () => {
             </div>
 
             {/* Filtros */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-lg">
-                    <FileText className="text-blue-500" />
+            <Card className="bg-gray-900/90 border border-gray-800 shadow-xl rounded-xl">
+              <CardHeader className="pb-3 border-b border-gray-800/80">
+                <CardTitle className="flex items-center justify-between text-white">
+                  <div className="flex items-center gap-2 text-base font-bold">
+                    <Filter className="text-seguranca-yellow h-5 w-5" />
                     Filtros e Busca
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="pt-4 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   {/* Campo de Busca */}
                   <div className="md:col-span-2">
+                    <label className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Search className="h-3.5 w-3.5 text-seguranca-yellow" /> Pesquisar por Descrição / Fornecedor
+                    </label>
                     <input
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Buscar por descrição ou fornecedor..."
-                      className="w-full px-3 py-2 bg-seguranca-black border border-gray-700 rounded-lg text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Digite para pesquisar..."
+                      className="w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-white placeholder-gray-400 font-medium focus:outline-none focus:ring-1 focus:ring-seguranca-yellow focus:border-seguranca-yellow shadow-inner"
                     />
                   </div>
 
                   {/* Filtro por Status */}
                   <div>
+                    <label className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Filter className="h-3.5 w-3.5 text-blue-400" /> Status da Conta
+                    </label>
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-3 py-2 bg-seguranca-black border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-white font-medium focus:outline-none focus:ring-1 focus:ring-seguranca-yellow focus:border-seguranca-yellow shadow-inner"
                     >
-                      <option value="TODOS" className="text-gray-900">Todos os Status</option>
-                      <option value="ABERTA" className="text-gray-900">Aberta</option>
-                      <option value="PAGA" className="text-gray-900">Paga</option>
-                      <option value="VENCIDA" className="text-gray-900">Vencida</option>
+                      <option value="TODOS" className="text-gray-900 bg-gray-100 font-semibold">Todos os Status</option>
+                      <option value="ABERTA" className="text-gray-900 bg-gray-100 font-semibold">Aberta</option>
+                      <option value="PAGA" className="text-gray-900 bg-gray-100 font-semibold">Paga</option>
+                      <option value="VENCIDA" className="text-gray-900 bg-gray-100 font-semibold">Vencida</option>
                     </select>
                   </div>
 
                   {/* Filtro por Tipo */}
                   <div>
+                    <label className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Filter className="h-3.5 w-3.5 text-cyan-400" /> Tipo de Despesa
+                    </label>
                     <select
                       value={tipoFilter}
                       onChange={(e) => setTipoFilter(e.target.value)}
-                      className="w-full px-3 py-2 bg-seguranca-black border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-white font-medium focus:outline-none focus:ring-1 focus:ring-seguranca-yellow focus:border-seguranca-yellow shadow-inner"
                     >
-                      <option value="TODOS" className="text-gray-900">Todos os Tipos</option>
-                      <option value="FIXA" className="text-gray-900">Fixa</option>
-                      <option value="VARIAVEL" className="text-gray-900">Variável</option>
+                      <option value="TODOS" className="text-gray-900 bg-gray-100 font-semibold">Todos os Tipos</option>
+                      <option value="FIXA" className="text-gray-900 bg-gray-100 font-semibold">Fixa</option>
+                      <option value="VARIAVEL" className="text-gray-900 bg-gray-100 font-semibold">Variável</option>
                     </select>
                   </div>
                 </div>
@@ -1151,49 +1171,53 @@ const ContasAPagar: React.FC = () => {
             </Card>
 
             {/* Seletor de Data */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="text-blue-600" />
+            <Card className="bg-gray-900/90 border border-gray-800 shadow-xl rounded-xl">
+              <CardHeader className="pb-3 border-b border-gray-800/80">
+                <CardTitle className="flex items-center justify-between text-white">
+                  <div className="flex items-center gap-2 text-base font-bold">
+                    <Calendar className="text-seguranca-yellow h-5 w-5" />
                     Período de Vencimento
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <Badge variant="outline" className="text-xs border-seguranca-yellow/40 text-seguranca-yellow font-semibold px-2.5 py-1">
                     {contasFiltradas.length} conta(s) encontrada(s)
-                  </div>
+                  </Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Seletor de Ano e Mês */}
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Ano:</span>
-                    <div className="flex gap-2">
-                      {[2025, 2026].map(ano => (
-                        <Button
-                          key={ano}
-                          variant={ano === anoSelecionado ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setAnoSelecionado(ano)}
-                          className={`min-w-[60px] ${ano === anoSelecionado ? "bg-blue-600 hover:bg-blue-700" : ""}`}
-                        >
-                          {ano}
-                        </Button>
-                      ))}
-                    </div>
+              <CardContent className="pt-4 space-y-5">
+                {/* Seletor de Ano */}
+                <div>
+                  <label className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-seguranca-yellow" /> Selecione o Ano
+                  </label>
+                  <div className="flex gap-2">
+                    {[2025, 2026].map(ano => (
+                      <Button
+                        key={ano}
+                        variant={ano === anoSelecionado ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setAnoSelecionado(ano)}
+                        className={`min-w-[70px] font-bold ${
+                          ano === anoSelecionado 
+                            ? "bg-seguranca-yellow text-black hover:bg-yellow-500 shadow-md" 
+                            : "bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700 hover:text-white"
+                        }`}
+                      >
+                        {ano}
+                      </Button>
+                    ))}
                   </div>
                 </div>
 
                 {/* Seletor de Mês */}
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-sm font-medium text-gray-700">Mês:</span>
-                    <span className="text-sm text-blue-600 font-medium">
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-xs font-bold text-gray-200 uppercase tracking-wider">Mês Selecionado:</label>
+                    <span className="text-sm font-bold text-seguranca-yellow bg-seguranca-yellow/10 px-2.5 py-0.5 rounded border border-seguranca-yellow/30">
                       {['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
                         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][mesSelecionado - 1]} {anoSelecionado}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
                     {[
                       'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
                       'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
@@ -1203,7 +1227,11 @@ const ContasAPagar: React.FC = () => {
                         variant={index + 1 === mesSelecionado ? "default" : "outline"}
                         size="sm"
                         onClick={() => setMesSelecionado(index + 1)}
-                        className={`text-xs ${index + 1 === mesSelecionado ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                        className={`text-xs font-semibold ${
+                          index + 1 === mesSelecionado 
+                            ? "bg-seguranca-yellow text-black hover:bg-yellow-500 font-bold shadow-md scale-105" 
+                            : "bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700 hover:text-white"
+                        }`}
                       >
                         {mes}
                       </Button>
@@ -1671,6 +1699,13 @@ const ContasAPagar: React.FC = () => {
         <ContasAPagarReportCustomModal
           open={showCustomReportModal}
           onOpenChange={setShowCustomReportModal}
+        />
+
+        {/* Modal de Importação de Planilha Excel */}
+        <ImportInvoicesModal
+          open={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={loadData}
         />
       </div>
     </StandardLayout>

@@ -1177,7 +1177,7 @@ public class EmployeeService {
         employeeChangeHistoryService.recordChange(employeeId, category, fieldName, fieldLabel, oldVal, newVal, changedByUserId);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = {ResourceNotFoundException.class, jakarta.persistence.EntityNotFoundException.class})
     // Removido @Cacheable - entidade Employee tem relacionamentos circulares que
     // causam problemas no Redis
     // O cache será aplicado apenas nos métodos que retornam DTOs
@@ -1221,7 +1221,7 @@ public class EmployeeService {
         return employee;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = {ResourceNotFoundException.class, jakarta.persistence.EntityNotFoundException.class})
     // @Cacheable removido - EmployeeDTO pode conter campos não serializáveis pelo Redis
     // (ex: tipos customizados, enums com configurações especiais, relacionamentos complexos)
     // que causam SerializationException na segunda chamada (500). Cachear DTOs de Employee

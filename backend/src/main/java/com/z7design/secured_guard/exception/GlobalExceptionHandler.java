@@ -54,6 +54,37 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
+    @ExceptionHandler(org.springframework.transaction.UnexpectedRollbackException.class)
+    public ResponseEntity<ErrorResponse> handleUnexpectedRollback(
+            org.springframework.transaction.UnexpectedRollbackException ex, WebRequest request) {
+        log.warn("Transação revertida inesperadamente: {}", ex.getMessage());
+        String path = request.getDescription(false).replace("uri=", "");
+
+        Throwable cause = ex.getCause();
+        while (cause != null) {
+            if (cause instanceof ResourceNotFoundException) {
+                ErrorResponse errorResponse = ErrorResponse.builder()
+                        .timestamp(LocalDateTime.now())
+                        .status(HttpStatus.NOT_FOUND.value())
+                        .error("RESOURCE_NOT_FOUND")
+                        .message(cause.getMessage())
+                        .path(path)
+                        .build();
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            cause = cause.getCause();
+        }
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error("TRANSACTION_ROLLBACK")
+                .message("A transação não pôde ser completada.")
+                .path(path)
+                .build();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex, WebRequest request) {
         log.warn("Erro de negócio: {}", ex.getMessage());
