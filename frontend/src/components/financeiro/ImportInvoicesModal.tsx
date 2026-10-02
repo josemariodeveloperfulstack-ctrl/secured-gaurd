@@ -175,6 +175,24 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
             if (!detectedCompany) detectedCompany = 'ADM';
           }
 
+          // Varredura de todo o texto da linha para identificar menções à Unidade (Contagem vs Uberlândia)
+          const fullRowText = row.map((c: any) => String(c || '').trim()).join(' ').toUpperCase();
+
+          if (fullRowText.includes('CONTAGEM') || fullRowText.includes('CONTAG') || fullRowText.includes('SEDE') || fullRowText.includes('MATRIZ')) {
+            detectedUnit = 'CONTAGEM';
+          } else if (fullRowText.includes('UBERLANDIA') || fullRowText.includes('UBERLÂNDIA') || fullRowText.includes('UDI')) {
+            detectedUnit = 'UBERLÂNDIA';
+          } else if (!detectedUnit) {
+            // Se não especificado no texto:
+            // Coluna H (7) com valor = UBERLÂNDIA
+            // Colunas I, J, K com valor (Vig, Terc, Serv Adm) = CONTAGEM (Sede)
+            if (valUberlandia > 0 && valVigilancia <= 0 && valTerceirizacao <= 0 && valServicosAdm2 <= 0) {
+              detectedUnit = 'UBERLÂNDIA';
+            } else {
+              detectedUnit = 'CONTAGEM';
+            }
+          }
+
           // Normalizar Sigla da Empresa
           if (detectedCompany.includes('VIG') || detectedCompany.includes('VIGILAN')) {
             detectedCompany = 'VIG';
@@ -184,7 +202,9 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
             detectedCompany = 'ADM';
           } else if (detectedCompany.includes('UBERL')) {
             detectedCompany = 'UBERL';
-            detectedUnit = 'UBERLÂNDIA';
+            if (!detectedUnit || detectedUnit === 'CONTAGEM') {
+              detectedUnit = 'UBERLÂNDIA';
+            }
           }
 
           const warnings: string[] = [];
@@ -240,7 +260,7 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
             description: colD_Fornecedor || colF_Desc || 'Pagamento Importado',
             notes,
             amount: rowAmount,
-            unitName: detectedUnit || 'UBERLÂNDIA',
+            unitName: detectedUnit || 'CONTAGEM',
             status,
             barcode: colM_Barcode,
             isValid,
@@ -596,8 +616,22 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
                           </div>
                         </TableCell>
 
-                        <TableCell className="w-[120px] py-2 px-3 text-xs text-gray-300 whitespace-nowrap font-medium">
-                          {item.unitName || 'UBERLÂNDIA'}
+                        <TableCell className="w-[120px] py-2 px-3 text-xs whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newUnit = item.unitName === 'CONTAGEM' ? 'UBERLÂNDIA' : 'CONTAGEM';
+                              setItems(prev => prev.map(p => p.id === item.id ? { ...p, unitName: newUnit } : p));
+                            }}
+                            title="Clique para alternar a Unidade (CONTAGEM / UBERLÂNDIA)"
+                            className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors cursor-pointer ${
+                              item.unitName === 'CONTAGEM'
+                                ? 'bg-blue-500/20 text-blue-300 border-blue-500/40 hover:bg-blue-500/30'
+                                : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                            }`}
+                          >
+                            {item.unitName || 'CONTAGEM'}
+                          </button>
                         </TableCell>
 
                         <TableCell className="w-[95px] py-2 px-3">

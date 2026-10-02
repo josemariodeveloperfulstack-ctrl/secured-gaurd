@@ -11,6 +11,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
 import { contasAPagarService, Supplier, CategoriaPai, Subcategoria } from '@/services/contasAPagarService';
 import SupplierFormModal from '@/components/estoque/SupplierFormModal';
+import { SupplierCombobox } from '@/components/ui/supplier-combobox';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -447,6 +448,44 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
     ? subcategorias.filter((s) => s.categoriaPaiId === selectedCategoriaPaiId)
     : [];
 
+  // Combina setores sugeridos (Postos/Departamentos) e Centros de Custo em uma única lista sem repetições (sem duplicados no VPS/Local)
+  const sectoresEOptionLista = React.useMemo(() => {
+    const rawList: string[] = [];
+
+    if (Array.isArray(setoresSugeridos)) {
+      setoresSugeridos.forEach((s) => {
+        if (s && typeof s === 'string' && s.trim()) {
+          rawList.push(s.trim());
+        }
+      });
+    }
+
+    if (Array.isArray(costCenters)) {
+      costCenters.forEach((cc) => {
+        if (cc && typeof cc === 'string' && cc.trim()) {
+          rawList.push(cc.trim());
+        }
+      });
+    }
+
+    if (formData.workSector && typeof formData.workSector === 'string' && formData.workSector.trim()) {
+      rawList.push(formData.workSector.trim());
+    }
+
+    const seenLower = new Set<string>();
+    const result: string[] = [];
+
+    for (const item of rawList) {
+      const lower = item.toLowerCase();
+      if (!seenLower.has(lower)) {
+        seenLower.add(lower);
+        result.push(item);
+      }
+    }
+
+    return result.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [setoresSugeridos, costCenters, formData.workSector]);
+
   const requiresEmployee = Boolean(selectedSubcategoria?.requerVinculoFuncionario);
   const requiresSupplier = !requiresEmployee;
   const loggedInUserLabel = user?.name || user?.username || 'Usuário logado';
@@ -592,53 +631,28 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
               <label className="text-sm font-medium text-seguranca-lightgray">
                 Fornecedor {requiresSupplier ? '*' : '(opcional para Pessoal / RH)'}
               </label>
-              <Select
+              <SupplierCombobox
+                suppliers={fornecedores}
                 value={formData.fornecedorId}
-                onValueChange={(value) => {
-                  const fornecedor = fornecedores.find(f => f.id === value);
-                  handleInputChange('fornecedorId', value);
-                  handleInputChange('fornecedor', fornecedor?.name || '');
+                fallbackDisplayName={formData.fornecedor}
+                onValueChange={(id, supplier) => {
+                  handleInputChange('fornecedorId', id);
+                  handleInputChange('fornecedor', supplier?.name || '');
                 }}
+                onAddNewSupplier={() => setSupplierModalOpen(true)}
+                placeholder="Selecione um fornecedor"
                 required={requiresSupplier}
-              >
-                <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                  <SelectValue placeholder="Selecione um fornecedor" />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-gray-600">
-                  <div className="px-3 py-2 text-xs text-gray-400">Ações rápidas</div>
-                  <SelectItem value="__novo_fornecedor__" className="text-seguranca-yellow hover:bg-seguranca-graphite" onClick={(e) => { e.preventDefault(); setSupplierModalOpen(true); }}>
-                    + Novo Fornecedor
-                  </SelectItem>
-                  <Separator className="my-1 bg-gray-700" />
-                  {fornecedores.filter(f => !!f && !!f.id).map((fornecedor) => (
-                    <SelectItem 
-                      key={fornecedor.id} 
-                      value={fornecedor.id}
-                      className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                    >
-                      {fornecedor.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="text-xs text-gray-400 mt-1">
-                Não encontrou?{' '}
-                <button type="button" className="text-seguranca-yellow underline" onClick={() => setSupplierModalOpen(true)}>
-                  Cadastrar fornecedor
+              />
+              <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
+                <span>Não encontrou na lista?</span>
+                <button
+                  type="button"
+                  className="text-seguranca-yellow hover:underline font-medium cursor-pointer"
+                  onClick={() => setSupplierModalOpen(true)}
+                >
+                  + Cadastrar fornecedor
                 </button>
               </div>
-              {(!Array.isArray(fornecedores) || fornecedores.length === 0) && (
-                <div className="text-xs text-gray-400 mt-1">
-                  Nenhum fornecedor encontrado.{' '}
-                  <button
-                    type="button"
-                    className="text-seguranca-yellow underline"
-                    onClick={() => setSupplierModalOpen(true)}
-                  >
-                    Cadastrar fornecedor
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Empresa */}
@@ -732,13 +746,8 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                   <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
                     Selecione o setor de trabalho
                   </SelectItem>
-                  {formData.workSector && !setoresSugeridos.includes(formData.workSector) && (
-                    <SelectItem value={formData.workSector} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      {formData.workSector}
-                    </SelectItem>
-                  )}
-                  {setoresSugeridos.map((setor, idx) => (
-                    <SelectItem key={idx} value={setor} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                  {sectoresEOptionLista.map((setor) => (
+                    <SelectItem key={setor} value={setor} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
                       {setor}
                     </SelectItem>
                   ))}
@@ -931,19 +940,37 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                     placeholder="Busque o funcionário pelo nome"
                     onEmployeeSelect={(emp) => {
                       handleInputChange('employeeId', emp.id);
-                      // Preencher empresa automaticamente se não estiver definida
-                      if (emp.companyId && !formData.empresaId) {
+
+                      // Preencher Empresa a partir do cadastro do funcionário (sempre, mesmo se já havia uma selecionada)
+                      if (emp.companyId) {
                         const match = empresas.find((e: any) => String(e.id) === String(emp.companyId));
                         if (match) {
                           handleInputChange('empresaId', match.id);
                           handleInputChange('empresa', match.name);
                           handleInputChange('companySigla', match.sigla || match.name);
+                        } else if (emp.companySigla || emp.companyName) {
+                          // Empresa não encontrada na lista local, usar dados do funcionário
+                          handleInputChange('empresaId', emp.companyId);
+                          handleInputChange('empresa', emp.companyName || '');
+                          handleInputChange('companySigla', emp.companySigla || emp.companyName || '');
                         }
                       }
-                      // SEMPRE sobrescreve o setor de trabalho com o do funcionário selecionado
-                      const suggestedSector = (emp as any).workPostName
+
+                      // Preencher Unidade a partir do cadastro do funcionário
+                      if (emp.unitName) {
+                        const matchUnit = unidades.find((u: any) =>
+                          (u.name || '').toLowerCase() === (emp.unitName || '').toLowerCase()
+                        );
+                        if (matchUnit) {
+                          handleInputChange('unitId', matchUnit.id);
+                          handleInputChange('unitName', matchUnit.name);
+                        }
+                      }
+
+                      // Preencher Setor de Trabalho a partir do cadastro do funcionário (workPost > department)
+                      const suggestedSector = emp.workPostName
                         || (emp as any).workPost?.name
-                        || (emp as any).departmentName
+                        || emp.departmentName
                         || (emp as any).department?.name;
                       if (suggestedSector) {
                         handleInputChange('workSector', suggestedSector);

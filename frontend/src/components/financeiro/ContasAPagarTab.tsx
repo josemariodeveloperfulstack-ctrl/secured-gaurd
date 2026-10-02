@@ -1352,7 +1352,7 @@ const ContasAPagarTab: React.FC = () => {
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Empresa</th>
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Descrição</th>
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Conta</th>
-                          <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Fornecedor</th>
+                          <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Fornecedor / Funcionário</th>
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Valor</th>
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Vencimento</th>
                           <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Status</th>
@@ -1387,19 +1387,34 @@ const ContasAPagarTab: React.FC = () => {
                                   )}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">{conta.descricao}</td>
+                              <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">
+                                <div className="max-w-xs truncate" title={conta.descricao}>
+                                  {conta.descricao}
+                                </div>
+                              </td>
                               <td className="px-4 py-3 text-gray-400 border-b border-gray-700/30">
                                 <div className="max-w-xs truncate" title={formatContaPlanoDeContas(conta)}>
                                   {formatContaPlanoDeContas(conta) || '-'}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">{conta.fornecedor}</td>
+                              <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">
+                                <div className="max-w-xs truncate" title={conta.employeeName || conta.fornecedor || '-'}>
+                                  {conta.employeeName || conta.fornecedor || '-'}
+                                </div>
+                              </td>
                               <td className="px-4 py-3 text-green-400 font-medium border-b border-gray-700/30">{formatCurrency(conta.valor)}</td>
                               <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">
                                 {conta.vencimento ? format(conta.vencimento, 'dd/MM/yyyy') : '-'}
                               </td>
                               <td className="px-4 py-3 border-b border-gray-700/30">
-                                <Badge variant={conta.status === 'PAGA' ? 'default' : conta.status === 'VENCIDA' ? 'destructive' : 'secondary'} className="text-xs">
+                                <Badge 
+                                  className={`text-xs font-semibold ${
+                                    conta.status === 'PAGA' ? 'bg-green-600 hover:bg-green-700 text-white' :
+                                    conta.status === 'CANCELADA' ? 'bg-orange-600 hover:bg-orange-700 text-white' :
+                                    (conta.status === 'VENCIDA' || (conta.status === 'ABERTA' && conta.vencimento && new Date(conta.vencimento) < new Date())) ? 'bg-red-600 hover:bg-red-700 text-white' :
+                                    'bg-blue-600 hover:bg-blue-700 text-white'
+                                  }`}
+                                >
                                   {getStatusDisplayName(conta.status)}
                                 </Badge>
                               </td>

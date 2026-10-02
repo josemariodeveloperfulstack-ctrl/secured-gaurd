@@ -312,6 +312,23 @@ public class InvoiceController {
         invoiceService.deleteById(UUID.fromString(id));
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/bulk-delete")
+    @Operation(summary = "Exclusão em massa de faturas", description = "Exclui uma lista de faturas em lote de alta performance")
+    public ResponseEntity<java.util.Map<String, Object>> bulkDelete(@RequestBody java.util.Map<String, java.util.List<String>> request) {
+        java.util.List<String> rawIds = request.get("ids");
+        if (rawIds == null || rawIds.isEmpty()) {
+            return ResponseEntity.ok(java.util.Map.of("deletedCount", 0, "requestedCount", 0));
+        }
+        java.util.List<UUID> uuids = rawIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(UUID::fromString)
+                .collect(Collectors.toList());
+        
+        int deleted = invoiceService.deleteInBulk(uuids);
+        log.info("Exclusão em massa de faturas: {} excluídas de {} solicitadas", deleted, uuids.size());
+        return ResponseEntity.ok(java.util.Map.of("deletedCount", deleted, "requestedCount", uuids.size()));
+    }
     
     @PatchMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/status")
     @Operation(summary = "Atualizar status da fatura", description = "Atualiza apenas o status de uma fatura")

@@ -13,6 +13,7 @@ import { unitService, Unit } from '@/services/unitService';
 import { format, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { contasAPagarService, Supplier, CreateSupplierRequest } from '@/services/contasAPagarService';
+import { SupplierCombobox } from '@/components/ui/supplier-combobox';
 import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
 import api from '@/lib/axios';
 
@@ -418,24 +419,17 @@ export const TransacaoFormModal: React.FC<TransacaoFormModalProps> = ({
           {/* Linha 5 - Fornecedor */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-seguranca-lightgray">Fornecedor *</label>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Select value={formData.fornecedorId} onValueChange={(value) => handleInputChange('fornecedorId', value === '__NONE__' ? '' : value)}>
-                  <SelectTrigger className="form-input">
-                    <SelectValue placeholder="Selecione o fornecedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__NONE__">Sem fornecedor</SelectItem>
-                    {fornecedores.map(f => (
-                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button type="button" variant="outline" onClick={() => setShowNovoFornecedor(true)} title="Cadastrar fornecedor" className="shrink-0">
-                <Plus size={16} />
-              </Button>
-            </div>
+            <SupplierCombobox
+              suppliers={fornecedores}
+              value={formData.fornecedorId}
+              onValueChange={(id, supplier) => {
+                handleInputChange('fornecedorId', id);
+                handleInputChange('fornecedor', supplier?.name || '');
+              }}
+              onAddNewSupplier={() => setShowNovoFornecedor(true)}
+              placeholder="Selecione o fornecedor"
+              required
+            />
           </div>
 
           {/* Linha 6 - Categoria e Centro de Custo */}

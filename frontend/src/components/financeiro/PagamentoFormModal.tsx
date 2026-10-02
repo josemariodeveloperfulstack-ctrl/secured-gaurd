@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { pagamentosService, Pagamento, CreatePagamentoRequest, UpdatePagamentoRequest } from '@/services/pagamentosService';
 import { Supplier, CategoriaPai, Subcategoria, contasAPagarService } from '@/services/contasAPagarService';
 import SupplierFormModal from '@/components/estoque/SupplierFormModal';
+import { SupplierCombobox } from '@/components/ui/supplier-combobox';
 import { DatePicker } from '@/components/ui/date-picker';
 import { formatCurrency as formatCurrencyBRL } from '@/utils/formatters';
 
@@ -342,41 +343,24 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
           {/* Fornecedor */}
           <div className="space-y-2">
             <Label htmlFor="fornecedor">Fornecedor *</Label>
-            <Select value={formData.fornecedorId} onValueChange={(value) => handleInputChange('fornecedorId', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um fornecedor" />
-              </SelectTrigger>
-              <SelectContent>
-                <div className="px-3 py-2 text-xs text-gray-500">Ações rápidas</div>
-                <SelectItem value="__novo_fornecedor__" className="text-seguranca-yellow" onClick={(e) => { e.preventDefault(); setSupplierModalOpen(true); }}>
-                  + Novo Fornecedor
-                </SelectItem>
-                <Separator className="my-1" />
-                {Array.isArray(fornecedores) && fornecedores.length > 0 ? (
-                  fornecedores.map((fornecedor) => (
-                    <SelectItem key={fornecedor.id} value={fornecedor.id}>
-                      {fornecedor.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="no-suppliers" disabled>
-                    Nenhum fornecedor disponível
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-            {(!Array.isArray(fornecedores) || fornecedores.length === 0) && (
-              <div className="text-xs text-gray-500 mt-1">
-                Nenhum fornecedor encontrado.{' '}
-                <button
-                  type="button"
-                  className="text-seguranca-yellow underline"
-                  onClick={() => setSupplierModalOpen(true)}
-                >
-                  Cadastrar fornecedor
-                </button>
-              </div>
-            )}
+            <SupplierCombobox
+              suppliers={fornecedores}
+              value={formData.fornecedorId}
+              onValueChange={(value) => handleInputChange('fornecedorId', value)}
+              onAddNewSupplier={() => setSupplierModalOpen(true)}
+              placeholder="Selecione um fornecedor"
+              required
+            />
+            <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
+              <span>Não encontrou na lista?</span>
+              <button
+                type="button"
+                className="text-seguranca-yellow hover:underline font-medium cursor-pointer"
+                onClick={() => setSupplierModalOpen(true)}
+              >
+                + Cadastrar fornecedor
+              </button>
+            </div>
           </div>
 
           {/* Descrição */}
