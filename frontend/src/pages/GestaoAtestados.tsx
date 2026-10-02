@@ -400,6 +400,54 @@ const GestaoAtestados: React.FC = () => {
     </TableHead>
   );
 
+  const renderTypeBadge = (type: MedicalDocumentType | string) => {
+    const label = MEDICAL_TYPE_LABELS[type as MedicalDocumentType] || type;
+    switch (type) {
+      case 'ATESTADO':
+      case 'ATESTADO_MEDICO':
+      case 'ATESTADO_ODONTOLOGICO':
+      case 'ATESTADO_AFASTAMENTO':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-purple-500/15 text-purple-300 border border-purple-500/30 whitespace-nowrap shadow-sm">
+            <Stethoscope className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+            {label}
+          </span>
+        );
+      case 'DECLARACAO':
+      case 'DECLARACAO_COMPARECIMENTO':
+      case 'DECLARACAO_HORAS':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 whitespace-nowrap shadow-sm">
+            <Clock className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+            {label}
+          </span>
+        );
+      case 'LICENCA_MATERNIDADE':
+      case 'LICENCA_PATERNIDADE':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-pink-500/15 text-pink-300 border border-pink-500/30 whitespace-nowrap shadow-sm">
+            <Users className="h-3.5 w-3.5 text-pink-400 shrink-0" />
+            {label}
+          </span>
+        );
+      case 'ACIDENTE_TRABALHO':
+      case 'CAT':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-rose-500/15 text-rose-300 border border-rose-500/30 whitespace-nowrap shadow-sm">
+            <AlertTriangle className="h-3.5 w-3.5 text-rose-400 shrink-0" />
+            {label}
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-500/15 text-slate-300 border border-slate-500/30 whitespace-nowrap shadow-sm">
+            <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            {label}
+          </span>
+        );
+    }
+  };
+
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm());
@@ -835,26 +883,47 @@ const GestaoAtestados: React.FC = () => {
             ) : (
               <>
                 {/* Desktop Table */}
-                <div className="hidden md:block overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-gray-700/50 hover:bg-transparent">
-                        <SortableHead column="employeeName">Funcionário</SortableHead>
-                        <SortableHead column="documentType">Tipo</SortableHead>
-                        <SortableHead column="startDate">Período</SortableHead>
-                        <SortableHead column="createdAt">Cadastro</SortableHead>
-                        <SortableHead column="days">Dias/Horas</SortableHead>
-                        <SortableHead column="cidCode">CID</SortableHead>
-                        <TableHead>Empresa</TableHead>
-                        <TableHead>Alerta INSS / CLT</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
+                <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-700/60 bg-seguranca-black/30 shadow-inner">
+                  <Table className="w-full min-w-[1100px]">
+                    <TableHeader className="bg-seguranca-graphite/80 border-b border-gray-700/60">
+                      <TableRow className="border-none hover:bg-transparent">
+                        <SortableHead column="employeeName" className="w-[240px] pl-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                          Funcionário
+                        </SortableHead>
+                        <SortableHead column="documentType" className="w-[180px] py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                          Tipo
+                        </SortableHead>
+                        <SortableHead column="startDate" className="w-[200px] py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                          Período
+                        </SortableHead>
+                        <SortableHead column="createdAt" className="w-[110px] py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                          Cadastro
+                        </SortableHead>
+                        <SortableHead column="days" className="w-[110px] py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-400 text-center">
+                          Dias/Horas
+                        </SortableHead>
+                        <SortableHead column="cidCode" className="w-[160px] py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                          CID
+                        </SortableHead>
+                        <TableHead className="w-[160px] py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                          Empresa
+                        </TableHead>
+                        <TableHead className="w-[160px] py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-400 text-center">
+                          Alerta INSS / CLT
+                        </TableHead>
+                        <TableHead className="w-[120px] py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-400 text-right pr-4">
+                          Ações
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {sortedItems.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                            Nenhum documento encontrado no período.
+                          <TableCell colSpan={9} className="text-center text-muted-foreground py-12">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <FileText className="h-8 w-8 text-gray-600" />
+                              <span>Nenhum documento encontrado no período.</span>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -862,93 +931,136 @@ const GestaoAtestados: React.FC = () => {
                           const empData = doc.employeeId ? inssAlertSummary.map[doc.employeeId] : null;
                           const totalEmpDays = empData?.totalDays ?? doc.relatedDaysInWindow ?? doc.days ?? 0;
                           return (
-                            <TableRow key={doc.id} className="border-gray-700/30 hover:bg-white/[0.02] transition-colors">
-                              <TableCell>
-                                <div className="font-medium text-sm">{doc.employeeName}</div>
-                                <div className="text-[11px] text-muted-foreground">
-                                  {[doc.employeePosition, doc.employeeDepartment].filter(Boolean).join(' · ') || '—'}
+                            <TableRow
+                              key={doc.id}
+                              className="border-b border-gray-800/80 hover:bg-white/[0.04] transition-colors group"
+                            >
+                              <TableCell className="pl-4 py-3.5 align-middle">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="h-8 w-8 rounded-full bg-seguranca-graphite/80 border border-seguranca-yellow/30 flex items-center justify-center text-seguranca-yellow shrink-0">
+                                    <User className="h-4 w-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div
+                                      className="font-semibold text-sm text-white group-hover:text-seguranca-yellow transition-colors truncate max-w-[170px]"
+                                      title={doc.employeeName}
+                                    >
+                                      {doc.employeeName}
+                                    </div>
+                                    <div
+                                      className="text-[11px] text-gray-400 truncate max-w-[170px]"
+                                      title={[doc.employeePosition, doc.employeeDepartment].filter(Boolean).join(' · ')}
+                                    >
+                                      {[doc.employeePosition, doc.employeeDepartment].filter(Boolean).join(' · ') || '—'}
+                                    </div>
+                                    {employeeCertificateCounts[doc.employeeId] ? (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20 mt-0.5">
+                                        {employeeCertificateCounts[doc.employeeId]} atestado(s)
+                                      </span>
+                                    ) : null}
+                                  </div>
                                 </div>
-                                {employeeCertificateCounts[doc.employeeId] ? (
-                                  <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-300 border-blue-500/30 mt-1">
-                                    {employeeCertificateCounts[doc.employeeId]} atestado(s)
-                                  </Badge>
-                                ) : null}
                               </TableCell>
-                              <TableCell>
-                                <Badge variant="secondary" className="text-[11px]">{MEDICAL_TYPE_LABELS[doc.documentType]}</Badge>
+                              <TableCell className="py-3.5 align-middle">
+                                {renderTypeBadge(doc.documentType)}
                               </TableCell>
-                              <TableCell className="text-sm whitespace-nowrap">
-                                {formatAdmissionDateBr(doc.startDate)}
-                                {doc.endDate ? ` → ${formatAdmissionDateBr(doc.endDate)}` : ''}
+                              <TableCell className="py-3.5 align-middle whitespace-nowrap">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.03] border border-gray-700/50 text-xs text-gray-200 font-medium">
+                                  <Calendar className="h-3.5 w-3.5 text-seguranca-yellow/80 shrink-0" />
+                                  <span>{formatAdmissionDateBr(doc.startDate)}</span>
+                                  {doc.endDate && (
+                                    <>
+                                      <span className="text-gray-500">→</span>
+                                      <span>{formatAdmissionDateBr(doc.endDate)}</span>
+                                    </>
+                                  )}
+                                </div>
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
+                              <TableCell className="py-3.5 align-middle text-xs text-gray-400 whitespace-nowrap">
                                 {doc.createdAt ? formatAdmissionDateBr(doc.createdAt.slice(0, 10)) : '—'}
                               </TableCell>
-                              <TableCell className="text-sm font-semibold">
-                                {doc.days != null ? `${doc.days}d` : '-'}
-                                {doc.hours != null ? ` / ${doc.hours}h` : ''}
+                              <TableCell className="py-3.5 align-middle text-center whitespace-nowrap">
+                                <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-seguranca-black/80 border border-gray-700 text-xs font-bold text-seguranca-yellow font-mono">
+                                  {doc.days != null ? `${doc.days}d` : '-'}
+                                  {doc.hours != null ? ` / ${doc.hours}h` : ''}
+                                </span>
                               </TableCell>
-                              <TableCell className="text-sm">
-                                {doc.cidCode || '-'}
-                                {doc.cidDescription ? (
-                                  <div className="text-[11px] text-muted-foreground truncate max-w-[160px]">
-                                    {doc.cidDescription}
+                              <TableCell className="py-3.5 align-middle">
+                                {doc.cidCode ? (
+                                  <div className="space-y-0.5">
+                                    <span className="inline-block px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                      {doc.cidCode}
+                                    </span>
+                                    {doc.cidDescription && (
+                                      <div
+                                        className="text-[11px] text-gray-400 truncate max-w-[150px]"
+                                        title={doc.cidDescription}
+                                      >
+                                        {doc.cidDescription}
+                                      </div>
+                                    )}
                                   </div>
-                                ) : null}
+                                ) : (
+                                  <span className="text-xs text-gray-500">—</span>
+                                )}
                               </TableCell>
-                              <TableCell className="text-sm">
+                              <TableCell className="py-3.5 align-middle">
                                 {doc.companyName ? (
-                                  <div className="flex items-center gap-1 text-[11px] text-gray-300">
-                                    <Building2 className="h-3 w-3 shrink-0 text-gray-500" />
-                                    <span className="truncate max-w-[120px]">{doc.companyName}</span>
+                                  <div className="flex items-center gap-1.5 text-xs text-gray-300">
+                                    <Building2 className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+                                    <span className="truncate max-w-[140px]" title={doc.companyName}>
+                                      {doc.companyName}
+                                    </span>
                                   </div>
                                 ) : (
-                                  <span className="text-xs text-muted-foreground">—</span>
+                                  <span className="text-xs text-gray-500">—</span>
                                 )}
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="py-3.5 align-middle text-center whitespace-nowrap">
                                 {totalEmpDays >= 15 ? (
-                                  <Badge variant="destructive" className="bg-red-600 font-bold flex items-center gap-1 w-fit text-[11px]">
-                                    <ShieldAlert className="h-3 w-3 shrink-0" />
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 shadow-sm animate-pulse">
+                                    <ShieldAlert className="h-3.5 w-3.5 text-red-400 shrink-0" />
                                     <span>15+ dias (INSS)</span>
-                                  </Badge>
+                                  </span>
                                 ) : totalEmpDays >= 12 ? (
-                                  <Badge className="bg-amber-600 text-white font-bold flex items-center gap-1 w-fit text-[11px]">
-                                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                                     <span>Alerta ({totalEmpDays}d)</span>
-                                  </Badge>
+                                  </span>
+                                ) : totalEmpDays > 0 ? (
+                                  <span className="text-xs text-gray-400 font-medium">{totalEmpDays}d acum.</span>
                                 ) : (
-                                  <span className="text-xs text-muted-foreground">{totalEmpDays > 0 ? `${totalEmpDays}d acum.` : '—'}</span>
+                                  <span className="text-xs text-gray-600">—</span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1">
+                              <TableCell className="py-3.5 pr-4 align-middle text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300 h-8 px-2"
+                                    className="h-8 w-8 p-0 border-emerald-500/30 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors"
                                     onClick={() => openView(doc)}
                                     title="Visualizar detalhes do atestado"
                                   >
-                                    <Eye className="h-3.5 w-3.5" />
+                                    <Eye className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-blue-500/40 text-blue-400 hover:bg-blue-950/40 hover:text-blue-300 h-8 px-2"
+                                    className="h-8 w-8 p-0 border-blue-500/30 text-blue-400 bg-blue-500/5 hover:bg-blue-500/20 hover:text-blue-300 transition-colors"
                                     onClick={() => openEdit(doc)}
                                     title="Editar lançamento de atestado"
                                   >
-                                    <Pencil className="h-3.5 w-3.5" />
+                                    <Pencil className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="text-red-400 hover:text-red-300 hover:bg-red-950/30 h-8 px-2"
+                                    className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/20 transition-colors"
                                     onClick={() => void handleDelete(doc.id)}
                                     title="Cancelar atestado"
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </div>
                               </TableCell>
@@ -963,9 +1075,10 @@ const GestaoAtestados: React.FC = () => {
                 {/* Mobile Cards */}
                 <div className="md:hidden space-y-3">
                   {sortedItems.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8 text-sm">
-                      Nenhum documento encontrado no período.
-                    </p>
+                    <div className="text-center text-muted-foreground py-10 bg-seguranca-graphite/30 rounded-xl border border-gray-700/30">
+                      <FileText className="h-8 w-8 mx-auto mb-2 text-gray-600" />
+                      <p className="text-sm">Nenhum documento encontrado no período.</p>
+                    </div>
                   ) : (
                     sortedItems.map((doc) => {
                       const empData = doc.employeeId ? inssAlertSummary.map[doc.employeeId] : null;
@@ -973,7 +1086,7 @@ const GestaoAtestados: React.FC = () => {
                       return (
                         <div
                           key={doc.id}
-                          className="bg-seguranca-graphite/60 border border-gray-700/40 rounded-xl p-4 space-y-3 hover:border-gray-600/60 transition-colors"
+                          className="bg-seguranca-graphite/60 border border-gray-700/40 rounded-xl p-4 space-y-3 hover:border-gray-600/60 transition-colors shadow-sm"
                         >
                           {/* Header — Nome + Badge */}
                           <div className="flex items-start justify-between gap-2">
@@ -988,9 +1101,9 @@ const GestaoAtestados: React.FC = () => {
                                 </p>
                               )}
                             </div>
-                            <Badge variant="secondary" className="text-[10px] shrink-0">
-                              {MEDICAL_TYPE_LABELS[doc.documentType]}
-                            </Badge>
+                            <div className="shrink-0">
+                              {renderTypeBadge(doc.documentType)}
+                            </div>
                           </div>
 
                           {/* Dados */}
@@ -1004,7 +1117,7 @@ const GestaoAtestados: React.FC = () => {
                             </div>
                             <div>
                               <span className="text-muted-foreground">Dias/Horas:</span>
-                              <div className="text-white font-semibold">
+                              <div className="text-seguranca-yellow font-bold font-mono">
                                 {doc.days != null ? `${doc.days}d` : '-'}
                                 {doc.hours != null ? ` / ${doc.hours}h` : ''}
                               </div>
@@ -1012,7 +1125,7 @@ const GestaoAtestados: React.FC = () => {
                             <div>
                               <span className="text-muted-foreground">CID:</span>
                               <div className="text-white">
-                                {doc.cidCode || '-'}
+                                <span className="font-mono font-bold text-amber-300">{doc.cidCode || '-'}</span>
                                 {doc.cidDescription ? (
                                   <span className="text-muted-foreground ml-1 text-[10px]">({doc.cidDescription})</span>
                                 ) : null}
@@ -1030,30 +1143,48 @@ const GestaoAtestados: React.FC = () => {
                           <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-700/30">
                             <div>
                               {totalEmpDays >= 15 ? (
-                                <Badge variant="destructive" className="bg-red-600 font-bold text-[10px] gap-1">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/40">
                                   <ShieldAlert className="h-3 w-3" /> INSS (15+d)
-                                </Badge>
+                                </span>
                               ) : totalEmpDays >= 12 ? (
-                                <Badge className="bg-amber-600 text-white font-bold text-[10px] gap-1">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
                                   <AlertTriangle className="h-3 w-3" /> Alerta ({totalEmpDays}d)
-                                </Badge>
+                                </span>
                               ) : totalEmpDays > 0 ? (
                                 <span className="text-[10px] text-muted-foreground">{totalEmpDays}d acum.</span>
                               ) : null}
                               {employeeCertificateCounts[doc.employeeId] && (
-                                <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-300 border-blue-500/30 ml-1.5">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20 ml-1.5">
                                   {employeeCertificateCounts[doc.employeeId]} atestado(s)
-                                </Badge>
+                                </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Button size="sm" variant="outline" className="h-7 w-7 p-0 border-emerald-500/40 text-emerald-400" onClick={() => openView(doc)} title="Visualizar">
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 w-7 p-0 border-emerald-500/30 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/20"
+                                onClick={() => openView(doc)}
+                                title="Visualizar"
+                              >
                                 <Eye className="h-3.5 w-3.5" />
                               </Button>
-                              <Button size="sm" variant="outline" className="h-7 w-7 p-0 border-blue-500/40 text-blue-400" onClick={() => openEdit(doc)} title="Editar">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 w-7 p-0 border-blue-500/30 text-blue-400 bg-blue-500/5 hover:bg-blue-500/20"
+                                onClick={() => openEdit(doc)}
+                                title="Editar"
+                              >
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:bg-red-950/30" onClick={() => void handleDelete(doc.id)} title="Cancelar">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                                onClick={() => void handleDelete(doc.id)}
+                                title="Cancelar"
+                              >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
@@ -1428,7 +1559,7 @@ const GestaoAtestados: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <div className="text-[11px] text-muted-foreground uppercase tracking-wider">Tipo</div>
-                      <Badge variant="secondary" className="mt-1">{MEDICAL_TYPE_LABELS[viewDoc.documentType]}</Badge>
+                      <div className="mt-1">{renderTypeBadge(viewDoc.documentType)}</div>
                     </div>
                     <div>
                       <div className="text-[11px] text-muted-foreground uppercase tracking-wider">Período</div>

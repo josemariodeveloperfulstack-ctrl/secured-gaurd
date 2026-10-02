@@ -37,6 +37,10 @@ import OccurrenceMap from './OccurrenceMap';
 import { useToast } from '@/hooks/use-toast';
 import { operationalService, VacationCoverage, Absence, WorkPostAssignment, SpecificActivity, CreateAbsenceDTO, CreateWorkPostAssignmentDTO, CreateSpecificActivityDTO, CreateVacationCoverageDTO } from '@/services/operationalService';
 import { remanejamentoService, Remanejamento, CreateRemanejamentoDTO } from '@/services/remanejamentoService';
+import { feriasService, FeriasPeriodo } from '@/services/feriasService';
+import { medicalDocumentService, MedicalDocument, MEDICAL_TYPE_LABELS } from '@/services/medicalDocumentService';
+import FeriasReportModal from '@/components/ferias/FeriasReportModal';
+import { Stethoscope, ShieldAlert, Building2, ExternalLink } from 'lucide-react';
 import api from '@/lib/axios';
 import axios from 'axios';
 import operationalReportGenerator from '@/utils/operationalReportGenerator';
@@ -66,6 +70,11 @@ const Frota = lazy(() => import('@/pages/Frota'));
 
 const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscala }) => {
   const [vacationCoverages, setVacationCoverages] = useState<VacationCoverage[]>([]);
+  const [feriasList, setFeriasList] = useState<FeriasPeriodo[]>([]);
+  const [medicalDocs, setMedicalDocs] = useState<MedicalDocument[]>([]);
+  const [vacationSubTab, setVacationSubTab] = useState<'scheduled' | 'coverage'>('scheduled');
+  const [absenceSubTab, setAbsenceSubTab] = useState<'medical' | 'manual'>('medical');
+  const [showFeriasReportModal, setShowFeriasReportModal] = useState(false);
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [workPostAssignments, setWorkPostAssignments] = useState<WorkPostAssignment[]>([]);
   const [specificActivities, setSpecificActivities] = useState<SpecificActivity[]>([]);
@@ -109,13 +118,15 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const [coverages, absenceList, assignments, activities, remanejamentosList, employeesData] = await Promise.all([
-        operationalService.getAllVacationCoverages(),
-        operationalService.getAllAbsences(),
-        operationalService.getAllWorkPostAssignments(),
-        operationalService.getAllSpecificActivities(),
-        remanejamentoService.getAllRemanejamentos(),
-        loadEmployees()
+      const [coverages, absenceList, assignments, activities, remanejamentosList, employeesData, feriasData, medicalDocsData] = await Promise.all([
+        operationalService.getAllVacationCoverages().catch(() => []),
+        operationalService.getAllAbsences().catch(() => []),
+        operationalService.getAllWorkPostAssignments().catch(() => []),
+        operationalService.getAllSpecificActivities().catch(() => []),
+        remanejamentoService.getAllRemanejamentos().catch(() => []),
+        loadEmployees().catch(() => []),
+        feriasService.getFerias().catch(() => []),
+        medicalDocumentService.getAll().catch(() => []),
       ]);
 
       setVacationCoverages(coverages);
@@ -124,6 +135,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
       setSpecificActivities(activities);
       setRemanejamentos(remanejamentosList);
       setEmployees(employeesData);
+      setFeriasList(feriasData || []);
+      setMedicalDocs(medicalDocsData || []);
     } catch (error) {
       console.error('Erro ao carregar dados operacionais:', error);
       toast({
@@ -889,7 +902,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
                   </TabsTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
-                  <p className="font-semibold">Cobertura de Férias</p>
+                  <p className="font-semibold">Férias Agendadas & Coberturas</p>
                   <p className="text-xs text-gray-400">Gestão de férias e substituições</p>
                 </TooltipContent>
               </Tooltip>
@@ -905,8 +918,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
                   </TabsTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
-                  <p className="font-semibold">Controle de Faltas</p>
-                  <p className="text-xs text-gray-400">Registro e justificativas</p>
+                  <p className="font-semibold">Faltas & Atestados Médicos</p>
+                  <p className="text-xs text-gray-400">Atestados entregues e faltas</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -917,12 +930,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
                     className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
                   >
                     <MapPin className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
-                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Postos</span>
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Setor de Trabalho</span>
                   </TabsTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
-                  <p className="font-semibold">Atribuições de Posto</p>
-                  <p className="text-xs text-gray-400">Alocação de funcionários</p>
+                  <p className="font-semibold">Setor de Trabalho</p>
+                  <p className="text-xs text-gray-400">Alocação e atribuições de postos/setores</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -1026,184 +1039,359 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
           </div>
         </TooltipProvider>
 
-        {/* Aba de Cobertura de Férias */}
+        {/* Aba de Cobertura e Férias Agendadas */}
         <TabsContent value="vacations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Cobertura de Férias ({vacationCoverages.length})
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button onClick={handleGenerateVacationCoverageReport} size="sm" variant="outline">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Gerar Relatório
+          <Card className="border-slate-700/50 bg-seguranca-graphite/40">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Calendar className="h-5 w-5 text-amber-400" />
+                    Gestão de Férias & Coberturas
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Consulte todas as férias agendadas dos funcionários e as coberturas operacionais.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={() => setShowFeriasReportModal(true)} size="sm" variant="outline" className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10">
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Relatório Completo (PDF / Excel)
                   </Button>
-                  <Button onClick={handleCreateVacationCoverage} size="sm">
+                  <Button onClick={handleCreateVacationCoverage} size="sm" className="bg-seguranca-red hover:bg-red-700 text-white">
                     <Plus className="h-4 w-4 mr-2" />
                     Nova Cobertura
                   </Button>
                 </div>
               </div>
+
+              {/* Sub-abas: Férias Agendadas vs Coberturas */}
+              <div className="flex items-center gap-2 pt-3 border-t border-gray-700/40">
+                <Button
+                  size="sm"
+                  variant={vacationSubTab === 'scheduled' ? 'default' : 'outline'}
+                  onClick={() => setVacationSubTab('scheduled')}
+                  className={vacationSubTab === 'scheduled' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'border-gray-700 text-gray-300'}
+                >
+                  <Calendar className="h-4 w-4 mr-1.5" />
+                  Férias Agendadas ({feriasList.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={vacationSubTab === 'coverage' ? 'default' : 'outline'}
+                  onClick={() => setVacationSubTab('coverage')}
+                  className={vacationSubTab === 'coverage' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'border-gray-700 text-gray-300'}
+                >
+                  <Users className="h-4 w-4 mr-1.5" />
+                  Coberturas de Férias ({vacationCoverages.length})
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {vacationCoverages.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    Nenhuma cobertura de férias encontrada.
-                  </p>
-                ) : (
-                  vacationCoverages.map(coverage => (
-                    <div key={coverage.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex-1">
-                        <p className="font-semibold text-base">
-                          {coverage.employee?.name || 'Funcionário não definido'}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Users className="h-4 w-4 text-blue-400" />
-                          <p className="text-sm text-muted-foreground">
-                            Substituto: <strong>{coverage.substituteEmployee?.name || 'Sem substituto'}</strong>
-                          </p>
+              {vacationSubTab === 'scheduled' ? (
+                <div className="space-y-3">
+                  {feriasList.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <Calendar className="h-8 w-8 mx-auto mb-2 text-gray-600" />
+                      <p className="text-sm">Nenhuma férias agendada encontrada.</p>
+                    </div>
+                  ) : (
+                    feriasList.map((ferias) => {
+                      const days = Math.max(1, Math.ceil((new Date(ferias.dataFim).getTime() - new Date(ferias.dataInicio).getTime()) / (1000 * 60 * 60 * 24)) + 1);
+                      return (
+                        <div key={ferias.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-gray-700/50 bg-seguranca-black/30 rounded-xl hover:border-gray-600 transition-colors gap-3">
+                          <div className="flex-1 space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-white text-base">
+                                {ferias.employeeName || 'Funcionário não definido'}
+                              </p>
+                              {ferias.empresa && (
+                                <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-300 border-blue-500/30">
+                                  {ferias.empresa}
+                                </Badge>
+                              )}
+                              {ferias.setor && (
+                                <span className="text-xs text-gray-400">· {ferias.setor}</span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-3 text-xs text-gray-300">
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/[0.04] border border-gray-700/40 font-medium">
+                                <Calendar className="h-3.5 w-3.5 text-amber-400" />
+                                {formatDate(ferias.dataInicio)} → {formatDate(ferias.dataFim)} ({days} dias)
+                              </span>
+                              {ferias.periodoAquisitivo && (
+                                <span className="inline-flex items-center gap-1 text-gray-400">
+                                  Aquisição: <strong>{ferias.periodoAquisitivo}</strong>
+                                </span>
+                              )}
+                              <span className="text-gray-400">
+                                Tipo: <strong>{ferias.tipo === 'FERIAS_VENDIDAS' ? 'Vendidas' : ferias.tipo === 'ABONO_PECUNIARIO' ? 'Abono Pecuniário' : 'Férias Regulares'}</strong>
+                              </span>
+                            </div>
+                            {ferias.observacoes && (
+                              <p className="text-xs text-muted-foreground italic">💬 {ferias.observacoes}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 self-start sm:self-center">
+                            <Badge className={
+                              ferias.status === 'APROVADO' ? 'bg-emerald-600 text-white font-medium' :
+                              ferias.status === 'PENDENTE' ? 'bg-amber-600 text-white font-medium' :
+                              'bg-gray-600 text-white font-medium'
+                            }>
+                              {ferias.status}
+                            </Badge>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3.5 w-3.5" />
-                            {formatDate(coverage.startDate)} - {formatDate(coverage.endDate)}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            Turno: <strong>{formatShift(coverage.shift)}</strong>
-                          </span>
-                          {coverage.location && (
+                      );
+                    })
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {vacationCoverages.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <Users className="h-8 w-8 mx-auto mb-2 text-gray-600" />
+                      <p className="text-sm">Nenhuma cobertura de férias encontrada.</p>
+                    </div>
+                  ) : (
+                    vacationCoverages.map(coverage => (
+                      <div key={coverage.id} className="flex items-center justify-between p-4 border border-gray-700/50 bg-seguranca-black/30 rounded-xl hover:border-gray-600 transition-colors">
+                        <div className="flex-1">
+                          <p className="font-semibold text-base text-white">
+                            {coverage.employee?.name || 'Funcionário não definido'}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Users className="h-4 w-4 text-blue-400" />
+                            <p className="text-sm text-muted-foreground">
+                              Substituto: <strong className="text-white">{coverage.substituteEmployee?.name || 'Sem substituto'}</strong>
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
-                              <MapPin className="h-3.5 w-3.5" />
-                              {coverage.location.name}
+                              <Calendar className="h-3.5 w-3.5 text-amber-400" />
+                              {formatDate(coverage.startDate)} - {formatDate(coverage.endDate)}
                             </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5" />
+                              Turno: <strong>{formatShift(coverage.shift)}</strong>
+                            </span>
+                            {coverage.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3.5 w-3.5 text-seguranca-red" />
+                                {coverage.location.name}
+                              </span>
+                            )}
+                          </div>
+                          {coverage.observations && (
+                            <p className="text-xs text-muted-foreground mt-2 italic">
+                              💬 {coverage.observations}
+                            </p>
                           )}
                         </div>
-                        {coverage.observations && (
-                          <p className="text-xs text-muted-foreground mt-2 italic">
-                            💬 {coverage.observations}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="cursor-pointer"
-                          onClick={() => handleChangeVacationCoverageStatus(coverage)}
-                          title="Clique para alterar o status"
-                        >
-                          {getStatusBadge(coverage.status)}
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="cursor-pointer"
+                            onClick={() => handleChangeVacationCoverageStatus(coverage)}
+                            title="Clique para alterar o status"
+                          >
+                            {getStatusBadge(coverage.status)}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditVacationCoverage(coverage)}
+                            title="Editar cobertura"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteVacationCoverage(coverage)}
+                            title="Excluir cobertura"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditVacationCoverage(coverage)}
-                          title="Editar cobertura"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteVacationCoverage(coverage)}
-                          title="Excluir cobertura"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                    ))
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Aba de Controle de Faltas */}
+        {/* Aba de Controle de Faltas e Atestados */}
         <TabsContent value="absences" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <UserX className="h-5 w-5" />
-                  Controle de Faltas ({absences.length})
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button onClick={handleGenerateAbsenceReport} size="sm" variant="outline">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Gerar Relatório
+          <Card className="border-slate-700/50 bg-seguranca-graphite/40">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <UserX className="h-5 w-5 text-red-400" />
+                    Controle de Faltas & Atestados Médicos
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Lista de colaboradores com atestados médicos entregues e faltas operacionais.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={() => setShowFeriasReportModal(true)} size="sm" variant="outline" className="border-red-500/40 text-red-300 hover:bg-red-500/10">
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Relatório de Atestados / Faltas
                   </Button>
-                  <Button onClick={handleCreateAbsence} size="sm">
+                  <Button onClick={handleCreateAbsence} size="sm" className="bg-seguranca-red hover:bg-red-700 text-white">
                     <Plus className="h-4 w-4 mr-2" />
                     Nova Falta
                   </Button>
                 </div>
               </div>
+
+              {/* Sub-abas: Atestados Médicos vs Faltas Manuais */}
+              <div className="flex items-center gap-2 pt-3 border-t border-gray-700/40">
+                <Button
+                  size="sm"
+                  variant={absenceSubTab === 'medical' ? 'default' : 'outline'}
+                  onClick={() => setAbsenceSubTab('medical')}
+                  className={absenceSubTab === 'medical' ? 'bg-red-600 hover:bg-red-700 text-white' : 'border-gray-700 text-gray-300'}
+                >
+                  <Stethoscope className="h-4 w-4 mr-1.5" />
+                  Funcionários com Atestados ({medicalDocs.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={absenceSubTab === 'manual' ? 'default' : 'outline'}
+                  onClick={() => setAbsenceSubTab('manual')}
+                  className={absenceSubTab === 'manual' ? 'bg-red-600 hover:bg-red-700 text-white' : 'border-gray-700 text-gray-300'}
+                >
+                  <UserX className="h-4 w-4 mr-1.5" />
+                  Faltas Registradas ({absences.length})
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {absences.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    Nenhuma falta registrada.
-                  </p>
-                ) : (
-                  absences.map(absence => (
-                    <div key={absence.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
-                      <div className="flex-1">
-                        <p className="font-medium">
-                          {absence.employee?.name || 'Funcionário não definido'} ({formatDate(absence.absenceDate)})
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Tipo: {absence.absenceType.replace('_', ' ')} |
-                          Motivo: {absence.reason}
-                          {absence.medicalCertificateDays && ` | Dias: ${absence.medicalCertificateDays}`}
-                        </p>
-                        {absence.coverageNotes && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Observações: {absence.coverageNotes}
-                          </p>
-                        )}
-                        {absence.coverageEmployee && (
-                          <p className="text-xs text-muted-foreground">
-                            Coberto por: {absence.coverageEmployee?.name || 'Não definido'}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(absence.status)}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditAbsence(absence)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteAbsence(absence)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+              {absenceSubTab === 'medical' ? (
+                <div className="space-y-3">
+                  {medicalDocs.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <Stethoscope className="h-8 w-8 mx-auto mb-2 text-gray-600" />
+                      <p className="text-sm">Nenhum atestado médico registrado.</p>
                     </div>
-                  ))
-                )}
-              </div>
+                  ) : (
+                    medicalDocs.map((doc) => (
+                      <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-gray-700/50 bg-seguranca-black/30 rounded-xl hover:border-gray-600 transition-colors gap-3">
+                        <div className="flex-1 space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-white text-base">
+                              {doc.employeeName || 'Funcionário não informado'}
+                            </p>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                              {MEDICAL_TYPE_LABELS[doc.documentType] || doc.documentType}
+                            </span>
+                            {doc.companyName && (
+                              <span className="text-xs text-gray-400 flex items-center gap-1">
+                                <Building2 className="h-3 w-3" /> {doc.companyName}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-xs text-gray-300">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/[0.04] border border-gray-700/40">
+                              <Calendar className="h-3.5 w-3.5 text-amber-400" />
+                              {formatDate(doc.startDate)} {doc.endDate ? `→ ${formatDate(doc.endDate)}` : ''}
+                            </span>
+                            <span className="font-mono text-amber-300 font-bold">
+                              {doc.days != null ? `${doc.days} dia(s)` : ''} {doc.hours != null ? `/ ${doc.hours}h` : ''}
+                            </span>
+                            {doc.cidCode && (
+                              <span className="inline-flex items-center gap-1 font-mono text-amber-300">
+                                CID: <strong>{doc.cidCode}</strong> {doc.cidDescription ? `(${doc.cidDescription})` : ''}
+                              </span>
+                            )}
+                          </div>
+                          {doc.observations && (
+                            <p className="text-xs text-muted-foreground italic">💬 {doc.observations}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 self-start sm:self-center">
+                          {(doc.days ?? 0) >= 15 ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 animate-pulse">
+                              <ShieldAlert className="h-3.5 w-3.5 text-red-400" /> 15+ dias (INSS)
+                            </span>
+                          ) : (doc.days ?? 0) >= 12 ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-400" /> Alerta ({(doc.days ?? 0)}d)
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {absences.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <UserX className="h-8 w-8 mx-auto mb-2 text-gray-600" />
+                      <p className="text-sm">Nenhuma falta registrada.</p>
+                    </div>
+                  ) : (
+                    absences.map(absence => (
+                      <div key={absence.id} className="flex items-center justify-between p-3 border border-gray-700/50 bg-seguranca-black/30 rounded-xl hover:border-gray-600 transition-colors">
+                        <div className="flex-1">
+                          <p className="font-medium text-white">
+                            {absence.employee?.name || 'Funcionário não definido'} ({formatDate(absence.absenceDate)})
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Tipo: {absence.absenceType.replace('_', ' ')} |
+                            Motivo: {absence.reason}
+                            {absence.medicalCertificateDays && ` | Dias: ${absence.medicalCertificateDays}`}
+                          </p>
+                          {absence.coverageNotes && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Observações: {absence.coverageNotes}
+                            </p>
+                          )}
+                          {absence.coverageEmployee && (
+                            <p className="text-xs text-muted-foreground">
+                              Coberto por: {absence.coverageEmployee?.name || 'Não definido'}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(absence.status)}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditAbsence(absence)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteAbsence(absence)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Aba de Atribuições de Posto */}
+        {/* Aba de Atribuições de Setor de Trabalho */}
         <TabsContent value="assignments" className="space-y-4">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="h-5 w-5" />
-                  Atribuições de Posto ({workPostAssignments.length})
+                  Atribuições de Setor de Trabalho ({workPostAssignments.length})
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button onClick={handleGenerateWorkPostAssignmentReport} size="sm" variant="outline">
@@ -1622,6 +1810,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
         title="Excluir Remanejamento"
         description="Tem certeza que deseja excluir este remanejamento?"
         itemName={remanejamentoToDelete ? `${formatRemanejamentoType(remanejamentoToDelete.tipo)} - ${remanejamentoToDelete.employeeName}` : ''}
+      />
+
+      {/* Modal de Relatório Completo de Férias */}
+      <FeriasReportModal
+        isOpen={showFeriasReportModal}
+        onClose={() => setShowFeriasReportModal(false)}
       />
     </div>
   );

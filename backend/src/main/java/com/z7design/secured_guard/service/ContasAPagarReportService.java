@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.service;
 
+import com.itextpdf.io.image.ImageData;
+import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.pdf.PdfWriter;
@@ -7,6 +9,7 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.Border;
 import com.itextpdf.layout.borders.SolidBorder;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.element.Text;
@@ -309,7 +312,7 @@ public class ContasAPagarReportService {
      * Monta o documento PDF com layout executivo limpo (sem cabeçalho de onda / imagem pesada).
      */
     private byte[] generateCustomPdfDocument(List<Invoice> invoices, CustomContasAPagarReportRequestDTO req) throws IOException {
-        Company company = resolveCompany(null);
+        Company company = resolveCompany(req != null ? req.getCompanySigla() : null, req != null ? req.getCompanyId() : null);
         UUID companyId = company != null ? company.getId() : null;
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -326,17 +329,17 @@ public class ContasAPagarReportService {
                     .showFooterBackgroundLine(false)
                     .includeEmailInFooter(true)
                     .landscape(true)
-                    .topMargin(20f)
+                    .topMargin(18f)
                     .marginExtraTop(0f)
-                    .bottomMargin(45f)
-                    .leftMargin(24f)
-                    .rightMargin(24f)
+                    .bottomMargin(75f) // Espaço adequado para o rodapé (15pt a 65pt) não colidir com o conteúdo
+                    .leftMargin(20f)
+                    .rightMargin(20f)
                     .build();
 
             docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
             Document document = docWithPdf.getDocument();
 
-            // 1. Cabeçalho Executivo Limpo
+            // 1. Cabeçalho Executivo Limpo com Logo em destaque
             String periodBadge = "TODOS OS REGISTROS";
             if (req.getStartDate() != null && req.getEndDate() != null) {
                 periodBadge = req.getStartDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a " + req.getEndDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
@@ -549,40 +552,123 @@ public class ContasAPagarReportService {
     // MÉTODOS VISUAIS DO LAYOUT EXECUTIVO
     // ==========================================
 
+    private Image loadCompanyLogoImage(Company company) {
+        if (company == null || company.getLogoUrl() == null || company.getLogoUrl().isBlank()) {
+            return null;
+        }
+        try {
+            String logoUrl = company.getLogoUrl();
+            ImageData imageData = null;
+            if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+                imageData = ImageDataFactory.create(logoUrl);
+            } else {
+                java.nio.file.Path p = java.nio.file.Paths.get(logoUrl);
+                if (java.nio.file.Files.exists(p)) {
+                    imageData = ImageDataFactory.create(java.nio.file.Files.readAllBytes(p));
+                } else {
+                    String clean = logoUrl.startsWith("/") ? logoUrl.substring(1) : logoUrl;
+                    java.nio.file.Path pRel = java.nio.file.Paths.get(clean);
+                    if (java.nio.file.Files.exists(pRel)) {
+                        imageData = ImageDataFactory.create(java.nio.file.Files.readAllBytes(pRel));
+                    }
+                }
+            }
+            if (imageData != null) {
+                Image img = new Image(imageData);
+                img.setMaxWidth(100f);
+                img.setMaxHeight(32f);
+                img.setAutoScale(true);
+                return img;
+            }
+        } catch (Exception e) {
+            log.warn("Não foi possível carregar logo da empresa {}: {}", company.getName(), e.getMessage());
+        }
+        return null;
+    }
+
     private void addExecutiveHeader(Document document, Company company, String reportTitle, String badgeText, String periodOrCodeText) {
-        Table headerTable = new Table(UnitValue.createPercentArray(new float[]{55f, 45f})).useAllAvailableWidth();
+        Table headerTable = new Table(UnitValue.createPercentArray(new float[]{58f, 42f})).useAllAvailableWidth();
         headerTable.setBorder(Border.NO_BORDER);
         headerTable.setMarginBottom(4f);
 
-        // Esquerda: Dados da Empresa
+        // Esquerda: Logo em caixa escura elegante + Dados da Empresa
         Cell leftCell = new Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE);
-        String compName = (company != null && company.getName() != null && !company.getName().isBlank())
-                ? company.getName().toUpperCase()
-                : "PROMOVER TERCEIRIZAÇÃO E SERVIÇOS LTDA";
-        leftCell.add(new Paragraph(compName)
-                .setFontSize(10.5f)
-                .setBold()
-                .setFontColor(SLATE_DARK)
-                .setMarginBottom(2f));
 
-        StringBuilder addressSb = new StringBuilder();
-        if (company != null) {
-            if (company.getCnpj() != null && !company.getCnpj().isBlank()) {
-                addressSb.append("CNPJ: ").append(CompanyDataFormatter.formatCnpj(company.getCnpj()));
+        Image logoImg = loadCompanyLogoImage(company);
+        if (logoImg != null) {
+            Table compBox = new Table(UnitValue.createPercentArray(new float[]{22f, 78f})).useAllAvailableWidth();
+            compBox.setBorder(Border.NO_BORDER);
+
+            Cell logoCell = new Cell()
+                    .setBackgroundColor(new DeviceRgb(15, 23, 42)) // #0f172a Fundo escuro para destacar a logo
+                    .setBorder(new SolidBorder(new DeviceRgb(51, 65, 85), 0.5f))
+                    .setPadding(3f)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                    .add(logoImg);
+
+            Cell infoCell = new Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE).setPaddingLeft(6f);
+            String compName = (company != null && company.getName() != null && !company.getName().isBlank())
+                    ? company.getName().toUpperCase()
+                    : "PROMOVER TERCEIRIZAÇÃO E SERVIÇOS LTDA";
+            infoCell.add(new Paragraph(compName)
+                    .setFontSize(9.5f)
+                    .setBold()
+                    .setFontColor(SLATE_DARK)
+                    .setMarginBottom(1.5f));
+
+            StringBuilder addressSb = new StringBuilder();
+            if (company != null) {
+                if (company.getCnpj() != null && !company.getCnpj().isBlank()) {
+                    addressSb.append("CNPJ: ").append(CompanyDataFormatter.formatCnpj(company.getCnpj()));
+                }
+                String fullAddr = CompanyDataFormatter.formatFullAddress(company);
+                if (fullAddr != null && !fullAddr.isBlank()) {
+                    if (addressSb.length() > 0) addressSb.append(" • ");
+                    addressSb.append(fullAddr);
+                }
             }
-            String fullAddr = CompanyDataFormatter.formatFullAddress(company);
-            if (fullAddr != null && !fullAddr.isBlank()) {
-                if (addressSb.length() > 0) addressSb.append(" • ");
-                addressSb.append(fullAddr);
+            if (addressSb.length() == 0) {
+                addressSb.append("CNPJ: 36.698.521/0001-01 • Rua Pelegrino de Paula Ferreira, 77 - Centro - Contagem/MG");
             }
+            infoCell.add(new Paragraph(addressSb.toString())
+                    .setFontSize(6.5f)
+                    .setFontColor(new DeviceRgb(100, 116, 139))
+                    .setMarginBottom(0f));
+
+            compBox.addCell(logoCell);
+            compBox.addCell(infoCell);
+            leftCell.add(compBox);
+        } else {
+            String compName = (company != null && company.getName() != null && !company.getName().isBlank())
+                    ? company.getName().toUpperCase()
+                    : "PROMOVER TERCEIRIZAÇÃO E SERVIÇOS LTDA";
+            leftCell.add(new Paragraph(compName)
+                    .setFontSize(10.5f)
+                    .setBold()
+                    .setFontColor(SLATE_DARK)
+                    .setMarginBottom(2f));
+
+            StringBuilder addressSb = new StringBuilder();
+            if (company != null) {
+                if (company.getCnpj() != null && !company.getCnpj().isBlank()) {
+                    addressSb.append("CNPJ: ").append(CompanyDataFormatter.formatCnpj(company.getCnpj()));
+                }
+                String fullAddr = CompanyDataFormatter.formatFullAddress(company);
+                if (fullAddr != null && !fullAddr.isBlank()) {
+                    if (addressSb.length() > 0) addressSb.append(" • ");
+                    addressSb.append(fullAddr);
+                }
+            }
+            if (addressSb.length() == 0) {
+                addressSb.append("CNPJ: 36.698.521/0001-01 • Rua Pelegrino de Paula Ferreira, 77 - Centro - Contagem/MG");
+            }
+            leftCell.add(new Paragraph(addressSb.toString())
+                    .setFontSize(7f)
+                    .setFontColor(new DeviceRgb(100, 116, 139))
+                    .setMarginBottom(0f));
         }
-        if (addressSb.length() == 0) {
-            addressSb.append("CNPJ: 36.698.521/0001-01 • Rua Pelegrino de Paula Ferreira, 77 - Centro - Contagem/MG - 32017-400");
-        }
-        leftCell.add(new Paragraph(addressSb.toString())
-                .setFontSize(7f)
-                .setFontColor(new DeviceRgb(100, 116, 139))
-                .setMarginBottom(0f));
+
         headerTable.addCell(leftCell);
 
         // Direita: Título em vermelho, Badge e Data
@@ -709,16 +795,16 @@ public class ContasAPagarReportService {
 
     private Cell createHeaderCell(String text, TextAlignment alignment) {
         return new Cell()
-                .add(new Paragraph(text != null ? text.toUpperCase() : "").setFontSize(7.5f).setBold().setFontColor(ColorConstants.WHITE))
+                .add(new Paragraph(text != null ? text.toUpperCase() : "").setFontSize(7f).setBold().setFontColor(ColorConstants.WHITE))
                 .setTextAlignment(alignment != null ? alignment : TextAlignment.CENTER)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBackgroundColor(SLATE_DARK)
                 .setBorder(new SolidBorder(SLATE_DARK, 0.5f))
-                .setPadding(3.5f);
+                .setPadding(2.5f);
     }
 
     private Cell createDataCell(String text, TextAlignment alignment, boolean isAltRow, boolean isBold) {
-        Paragraph p = new Paragraph(text != null ? text : "").setFontSize(7.5f);
+        Paragraph p = new Paragraph(text != null ? text : "").setFontSize(7f);
         if (isBold) {
             p.setBold();
         }
@@ -728,7 +814,7 @@ public class ContasAPagarReportService {
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBackgroundColor(isAltRow ? ROW_ALT : ColorConstants.WHITE)
                 .setBorder(new SolidBorder(SLATE_BORDER, 0.5f))
-                .setPadding(3f);
+                .setPadding(2.5f);
     }
 
     private Cell createStatusBadgeCell(ExpenseStatus status, boolean isAltRow) {
@@ -743,7 +829,7 @@ public class ContasAPagarReportService {
         }
 
         Paragraph p = new Paragraph("[" + label.toUpperCase() + "]")
-                .setFontSize(7f)
+                .setFontSize(6.8f)
                 .setBold()
                 .setFontColor(textColor);
 
@@ -753,7 +839,7 @@ public class ContasAPagarReportService {
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBackgroundColor(isAltRow ? ROW_ALT : ColorConstants.WHITE)
                 .setBorder(new SolidBorder(SLATE_BORDER, 0.5f))
-                .setPadding(3f);
+                .setPadding(2.5f);
     }
 
     private TextAlignment getColumnAlignment(String colKey) {
@@ -768,20 +854,22 @@ public class ContasAPagarReportService {
 
     private float getColumnProportionalWidth(String colKey) {
         return switch (colKey) {
-            case "dueDate", "vencimento", "issueDate", "dataEmissao", "paymentDate", "dataPagamento" -> 8f;
-            case "description", "descricao" -> 22f;
-            case "supplier", "fornecedor" -> 17f;
+            case "dueDate", "vencimento" -> 7.5f;
+            case "issueDate", "dataEmissao" -> 7.5f;
+            case "paymentDate", "dataPagamento" -> 7.5f;
+            case "description", "descricao" -> 16f;
+            case "supplier", "fornecedor" -> 16f;
             case "company", "empresa", "companySigla" -> 7f;
-            case "unit", "unidade" -> 11f;
-            case "workSector", "setor", "setorTrabalho" -> 11f;
-            case "category", "categoria", "conta" -> 13f;
-            case "centroCusto" -> 9f;
-            case "type", "tipo" -> 7f;
+            case "unit", "unidade" -> 9.5f;
+            case "workSector", "setor", "setorTrabalho" -> 9.5f;
+            case "category", "categoria", "conta" -> 11f;
+            case "centroCusto" -> 8f;
+            case "type", "tipo" -> 6.5f;
             case "amount", "valor" -> 9f;
             case "status" -> 8f;
-            case "barcode", "codigoBarras" -> 12f;
-            case "observations", "observacoes" -> 12f;
-            default -> 10f;
+            case "barcode", "codigoBarras" -> 10f;
+            case "observations", "observacoes" -> 10f;
+            default -> 8f;
         };
     }
 
@@ -813,7 +901,7 @@ public class ContasAPagarReportService {
             case "paymentDate", "dataPagamento" -> inv.getPaymentDate() != null ? inv.getPaymentDate().format(dateFormatter) : "-";
             case "description", "descricao" -> {
                 String d = inv.getDescription() != null ? inv.getDescription() : "";
-                yield d.length() > 65 ? d.substring(0, 62) + "..." : d;
+                yield d.length() > 55 ? d.substring(0, 52) + "..." : d;
             }
             case "supplier", "fornecedor" -> getFornecedorOuFuncionario(inv);
             case "company", "empresa", "companySigla" -> inv.getCompanySigla() != null ? inv.getCompanySigla() : "-";
@@ -830,11 +918,17 @@ public class ContasAPagarReportService {
         };
     }
 
-    private Company resolveCompany(UUID companyId) {
+    private Company resolveCompany(String companySigla, UUID companyId) {
         if (companyId != null) {
-            return companyRepository.findById(companyId).orElse(null);
+            Optional<Company> c = companyRepository.findById(companyId);
+            if (c.isPresent()) return c.get();
         }
-        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (companySigla != null && !companySigla.isBlank() && !"TODAS".equalsIgnoreCase(companySigla)) {
+            Optional<Company> c = companyRepository.findFirstBySiglaIgnoreCase(companySigla.trim())
+                    .or(() -> companyRepository.findBySigla(companySigla.trim()));
+            if (c.isPresent()) return c.get();
+        }
+        List<Company> activeCompanies = companyRepository.findByStatusOrderByNameAsc(CompanyStatus.ACTIVE);
         if (activeCompanies != null && !activeCompanies.isEmpty()) {
             return activeCompanies.get(0);
         }
