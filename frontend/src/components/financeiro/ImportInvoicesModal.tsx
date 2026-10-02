@@ -152,7 +152,14 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
     if (!val) return '';
     if (isDateValue(val)) return '';
     const str = String(val).trim();
-    if (!str || str.length < 2) return '';
+    if (!str) return '';
+    const lower = str.toLowerCase();
+    // Desconsiderar células com 'x', 'X', traços, 'null', etc.
+    if (lower === 'x' || lower === 'xx' || lower === 'xxx' || /^x+(\s+x+)*$/i.test(str)) return '';
+    if (str === '-' || str === '--' || str === '---' || str === '***' || lower === 'n/a' || lower === 'null' || lower === 'undefined' || lower === 'none') return '';
+    // Desconsiderar títulos de seção/agrupamento
+    if (lower === 'detalhamento de contas' || lower.startsWith('totais por empresa') || lower === 'vig' || lower === 'terc' || lower === 'adm') return '';
+    if (str.length < 2) return '';
     // Se for apenas número sem letras (ex: '12345', '10.50')
     if (parseNumber(str) > 0 && !/[a-zA-ZÀ-ÿ]{3,}/.test(str)) return '';
     return str;
@@ -448,11 +455,16 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
           const row = rawRows[index];
           if (!row || !Array.isArray(row) || row.length === 0) continue;
 
-          const fullRowText = row.map((c: any) => String(c || '').trim()).join(' ');
-          const fullRowUpper = normalizeStr(fullRowText);
-
-          // Ignorar linhas vazias ou de totalizador
-          if (!fullRowText || fullRowUpper.startsWith('TOTAL') || fullRowUpper.startsWith('SOMA') || fullRowUpper.startsWith('SUBTOTAL')) {
+          // Ignorar linhas vazias, linhas com X/x repetidos ou totalizadores
+          if (
+            !fullRowText || 
+            /^[\s,xX\-_*.\/]+$/i.test(fullRowText) ||
+            fullRowUpper.startsWith('TOTAL') || 
+            fullRowUpper.startsWith('SOMA') || 
+            fullRowUpper.startsWith('SUBTOTAL') ||
+            fullRowUpper.startsWith('TOTAIS POR EMPRESA') ||
+            fullRowUpper === 'DETALHAMENTO DE CONTAS'
+          ) {
             continue;
           }
 
@@ -516,6 +528,12 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
             }
           }
 
+          // Se a linha não possui nenhum valor financeiro válido (> 0), desconsiderar completamente
+          // (ex: divisórias com 'X', títulos de grupos como 'VIG', 'TERC', 'DARF IRRF' sem valor ou linhas vazias)
+          if (rowAmount <= 0) {
+            continue;
+          }
+
           // 3. Reconhecimento Preciso e Inteligente de Fornecedor e Descrição
           let supplierName = colMap.supplier !== -1 ? cleanTextValue(row[colMap.supplier]) : '';
           let description = colMap.desc !== -1 ? cleanTextValue(row[colMap.desc]) : '';
@@ -565,14 +583,6 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
             } else if (supplierName) {
               description = supplierName;
             }
-          }
-
-          // Descartar linhas fantasmas / vazias do Excel:
-          // Se a linha não tem valor financeiro (rowAmount <= 0) E não tem nenhum fornecedor/texto válido real,
-          // significa que é uma linha vazia gerada por formatação residual do Excel.
-          const hasRealText = (supplierName && supplierName.length >= 2) || (description && description.length >= 2) || availableTextColumns.length > 0;
-          if (rowAmount <= 0 && !hasRealText) {
-            continue; // Pula linha vazia/fantasma do Excel
           }
 
           if (!supplierName) supplierName = 'Fornecedor Importado';
