@@ -114,6 +114,13 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   const [selectedCategoriaPaiId, setSelectedCategoriaPaiId] = useState<string>('');
   const [selectedSubcategoria, setSelectedSubcategoria] = useState<Subcategoria | null>(null);
 
+  const loggedInUserLabel = useMemo(() => {
+    if (!user) return 'Usuário Logado';
+    const name = user.name || user.username || 'Usuário Logado';
+    const role = user.role ? ` (${user.role.replace(/_/g, ' ')})` : '';
+    return `${name}${role}`;
+  }, [user]);
+
   // Helpers para moeda BRL com 2 casas decimais
   const formatToBRL = (raw: string | number): string => {
     if (typeof raw === 'number') {
@@ -355,7 +362,9 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           centroCusto: initialData.centroCusto || '',
           unitId: initialData.unitId ? String(initialData.unitId) : '',
           unitName: initialData.unitName || '',
-          workSector: initialData.workSector || ''
+          workSector: initialData.workSector || '',
+          createdById: initialData.createdById || '',
+          createdByName: initialData.createdByName || ''
         });
         setValorDisplay(formatToBRL(initialData.valor ?? 0));
         setPaymentConfirmDate((typeof initialData.dataPagamento === 'string' ? parseDateFromBackend(initialData.dataPagamento) : initialData.dataPagamento) || new Date());
@@ -1120,17 +1129,15 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
             </div>
           )}
 
-          <div className="rounded-md border border-gray-600 bg-seguranca-black/40 p-3">
-            <label className="text-sm font-medium text-seguranca-lightgray">Lançado por</label>
-            <p className="mt-1 text-sm text-white">
-              {editMode
-                ? (initialData?.createdByName || formData.createdByName || 'Não registrado')
-                : loggedInUserLabel}
+          <div className="rounded-md border border-gray-700 bg-gray-900/70 p-3">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Lançado por</label>
+            <p className="mt-1 text-sm font-bold text-seguranca-yellow flex items-center gap-1.5">
+              <span>{editMode ? (initialData?.createdByName || formData.createdByName || loggedInUserLabel) : loggedInUserLabel}</span>
             </p>
-            <p className="text-xs text-gray-400 mt-1">
-              {editMode
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {editMode && (initialData?.createdByName || formData.createdByName)
                 ? 'Usuário que registrou este lançamento no sistema.'
-                : 'Será registrado automaticamente com o usuário logado ao salvar.'}
+                : 'Este lançamento será registrado automaticamente no nome do usuário logado ao salvar.'}
             </p>
           </div>
 
