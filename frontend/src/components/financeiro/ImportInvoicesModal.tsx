@@ -169,8 +169,165 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
         
         const rawRows: any[][] = XLSX.utils.sheet_to_json(targetWorksheet, { header: 1, defval: '' });
 
-        // 1. Detecção Dinâmica de Cabeçalhos
-        let headerRowIndex = -1;
+        // 1. Detecção Dinâmica e Precisa de Cabeçalhos
+        const matchHeaderType = (headerText: string): string | null => {
+          const h = normalizeStr(headerText);
+          if (!h) return null;
+
+          // 1. Data de Vencimento / Emissão / Pagamento
+          if (
+            h.includes('VENC') ||
+            h === 'DATA' ||
+            h.includes('DT VENC') ||
+            h.includes('DATA VENC') ||
+            h.includes('EMISSAO') ||
+            h.includes('DATA PAG') ||
+            h.includes('DT PAG') ||
+            h === 'DIA' ||
+            h.includes('DATA/VENC') ||
+            h.includes('DT. VENC')
+          ) {
+            return 'date';
+          }
+
+          // 2. Fornecedor / Favorecido / Credor / Razão Social / Cedente / Beneficiário
+          if (
+            h.includes('FORNEC') ||
+            h.includes('FORN') ||
+            h.includes('FAVOREC') ||
+            h.includes('CREDOR') ||
+            h.includes('BENEFICI') ||
+            h.includes('PRESTADOR') ||
+            h.includes('RAZAO SOCIAL') ||
+            h.includes('RAZAO') ||
+            h.includes('NOME FANTASIA') ||
+            h.includes('FANTASIA') ||
+            h.includes('LOJA') ||
+            h.includes('ESTABELEC') ||
+            h.includes('EMPRESA FORNECEDORA') ||
+            h.includes('FORNECEDOR/FAVORECIDO') ||
+            h.includes('FORNECEDOR / FAVORECIDO') ||
+            h.includes('PARCEIRO') ||
+            h.includes('CONTRATAD') ||
+            h.includes('NOME/RAZAO') ||
+            h.includes('NOME DO FORNECEDOR') ||
+            h.includes('NOME FORNECEDOR') ||
+            h.includes('CEDENTE') ||
+            h.includes('SACADO') ||
+            h.includes('DESTINATARIO') ||
+            h.includes('PAGAR A') ||
+            h.includes('PAGO A') ||
+            h.includes('EMISSOR') ||
+            h.includes('VENDEDOR') ||
+            h.includes('EMPRESA/FORNECEDOR') ||
+            h.includes('CLIENTE/FORNECEDOR') ||
+            h === 'NOME' ||
+            h === 'TITULAR'
+          ) {
+            return 'supplier';
+          }
+
+          // 3. Descrição / Histórico / Item / Produto / Serviço / Objeto / Detalhe / Motivo
+          if (
+            h.includes('DESC') ||
+            h.includes('DESCRICAO') ||
+            h.includes('HISTORIC') ||
+            h.includes('DISCRIMIN') ||
+            h.includes('DETALH') ||
+            h.includes('ITEM') ||
+            h.includes('PRODUTO') ||
+            h.includes('SERVICO') ||
+            h.includes('MATERIAL') ||
+            h.includes('ESPECIFIC') ||
+            h.includes('CONTEUDO') ||
+            h.includes('REFERENCIA') ||
+            h.includes('REFERENTE') ||
+            h.includes('OBJETO') ||
+            h.includes('MOTIVO') ||
+            h.includes('FINALIDADE') ||
+            h.includes('DESPESA') ||
+            h.includes('NATUREZA') ||
+            h.includes('OBS') ||
+            h.includes('OBSERVACAO') ||
+            h.includes('COMPLEMENTO') ||
+            h.includes('PLANO DE CONTAS') ||
+            h.includes('CONTA') ||
+            h.includes('CLASSIFICACAO') ||
+            h.includes('HIST') ||
+            h === 'TEXTO'
+          ) {
+            return 'desc';
+          }
+
+          // 4. Colunas de Valores por Unidade / Setor (Planilha Matriz)
+          if (h.includes('UBERLANDIA') || h.includes('UBERL') || h.includes('UDI')) {
+            return 'valUberlandia';
+          }
+          if (h.includes('VIGILAN') || h.includes('VIG')) {
+            return 'valVigilancia';
+          }
+          if (h.includes('TERCEIR') || h.includes('TERC')) {
+            return 'valTerceirizacao';
+          }
+          if (h.includes('SERV ADM') || h.includes('SERVICOS ADM') || h.includes('ADM 2')) {
+            return 'valServicosAdm';
+          }
+
+          // 5. Valor / Total / Preço
+          if (
+            h === 'VALOR' ||
+            h.includes('VALOR TOTAL') ||
+            h === 'TOTAL' ||
+            h.includes('VALOR (R$)') ||
+            h.includes('VALOR R$') ||
+            h === 'R$' ||
+            h.includes('PRECO') ||
+            h.includes('CUSTO') ||
+            h.includes('A PAGAR') ||
+            h.includes('VALOR DA NOTA') ||
+            h.includes('VALOR LIQUIDO') ||
+            h.includes('VALOR BRUTO') ||
+            h.includes('PAGAMENTO') ||
+            h.includes('VALOR PAGO')
+          ) {
+            return 'amount';
+          }
+
+          // 6. Empresa
+          if (h === 'EMPRESA' || h.includes('SIGLA') || h.includes('FILIAL') || h === 'EMP' || h.includes('EMPRESA (SIGLA)')) {
+            return 'company';
+          }
+
+          // 7. Unidade / Posto
+          if (h.includes('UNIDADE') || h.includes('POSTO') || h.includes('CIDADE') || h.includes('LOCAL') || h.includes('BASE')) {
+            return 'unit';
+          }
+
+          // 8. Responsável / Solicitante / Quem
+          if (h.includes('QUEM') || h.includes('SOLICIT') || h.includes('RESPONS') || h.includes('COMPRADOR') || h.includes('ALMOXARIF')) {
+            return 'who';
+          }
+
+          // 9. Status
+          if (h.includes('STATUS') || h.includes('SITUAC') || h.includes('PAGO') || h.includes('BAIXA') || h.includes('QUITAD')) {
+            return 'status';
+          }
+
+          // 10. Código de Barras
+          if (h.includes('BARRA') || h.includes('BOLETO') || h.includes('DIGITAVEL') || h.includes('LINHA')) {
+            return 'barcode';
+          }
+
+          // 11. Tipo
+          if (h.includes('TIPO') || h.includes('CATEGORIA') || h.includes('CLASSIF')) {
+            return 'type';
+          }
+
+          return null;
+        };
+
+        let bestHeaderRowIndex = -1;
+        let bestMatchCount = 0;
         const colMap = {
           date: -1,
           company: -1,
@@ -188,57 +345,42 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
           unit: -1,
         };
 
-        for (let r = 0; r < Math.min(20, rawRows.length); r++) {
+        for (let r = 0; r < Math.min(25, rawRows.length); r++) {
           const row = rawRows[r];
-          if (!row || !Array.isArray(row)) continue;
+          if (!row || !Array.isArray(row) || row.length === 0) continue;
           
-          let matches = 0;
+          let currentMatches = 0;
           const tempMap = { ...colMap };
           
           row.forEach((cell, colIdx) => {
-            const h = normalizeStr(cell);
-            if (!h) return;
-            
-            if (h.includes('VENC') || h === 'DATA' || h.includes('DT VENC') || h.includes('DATA VENC') || h.includes('EMISSAO') || h.includes('DATA PAG')) {
-              if (tempMap.date === -1) { tempMap.date = colIdx; matches++; }
-            } else if (h.includes('FORNEC') || h.includes('FAVOREC') || h.includes('CREDOR') || h.includes('BENEFICI') || h.includes('PRESTADOR') || h.includes('RAZAO SOCIAL') || h.includes('LOJA')) {
-              if (tempMap.supplier === -1) { tempMap.supplier = colIdx; matches++; }
-            } else if (h === 'EMPRESA' || h.includes('SIGLA') || h.includes('FILIAL') || h === 'EMP') {
-              if (tempMap.company === -1) { tempMap.company = colIdx; matches++; }
-            } else if (h.includes('UBERLANDIA') || h.includes('UBERL') || h.includes('UDI')) {
-              tempMap.valUberlandia = colIdx; matches++;
-            } else if (h.includes('VIGILAN') || h.includes('VIG')) {
-              tempMap.valVigilancia = colIdx; matches++;
-            } else if (h.includes('TERCEIR') || h.includes('TERC')) {
-              tempMap.valTerceirizacao = colIdx; matches++;
-            } else if (h.includes('SERV') || h.includes('ADM')) {
-              tempMap.valServicosAdm = colIdx; matches++;
-            } else if (h === 'VALOR' || h.includes('VALOR TOTAL') || h === 'TOTAL' || h.includes('VALOR (R$)') || h.includes('VALOR R$') || h === 'R$' || h.includes('PRECO') || h.includes('CUSTO') || h.includes('A PAGAR') || h.includes('VALOR DA NOTA') || h.includes('VALOR LIQUIDO') || h.includes('VALOR BRUTO') || h.includes('PAGAMENTO')) {
-              if (tempMap.amount === -1) { tempMap.amount = colIdx; matches++; }
-            } else if (h.includes('DESC') || h.includes('HISTORIC') || h.includes('DETALH') || h.includes('ITEM') || h.includes('PRODUTO') || h.includes('SERVICO') || h.includes('MOTIVO') || h.includes('DESPESA')) {
-              if (tempMap.desc === -1) { tempMap.desc = colIdx; matches++; }
-            } else if (h.includes('QUEM') || h.includes('SOLICIT') || h.includes('RESPONS') || h.includes('COMPRADOR') || h.includes('SOLICITANTE') || h.includes('ALMOXARIF')) {
-              if (tempMap.who === -1) { tempMap.who = colIdx; matches++; }
-            } else if (h.includes('STATUS') || h.includes('SITUAC') || h.includes('PAGO') || h.includes('BAIXA') || h.includes('QUITAD')) {
-              if (tempMap.status === -1) { tempMap.status = colIdx; matches++; }
-            } else if (h.includes('BARRA') || h.includes('BOLETO') || h.includes('DIGITAVEL') || h.includes('LINHA')) {
-              if (tempMap.barcode === -1) { tempMap.barcode = colIdx; matches++; }
-            } else if (h.includes('UNIDADE') || h.includes('POSTO') || h.includes('CIDADE') || h.includes('LOCAL') || h.includes('BASE')) {
-              if (tempMap.unit === -1) { tempMap.unit = colIdx; matches++; }
-            } else if (h.includes('TIPO') || h.includes('CATEGORIA') || h.includes('CLASSIF')) {
-              if (tempMap.type === -1) { tempMap.type = colIdx; matches++; }
+            const type = matchHeaderType(String(cell || ''));
+            if (type && tempMap[type as keyof typeof tempMap] === -1) {
+              tempMap[type as keyof typeof tempMap] = colIdx;
+              currentMatches++;
             }
           });
           
-          if (matches >= 2) {
-            headerRowIndex = r;
+          if (currentMatches > bestMatchCount) {
+            bestMatchCount = currentMatches;
+            bestHeaderRowIndex = r;
             Object.assign(colMap, tempMap);
-            break;
           }
         }
 
-        // Se não identificou cabeçalho clássico, define posições padrão da planilha matriz
-        if (headerRowIndex === -1) {
+        // Fusão multi-linha de cabeçalhos (caso estejam divididos entre linhas 0 e 1)
+        if (bestHeaderRowIndex >= 0) {
+          for (let r = 0; r <= bestHeaderRowIndex; r++) {
+            const row = rawRows[r];
+            if (!row || !Array.isArray(row)) continue;
+            row.forEach((cell, colIdx) => {
+              const type = matchHeaderType(String(cell || ''));
+              if (type && colMap[type as keyof typeof colMap] === -1) {
+                colMap[type as keyof typeof colMap] = colIdx;
+              }
+            });
+          }
+        } else {
+          // Padrão da planilha matriz antiga se nenhum cabeçalho for detectado
           colMap.date = 1;
           colMap.company = 2;
           colMap.supplier = 3;
@@ -259,7 +401,7 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
         let sumAmount = 0;
         const suppliersSet = new Set<string>();
 
-        const startRow = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
+        const startRow = bestHeaderRowIndex >= 0 ? bestHeaderRowIndex + 1 : 0;
 
         for (let index = startRow; index < rawRows.length; index++) {
           const row = rawRows[index];
@@ -274,7 +416,7 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
           }
 
           // Se a linha for repetição do cabeçalho
-          if (fullRowUpper.includes('EMPRESA') && fullRowUpper.includes('FORNECEDOR')) {
+          if (fullRowUpper.includes('EMPRESA') && (fullRowUpper.includes('FORNECEDOR') || fullRowUpper.includes('DESCRICAO'))) {
             continue;
           }
 
@@ -333,30 +475,59 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
             }
           }
 
-          // 3. Fornecedor e Descrição
+          // 3. Reconhecimento Preciso e Inteligente de Fornecedor e Descrição
           let supplierName = colMap.supplier !== -1 ? String(row[colMap.supplier] || '').trim() : '';
           let description = colMap.desc !== -1 ? String(row[colMap.desc] || '').trim() : '';
           const who = colMap.who !== -1 ? String(row[colMap.who] || '').trim() : '';
 
-          // Se fornecedor estiver vazio, tenta extrair da descrição ou de outra coluna de texto
-          if (!supplierName) {
-            if (description && description.length > 2) {
-              supplierName = description;
-            } else {
-              for (let c = 0; c < row.length; c++) {
-                if (c === colMap.date || c === colMap.amount) continue;
-                const text = String(row[c] || '').trim();
-                if (text && text.length > 2 && parseNumber(text) === 0 && !parseExcelDate(text)) {
-                  supplierName = text;
-                  break;
-                }
-              }
+          // Se fornecedor ou descrição não foram mapeados diretamente por cabeçalho, coletar colunas de texto disponíveis
+          const availableTextColumns: { colIdx: number; text: string }[] = [];
+          for (let c = 0; c < row.length; c++) {
+            if (
+              c === colMap.date ||
+              c === colMap.amount ||
+              c === colMap.valUberlandia ||
+              c === colMap.valServicosAdm ||
+              c === colMap.valTerceirizacao ||
+              c === colMap.valVigilancia ||
+              c === colMap.who ||
+              c === colMap.barcode ||
+              c === colMap.company ||
+              c === colMap.unit ||
+              c === colMap.status ||
+              c === colMap.type
+            ) {
+              continue;
+            }
+
+            const rawVal = String(row[c] || '').trim();
+            if (rawVal && rawVal.length >= 2 && parseNumber(rawVal) === 0 && !parseExcelDate(rawVal)) {
+              availableTextColumns.push({ colIdx: c, text: rawVal });
             }
           }
 
-          if (!description) {
-            description = supplierName || 'Pagamento / Despesa Importada';
+          // Se fornecedor está vazio, tenta preencher a partir dos textos encontrados
+          if (!supplierName) {
+            const firstAvailable = availableTextColumns.find(col => col.text !== description);
+            if (firstAvailable) {
+              supplierName = firstAvailable.text;
+            } else if (description) {
+              supplierName = description;
+            }
           }
+
+          // Se descrição está vazia, tenta preencher a partir de outro texto disponível
+          if (!description) {
+            const secondAvailable = availableTextColumns.find(col => col.text !== supplierName);
+            if (secondAvailable) {
+              description = secondAvailable.text;
+            } else if (supplierName) {
+              description = supplierName;
+            }
+          }
+
+          if (!supplierName) supplierName = 'Fornecedor Importado';
+          if (!description) description = supplierName || 'Pagamento / Despesa Importada';
 
           // 4. Detecção de Unidade e Empresa
           if (colMap.unit !== -1 && row[colMap.unit]) {
@@ -399,7 +570,7 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
           const type: 'FIXA' | 'VARIAVEL' = colTypeStr.includes('FIXA') ? 'FIXA' : 'VARIAVEL';
           const status: 'PENDENTE' | 'PAGA' = (colStatusStr.includes('PAG') || colStatusStr.includes('SIM') || colStatusStr.includes('X')) ? 'PAGA' : 'PENDENTE';
 
-          let notes = description !== supplierName ? description : '';
+          let notes = (description && description !== supplierName) ? description : '';
           if (who) {
             notes += (notes ? ' | ' : '') + 'Responsável: ' + who;
           }
@@ -415,7 +586,7 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
             warnings.push('Data de vencimento não informada (será usada data de hoje).');
           }
 
-          if (supplierName) {
+          if (supplierName && supplierName !== 'Fornecedor Importado') {
             suppliersSet.add(supplierName);
           } else {
             warnings.push('Fornecedor não especificado.');
@@ -778,18 +949,24 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
                           </Badge>
                         </TableCell>
 
-                        <TableCell className="min-w-[240px] py-2 px-3">
-                          <div>
-                            <p className="font-semibold text-xs text-gray-100 line-clamp-1" title={item.supplierName}>
-                              {item.supplierName}
+                        <TableCell className="min-w-[260px] py-2 px-3">
+                          <div className="space-y-0.5">
+                            <p className="font-semibold text-xs text-yellow-300 line-clamp-1 flex items-center gap-1.5" title={`Fornecedor: ${item.supplierName}`}>
+                              <Building2 className="h-3 w-3 text-seguranca-yellow shrink-0" />
+                              <span>{item.supplierName}</span>
                             </p>
-                            {item.notes && (
-                              <p className="text-[11px] text-gray-400 line-clamp-1 mt-0.5" title={item.notes}>
+                            {item.description && (
+                              <p className="text-[11px] text-gray-300 line-clamp-1 pl-4" title={`Descrição: ${item.description}`}>
+                                {item.description}
+                              </p>
+                            )}
+                            {item.notes && item.notes !== item.description && item.notes !== item.supplierName && (
+                              <p className="text-[10px] text-gray-400 line-clamp-1 pl-4 italic" title={`Observação: ${item.notes}`}>
                                 {item.notes}
                               </p>
                             )}
                             {item.errors.length > 0 && (
-                              <p className="text-[10px] text-red-400 mt-0.5 font-medium">
+                              <p className="text-[10px] text-red-400 pl-4 font-medium">
                                 {item.errors.join(' ')}
                               </p>
                             )}
