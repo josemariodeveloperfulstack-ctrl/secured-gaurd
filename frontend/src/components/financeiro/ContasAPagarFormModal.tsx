@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
@@ -113,6 +114,194 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
   const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
   const [selectedCategoriaPaiId, setSelectedCategoriaPaiId] = useState<string>('');
   const [selectedSubcategoria, setSelectedSubcategoria] = useState<Subcategoria | null>(null);
+
+  // Modais de Cadastro de Categoria e Subcategoria no Plano de Contas
+  const [newPlanoCategoriaModalOpen, setNewPlanoCategoriaModalOpen] = useState(false);
+  const [newPlanoCategoriaNome, setNewPlanoCategoriaNome] = useState('');
+  const [newPlanoCategoriaCodigo, setNewPlanoCategoriaCodigo] = useState('');
+  const [savingPlanoCategoria, setSavingPlanoCategoria] = useState(false);
+
+  const [newPlanoSubcategoriaModalOpen, setNewPlanoSubcategoriaModalOpen] = useState(false);
+  const [newPlanoSubcategoriaNome, setNewPlanoSubcategoriaNome] = useState('');
+  const [newPlanoSubcategoriaCodigo, setNewPlanoSubcategoriaCodigo] = useState('');
+  const [newPlanoSubcategoriaRequerFuncionario, setNewPlanoSubcategoriaRequerFuncionario] = useState(false);
+  const [savingPlanoSubcategoria, setSavingPlanoSubcategoria] = useState(false);
+
+  // Helpers para cálculo automático do próximo código numérico sequencial
+  const getNextCategoriaPaiCodigo = (cats: CategoriaPai[]): string => {
+    if (!cats || cats.length === 0) return '01';
+    const nums = cats
+      .map(c => {
+        const match = (c.codigo || '').trim().match(/^(\d+)/);
+        return match ? parseInt(match[1], 10) : NaN;
+      })
+      .filter(n => !isNaN(n));
+    const max = nums.length > 0 ? Math.max(...nums) : 0;
+    return String(max + 1).padStart(2, '0');
+  };
+
+  const getNextSubcategoriaCodigo = (parentCodigo: string, subs: Subcategoria[], parentId: string): string => {
+    const prefix = (parentCodigo || '').trim() || '01';
+    const currentSubs = subs.filter(s => s.categoriaPaiId === parentId);
+    if (currentSubs.length === 0) {
+      return `${prefix}.01`;
+    }
+    const subNums = currentSubs
+      .map(s => {
+        const code = (s.codigo || '').trim();
+        if (code.includes('.')) {
+          const parts = code.split('.');
+          const last = parts[parts.length - 1];
+          const match = last.match(/(\d+)/);
+          return match ? parseInt(match[1], 10) : NaN;
+        }
+        const match = code.match(/(\d+)$/);
+        return match ? parseInt(match[1], 10) : NaN;
+      })
+      .filter(n => !isNaN(n));
+    const max = subNums.length > 0 ? Math.max(...subNums) : 0;
+    return `${prefix}.${String(max + 1).padStart(2, '0')}`;
+  };
+
+  const handleOpenNewPlanoCategoriaModal = () => {
+    const nextCode = getNextCategoriaPaiCodigo(categoriasPai);
+    setNewPlanoCategoriaCodigo(nextCode);
+    setNewPlanoCategoriaNome('');
+    setNewPlanoCategoriaModalOpen(true);
+  };
+
+  const handleSaveNewPlanoCategoria = async () => {
+    if (!newPlanoCategoriaNome.trim()) {
+      toast({
+        title: "Erro",
+        description: "Informe o nome da categoria.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!newPlanoCategoriaCodigo.trim()) {
+      toast({
+        title: "Erro",
+        description: "Informe o código da categoria.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingPlanoCategoria(true);
+    try {
+      const created = await contasAPagarService.createCategoriaPai({
+        nome: newPlanoCategoriaNome.trim(),
+        codigo: newPlanoCategoriaCodigo.trim()
+      });
+
+      const updatedCats = await contasAPagarService.getCategoriasPai();
+      setCategoriasPai(Array.isArray(updatedCats) ? updatedCats : []);
+
+      // Auto-selecionar a nova categoria criada
+      setSelectedCategoriaPaiId(created.id);
+      setSelectedSubcategoria(null);
+      handleInputChange('subcategoriaId', '');
+
+      toast({
+        title: "Categoria criada!",
+        description: `Categoria "${created.codigo} - ${created.nome}" cadastrada e selecionada com sucesso.`
+      });
+      setNewPlanoCategoriaModalOpen(false);
+    } catch (error: any) {
+      console.error('Erro ao criar categoria pai:', error);
+      toast({
+        title: "Erro",
+        description: error?.response?.data?.message || "Erro ao cadastrar categoria. Verifique se o código já existe.",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingPlanoCategoria(false);
+    }
+  };
+
+  const handleOpenNewPlanoSubcategoriaModal = () => {
+    if (!selectedCategoriaPaiId) {
+      toast({
+        title: "Atenção",
+        description: "Selecione uma categoria pai antes de cadastrar a subcategoria.",
+        variant: "destructive"
+      });
+      return;
+    }
+    const parentCat = categoriasPai.find(c => c.id === selectedCategoriaPaiId);
+    const nextCode = getNextSubcategoriaCodigo(parentCat?.codigo || '01', subcategorias, selectedCategoriaPaiId);
+    setNewPlanoSubcategoriaCodigo(nextCode);
+    setNewPlanoSubcategoriaNome('');
+    const isRH = (parentCat?.nome || '').toLowerCase().includes('rh') || (parentCat?.nome || '').toLowerCase().includes('pessoal') || parentCat?.codigo === '01';
+    setNewPlanoSubcategoriaRequerFuncionario(isRH);
+    setNewPlanoSubcategoriaModalOpen(true);
+  };
+
+  const handleSaveNewPlanoSubcategoria = async () => {
+    if (!selectedCategoriaPaiId) {
+      toast({
+        title: "Erro",
+        description: "Categoria pai não selecionada.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!newPlanoSubcategoriaNome.trim()) {
+      toast({
+        title: "Erro",
+        description: "Informe o nome da subcategoria / conta.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!newPlanoSubcategoriaCodigo.trim()) {
+      toast({
+        title: "Erro",
+        description: "Informe o código da subcategoria.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingPlanoSubcategoria(true);
+    try {
+      const created = await contasAPagarService.createSubcategoria({
+        categoriaPaiId: selectedCategoriaPaiId,
+        nome: newPlanoSubcategoriaNome.trim(),
+        codigo: newPlanoSubcategoriaCodigo.trim(),
+        requerVinculoFuncionario: newPlanoSubcategoriaRequerFuncionario
+      });
+
+      const updatedSubs = await contasAPagarService.getSubcategorias();
+      setSubcategorias(Array.isArray(updatedSubs) ? updatedSubs : []);
+
+      // Auto-selecionar a nova subcategoria criada
+      handleInputChange('subcategoriaId', created.id);
+      setSelectedSubcategoria(created);
+      if (created.requerVinculoFuncionario) {
+        handleInputChange('fornecedorId', '');
+        handleInputChange('fornecedor', '');
+      } else {
+        handleInputChange('employeeId', '');
+      }
+
+      toast({
+        title: "Subcategoria criada!",
+        description: `Conta "${created.codigo} - ${created.nome}" cadastrada e selecionada com sucesso.`
+      });
+      setNewPlanoSubcategoriaModalOpen(false);
+    } catch (error: any) {
+      console.error('Erro ao criar subcategoria:', error);
+      toast({
+        title: "Erro",
+        description: error?.response?.data?.message || "Erro ao cadastrar subcategoria. Verifique se o código já existe.",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingPlanoSubcategoria(false);
+    }
+  };
 
   const loggedInUserLabel = useMemo(() => {
     if (!user) return 'Usuário Logado';
@@ -497,7 +686,6 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
   const requiresEmployee = Boolean(selectedSubcategoria?.requerVinculoFuncionario);
   const requiresSupplier = !requiresEmployee;
-  const loggedInUserLabel = user?.name || user?.username || 'Usuário logado';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -850,7 +1038,18 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-seguranca-lightgray">Categoria *</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-seguranca-lightgray">Categoria *</label>
+                    <button
+                      type="button"
+                      onClick={handleOpenNewPlanoCategoriaModal}
+                      className="text-xs text-seguranca-yellow hover:underline flex items-center gap-1 font-medium transition-colors"
+                      title="Cadastrar nova categoria no Plano de Contas"
+                    >
+                      <Plus size={13} />
+                      <span>Cadastrar categoria</span>
+                    </button>
+                  </div>
                   <Select
                     value={selectedCategoriaPaiId || 'none'}
                     onValueChange={(value) => {
@@ -876,13 +1075,25 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                   </Select>
                   {categoriasPai.length === 0 && (
                     <p className="text-xs text-amber-400">
-                      Nenhuma categoria cadastrada. Cadastre em Plano de Contas ou reinicie o backend para carregar o seed.
+                      Nenhuma categoria cadastrada. Cadastre clicando em "+ Cadastrar categoria" acima.
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-seguranca-lightgray">Conta / Subcategoria *</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-seguranca-lightgray">Conta / Subcategoria *</label>
+                    <button
+                      type="button"
+                      onClick={handleOpenNewPlanoSubcategoriaModal}
+                      disabled={!selectedCategoriaPaiId}
+                      className="text-xs text-seguranca-yellow hover:underline flex items-center gap-1 font-medium disabled:opacity-40 disabled:hover:no-underline disabled:cursor-not-allowed transition-colors"
+                      title={!selectedCategoriaPaiId ? 'Selecione uma categoria primeiro' : 'Cadastrar nova subcategoria no Plano de Contas'}
+                    >
+                      <Plus size={13} />
+                      <span>Cadastrar subcategoria</span>
+                    </button>
+                  </div>
                   <Select
                     value={formData.subcategoriaId || 'none'}
                     onValueChange={(value) => {
@@ -1212,6 +1423,163 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 className="bg-seguranca-red hover:bg-seguranca-darkred"
               >
                 Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Nova Categoria - Plano de Contas */}
+      <Dialog open={newPlanoCategoriaModalOpen} onOpenChange={setNewPlanoCategoriaModalOpen}>
+        <DialogContent className="sm:max-w-[450px] bg-seguranca-graphite border-gray-600 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-seguranca-yellow flex items-center gap-2">
+              <FolderTree size={18} />
+              Nova Categoria (Plano de Contas)
+            </DialogTitle>
+            <DialogDescription className="text-gray-300">
+              Cadastre uma nova categoria principal no Plano de Contas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-seguranca-lightgray">Código Sequencial *</label>
+              <Input
+                placeholder="Ex: 07"
+                value={newPlanoCategoriaCodigo}
+                onChange={(e) => setNewPlanoCategoriaCodigo(e.target.value)}
+                className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+              />
+              <p className="text-[11px] text-gray-400">
+                Calculado automaticamente na ordem numérica sequencial.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-seguranca-lightgray">Nome da Categoria *</label>
+              <Input
+                placeholder="Ex: Impostos e Taxas"
+                value={newPlanoCategoriaNome}
+                onChange={(e) => setNewPlanoCategoriaNome(e.target.value)}
+                className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setNewPlanoCategoriaModalOpen(false)}
+                className="border-gray-600 text-white hover:bg-seguranca-black"
+                disabled={savingPlanoCategoria}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSaveNewPlanoCategoria}
+                disabled={savingPlanoCategoria}
+                className="bg-seguranca-red hover:bg-seguranca-darkred"
+              >
+                {savingPlanoCategoria ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar Categoria'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Nova Subcategoria - Plano de Contas */}
+      <Dialog open={newPlanoSubcategoriaModalOpen} onOpenChange={setNewPlanoSubcategoriaModalOpen}>
+        <DialogContent className="sm:max-w-[480px] bg-seguranca-graphite border-gray-600 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-seguranca-yellow flex items-center gap-2">
+              <Plus size={18} />
+              Nova Subcategoria (Plano de Contas)
+            </DialogTitle>
+            <DialogDescription className="text-gray-300">
+              Cadastre uma nova conta vinculada à categoria selecionada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {/* Categoria Pai selecionada */}
+            <div className="rounded-md border border-seguranca-yellow/30 bg-seguranca-black/40 p-2.5 text-xs text-seguranca-lightgray">
+              <span className="text-gray-400">Categoria Pai: </span>
+              <span className="font-semibold text-seguranca-yellow">
+                {categoriasPai.find(c => c.id === selectedCategoriaPaiId)?.codigo} - {categoriasPai.find(c => c.id === selectedCategoriaPaiId)?.nome}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-seguranca-lightgray">Código Sequencial *</label>
+              <Input
+                placeholder="Ex: 01.05"
+                value={newPlanoSubcategoriaCodigo}
+                onChange={(e) => setNewPlanoSubcategoriaCodigo(e.target.value)}
+                className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+              />
+              <p className="text-[11px] text-gray-400">
+                Calculado automaticamente na sequência numérica desta categoria.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-seguranca-lightgray">Nome da Subcategoria / Conta *</label>
+              <Input
+                placeholder="Ex: Gratificação / Premiação"
+                value={newPlanoSubcategoriaNome}
+                onChange={(e) => setNewPlanoSubcategoriaNome(e.target.value)}
+                className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex items-start space-x-3 rounded-md border border-gray-700 bg-seguranca-black/60 p-3">
+              <Checkbox
+                id="reqFuncPlano"
+                checked={newPlanoSubcategoriaRequerFuncionario}
+                onCheckedChange={(checked) => setNewPlanoSubcategoriaRequerFuncionario(!!checked)}
+                className="mt-0.5 border-gray-500 data-[state=checked]:bg-seguranca-yellow data-[state=checked]:text-black"
+              />
+              <div className="space-y-1 leading-none">
+                <label htmlFor="reqFuncPlano" className="text-xs font-medium text-seguranca-lightgray cursor-pointer">
+                  Requer vínculo com funcionário
+                </label>
+                <p className="text-[11px] text-gray-400">
+                  Marque se esta conta exige selecionar o funcionário beneficiário (ex.: rescisão, vale, adiantamento, folha de pagamento).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setNewPlanoSubcategoriaModalOpen(false)}
+                className="border-gray-600 text-white hover:bg-seguranca-black"
+                disabled={savingPlanoSubcategoria}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSaveNewPlanoSubcategoria}
+                disabled={savingPlanoSubcategoria}
+                className="bg-seguranca-red hover:bg-seguranca-darkred"
+              >
+                {savingPlanoSubcategoria ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar Subcategoria'
+                )}
               </Button>
             </div>
           </div>
