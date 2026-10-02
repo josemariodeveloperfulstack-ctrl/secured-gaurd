@@ -21,6 +21,7 @@ public class CustomContasAPagarReportRequestDTO {
     private ExpenseType type;
     private UUID supplierId;
     private UUID unitId;
+    private UUID companyId;
     private String workSector;
     private String companySigla;
     private String category;
@@ -37,4 +38,12 @@ public class CustomContasAPagarReportRequestDTO {
      * Tipo de agrupamento para exibição no PDF (ex: "UNIT_SECTOR", "STATUS", "SUPPLIER", "NONE")
      */
     private String groupBy = "UNIT_SECTOR";
+
+    public UUID getCompanyId() {
+        return companyId != null ? companyId : unitId;
+    }
+
+    public void setCompanyId(UUID companyId) {
+        this.companyId = companyId;
+    }
 }
