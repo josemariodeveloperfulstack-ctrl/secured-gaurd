@@ -465,29 +465,46 @@ export const contasAPagarService = {
 
   // Atualizar conta
   async updateContaAPagar(id: string, conta: Partial<ContaAPagar>): Promise<ContaAPagar> {
+    // Caso especial: se for apenas marcar como paga
+    const keys = Object.keys(conta);
+    if (conta.status === 'PAGA' && (keys.length === 1 || (keys.length === 2 && 'dataPagamento' in conta))) {
+      return this.marcarComoPaga(id, conta.dataPagamento ? new Date(conta.dataPagamento) : new Date());
+    }
+
+    // Se faltarem campos obrigatórios, buscar conta existente para mesclar
+    let fullConta: Partial<ContaAPagar> = { ...conta };
+    if (!conta.descricao || conta.valor === undefined || !conta.vencimento || !conta.dataEmissao || !conta.status) {
+      try {
+        const existing = await this.getContaAPagarById(id);
+        fullConta = { ...existing, ...conta };
+      } catch (e) {
+        console.warn('Não foi possível buscar a conta existente para mesclagem:', e);
+      }
+    }
+
     const requestData: Partial<CreateContaAPagarRequest> = {};
 
-    if (conta.descricao) requestData.description = conta.descricao;
-    if (conta.fornecedorId !== undefined) requestData.supplierId = conta.fornecedorId || null;
-    if (conta.valor !== undefined) requestData.amount = conta.valor;
-    if (conta.tipo) requestData.type = conta.tipo;
-    if (conta.status) requestData.status = mapFrontendStatusToBackend(conta.status) as any;
-    if (conta.dataEmissao) requestData.issueDate = formatDateForBackend(conta.dataEmissao);
-    if (conta.vencimento) requestData.dueDate = formatDateForBackend(conta.vencimento);
-    if (conta.dataPagamento) requestData.paymentDate = formatDateForBackend(conta.dataPagamento);
-    if (conta.codigoBarras) requestData.barcode = conta.codigoBarras;
-    if (conta.categoria !== undefined) requestData.category = conta.categoria === 'NENHUMA' ? undefined : conta.categoria;
-    if (conta.subcategoriaId !== undefined) requestData.subcategoriaId = conta.subcategoriaId || null;
-    if (conta.employeeId !== undefined) requestData.employeeId = conta.employeeId || null;
-    if (conta.observacoes) requestData.notes = conta.observacoes;
-    if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto;
-    if (conta.companySigla !== undefined) requestData.companySigla = conta.companySigla;
-    if (conta.unitId !== undefined) requestData.unitId = conta.unitId;
-    if (conta.workSector !== undefined) requestData.workSector = conta.workSector;
+    if (fullConta.descricao) requestData.description = fullConta.descricao;
+    if (fullConta.fornecedorId !== undefined) requestData.supplierId = fullConta.fornecedorId || null;
+    if (fullConta.valor !== undefined) requestData.amount = fullConta.valor;
+    if (fullConta.tipo) requestData.type = fullConta.tipo;
+    if (fullConta.status) requestData.status = mapFrontendStatusToBackend(fullConta.status) as any;
+    if (fullConta.dataEmissao) requestData.issueDate = formatDateForBackend(fullConta.dataEmissao);
+    if (fullConta.vencimento) requestData.dueDate = formatDateForBackend(fullConta.vencimento);
+    if (fullConta.dataPagamento) requestData.paymentDate = formatDateForBackend(fullConta.dataPagamento);
+    if (fullConta.codigoBarras) requestData.barcode = fullConta.codigoBarras;
+    if (fullConta.categoria !== undefined) requestData.category = fullConta.categoria === 'NENHUMA' ? undefined : fullConta.categoria;
+    if (fullConta.subcategoriaId !== undefined) requestData.subcategoriaId = fullConta.subcategoriaId || null;
+    if (fullConta.employeeId !== undefined) requestData.employeeId = fullConta.employeeId || null;
+    if (fullConta.observacoes) requestData.notes = fullConta.observacoes;
+    if (fullConta.centroCusto !== undefined) requestData.centroCusto = fullConta.centroCusto === 'NENHUM' ? undefined : fullConta.centroCusto;
+    if (fullConta.companySigla !== undefined) requestData.companySigla = fullConta.companySigla;
+    if (fullConta.unitId !== undefined) requestData.unitId = fullConta.unitId;
+    if (fullConta.workSector !== undefined) requestData.workSector = fullConta.workSector;
 
     try {
       const response = await api.put(`/api/invoices/${id}`, requestData);
-      return this.getContaAPagarById(response.data.id);
+      return this.getContaAPagarById(response.data.id || id);
     } catch (error: any) {
       console.error('Erro ao atualizar conta a pagar:', error);
       throw error;
@@ -576,11 +593,13 @@ export const contasAPagarService = {
   },
 
   // Marcar conta como paga
-  async marcarComoPaga(id: string, dataPagamento: Date): Promise<ContaAPagar> {
-    const response = await api.patch(`/api/invoices/${id}/mark-as-paid`, {
-      paymentDate: formatDateForBackend(dataPagamento)
+  async marcarComoPaga(id: string, dataPagamento?: Date | string): Promise<ContaAPagar> {
+    const paymentDateStr = dataPagamento ? formatDateForBackend(dataPagamento) : undefined;
+    const url = `/api/invoices/${id}/mark-as-paid` + (paymentDateStr ? `?paymentDate=${paymentDateStr}` : '');
+    const response = await api.patch(url, {
+      paymentDate: paymentDateStr
     });
-    return this.getContaAPagarById(response.data.id);
+    return this.getContaAPagarById(response.data.id || id);
   },
 
   // Buscar contas vencidas
