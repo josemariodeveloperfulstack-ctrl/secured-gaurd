@@ -455,6 +455,9 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
           const row = rawRows[index];
           if (!row || !Array.isArray(row) || row.length === 0) continue;
 
+          const fullRowText = row.map((c: any) => String(c || '').trim()).join(' ');
+          const fullRowUpper = normalizeStr(fullRowText);
+
           // Ignorar linhas vazias, linhas com X/x repetidos ou totalizadores
           if (
             !fullRowText || 
