@@ -1,11 +1,19 @@
 package com.z7design.secured_guard.service;
 
+import com.itextpdf.kernel.colors.ColorConstants;
+import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
+import com.itextpdf.layout.borders.Border;
+import com.itextpdf.layout.borders.SolidBorder;
+import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import com.itextpdf.layout.properties.VerticalAlignment;
+import com.z7design.secured_guard.dto.CustomContasAPagarReportRequestDTO;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Company.CompanyStatus;
@@ -13,8 +21,7 @@ import com.z7design.secured_guard.model.Invoice;
 import com.z7design.secured_guard.model.enums.ExpenseStatus;
 import com.z7design.secured_guard.model.enums.ExpenseType;
 import com.z7design.secured_guard.repository.CompanyRepository;
-import com.z7design.secured_guard.exception.ResourceNotFoundException;
-import com.z7design.secured_guard.exception.BusinessException;
+import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,148 +46,118 @@ public class ContasAPagarReportService {
     private final StandardReportLayoutService standardReportLayoutService;
     private final CompanyRepository companyRepository;
 
+    private static final String CATEGORIA_RESCISAO_FUNCIONARIOS = "Rescisão de funcionários";
+
+    // Cores do layout executivo padronizado
+    private static final DeviceRgb RED_PRIMARY = new DeviceRgb(220, 38, 38);       // #dc2626
+    private static final DeviceRgb RED_DARK = new DeviceRgb(185, 28, 28);          // #b91c1c
+    private static final DeviceRgb SLATE_DARK = new DeviceRgb(30, 41, 59);         // #1e293b
+    private static final DeviceRgb SLATE_LIGHT = new DeviceRgb(241, 245, 249);     // #f1f5f9
+    private static final DeviceRgb SLATE_BORDER = new DeviceRgb(203, 213, 225);    // #cbd5e1
+    private static final DeviceRgb ROW_ALT = new DeviceRgb(248, 250, 252);         // #f8fafc
+    private static final DeviceRgb GREEN_TEXT = new DeviceRgb(22, 101, 52);        // #166534
+    private static final DeviceRgb AMBER_TEXT = new DeviceRgb(180, 83, 9);         // #b45309
+
     /**
-     * Gera relatório de contas a pagar por período
+     * Gera relatório de contas a pagar por período (HTML)
      */
     public String generateContasAPagarReport(LocalDate startDate, LocalDate endDate) {
-        log.info("Gerando relatório de contas a pagar para período: {} a {}", startDate, endDate);
-
+        log.info("Gerando relatório HTML de contas a pagar para período: {} a {}", startDate, endDate);
         try {
-            // Buscar todas as contas no período
             List<Invoice> invoices = invoiceService.findByDueDateBetween(startDate, endDate);
-
-            // Preparar dados para o template
             Map<String, Object> reportData = prepareReportData(invoices, startDate, endDate);
-
-            // Gerar relatório completo
-            String report = reportTemplateService.generateFullReport("contas-a-pagar", reportData);
-
-            log.info("Relatório gerado com sucesso para {} contas", invoices.size());
-            return report;
-
+            return reportTemplateService.generateFullReport("contas-a-pagar", reportData);
         } catch (Exception e) {
-            log.error("Erro ao gerar relatório de contas a pagar: {}", e.getMessage(), e);
+            log.error("Erro ao gerar relatório HTML de contas a pagar: {}", e.getMessage(), e);
             throw new RuntimeException("Erro ao gerar relatório: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Gera relatório de contas a pagar por status
+     * Gera relatório de contas a pagar por status (HTML)
      */
     public String generateContasAPagarReportByStatus(ExpenseStatus status) {
-        log.info("Gerando relatório de contas a pagar por status: {}", status);
-
+        log.info("Gerando relatório HTML de contas a pagar por status: {}", status);
         try {
             List<Invoice> invoices = invoiceService.findByStatus(status);
-
             Map<String, Object> reportData = prepareReportData(invoices, null, null);
             reportData.put("reportTitle", "Relatório de Contas " + getStatusDisplayName(status));
-
-            String report = reportTemplateService.generateFullReport("contas-a-pagar", reportData);
-
-            log.info("Relatório por status gerado com sucesso para {} contas", invoices.size());
-            return report;
-
+            return reportTemplateService.generateFullReport("contas-a-pagar", reportData);
         } catch (Exception e) {
-            log.error("Erro ao gerar relatório por status: {}", e.getMessage(), e);
+            log.error("Erro ao gerar relatório HTML por status: {}", e.getMessage(), e);
             throw new RuntimeException("Erro ao gerar relatório: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Gera relatório PDF de contas a pagar por status com layout padrão
+     * Gera relatório PDF de contas a pagar por status com layout executivo
      */
     @Transactional(readOnly = true)
     public byte[] generateContasAPagarReportPDFByStatus(ExpenseStatus status) throws IOException {
-        log.info("Gerando relatório PDF de contas a pagar por status: {} com layout padrão", status);
-
+        log.info("Gerando relatório PDF de contas a pagar por status: {}", status);
         try {
             List<Invoice> invoices = invoiceService.findByStatus(status);
-            log.info("Dados obtidos: {} contas a pagar", invoices.size());
-
             return generateContasAPagarReportPDFWithIText(invoices, null, null, status, null);
-
         } catch (Exception e) {
-            log.error("Erro ao gerar relatório PDF de contas a pagar por status", e);
+            log.error("Erro ao gerar relatório PDF por status", e);
             throw new IOException("Erro ao gerar relatório de contas a pagar: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Gera relatório de contas a pagar por tipo
+     * Gera relatório de contas a pagar por tipo (HTML)
      */
     public String generateContasAPagarReportByType(ExpenseType type) {
-        log.info("Gerando relatório de contas a pagar por tipo: {}", type);
-
+        log.info("Gerando relatório HTML de contas a pagar por tipo: {}", type);
         try {
             List<Invoice> invoices = invoiceService.findByType(type);
-
             Map<String, Object> reportData = prepareReportData(invoices, null, null);
             reportData.put("reportTitle", "Relatório de " + getTypeDisplayName(type));
-
-            String report = reportTemplateService.generateFullReport("contas-a-pagar", reportData);
-
-            log.info("Relatório por tipo gerado com sucesso para {} contas", invoices.size());
-            return report;
-
+            return reportTemplateService.generateFullReport("contas-a-pagar", reportData);
         } catch (Exception e) {
-            log.error("Erro ao gerar relatório por tipo: {}", e.getMessage(), e);
+            log.error("Erro ao gerar relatório HTML por tipo: {}", e.getMessage(), e);
             throw new RuntimeException("Erro ao gerar relatório: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Gera relatório PDF de contas a pagar por tipo com layout padrão
+     * Gera relatório PDF de contas a pagar por tipo com layout executivo
      */
+    @Transactional(readOnly = true)
     public byte[] generateContasAPagarReportPDFByType(ExpenseType type) throws IOException {
-        log.info("Gerando relatório PDF de contas a pagar por tipo: {} com layout padrão", type);
-
+        log.info("Gerando relatório PDF de contas a pagar por tipo: {}", type);
         try {
             List<Invoice> invoices = invoiceService.findByType(type);
-            log.info("Dados obtidos: {} contas a pagar", invoices.size());
-
             return generateContasAPagarReportPDFWithIText(invoices, null, null, null, type);
-
         } catch (Exception e) {
-            log.error("Erro ao gerar relatório PDF de contas a pagar por tipo", e);
+            log.error("Erro ao gerar relatório PDF por tipo", e);
             throw new IOException("Erro ao gerar relatório de contas a pagar: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Gera relatório resumido de contas a pagar
+     * Gera relatório resumido de contas a pagar (HTML)
      */
     public String generateContasAPagarSummaryReport() {
-        log.info("Gerando relatório resumido de contas a pagar");
-
+        log.info("Gerando relatório HTML resumido de contas a pagar");
         try {
             List<Invoice> allInvoices = invoiceService.findAll();
-
             Map<String, Object> reportData = prepareSummaryData(allInvoices);
-
-            String report = reportTemplateService.generateFullReport("contas-a-pagar", reportData);
-
-            log.info("Relatório resumido gerado com sucesso");
-            return report;
-
+            return reportTemplateService.generateFullReport("contas-a-pagar", reportData);
         } catch (Exception e) {
-            log.error("Erro ao gerar relatório resumido: {}", e.getMessage(), e);
+            log.error("Erro ao gerar relatório HTML resumido: {}", e.getMessage(), e);
             throw new RuntimeException("Erro ao gerar relatório: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Gera relatório PDF resumido de contas a pagar com layout padrão
+     * Gera relatório PDF resumido de contas a pagar com layout executivo
      */
     public byte[] generateContasAPagarSummaryReportPDF() throws IOException {
-        log.info("Gerando relatório PDF resumido de contas a pagar com layout padrão");
-
+        log.info("Gerando relatório PDF resumido de contas a pagar");
         try {
             List<Invoice> allInvoices = invoiceService.findAll();
-            log.info("Dados obtidos: {} contas a pagar", allInvoices.size());
-
             return generateContasAPagarReportPDFWithITextResumo(allInvoices);
-
         } catch (Exception e) {
             log.error("Erro ao gerar relatório PDF resumido de contas a pagar", e);
             throw new IOException("Erro ao gerar relatório de contas a pagar: " + e.getMessage(), e);
@@ -188,433 +165,29 @@ public class ContasAPagarReportService {
     }
 
     /**
-     * Gera relatório PDF resumido de contas a pagar usando iText com layout padrão
-     */
-    private byte[] generateContasAPagarReportPDFWithITextResumo(List<Invoice> invoices) throws IOException {
-        log.info("Gerando relatório PDF resumido de contas a pagar com iText - {} contas", invoices.size());
-
-        // Determinar companyId - usar primeira empresa ativa
-        java.util.UUID companyId = null;
-        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
-        if (activeCompanies != null && !activeCompanies.isEmpty()) {
-            companyId = activeCompanies.get(0).getId();
-            log.info("Usando primeira empresa ativa: {} (ID: {})",
-                    activeCompanies.get(0).getName(), companyId);
-        } else {
-            List<Company> allCompanies = companyRepository.findAll();
-            if (allCompanies != null && !allCompanies.isEmpty()) {
-                companyId = allCompanies.get(0).getId();
-                log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})",
-                        allCompanies.get(0).getName(), companyId);
-            } else {
-                throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
-                        "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
-            }
-        }
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
-
-        try {
-            PdfWriter writer = new PdfWriter(baos);
-
-            // Criar documento com layout padrão - título para relatório resumido
-            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
-                    .companyId(companyId)
-                    .reportTitle("RELATÓRIO RESUMO - CONTAS A PAGAR")
-                    .landscape(true)
-                    .topMargin(120f) // Espaço para cabeçalho
-                    .bottomMargin(80f) // Espaço para rodapé
-                    .leftMargin(30f)
-                    .rightMargin(30f)
-                    .build();
-
-            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
-            Document document = docWithPdf.getDocument();
-
-            // Informações do relatório
-            Paragraph reportInfo = new Paragraph(
-                    "Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setFontSize(10)
-                    .setMarginBottom(10);
-            document.add(reportInfo);
-
-            // Estatísticas
-            BigDecimal totalAmount = invoices.stream()
-                    .map(Invoice::getAmount)
-                    .filter(Objects::nonNull)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            long contasAbertas = invoices.stream()
-                    .filter(i -> i.getStatus() == ExpenseStatus.PENDENTE)
-                    .count();
-            long contasPagas = invoices.stream()
-                    .filter(i -> i.getStatus() == ExpenseStatus.PAGA)
-                    .count();
-            long contasVencidas = invoices.stream()
-                    .filter(i -> i.getStatus() == ExpenseStatus.PENDENTE &&
-                            i.getDueDate() != null &&
-                            i.getDueDate().isBefore(LocalDate.now()))
-                    .count();
-
-            Paragraph stats = new Paragraph(String.format(
-                    "Total de contas: %d | Abertas: %d | Pagas: %d | Vencidas: %d | Valor Total: R$ %s",
-                    invoices.size(), contasAbertas, contasPagas, contasVencidas,
-                    totalAmount.setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",")))
-                    .setFontSize(11)
-                    .setBold()
-                    .setMarginBottom(15);
-            document.add(stats);
-
-            // Tabela de contas
-            if (invoices.isEmpty()) {
-                Paragraph noData = new Paragraph("Nenhuma conta a pagar encontrada.")
-                        .setTextAlignment(TextAlignment.CENTER)
-                        .setFontSize(12)
-                        .setMarginTop(20);
-                document.add(noData);
-            } else {
-                Table table = new Table(new float[]{9f, 15f, 20f, 13f, 12f, 7f, 9f, 9f, 6f}).useAllAvailableWidth();
-
-                // Cabeçalhos
-                table.addHeaderCell(createHeaderCell("Vencimento"));
-                table.addHeaderCell(createHeaderCell("Fornecedor"));
-                table.addHeaderCell(createHeaderCell("Descrição"));
-                table.addHeaderCell(createHeaderCell("Unidade / Setor"));
-                table.addHeaderCell(createHeaderCell("Conta"));
-                table.addHeaderCell(createHeaderCell("Tipo"));
-                table.addHeaderCell(createHeaderCell("Valor"));
-                table.addHeaderCell(createHeaderCell("Status"));
-                table.addHeaderCell(createHeaderCell("Empresa"));
-
-                // Dados
-                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-                for (Invoice invoice : invoices) {
-                    table.addCell(
-                            createCell(invoice.getDueDate() != null ? invoice.getDueDate().format(dateFormatter) : ""));
-                    table.addCell(createCell(
-                            invoice.getSupplier() != null ? invoice.getSupplier().getName() : "Não informado"));
-
-                    // Descrição (truncar se muito longa)
-                    String desc = invoice.getDescription() != null ? invoice.getDescription() : "";
-                    if (desc.length() > 40) {
-                        desc = desc.substring(0, 37) + "...";
-                    }
-                    table.addCell(createCell(desc));
-
-                    table.addCell(createCell(getContaPlanoDeContas(invoice)));
-
-                    table.addCell(createCell(getTypeDisplayName(invoice.getType())));
-                    table.addCell(
-                            createCell(
-                                    invoice.getAmount() != null
-                                            ? "R$ " + invoice.getAmount().setScale(2, java.math.RoundingMode.HALF_UP)
-                                                    .toString().replace(".", ",")
-                                            : ""));
-                    table.addCell(createCell(getStatusDisplayName(invoice.getStatus())));
-                    table.addCell(createCell(
-                            invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "Não informado"));
-                }
-
-                document.add(table);
-            }
-
-            // Finalizar layout padrão (adiciona header/footer em todas as páginas)
-            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
-
-            document.close();
-
-        } catch (Exception e) {
-            log.error("Erro ao gerar PDF de contas a pagar: {}", e.getMessage(), e);
-            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
-        }
-
-        byte[] result = baos.toByteArray();
-        log.info("PDF resumido de contas a pagar gerado com sucesso, tamanho: {} bytes", result.length);
-        return result;
-    }
-
-    /**
-     * Gera relatório PDF de contas a pagar por empresa (sigla) com layout padrão
-     */
-    @Transactional(readOnly = true)
-    public byte[] generateContasAPagarReportPDFByCompany(String companySigla,
-            LocalDate startDate,
-            LocalDate endDate) throws IOException {
-        log.info("Gerando relatório PDF de contas a pagar por empresa: {} com layout padrão", companySigla);
-
-        try {
-            List<Invoice> allInvoices;
-            if (startDate != null && endDate != null) {
-                allInvoices = invoiceService.findByDueDateBetween(startDate, endDate);
-            } else {
-                allInvoices = invoiceService.findAll();
-            }
-
-            // Filtrar por empresa (sigla) - se for "TODAS", não aplicar o filtro
-            List<Invoice> invoices;
-            if ("TODAS".equalsIgnoreCase(companySigla)) {
-                invoices = allInvoices;
-            } else {
-                invoices = allInvoices.stream()
-                        .filter(i -> i.getCompanySigla() != null && i.getCompanySigla().equalsIgnoreCase(companySigla))
-                        .collect(Collectors.toList());
-            }
-
-            log.info("Dados obtidos: {} contas a pagar para empresa {}", invoices.size(), companySigla);
-
-            return generateContasAPagarReportPDFWithITextByCompany(invoices, startDate, endDate, companySigla);
-
-        } catch (Exception e) {
-            log.error("Erro ao gerar relatório PDF de contas a pagar por empresa", e);
-            throw new IOException("Erro ao gerar relatório de contas a pagar: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Gera relatório PDF de contas a pagar com layout padrão (versão com título
-     * personalizado por empresa)
-     */
-    private byte[] generateContasAPagarReportPDFWithITextByCompany(List<Invoice> invoices,
-            LocalDate startDate,
-            LocalDate endDate,
-            String companySigla) throws IOException {
-        log.info("Gerando relatório PDF de contas a pagar com iText - {} contas para empresa {}", invoices.size(),
-                companySigla);
-
-        // Determinar companyId baseado no companySigla
-        java.util.UUID companyId = null;
-        Company selectedCompany = null;
-
-        // Se não for "TODAS", buscar a empresa específica pela sigla
-        if (!"TODAS".equalsIgnoreCase(companySigla)) {
-            Optional<Company> companyOpt = companyRepository.findBySigla(companySigla);
-            if (companyOpt.isPresent()) {
-                selectedCompany = companyOpt.get();
-                companyId = selectedCompany.getId();
-                log.info("Usando empresa específica: {} (ID: {}, Sigla: {})",
-                        selectedCompany.getName(), companyId, companySigla);
-            } else {
-                log.warn("Empresa com sigla {} não encontrada. Usando empresa padrão.", companySigla);
-            }
-        }
-
-        // Se for "TODAS" ou empresa não encontrada, usar primeira empresa ativa (padrão
-        // Vigilância)
-        if (companyId == null) {
-            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
-            if (activeCompanies != null && !activeCompanies.isEmpty()) {
-                selectedCompany = activeCompanies.get(0);
-                companyId = selectedCompany.getId();
-                log.info("Usando primeira empresa ativa (padrão): {} (ID: {})",
-                        selectedCompany.getName(), companyId);
-            } else {
-                List<Company> allCompanies = companyRepository.findAll();
-                if (allCompanies != null && !allCompanies.isEmpty()) {
-                    selectedCompany = allCompanies.get(0);
-                    companyId = selectedCompany.getId();
-                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})",
-                            selectedCompany.getName(), companyId);
-                } else {
-                    throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
-                            "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
-                }
-            }
-        }
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
-
-        try {
-            PdfWriter writer = new PdfWriter(baos);
-
-            // Criar documento com layout padrão - título personalizado para relatório por
-            // empresa
-            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
-                    .companyId(companyId)
-                    .reportTitle("RELATÓRIO POR EMPRESA - CONTAS A PAGAR")
-                    .landscape(true)
-                    .topMargin(120f) // Espaço para cabeçalho
-                    .bottomMargin(80f) // Espaço para rodapé
-                    .leftMargin(30f)
-                    .rightMargin(30f)
-                    .build();
-
-            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
-            Document document = docWithPdf.getDocument();
-
-            // Informações do relatório
-            Paragraph reportInfo = new Paragraph(
-                    "Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setFontSize(10)
-                    .setMarginBottom(10);
-            document.add(reportInfo);
-
-            // Informação da empresa filtrada
-            Paragraph companyInfo = new Paragraph("Empresa: " + companySigla)
-                    .setFontSize(12)
-                    .setBold()
-                    .setMarginBottom(10);
-            document.add(companyInfo);
-
-            // Filtros aplicados
-            if (startDate != null || endDate != null) {
-                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
-                        .setFontSize(10)
-                        .setBold()
-                        .setMarginBottom(5);
-                document.add(filtersInfo);
-
-                if (startDate != null && endDate != null) {
-                    document.add(
-                            new Paragraph("Período: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
-                                    " a " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10)
-                                    .setMarginBottom(2));
-                }
-                document.add(new Paragraph("").setMarginBottom(10));
-            }
-
-            // Estatísticas
-            BigDecimal totalAmount = invoices.stream()
-                    .map(Invoice::getAmount)
-                    .filter(Objects::nonNull)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            long contasAbertas = invoices.stream()
-                    .filter(i -> i.getStatus() == ExpenseStatus.PENDENTE)
-                    .count();
-            long contasPagas = invoices.stream()
-                    .filter(i -> i.getStatus() == ExpenseStatus.PAGA)
-                    .count();
-            long contasVencidas = invoices.stream()
-                    .filter(i -> i.getStatus() == ExpenseStatus.PENDENTE &&
-                            i.getDueDate() != null &&
-                            i.getDueDate().isBefore(LocalDate.now()))
-                    .count();
-
-            Paragraph stats = new Paragraph(String.format(
-                    "Total de contas: %d | Abertas: %d | Pagas: %d | Vencidas: %d | Valor Total: R$ %s",
-                    invoices.size(), contasAbertas, contasPagas, contasVencidas,
-                    totalAmount.setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",")))
-                    .setFontSize(12)
-                    .setBold()
-                    .setMarginBottom(15);
-            document.add(stats);
-
-            // Tabela de contas
-            if (invoices.isEmpty()) {
-                Paragraph noData = new Paragraph("Nenhuma conta a pagar encontrada com os filtros aplicados.")
-                        .setTextAlignment(TextAlignment.CENTER)
-                        .setFontSize(12)
-                        .setMarginTop(20);
-                document.add(noData);
-            } else {
-                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
-
-                // Cabeçalhos
-                table.addHeaderCell(createHeaderCell("Vencimento"));
-                table.addHeaderCell(createHeaderCell("Fornecedor"));
-                table.addHeaderCell(createHeaderCell("Descrição"));
-                table.addHeaderCell(createHeaderCell("Conta"));
-                table.addHeaderCell(createHeaderCell("Tipo"));
-                table.addHeaderCell(createHeaderCell("Valor"));
-                table.addHeaderCell(createHeaderCell("Status"));
-                table.addHeaderCell(createHeaderCell("Empresa"));
-
-                // Dados
-                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-                for (Invoice invoice : invoices) {
-                    table.addCell(
-                            createCell(invoice.getDueDate() != null ? invoice.getDueDate().format(dateFormatter) : ""));
-
-                    // Em rescisão de funcionários exibe o funcionário; nas demais, o fornecedor
-                    table.addCell(createCell(getFornecedorOuFuncionario(invoice)));
-
-                    // Descrição (truncar se muito longa)
-                    String desc = invoice.getDescription() != null ? invoice.getDescription() : "";
-                    if (desc.length() > 40) {
-                        desc = desc.substring(0, 37) + "...";
-                    }
-                    table.addCell(createCell(desc));
-
-                    table.addCell(createCell(getContaPlanoDeContas(invoice)));
-
-                    table.addCell(createCell(getTypeDisplayName(invoice.getType())));
-                    table.addCell(
-                            createCell(
-                                    invoice.getAmount() != null
-                                            ? "R$ " + invoice.getAmount().setScale(2, java.math.RoundingMode.HALF_UP)
-                                                    .toString().replace(".", ",")
-                                            : ""));
-                    table.addCell(createCell(getStatusDisplayName(invoice.getStatus())));
-                    table.addCell(createCell(
-                            invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "Não informado"));
-                }
-
-                document.add(table);
-            }
-
-            // Finalizar layout padrão (adiciona header/footer em todas as páginas)
-            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
-
-            document.close();
-
-        } catch (Exception e) {
-            log.error("Erro ao gerar PDF de contas a pagar: {}", e.getMessage(), e);
-            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
-        }
-
-        byte[] result = baos.toByteArray();
-        log.info("PDF de contas a pagar gerado com sucesso, tamanho: {} bytes", result.length);
-        return result;
-    }
-
-    /**
-     * Gera relatório PDF de contas a pagar com layout padrão
+     * Gera relatório PDF de contas a pagar por período e filtros
      */
     @Transactional(readOnly = true)
     public byte[] generateContasAPagarReportPDF(LocalDate startDate, LocalDate endDate,
             ExpenseStatus statusFilter, ExpenseType typeFilter) throws IOException {
-        log.info("Gerando relatório PDF de contas a pagar com layout padrão - Período: {} a {}, Status: {}, Tipo: {}",
+        log.info("Gerando relatório PDF de contas a pagar - Período: {} a {}, Status: {}, Tipo: {}",
                 startDate, endDate, statusFilter, typeFilter);
-
         try {
-            // Buscar dados com filtros
             List<Invoice> invoices;
             if (startDate != null && endDate != null) {
-                log.info("🔍 DEBUG: Buscando faturas com dueDate entre {} e {}", startDate, endDate);
                 invoices = invoiceService.findByDueDateBetween(startDate, endDate);
-                log.info("🔍 DEBUG: Encontradas {} faturas no período", invoices.size());
-
-                // Debug: Mostrar todas as faturas para comparação
-                List<Invoice> allInvoices = invoiceService.findAll();
-                log.info("🔍 DEBUG: Total de faturas no sistema: {}", allInvoices.size());
-                if (!allInvoices.isEmpty()) {
-                    log.info("🔍 DEBUG: Primeiras 5 faturas (dueDate):");
-                    allInvoices.stream().limit(5).forEach(inv -> log.info("  - ID: {}, DueDate: {}, Description: {}",
-                            inv.getId(), inv.getDueDate(), inv.getDescription()));
-                }
             } else {
                 invoices = invoiceService.findAll();
             }
 
-            // Aplicar filtros adicionais
             if (statusFilter != null) {
-                invoices = invoices.stream()
-                        .filter(i -> i.getStatus() == statusFilter)
-                        .collect(Collectors.toList());
+                invoices = invoices.stream().filter(i -> i.getStatus() == statusFilter).collect(Collectors.toList());
             }
-
             if (typeFilter != null) {
-                invoices = invoices.stream()
-                        .filter(i -> i.getType() == typeFilter)
-                        .collect(Collectors.toList());
+                invoices = invoices.stream().filter(i -> i.getType() == typeFilter).collect(Collectors.toList());
             }
-
-            log.info("Dados obtidos: {} contas a pagar", invoices.size());
 
             return generateContasAPagarReportPDFWithIText(invoices, startDate, endDate, statusFilter, typeFilter);
-
         } catch (Exception e) {
             log.error("Erro ao gerar relatório PDF de contas a pagar", e);
             throw new IOException("Erro ao gerar relatório de contas a pagar: " + e.getMessage(), e);
@@ -622,386 +195,50 @@ public class ContasAPagarReportService {
     }
 
     /**
-     * Gera relatório PDF de contas a pagar usando iText com layout padrão
-     */
-    private byte[] generateContasAPagarReportPDFWithIText(List<Invoice> invoices,
-            LocalDate startDate,
-            LocalDate endDate,
-            ExpenseStatus statusFilter,
-            ExpenseType typeFilter) throws IOException {
-        log.info("Gerando relatório PDF de contas a pagar com iText - {} contas", invoices.size());
-
-        // Determinar companyId - usar primeira empresa ativa
-        java.util.UUID companyId = null;
-        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
-        if (activeCompanies != null && !activeCompanies.isEmpty()) {
-            companyId = activeCompanies.get(0).getId();
-            log.info("Usando primeira empresa ativa: {} (ID: {})",
-                    activeCompanies.get(0).getName(), companyId);
-        } else {
-            List<Company> allCompanies = companyRepository.findAll();
-            if (allCompanies != null && !allCompanies.isEmpty()) {
-                companyId = allCompanies.get(0).getId();
-                log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})",
-                        allCompanies.get(0).getName(), companyId);
-            } else {
-                throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
-                        "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
-            }
-        }
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
-
-        try {
-            PdfWriter writer = new PdfWriter(baos);
-
-            // Criar documento com layout padrão
-            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
-                    .companyId(companyId)
-                    .reportTitle("RELATÓRIO DE CONTAS A PAGAR")
-                    .landscape(true)
-                    .topMargin(120f) // Espaço para cabeçalho
-                    .bottomMargin(80f) // Espaço para rodapé
-                    .leftMargin(30f)
-                    .rightMargin(30f)
-                    .build();
-
-            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
-            Document document = docWithPdf.getDocument();
-
-            // Informações do relatório
-            Paragraph reportInfo = new Paragraph(
-                    "Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setFontSize(10)
-                    .setMarginBottom(10);
-            document.add(reportInfo);
-
-            // Filtros aplicados
-            if (startDate != null || endDate != null || statusFilter != null || typeFilter != null) {
-                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
-                        .setFontSize(10)
-                        .setBold()
-                        .setMarginBottom(5);
-                document.add(filtersInfo);
-
-                if (startDate != null && endDate != null) {
-                    document.add(
-                            new Paragraph("Período: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
-                                    " a " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10)
-                                    .setMarginBottom(2));
-                }
-                if (statusFilter != null) {
-                    document.add(new Paragraph("Status: " + getStatusDisplayName(statusFilter)).setFontSize(10)
-                            .setMarginBottom(2));
-                }
-                if (typeFilter != null) {
-                    document.add(new Paragraph("Tipo: " + getTypeDisplayName(typeFilter)).setFontSize(10)
-                            .setMarginBottom(2));
-                }
-                document.add(new Paragraph("").setMarginBottom(10));
-            }
-
-            // Estatísticas
-            BigDecimal totalAmount = invoices.stream()
-                    .map(Invoice::getAmount)
-                    .filter(Objects::nonNull)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            long contasAbertas = invoices.stream()
-                    .filter(i -> i.getStatus() == ExpenseStatus.PENDENTE)
-                    .count();
-            long contasPagas = invoices.stream()
-                    .filter(i -> i.getStatus() == ExpenseStatus.PAGA)
-                    .count();
-            long contasVencidas = invoices.stream()
-                    .filter(i -> i.getStatus() == ExpenseStatus.PENDENTE &&
-                            i.getDueDate() != null &&
-                            i.getDueDate().isBefore(LocalDate.now()))
-                    .count();
-
-            Paragraph stats = new Paragraph(String.format(
-                    "Total de contas: %d | Abertas: %d | Pagas: %d | Vencidas: %d | Valor Total: R$ %s",
-                    invoices.size(), contasAbertas, contasPagas, contasVencidas,
-                    totalAmount.setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",")))
-                    .setFontSize(12)
-                    .setBold()
-                    .setMarginBottom(15);
-            document.add(stats);
-
-            // Tabela de contas
-            if (invoices.isEmpty()) {
-                Paragraph noData = new Paragraph("Nenhuma conta a pagar encontrada com os filtros aplicados.")
-                        .setTextAlignment(TextAlignment.CENTER)
-                        .setFontSize(12)
-                        .setMarginTop(20);
-                document.add(noData);
-            } else {
-                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
-
-                // Cabeçalhos
-                table.addHeaderCell(createHeaderCell("Vencimento"));
-                table.addHeaderCell(createHeaderCell("Fornecedor"));
-                table.addHeaderCell(createHeaderCell("Descrição"));
-                table.addHeaderCell(createHeaderCell("Conta"));
-                table.addHeaderCell(createHeaderCell("Tipo"));
-                table.addHeaderCell(createHeaderCell("Valor"));
-                table.addHeaderCell(createHeaderCell("Status"));
-                table.addHeaderCell(createHeaderCell("Empresa"));
-
-                // Dados
-                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-                for (Invoice invoice : invoices) {
-                    table.addCell(
-                            createCell(invoice.getDueDate() != null ? invoice.getDueDate().format(dateFormatter) : ""));
-                    table.addCell(createCell(
-                            invoice.getSupplier() != null ? invoice.getSupplier().getName() : "Não informado"));
-
-                    // Descrição (truncar se muito longa)
-                    String desc = invoice.getDescription() != null ? invoice.getDescription() : "";
-                    if (desc.length() > 40) {
-                        desc = desc.substring(0, 37) + "...";
-                    }
-                    table.addCell(createCell(desc));
-
-                    table.addCell(createCell(getContaPlanoDeContas(invoice)));
-
-                    table.addCell(createCell(getTypeDisplayName(invoice.getType())));
-                    table.addCell(
-                            createCell(
-                                    invoice.getAmount() != null
-                                            ? "R$ " + invoice.getAmount().setScale(2, java.math.RoundingMode.HALF_UP)
-                                                    .toString().replace(".", ",")
-                                            : ""));
-                    table.addCell(createCell(getStatusDisplayName(invoice.getStatus())));
-                    table.addCell(createCell(
-                            invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "Não informado"));
-                }
-
-                document.add(table);
-            }
-
-            // Finalizar layout padrão (adiciona header/footer em todas as páginas)
-            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
-
-            document.close();
-
-        } catch (Exception e) {
-            log.error("Erro ao gerar PDF de contas a pagar: {}", e.getMessage(), e);
-            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
-        }
-
-        byte[] result = baos.toByteArray();
-        log.info("PDF de contas a pagar gerado com sucesso, tamanho: {} bytes", result.length);
-        return result;
-    }
-
-    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
-        return new com.itextpdf.layout.element.Cell()
-                .add(new Paragraph(text).setBold().setFontSize(10))
-                .setTextAlignment(TextAlignment.CENTER)
-                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
-    }
-
-    private com.itextpdf.layout.element.Cell createCell(String text) {
-        return new com.itextpdf.layout.element.Cell()
-                .add(new Paragraph(text != null ? text : "").setFontSize(9))
-                .setTextAlignment(TextAlignment.LEFT);
-    }
-
-    /**
-     * Prepara dados para o template de relatório
-     */
-    private Map<String, Object> prepareReportData(List<Invoice> invoices, LocalDate startDate, LocalDate endDate) {
-        Map<String, Object> data = new HashMap<>();
-
-        // Dados básicos
-        data.put("reportDate", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-        data.put("currentDate", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
-        data.put("pageNumber", "1");
-
-        if (startDate != null && endDate != null) {
-            data.put("startDate", startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-            data.put("endDate", endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-        }
-
-        // Estatísticas
-        int totalContas = invoices.size();
-        BigDecimal valorTotal = invoices.stream()
-                .map(Invoice::getAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        long contasAbertas = invoices.stream()
-                .filter(i -> i.getStatus() == ExpenseStatus.PENDENTE)
-                .count();
-
-        long contasPagas = invoices.stream()
-                .filter(i -> i.getStatus() == ExpenseStatus.PAGA)
-                .count();
-
-        long contasVencidas = invoices.stream()
-                .filter(i -> i.getStatus() == ExpenseStatus.PENDENTE &&
-                        i.getDueDate() != null &&
-                        i.getDueDate().isBefore(LocalDate.now()))
-                .count();
-
-        data.put("totalContas", totalContas);
-        data.put("valorTotal", formatCurrency(valorTotal));
-        data.put("contasAbertas", contasAbertas);
-        data.put("contasPagas", contasPagas);
-        data.put("contasVencidas", contasVencidas);
-
-        // Percentuais
-        if (totalContas > 0) {
-            data.put("percentualAbertas", String.format("%.1f", (contasAbertas * 100.0) / totalContas));
-            data.put("percentualPagas", String.format("%.1f", (contasPagas * 100.0) / totalContas));
-            data.put("percentualVencidas", String.format("%.1f", (contasVencidas * 100.0) / totalContas));
-        } else {
-            data.put("percentualAbertas", "0.0");
-            data.put("percentualPagas", "0.0");
-            data.put("percentualVencidas", "0.0");
-        }
-
-        // Dados das contas para a tabela
-        List<Map<String, Object>> contasData = invoices.stream()
-                .map(this::mapInvoiceToReportData)
-                .collect(Collectors.toList());
-
-        data.put("contas", contasData);
-
-        return data;
-    }
-
-    /**
-     * Prepara dados resumidos
-     */
-    private Map<String, Object> prepareSummaryData(List<Invoice> invoices) {
-        Map<String, Object> data = prepareReportData(invoices, null, null);
-        data.put("reportTitle", "Relatório Resumido de Contas a Pagar");
-
-        // Análise por fornecedor
-        Map<String, Long> contasPorFornecedor = invoices.stream()
-                .filter(i -> i.getSupplier() != null)
-                .collect(Collectors.groupingBy(
-                        i -> i.getSupplier().getName(),
-                        Collectors.counting()));
-
-        data.put("contasPorFornecedor", contasPorFornecedor);
-
-        return data;
-    }
-
-    /**
-     * Mapeia uma invoice para dados do relatório
-     */
-    private Map<String, Object> mapInvoiceToReportData(Invoice invoice) {
-        Map<String, Object> invoiceData = new HashMap<>();
-
-        invoiceData.put("vencimento",
-                invoice.getDueDate() != null ? invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
-                        : "-");
-        invoiceData.put("fornecedor", getFornecedorOuFuncionario(invoice));
-        invoiceData.put("descricao", invoice.getDescription() != null ? invoice.getDescription() : "-");
-        invoiceData.put("tipo", getTypeDisplayName(invoice.getType()));
-        invoiceData.put("valor", formatCurrency(invoice.getAmount()));
-        invoiceData.put("status", getStatusDisplayName(invoice.getStatus()));
-        invoiceData.put("empresa", invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "-");
-        invoiceData.put("conta", getContaPlanoDeContas(invoice));
-
-        return invoiceData;
-    }
-
-    /**
-     * Obtém a conta do plano de contas vinculada à invoice (ex.: código - nome),
-     * de forma segura contra lazy loading.
-     */
-    private String getContaPlanoDeContas(Invoice invoice) {
-        try {
-            if (invoice.getSubcategoria() != null) {
-                String codigo = invoice.getSubcategoria().getCodigo();
-                String nome = invoice.getSubcategoria().getNome();
-                return (codigo != null ? codigo : "") + " - " + (nome != null ? nome : "");
-            }
-        } catch (Exception e) {
-            log.warn("Erro ao acessar subcategoria da fatura {}: {}", invoice.getId(), e.getMessage());
-        }
-        return "Não informado";
-    }
-
-    private static final String CATEGORIA_RESCISAO_FUNCIONARIOS = "Rescisão de funcionários";
-
-    /**
-     * Em contas de rescisão de funcionários, exibe o nome do funcionário vinculado
-     * em vez do fornecedor. Nas demais contas, mantém o fornecedor.
-     */
-    private String getFornecedorOuFuncionario(Invoice invoice) {
-        try {
-            if (invoice.getSubcategoria() != null
-                    && invoice.getSubcategoria().getCategoriaPai() != null
-                    && CATEGORIA_RESCISAO_FUNCIONARIOS.equals(invoice.getSubcategoria().getCategoriaPai().getNome())
-                    && invoice.getEmployee() != null
-                    && invoice.getEmployee().getName() != null
-                    && !invoice.getEmployee().getName().isBlank()) {
-                return invoice.getEmployee().getName();
-            }
-        } catch (Exception e) {
-            log.warn("Erro ao acessar funcionário da fatura {}: {}", invoice.getId(), e.getMessage());
-        }
-        try {
-            if (invoice.getSupplier() != null) {
-                return invoice.getSupplier().getName();
-            }
-        } catch (Exception e) {
-            log.warn("Erro ao acessar fornecedor da fatura {}: {}", invoice.getId(), e.getMessage());
-        }
-        return "Não informado";
-    }
-
-    /**
-     * Formata valor monetário
-     */
-    private String formatCurrency(BigDecimal value) {
-        if (value == null)
-            return "R$ 0,00";
-        return String.format("R$ %,.2f", value).replace(",", "X").replace(".", ",").replace("X", ".");
-    }
-
-    /**
-     * Obtém nome de exibição do status
-     */
-    private String getStatusDisplayName(ExpenseStatus status) {
-        if (status == null)
-            return "Não definido";
-
-        return switch (status) {
-            case PENDENTE -> "Aberta";
-            case PAGA -> "Paga";
-            case CANCELADA -> "Cancelada";
-            case ERRO -> "Erro";
-            case SOLICITADA -> "Solicitada";
-            case PAGA_ANTERIORMENTE -> "Paga Anteriormente";
-            case PENDENTE_ERRO -> "Pendente/Erro";
-        };
-    }
-
-    /**
-     * Obtém nome de exibição do tipo
-     */
-    /**
-     * Gera relatório PDF personalizado de contas a pagar com filtros dinâmicos,
-     * seleção de colunas e agrupamento com subtotais por Unidade/Setor.
+     * Gera relatório PDF de contas a pagar por empresa (sigla)
      */
     @Transactional(readOnly = true)
-    public byte[] generateCustomContasAPagarReportPDF(com.z7design.secured_guard.dto.CustomContasAPagarReportRequestDTO req) throws IOException {
-        log.info("Gerando relatório PDF personalizado de contas a pagar: {}", req);
+    public byte[] generateContasAPagarReportPDFByCompany(String companySigla,
+            LocalDate startDate, LocalDate endDate) throws IOException {
+        log.info("Gerando relatório PDF de contas a pagar por empresa: {}", companySigla);
+        try {
+            List<Invoice> invoices = invoiceService.findAll();
+            if (companySigla != null && !companySigla.isBlank() && !"TODAS".equalsIgnoreCase(companySigla)) {
+                invoices = invoices.stream()
+                        .filter(i -> i.getCompanySigla() != null && i.getCompanySigla().equalsIgnoreCase(companySigla.trim()))
+                        .collect(Collectors.toList());
+            }
+            if (startDate != null) {
+                invoices = invoices.stream().filter(i -> i.getDueDate() != null && !i.getDueDate().isBefore(startDate)).collect(Collectors.toList());
+            }
+            if (endDate != null) {
+                invoices = invoices.stream().filter(i -> i.getDueDate() != null && !i.getDueDate().isAfter(endDate)).collect(Collectors.toList());
+            }
 
+            CustomContasAPagarReportRequestDTO req = new CustomContasAPagarReportRequestDTO();
+            req.setCompanySigla(companySigla);
+            req.setStartDate(startDate);
+            req.setEndDate(endDate);
+            req.setGroupBy("UNIT_SECTOR");
+            req.setSelectedColumns(Arrays.asList("dueDate", "description", "supplier", "unit", "workSector", "category", "amount", "status"));
+
+            return generateCustomPdfDocument(invoices, req);
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF por empresa: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Gera relatório PDF personalizado com agrupamento, filtros dinâmicos e colunas selecionadas.
+     */
+    @Transactional(readOnly = true)
+    public byte[] generateCustomContasAPagarReportPDF(CustomContasAPagarReportRequestDTO req) throws IOException {
+        log.info("Gerando relatório PDF personalizado de contas a pagar: {}", req);
         try {
             List<Invoice> allInvoices = invoiceService.findAll();
 
-            // Filtragem dinâmica em memória
             List<Invoice> filtered = allInvoices.stream().filter(invoice -> {
-                // Filtro por Data
                 LocalDate targetDate = invoice.getDueDate();
                 if ("issueDate".equalsIgnoreCase(req.getDateField())) {
                     targetDate = invoice.getIssueDate();
@@ -1015,62 +252,36 @@ public class ContasAPagarReportService {
                 if (req.getEndDate() != null && (targetDate == null || targetDate.isAfter(req.getEndDate()))) {
                     return false;
                 }
-
-                // Filtro por Status
                 if (req.getStatus() != null && invoice.getStatus() != req.getStatus()) {
                     return false;
                 }
-
-                // Filtro por Tipo
                 if (req.getType() != null && invoice.getType() != req.getType()) {
                     return false;
                 }
-
-                // Filtro por Fornecedor
-                if (req.getSupplierId() != null) {
-                    if (invoice.getSupplier() == null || !req.getSupplierId().equals(invoice.getSupplier().getId())) {
-                        return false;
-                    }
+                if (req.getSupplierId() != null && (invoice.getSupplier() == null || !req.getSupplierId().equals(invoice.getSupplier().getId()))) {
+                    return false;
                 }
-
-                // Filtro por Unidade
-                if (req.getUnitId() != null) {
-                    if (invoice.getUnit() == null || !req.getUnitId().equals(invoice.getUnit().getId())) {
-                        return false;
-                    }
+                if (req.getUnitId() != null && (invoice.getUnit() == null || !req.getUnitId().equals(invoice.getUnit().getId()))) {
+                    return false;
                 }
-
-                // Filtro por Setor de Trabalho
                 if (req.getWorkSector() != null && !req.getWorkSector().isBlank()) {
                     if (invoice.getWorkSector() == null || !invoice.getWorkSector().toLowerCase().contains(req.getWorkSector().trim().toLowerCase())) {
                         return false;
                     }
                 }
-
-                // Filtro por Empresa (Sigla)
                 if (req.getCompanySigla() != null && !req.getCompanySigla().isBlank() && !"TODAS".equalsIgnoreCase(req.getCompanySigla())) {
                     if (invoice.getCompanySigla() == null || !invoice.getCompanySigla().equalsIgnoreCase(req.getCompanySigla().trim())) {
                         return false;
                     }
                 }
-
-                // Filtro por Subcategoria / Plano de Contas
-                if (req.getSubcategoriaId() != null) {
-                    if (invoice.getSubcategoria() == null || !req.getSubcategoriaId().equals(invoice.getSubcategoria().getId())) {
-                        return false;
-                    }
+                if (req.getSubcategoriaId() != null && (invoice.getSubcategoria() == null || !req.getSubcategoriaId().equals(invoice.getSubcategoria().getId()))) {
+                    return false;
                 }
-
-                // Filtro por Funcionário
-                if (req.getEmployeeId() != null) {
-                    if (invoice.getEmployee() == null || !req.getEmployeeId().equals(invoice.getEmployee().getId())) {
-                        return false;
-                    }
+                if (req.getEmployeeId() != null && (invoice.getEmployee() == null || !req.getEmployeeId().equals(invoice.getEmployee().getId()))) {
+                    return false;
                 }
-
                 return true;
             }).sorted((a, b) -> {
-                // Ordenar por Unidade, Setor e Data de Vencimento
                 String uA = a.getUnit() != null && a.getUnit().getName() != null ? a.getUnit().getName() : "";
                 String uB = b.getUnit() != null && b.getUnit().getName() != null ? b.getUnit().getName() : "";
                 int cmpUnit = uA.compareToIgnoreCase(uB);
@@ -1087,28 +298,19 @@ public class ContasAPagarReportService {
             }).collect(Collectors.toList());
 
             log.info("Contas filtradas para o relatório personalizado: {} de {}", filtered.size(), allInvoices.size());
-
             return generateCustomPdfDocument(filtered, req);
-
         } catch (Exception e) {
             log.error("Erro ao gerar PDF personalizado de contas a pagar: {}", e.getMessage(), e);
             throw new IOException("Erro ao gerar relatório PDF personalizado: " + e.getMessage(), e);
         }
     }
 
-    private byte[] generateCustomPdfDocument(List<Invoice> invoices, com.z7design.secured_guard.dto.CustomContasAPagarReportRequestDTO req) throws IOException {
-        java.util.UUID companyId = null;
-        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
-        if (activeCompanies != null && !activeCompanies.isEmpty()) {
-            companyId = activeCompanies.get(0).getId();
-        } else {
-            List<Company> allCompanies = companyRepository.findAll();
-            if (allCompanies != null && !allCompanies.isEmpty()) {
-                companyId = allCompanies.get(0).getId();
-            } else {
-                throw new ResourceNotFoundException("Nenhuma empresa cadastrada para gerar o cabeçalho do relatório.");
-            }
-        }
+    /**
+     * Monta o documento PDF com layout executivo limpo (sem cabeçalho de onda / imagem pesada).
+     */
+    private byte[] generateCustomPdfDocument(List<Invoice> invoices, CustomContasAPagarReportRequestDTO req) throws IOException {
+        Company company = resolveCompany(null);
+        UUID companyId = company != null ? company.getId() : null;
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
@@ -1118,152 +320,100 @@ public class ContasAPagarReportService {
 
             ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
                     .companyId(companyId)
-                    .reportTitle("RELATÓRIO PERSONALIZADO - CONTAS A PAGAR")
+                    .reportTitle(null)
+                    .showHeader(false) // Desativa cabeçalho com imagem/gradiente pesado
+                    .showFooterContentSeparator(true)
+                    .showFooterBackgroundLine(false)
+                    .includeEmailInFooter(true)
                     .landscape(true)
-                    .topMargin(120f)
-                    .bottomMargin(80f)
-                    .leftMargin(30f)
-                    .rightMargin(30f)
+                    .topMargin(20f)
+                    .marginExtraTop(0f)
+                    .bottomMargin(45f)
+                    .leftMargin(24f)
+                    .rightMargin(24f)
                     .build();
 
             docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
             Document document = docWithPdf.getDocument();
 
-            // Informações do filtro aplicado
-            StringBuilder filtrosText = new StringBuilder("Filtros: ");
+            // 1. Cabeçalho Executivo Limpo
+            String periodBadge = "TODOS OS REGISTROS";
             if (req.getStartDate() != null && req.getEndDate() != null) {
-                filtrosText.append("Período: ").append(req.getStartDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
-                        .append(" a ").append(req.getEndDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).append(" | ");
+                periodBadge = req.getStartDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a " + req.getEndDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
             }
-            if (req.getStatus() != null) {
-                filtrosText.append("Status: ").append(getStatusDisplayName(req.getStatus())).append(" | ");
-            }
-            if (req.getType() != null) {
-                filtrosText.append("Tipo: ").append(getTypeDisplayName(req.getType())).append(" | ");
-            }
-            if (req.getCompanySigla() != null && !req.getCompanySigla().isBlank()) {
-                filtrosText.append("Empresa: ").append(req.getCompanySigla()).append(" | ");
-            }
-            if (req.getWorkSector() != null && !req.getWorkSector().isBlank()) {
-                filtrosText.append("Setor: ").append(req.getWorkSector()).append(" | ");
-            }
+            addExecutiveHeader(document, company, "RELATÓRIO DE CONTAS A PAGAR", "CONTAS A PAGAR", periodBadge);
 
-            Paragraph filterInfo = new Paragraph(filtrosText.toString().replaceAll(" \\| $", ""))
-                    .setFontSize(9)
-                    .setItalic()
-                    .setMarginBottom(8);
-            document.add(filterInfo);
+            // 2. Identificação e Filtros do Relatório
+            addSectionHeader(document, "IDENTIFICAÇÃO E FILTROS DO RELATÓRIO");
 
-            // Estatísticas gerais
             BigDecimal totalGeral = invoices.stream()
                     .map(Invoice::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            Paragraph statsInfo = new Paragraph(String.format(
-                    "Total de Registros: %d | Valor Total: %s",
-                    invoices.size(), formatCurrency(totalGeral)))
-                    .setFontSize(11)
-                    .setBold()
-                    .setMarginBottom(12);
-            document.add(statsInfo);
+            long contasAbertas = invoices.stream().filter(i -> i.getStatus() == ExpenseStatus.PENDENTE).count();
+            long contasPagas = invoices.stream().filter(i -> i.getStatus() == ExpenseStatus.PAGA || i.getStatus() == ExpenseStatus.PAGA_ANTERIORMENTE).count();
 
-            // Definição de colunas solicitadas
+            Table filterGrid = new Table(UnitValue.createPercentArray(new float[]{14f, 36f, 14f, 36f})).useAllAvailableWidth();
+            filterGrid.setMarginBottom(8f);
+
+            addGridRow(filterGrid, "PERÍODO:", periodBadge, "TOTAL REGISTROS:", String.valueOf(invoices.size()));
+            
+            String statusStr = req.getStatus() != null ? getStatusDisplayName(req.getStatus()) : "Todos (Abertas: " + contasAbertas + " | Pagas: " + contasPagas + ")";
+            addGridRow(filterGrid, "STATUS:", statusStr, "VALOR TOTAL:", formatCurrency(totalGeral));
+
+            String empStr = req.getCompanySigla() != null && !req.getCompanySigla().isBlank() ? req.getCompanySigla() : "Todas as Empresas";
+            String setorStr = req.getWorkSector() != null && !req.getWorkSector().isBlank() ? req.getWorkSector() : "Todos os Setores";
+            addGridRow(filterGrid, "EMPRESA:", empStr, "SETOR:", setorStr);
+
+            document.add(filterGrid);
+
+            // 3. Tabela de Contas a Pagar
+            addSectionHeader(document, "DETALHAMENTO DAS CONTAS A PAGAR");
+
             List<String> cols = req.getSelectedColumns();
             if (cols == null || cols.isEmpty()) {
                 cols = Arrays.asList("dueDate", "description", "supplier", "unit", "workSector", "category", "amount", "status");
             }
 
             if (invoices.isEmpty()) {
-                Paragraph noData = new Paragraph("Nenhuma conta encontrada com os filtros selecionados.")
+                Paragraph noData = new Paragraph("Nenhuma conta a pagar encontrada com os filtros selecionados.")
                         .setTextAlignment(TextAlignment.CENTER)
-                        .setFontSize(11)
-                        .setMarginTop(20);
+                        .setFontSize(9.5f)
+                        .setItalic()
+                        .setMarginTop(15);
                 document.add(noData);
             } else {
                 String groupMode = req.getGroupBy() != null ? req.getGroupBy().toUpperCase() : "UNIT_SECTOR";
 
                 if (!"NONE".equals(groupMode)) {
-                    Map<String, List<Invoice>> grouped;
-                    switch (groupMode) {
-                        case "WORK_SECTOR", "SETOR" -> {
-                            grouped = invoices.stream().collect(
-                                    Collectors.groupingBy(i -> {
-                                        String s = i.getWorkSector() != null && !i.getWorkSector().isBlank() ? i.getWorkSector() : "Geral / Não especificado";
-                                        return "🏷️ SETOR DE TRABALHO: " + s.toUpperCase();
-                                    }, LinkedHashMap::new, Collectors.toList())
-                            );
-                        }
-                        case "UNIT", "UNIDADE" -> {
-                            grouped = invoices.stream().collect(
-                                    Collectors.groupingBy(i -> {
-                                        String u = i.getUnit() != null && i.getUnit().getName() != null ? i.getUnit().getName() : "Sem Unidade";
-                                        return "🏢 UNIDADE: " + u.toUpperCase();
-                                    }, LinkedHashMap::new, Collectors.toList())
-                            );
-                        }
-                        case "COMPANY", "EMPRESA" -> {
-                            grouped = invoices.stream().collect(
-                                    Collectors.groupingBy(i -> {
-                                        String c = i.getCompanySigla() != null && !i.getCompanySigla().isBlank() ? i.getCompanySigla() : "Sem Empresa";
-                                        return "🏢 EMPRESA: " + c.toUpperCase();
-                                    }, LinkedHashMap::new, Collectors.toList())
-                            );
-                        }
-                        case "PERIOD", "PERIODO" -> {
-                            grouped = invoices.stream().collect(
-                                    Collectors.groupingBy(i -> {
-                                        LocalDate dt = "issueDate".equalsIgnoreCase(req.getDateField()) ? i.getIssueDate()
-                                                : ("paymentDate".equalsIgnoreCase(req.getDateField()) ? i.getPaymentDate() : i.getDueDate());
-                                        if (dt == null) return "📅 PERÍODO: NÃO ESPECIFICADO";
-                                        return "📅 PERÍODO: " + dt.format(DateTimeFormatter.ofPattern("MM/yyyy"));
-                                    }, LinkedHashMap::new, Collectors.toList())
-                            );
-                        }
-                        case "STATUS" -> {
-                            grouped = invoices.stream().collect(
-                                    Collectors.groupingBy(i -> {
-                                        return "📊 STATUS: " + getStatusDisplayName(i.getStatus()).toUpperCase();
-                                    }, LinkedHashMap::new, Collectors.toList())
-                            );
-                        }
-                        case "SUPPLIER", "FORNECEDOR" -> {
-                            grouped = invoices.stream().collect(
-                                    Collectors.groupingBy(i -> {
-                                        return "👤 FORNECEDOR / BENEFICIÁRIO: " + getFornecedorOuFuncionario(i).toUpperCase();
-                                    }, LinkedHashMap::new, Collectors.toList())
-                            );
-                        }
-                        default -> {
-                            grouped = invoices.stream().collect(
-                                    Collectors.groupingBy(i -> {
-                                        String u = i.getUnit() != null && i.getUnit().getName() != null ? i.getUnit().getName() : "Sem Unidade";
-                                        String s = i.getWorkSector() != null && !i.getWorkSector().isBlank() ? i.getWorkSector() : "Geral / Não especificado";
-                                        return "🏢 UNIDADE: " + u.toUpperCase() + "   |   🏷️ SETOR: " + s.toUpperCase();
-                                    }, LinkedHashMap::new, Collectors.toList())
-                            );
-                        }
-                    }
+                    Map<String, List<Invoice>> grouped = groupInvoices(invoices, groupMode, req);
 
                     for (Map.Entry<String, List<Invoice>> entry : grouped.entrySet()) {
                         String groupHeader = entry.getKey();
                         List<Invoice> groupInvoices = entry.getValue();
 
-                        // Header do grupo
-                        Paragraph groupTitle = new Paragraph(groupHeader)
-                                .setFontSize(10)
+                        // Faixa de cabeçalho do grupo
+                        Table groupBar = new Table(UnitValue.createPercentArray(new float[]{0.6f, 99.4f})).useAllAvailableWidth();
+                        groupBar.setMarginTop(6f);
+                        groupBar.setMarginBottom(3f);
+
+                        Cell bar = new Cell().setBackgroundColor(RED_PRIMARY).setBorder(Border.NO_BORDER).setPadding(0f);
+                        Cell title = new Cell().setBackgroundColor(SLATE_LIGHT).setBorder(Border.NO_BORDER).setPadding(4f);
+                        title.add(new Paragraph(groupHeader.toUpperCase())
+                                .setFontSize(8.5f)
                                 .setBold()
-                                .setBackgroundColor(new com.itextpdf.kernel.colors.DeviceRgb(235, 240, 248))
-                                .setPadding(4)
-                                .setMarginTop(8)
-                                .setMarginBottom(4);
-                        document.add(groupTitle);
+                                .setFontColor(SLATE_DARK));
+
+                        groupBar.addCell(bar);
+                        groupBar.addCell(title);
+                        document.add(groupBar);
 
                         // Tabela do grupo
                         Table table = createCustomTable(cols, groupInvoices);
                         document.add(table);
 
-                        // Subtotal do grupo
+                        // Subtotal
                         BigDecimal subtotal = groupInvoices.stream()
                                 .map(Invoice::getAmount)
                                 .filter(Objects::nonNull)
@@ -1274,38 +424,254 @@ public class ContasAPagarReportService {
                                 groupInvoices.size(),
                                 groupInvoices.size() > 1 ? "s" : "",
                                 formatCurrency(subtotal)))
-                                .setFontSize(9)
+                                .setFontSize(8f)
                                 .setBold()
+                                .setFontColor(SLATE_DARK)
                                 .setTextAlignment(TextAlignment.RIGHT)
-                                .setMarginBottom(10);
+                                .setMarginBottom(4f);
                         document.add(subtotalPara);
                     }
                 } else {
-                    // Sem agrupamento
                     Table table = createCustomTable(cols, invoices);
                     document.add(table);
                 }
 
                 // Totalizador Final
-                Paragraph finalTotal = new Paragraph("TOTAL GERAL: " + formatCurrency(totalGeral) + " (" + invoices.size() + " contas)")
-                        .setFontSize(12)
+                Table totalTable = new Table(UnitValue.createPercentArray(new float[]{65f, 35f})).useAllAvailableWidth();
+                totalTable.setMarginTop(8f);
+                Cell emptyCell = new Cell().setBorder(Border.NO_BORDER);
+                Cell totalCell = new Cell()
+                        .setBackgroundColor(SLATE_LIGHT)
+                        .setBorder(new SolidBorder(RED_PRIMARY, 1f))
+                        .setPadding(6f)
+                        .setTextAlignment(TextAlignment.RIGHT);
+                totalCell.add(new Paragraph("TOTAL GERAL (" + invoices.size() + " contas): " + formatCurrency(totalGeral))
+                        .setFontSize(10f)
                         .setBold()
-                        .setTextAlignment(TextAlignment.RIGHT)
-                        .setBackgroundColor(new com.itextpdf.kernel.colors.DeviceRgb(225, 235, 245))
-                        .setPadding(6)
-                        .setMarginTop(12);
-                document.add(finalTotal);
+                        .setFontColor(RED_DARK));
+                totalTable.addCell(emptyCell);
+                totalTable.addCell(totalCell);
+                document.add(totalTable);
             }
 
             standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
             document.close();
 
         } catch (Exception e) {
-            log.error("Erro ao montar PDF customizado: {}", e.getMessage(), e);
+            log.error("Erro ao montar PDF executivo de contas a pagar: {}", e.getMessage(), e);
             throw new IOException("Erro ao gerar PDF: " + e.getMessage(), e);
         }
 
         return baos.toByteArray();
+    }
+
+    private Map<String, List<Invoice>> groupInvoices(List<Invoice> invoices, String groupMode, CustomContasAPagarReportRequestDTO req) {
+        switch (groupMode) {
+            case "WORK_SECTOR", "SETOR" -> {
+                return invoices.stream().collect(
+                        Collectors.groupingBy(i -> {
+                            String s = i.getWorkSector() != null && !i.getWorkSector().isBlank() ? i.getWorkSector() : "Geral / Não especificado";
+                            return "SETOR DE TRABALHO: " + s.toUpperCase();
+                        }, LinkedHashMap::new, Collectors.toList())
+                );
+            }
+            case "UNIT", "UNIDADE" -> {
+                return invoices.stream().collect(
+                        Collectors.groupingBy(i -> {
+                            String u = i.getUnit() != null && i.getUnit().getName() != null ? i.getUnit().getName() : "Sem Unidade";
+                            return "UNIDADE: " + u.toUpperCase();
+                        }, LinkedHashMap::new, Collectors.toList())
+                );
+            }
+            case "COMPANY", "EMPRESA" -> {
+                return invoices.stream().collect(
+                        Collectors.groupingBy(i -> {
+                            String c = i.getCompanySigla() != null && !i.getCompanySigla().isBlank() ? i.getCompanySigla() : "Sem Empresa";
+                            return "EMPRESA: " + c.toUpperCase();
+                        }, LinkedHashMap::new, Collectors.toList())
+                );
+            }
+            case "PERIOD", "PERIODO" -> {
+                return invoices.stream().collect(
+                        Collectors.groupingBy(i -> {
+                            LocalDate dt = "issueDate".equalsIgnoreCase(req.getDateField()) ? i.getIssueDate()
+                                    : ("paymentDate".equalsIgnoreCase(req.getDateField()) ? i.getPaymentDate() : i.getDueDate());
+                            if (dt == null) return "PERÍODO: NÃO ESPECIFICADO";
+                            return "PERÍODO: " + dt.format(DateTimeFormatter.ofPattern("MM/yyyy"));
+                        }, LinkedHashMap::new, Collectors.toList())
+                );
+            }
+            case "STATUS" -> {
+                return invoices.stream().collect(
+                        Collectors.groupingBy(i -> "STATUS: " + getStatusDisplayName(i.getStatus()).toUpperCase(),
+                                LinkedHashMap::new, Collectors.toList())
+                );
+            }
+            case "SUPPLIER", "FORNECEDOR" -> {
+                return invoices.stream().collect(
+                        Collectors.groupingBy(i -> "FORNECEDOR / BENEFICIÁRIO: " + getFornecedorOuFuncionario(i).toUpperCase(),
+                                LinkedHashMap::new, Collectors.toList())
+                );
+            }
+            default -> {
+                return invoices.stream().collect(
+                        Collectors.groupingBy(i -> {
+                            String u = i.getUnit() != null && i.getUnit().getName() != null ? i.getUnit().getName() : "Sem Unidade";
+                            String s = i.getWorkSector() != null && !i.getWorkSector().isBlank() ? i.getWorkSector() : "Geral / Não especificado";
+                            return "UNIDADE: " + u.toUpperCase() + "   |   SETOR: " + s.toUpperCase();
+                        }, LinkedHashMap::new, Collectors.toList())
+                );
+            }
+        }
+    }
+
+    private byte[] generateContasAPagarReportPDFWithIText(List<Invoice> invoices,
+            LocalDate startDate, LocalDate endDate,
+            ExpenseStatus statusFilter, ExpenseType typeFilter) throws IOException {
+        CustomContasAPagarReportRequestDTO req = new CustomContasAPagarReportRequestDTO();
+        req.setStartDate(startDate);
+        req.setEndDate(endDate);
+        req.setStatus(statusFilter);
+        req.setType(typeFilter);
+        req.setGroupBy("UNIT_SECTOR");
+        req.setSelectedColumns(Arrays.asList("dueDate", "description", "supplier", "unit", "workSector", "category", "amount", "status"));
+        return generateCustomPdfDocument(invoices, req);
+    }
+
+    private byte[] generateContasAPagarReportPDFWithITextResumo(List<Invoice> invoices) throws IOException {
+        CustomContasAPagarReportRequestDTO req = new CustomContasAPagarReportRequestDTO();
+        req.setGroupBy("NONE");
+        req.setSelectedColumns(Arrays.asList("dueDate", "supplier", "description", "category", "type", "amount", "status", "company"));
+        return generateCustomPdfDocument(invoices, req);
+    }
+
+    // ==========================================
+    // MÉTODOS VISUAIS DO LAYOUT EXECUTIVO
+    // ==========================================
+
+    private void addExecutiveHeader(Document document, Company company, String reportTitle, String badgeText, String periodOrCodeText) {
+        Table headerTable = new Table(UnitValue.createPercentArray(new float[]{55f, 45f})).useAllAvailableWidth();
+        headerTable.setBorder(Border.NO_BORDER);
+        headerTable.setMarginBottom(4f);
+
+        // Esquerda: Dados da Empresa
+        Cell leftCell = new Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        String compName = (company != null && company.getName() != null && !company.getName().isBlank())
+                ? company.getName().toUpperCase()
+                : "PROMOVER TERCEIRIZAÇÃO E SERVIÇOS LTDA";
+        leftCell.add(new Paragraph(compName)
+                .setFontSize(10.5f)
+                .setBold()
+                .setFontColor(SLATE_DARK)
+                .setMarginBottom(2f));
+
+        StringBuilder addressSb = new StringBuilder();
+        if (company != null) {
+            if (company.getCnpj() != null && !company.getCnpj().isBlank()) {
+                addressSb.append("CNPJ: ").append(CompanyDataFormatter.formatCnpj(company.getCnpj()));
+            }
+            String fullAddr = CompanyDataFormatter.formatFullAddress(company);
+            if (fullAddr != null && !fullAddr.isBlank()) {
+                if (addressSb.length() > 0) addressSb.append(" • ");
+                addressSb.append(fullAddr);
+            }
+        }
+        if (addressSb.length() == 0) {
+            addressSb.append("CNPJ: 36.698.521/0001-01 • Rua Pelegrino de Paula Ferreira, 77 - Centro - Contagem/MG - 32017-400");
+        }
+        leftCell.add(new Paragraph(addressSb.toString())
+                .setFontSize(7f)
+                .setFontColor(new DeviceRgb(100, 116, 139))
+                .setMarginBottom(0f));
+        headerTable.addCell(leftCell);
+
+        // Direita: Título em vermelho, Badge e Data
+        Cell rightCell = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT).setVerticalAlignment(VerticalAlignment.MIDDLE);
+
+        rightCell.add(new Paragraph(reportTitle != null ? reportTitle.toUpperCase() : "RELATÓRIO DE CONTAS A PAGAR")
+                .setFontSize(12f)
+                .setBold()
+                .setFontColor(RED_PRIMARY)
+                .setMarginBottom(2f));
+
+        Paragraph metaPara = new Paragraph().setTextAlignment(TextAlignment.RIGHT).setMarginBottom(2f);
+        if (badgeText != null && !badgeText.isBlank()) {
+            metaPara.add(new Text(" " + badgeText.toUpperCase() + " ")
+                    .setFontSize(7.5f)
+                    .setBold()
+                    .setFontColor(ColorConstants.WHITE)
+                    .setBackgroundColor(GREEN_TEXT));
+            metaPara.add("  ");
+        }
+        if (periodOrCodeText != null && !periodOrCodeText.isBlank()) {
+            metaPara.add(new Text(" " + periodOrCodeText + " ")
+                    .setFontSize(7.5f)
+                    .setBold()
+                    .setFontColor(RED_DARK));
+        }
+        if (!metaPara.getChildren().isEmpty()) {
+            rightCell.add(metaPara);
+        }
+
+        rightCell.add(new Paragraph("Data de Emissão: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                .setFontSize(7f)
+                .setFontColor(new DeviceRgb(100, 116, 139))
+                .setMarginBottom(0f));
+
+        headerTable.addCell(rightCell);
+        document.add(headerTable);
+
+        // Linha divisória horizontal vermelha
+        Table divider = new Table(UnitValue.createPercentArray(new float[]{100f})).useAllAvailableWidth();
+        Cell divCell = new Cell().setHeight(1.5f)
+                .setBackgroundColor(RED_PRIMARY)
+                .setBorder(Border.NO_BORDER)
+                .setPadding(0f);
+        divider.addCell(divCell);
+        divider.setMarginBottom(6f);
+        document.add(divider);
+    }
+
+    private void addSectionHeader(Document document, String title) {
+        Table secTable = new Table(UnitValue.createPercentArray(new float[]{0.6f, 99.4f})).useAllAvailableWidth();
+        secTable.setBorder(Border.NO_BORDER);
+        secTable.setMarginTop(6f);
+        secTable.setMarginBottom(3f);
+
+        Cell barCell = new Cell().setBackgroundColor(RED_PRIMARY).setBorder(Border.NO_BORDER).setPadding(0f);
+        Cell textCell = new Cell().setBorder(Border.NO_BORDER).setPaddingLeft(4f).setPaddingTop(0f).setPaddingBottom(0f);
+        textCell.add(new Paragraph(title.toUpperCase())
+                .setFontSize(8.5f)
+                .setBold()
+                .setFontColor(RED_PRIMARY));
+
+        secTable.addCell(barCell);
+        secTable.addCell(textCell);
+        document.add(secTable);
+    }
+
+    private void addGridRow(Table table, String label1, String val1, String label2, String val2) {
+        table.addCell(new Cell()
+                .add(new Paragraph(label1).setFontSize(7f).setBold().setFontColor(new DeviceRgb(71, 85, 105)))
+                .setBackgroundColor(SLATE_LIGHT)
+                .setBorder(new SolidBorder(SLATE_BORDER, 0.5f))
+                .setPadding(3f));
+        table.addCell(new Cell()
+                .add(new Paragraph(val1 != null ? val1 : "-").setFontSize(7.5f).setFontColor(SLATE_DARK))
+                .setBackgroundColor(ColorConstants.WHITE)
+                .setBorder(new SolidBorder(SLATE_BORDER, 0.5f))
+                .setPadding(3f));
+
+        table.addCell(new Cell()
+                .add(new Paragraph(label2).setFontSize(7f).setBold().setFontColor(new DeviceRgb(71, 85, 105)))
+                .setBackgroundColor(SLATE_LIGHT)
+                .setBorder(new SolidBorder(SLATE_BORDER, 0.5f))
+                .setPadding(3f));
+        table.addCell(new Cell()
+                .add(new Paragraph(val2 != null ? val2 : "-").setFontSize(7.5f).setBold().setFontColor(SLATE_DARK))
+                .setBackgroundColor(ColorConstants.WHITE)
+                .setBorder(new SolidBorder(SLATE_BORDER, 0.5f))
+                .setPadding(3f));
     }
 
     private Table createCustomTable(List<String> cols, List<Invoice> groupInvoices) {
@@ -1314,38 +680,107 @@ public class ContasAPagarReportService {
             colWidths[i] = getColumnProportionalWidth(cols.get(i));
         }
         Table table = new Table(UnitValue.createPercentArray(colWidths)).useAllAvailableWidth();
+        table.setMarginBottom(4f);
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
         // Headers
         for (String col : cols) {
-            table.addHeaderCell(createHeaderCell(getColumnHeaderLabel(col)));
+            TextAlignment align = getColumnAlignment(col);
+            table.addHeaderCell(createHeaderCell(getColumnHeaderLabel(col), align));
         }
 
         // Rows
+        boolean isAlt = false;
         for (Invoice inv : groupInvoices) {
             for (String col : cols) {
-                table.addCell(createCell(getColumnValue(col, inv, dateFormatter)));
+                if ("status".equalsIgnoreCase(col)) {
+                    table.addCell(createStatusBadgeCell(inv.getStatus(), isAlt));
+                } else {
+                    TextAlignment align = getColumnAlignment(col);
+                    boolean isBold = "amount".equalsIgnoreCase(col) || "valor".equalsIgnoreCase(col);
+                    table.addCell(createDataCell(getColumnValue(col, inv, dateFormatter), align, isAlt, isBold));
+                }
             }
+            isAlt = !isAlt;
         }
 
         return table;
     }
 
+    private Cell createHeaderCell(String text, TextAlignment alignment) {
+        return new Cell()
+                .add(new Paragraph(text != null ? text.toUpperCase() : "").setFontSize(7.5f).setBold().setFontColor(ColorConstants.WHITE))
+                .setTextAlignment(alignment != null ? alignment : TextAlignment.CENTER)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setBackgroundColor(SLATE_DARK)
+                .setBorder(new SolidBorder(SLATE_DARK, 0.5f))
+                .setPadding(3.5f);
+    }
+
+    private Cell createDataCell(String text, TextAlignment alignment, boolean isAltRow, boolean isBold) {
+        Paragraph p = new Paragraph(text != null ? text : "").setFontSize(7.5f);
+        if (isBold) {
+            p.setBold();
+        }
+        return new Cell()
+                .add(p)
+                .setTextAlignment(alignment != null ? alignment : TextAlignment.LEFT)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setBackgroundColor(isAltRow ? ROW_ALT : ColorConstants.WHITE)
+                .setBorder(new SolidBorder(SLATE_BORDER, 0.5f))
+                .setPadding(3f);
+    }
+
+    private Cell createStatusBadgeCell(ExpenseStatus status, boolean isAltRow) {
+        String label = getStatusDisplayName(status);
+        DeviceRgb textColor;
+        if (status == ExpenseStatus.PAGA || status == ExpenseStatus.PAGA_ANTERIORMENTE) {
+            textColor = GREEN_TEXT;
+        } else if (status == ExpenseStatus.PENDENTE) {
+            textColor = AMBER_TEXT;
+        } else {
+            textColor = RED_PRIMARY;
+        }
+
+        Paragraph p = new Paragraph("[" + label.toUpperCase() + "]")
+                .setFontSize(7f)
+                .setBold()
+                .setFontColor(textColor);
+
+        return new Cell()
+                .add(p)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setBackgroundColor(isAltRow ? ROW_ALT : ColorConstants.WHITE)
+                .setBorder(new SolidBorder(SLATE_BORDER, 0.5f))
+                .setPadding(3f);
+    }
+
+    private TextAlignment getColumnAlignment(String colKey) {
+        return switch (colKey) {
+            case "dueDate", "vencimento", "issueDate", "dataEmissao", "paymentDate", "dataPagamento" -> TextAlignment.CENTER;
+            case "amount", "valor" -> TextAlignment.RIGHT;
+            case "status" -> TextAlignment.CENTER;
+            case "company", "empresa", "companySigla", "type", "tipo" -> TextAlignment.CENTER;
+            default -> TextAlignment.LEFT;
+        };
+    }
+
     private float getColumnProportionalWidth(String colKey) {
         return switch (colKey) {
-            case "dueDate", "vencimento", "issueDate", "dataEmissao", "paymentDate", "dataPagamento" -> 9f;
+            case "dueDate", "vencimento", "issueDate", "dataEmissao", "paymentDate", "dataPagamento" -> 8f;
             case "description", "descricao" -> 22f;
-            case "supplier", "fornecedor" -> 16f;
+            case "supplier", "fornecedor" -> 17f;
             case "company", "empresa", "companySigla" -> 7f;
             case "unit", "unidade" -> 11f;
-            case "workSector", "setor", "setorTrabalho" -> 13f;
-            case "category", "categoria", "conta" -> 12f;
-            case "centroCusto" -> 10f;
-            case "type", "tipo" -> 8f;
-            case "amount", "valor" -> 10f;
-            case "status" -> 9f;
-            case "barcode", "codigoBarras" -> 14f;
-            case "observations", "observacoes" -> 14f;
+            case "workSector", "setor", "setorTrabalho" -> 11f;
+            case "category", "categoria", "conta" -> 13f;
+            case "centroCusto" -> 9f;
+            case "type", "tipo" -> 7f;
+            case "amount", "valor" -> 9f;
+            case "status" -> 8f;
+            case "barcode", "codigoBarras" -> 12f;
+            case "observations", "observacoes" -> 12f;
             default -> 10f;
         };
     }
@@ -1395,17 +830,152 @@ public class ContasAPagarReportService {
         };
     }
 
-    /**
-     * Obtém nome de exibição do tipo
-     */
-    private String getTypeDisplayName(ExpenseType type) {
-        if (type == null)
-            return "Não definido";
+    private Company resolveCompany(UUID companyId) {
+        if (companyId != null) {
+            return companyRepository.findById(companyId).orElse(null);
+        }
+        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (activeCompanies != null && !activeCompanies.isEmpty()) {
+            return activeCompanies.get(0);
+        }
+        List<Company> allCompanies = companyRepository.findAll();
+        if (allCompanies != null && !allCompanies.isEmpty()) {
+            return allCompanies.get(0);
+        }
+        return null;
+    }
 
+    private String getContaPlanoDeContas(Invoice invoice) {
+        try {
+            if (invoice.getSubcategoria() != null) {
+                String codigo = invoice.getSubcategoria().getCodigo();
+                String nome = invoice.getSubcategoria().getNome();
+                return (codigo != null ? codigo : "") + " - " + (nome != null ? nome : "");
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao acessar subcategoria da fatura {}: {}", invoice.getId(), e.getMessage());
+        }
+        return "Não informado";
+    }
+
+    private String getFornecedorOuFuncionario(Invoice invoice) {
+        try {
+            if (invoice.getSubcategoria() != null
+                    && invoice.getSubcategoria().getCategoriaPai() != null
+                    && CATEGORIA_RESCISAO_FUNCIONARIOS.equals(invoice.getSubcategoria().getCategoriaPai().getNome())
+                    && invoice.getEmployee() != null
+                    && invoice.getEmployee().getName() != null
+                    && !invoice.getEmployee().getName().isBlank()) {
+                return invoice.getEmployee().getName();
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao acessar funcionário da fatura {}: {}", invoice.getId(), e.getMessage());
+        }
+        try {
+            if (invoice.getSupplier() != null) {
+                return invoice.getSupplier().getName();
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao acessar fornecedor da fatura {}: {}", invoice.getId(), e.getMessage());
+        }
+        return "Não informado";
+    }
+
+    private String formatCurrency(BigDecimal value) {
+        if (value == null) return "R$ 0,00";
+        return String.format("R$ %,.2f", value).replace(",", "X").replace(".", ",").replace("X", ".");
+    }
+
+    private String getStatusDisplayName(ExpenseStatus status) {
+        if (status == null) return "Não definido";
+        return switch (status) {
+            case PENDENTE -> "Aberta";
+            case PAGA -> "Paga";
+            case CANCELADA -> "Cancelada";
+            case ERRO -> "Erro";
+            case SOLICITADA -> "Solicitada";
+            case PAGA_ANTERIORMENTE -> "Paga Anteriormente";
+            case PENDENTE_ERRO -> "Pendente/Erro";
+        };
+    }
+
+    private String getTypeDisplayName(ExpenseType type) {
+        if (type == null) return "Não definido";
         return switch (type) {
             case FIXA -> "Fixa";
             case VARIAVEL -> "Variável";
         };
     }
-}
 
+    private Map<String, Object> prepareReportData(List<Invoice> invoices, LocalDate startDate, LocalDate endDate) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("reportDate", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+        data.put("currentDate", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+        data.put("pageNumber", "1");
+
+        if (startDate != null && endDate != null) {
+            data.put("startDate", startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            data.put("endDate", endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+        }
+
+        int totalContas = invoices.size();
+        BigDecimal valorTotal = invoices.stream()
+                .map(Invoice::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long contasAbertas = invoices.stream().filter(i -> i.getStatus() == ExpenseStatus.PENDENTE).count();
+        long contasPagas = invoices.stream().filter(i -> i.getStatus() == ExpenseStatus.PAGA).count();
+        long contasVencidas = invoices.stream().filter(i -> i.getStatus() == ExpenseStatus.PENDENTE && i.getDueDate() != null && i.getDueDate().isBefore(LocalDate.now())).count();
+
+        data.put("totalContas", totalContas);
+        data.put("valorTotal", formatCurrency(valorTotal));
+        data.put("contasAbertas", contasAbertas);
+        data.put("contasPagas", contasPagas);
+        data.put("contasVencidas", contasVencidas);
+
+        if (totalContas > 0) {
+            data.put("percentualAbertas", String.format("%.1f", (contasAbertas * 100.0) / totalContas));
+            data.put("percentualPagas", String.format("%.1f", (contasPagas * 100.0) / totalContas));
+            data.put("percentualVencidas", String.format("%.1f", (contasVencidas * 100.0) / totalContas));
+        } else {
+            data.put("percentualAbertas", "0.0");
+            data.put("percentualPagas", "0.0");
+            data.put("percentualVencidas", "0.0");
+        }
+
+        List<Map<String, Object>> contasData = invoices.stream()
+                .map(this::mapInvoiceToReportData)
+                .collect(Collectors.toList());
+
+        data.put("contas", contasData);
+        return data;
+    }
+
+    private Map<String, Object> prepareSummaryData(List<Invoice> invoices) {
+        Map<String, Object> data = prepareReportData(invoices, null, null);
+        data.put("reportTitle", "Relatório Resumido de Contas a Pagar");
+
+        Map<String, Long> contasPorFornecedor = invoices.stream()
+                .filter(i -> i.getSupplier() != null)
+                .collect(Collectors.groupingBy(
+                        i -> i.getSupplier().getName(),
+                        Collectors.counting()));
+
+        data.put("contasPorFornecedor", contasPorFornecedor);
+        return data;
+    }
+
+    private Map<String, Object> mapInvoiceToReportData(Invoice invoice) {
+        Map<String, Object> invoiceData = new HashMap<>();
+        invoiceData.put("vencimento", invoice.getDueDate() != null ? invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "-");
+        invoiceData.put("fornecedor", getFornecedorOuFuncionario(invoice));
+        invoiceData.put("descricao", invoice.getDescription() != null ? invoice.getDescription() : "-");
+        invoiceData.put("tipo", getTypeDisplayName(invoice.getType()));
+        invoiceData.put("valor", formatCurrency(invoice.getAmount()));
+        invoiceData.put("status", getStatusDisplayName(invoice.getStatus()));
+        invoiceData.put("empresa", invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "-");
+        invoiceData.put("conta", getContaPlanoDeContas(invoice));
+        return invoiceData;
+    }
+}
