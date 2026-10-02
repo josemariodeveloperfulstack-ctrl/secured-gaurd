@@ -261,38 +261,64 @@ public class InvoiceController {
             @ApiResponse(responseCode = "404", description = "Fatura não encontrada"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<InvoiceDTO> update(@PathVariable String id, @Valid @RequestBody InvoiceDTO invoiceDTO, Authentication authentication) {
+    public ResponseEntity<InvoiceDTO> update(@PathVariable String id, @RequestBody InvoiceDTO invoiceDTO, Authentication authentication) {
         try {
             log.info("PUT /api/invoices/{} - Atualizando fatura", id);
             log.info("Dados recebidos: {}", invoiceDTO);
             
-            // Validações específicas
+            UUID invoiceUuid = UUID.fromString(id);
+            Optional<Invoice> existingOpt = invoiceService.findById(invoiceUuid);
+            if (existingOpt.isEmpty()) {
+                log.error("Fatura não encontrada para atualização: {}", id);
+                return ResponseEntity.notFound().build();
+            }
+            Invoice existing = existingOpt.get();
+
+            // Preencher campos ausentes com os valores existentes (para suportar updates parciais de status/pagamento)
             if (invoiceDTO.getDescription() == null || invoiceDTO.getDescription().trim().isEmpty()) {
-                log.error("Descrição é obrigatória");
-                return ResponseEntity.badRequest().build();
+                invoiceDTO.setDescription(existing.getDescription());
             }
-            
             if (invoiceDTO.getAmount() == null || invoiceDTO.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                log.error("Valor é obrigatório e deve ser maior que zero");
-                return ResponseEntity.badRequest().build();
+                invoiceDTO.setAmount(existing.getAmount());
             }
-            
             if (invoiceDTO.getStatus() == null) {
-                log.error("Status é obrigatório");
-                return ResponseEntity.badRequest().build();
+                invoiceDTO.setStatus(existing.getStatus());
             }
-            
             if (invoiceDTO.getIssueDate() == null) {
-                log.error("Data de emissão é obrigatória");
-                return ResponseEntity.badRequest().build();
+                invoiceDTO.setIssueDate(existing.getIssueDate() != null ? existing.getIssueDate() : LocalDate.now());
             }
-            
             if (invoiceDTO.getDueDate() == null) {
-                log.error("Data de vencimento é obrigatória");
-                return ResponseEntity.badRequest().build();
+                invoiceDTO.setDueDate(existing.getDueDate() != null ? existing.getDueDate() : LocalDate.now());
+            }
+            if (invoiceDTO.getType() == null) {
+                invoiceDTO.setType(existing.getType());
+            }
+            if (invoiceDTO.getCategory() == null) {
+                invoiceDTO.setCategory(existing.getCategory());
+            }
+            if (invoiceDTO.getCentroCusto() == null) {
+                invoiceDTO.setCentroCusto(existing.getCentroCusto());
+            }
+            if (invoiceDTO.getSupplierId() == null && existing.getSupplier() != null) {
+                invoiceDTO.setSupplierId(existing.getSupplier().getId());
+            }
+            if (invoiceDTO.getSubcategoriaId() == null && existing.getSubcategoria() != null) {
+                invoiceDTO.setSubcategoriaId(existing.getSubcategoria().getId());
+            }
+            if (invoiceDTO.getEmployeeId() == null && existing.getEmployee() != null) {
+                invoiceDTO.setEmployeeId(existing.getEmployee().getId());
+            }
+            if (invoiceDTO.getCompanySigla() == null) {
+                invoiceDTO.setCompanySigla(existing.getCompanySigla());
+            }
+            if (invoiceDTO.getWorkSector() == null) {
+                invoiceDTO.setWorkSector(existing.getWorkSector());
+            }
+            if (invoiceDTO.getUnitId() == null && existing.getUnit() != null) {
+                invoiceDTO.setUnitId(existing.getUnit().getId());
             }
             
-            Invoice updated = invoiceService.update(UUID.fromString(id), invoiceDTO, resolveUserId(authentication));
+            Invoice updated = invoiceService.update(invoiceUuid, invoiceDTO, resolveUserId(authentication));
             
             log.info("✅ Fatura atualizada com sucesso - ID: {}", updated.getId());
             return ResponseEntity.ok(InvoiceDTO.fromEntity(updated));
