@@ -279,16 +279,49 @@ public class SecurityConfig {
                                                                 "ANALISTAS_DE_SUPRIMENTOS",
                                                                 "ANALISATA_DE_SUPREMIMENTOSS", "ROLE_ANALISATA_DE_SUPREMIMENTOSS",
                                                                 "ANALISATA_DE_SUPREMIMENTOS", "ROLE_ANALISATA_DE_SUPREMIMENTOS")
-                                                // Endpoints de work-posts
-                                                .requestMatchers("/api/work-posts/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
-                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
-                                                                "ROLE_GESTOR", "ROLE_SUPERVISOR",
-                                                                "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
-                                                                "ROLE_RH",
-                                                                "COMERCIAL", "ROLE_COMERCIAL",
-                                                                "ASSISTENTE_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
-                                                                "GESTOR_COMERCIAL", "ROLE_GESTOR_COMERCIAL")
+                                                 // Endpoints de cost-centers - listagem e leitura liberadas para autenticados
+                                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/cost-centers/**")
+                                                 .authenticated()
+                                                 .requestMatchers("/api/cost-centers/**")
+                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "ADMINISTRADOR", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
+                                                                 "FINANCEIRO", "ROLE_FINANCEIRO",
+                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
+                                                                 "AUXILIAR_ADMINISTRATIVO", "ROLE_AUXILIAR_ADMINISTRATIVO",
+                                                                 "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS",
+                                                                 "ANALISTA_DE_SUPRIMENTOS", "ROLE_ANALISTA_DE_SUPRIMENTOS",
+                                                                 "ANALISTAS_DE_SUPRIMENTOS", "ROLE_ANALISTAS_DE_SUPRIMENTOS",
+                                                                 "SUPRIMENTOS", "ROLE_SUPRIMENTOS",
+                                                                 "SUPREIMENTOS", "ROLE_SUPREIMENTOS",
+                                                                 "ANALISATA_DE_SUPREMIMENTOSS", "ROLE_ANALISATA_DE_SUPREMIMENTOSS",
+                                                                 "ANALISATA_DE_SUPREMIMENTOS", "ROLE_ANALISATA_DE_SUPREMIMENTOS",
+                                                                 "RH", "ROLE_RH", "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
+                                                                 "OPERACIONAL", "ROLE_OPERACIONAL", "ROLE_GESTOR", "GESTOR", "SUPERVISOR", "ROLE_SUPERVISOR",
+                                                                 "ESTOQUE", "ROLE_ESTOQUE", "COMPRAS", "ROLE_COMPRAS", "ALMOXARIFADO", "ROLE_ALMOXARIFADO")
+                                                 // Endpoints de work-posts - listagem e leitura liberadas para autenticados
+                                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/work-posts/**")
+                                                 .authenticated()
+                                                 .requestMatchers("/api/work-posts/**")
+                                                 .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
+                                                                 "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
+                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
+                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
+                                                                 "ROLE_RH", "RH",
+                                                                 "COMERCIAL", "ROLE_COMERCIAL",
+                                                                 "ASSISTENTE_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
+                                                                 "GESTOR_COMERCIAL", "ROLE_GESTOR_COMERCIAL",
+                                                                 "FINANCEIRO", "ROLE_FINANCEIRO",
+                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
+                                                                 "AUXILIAR_ADMINISTRATIVO", "ROLE_AUXILIAR_ADMINISTRATIVO",
+                                                                 "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS",
+                                                                 "ANALISTA_DE_SUPRIMENTOS", "ROLE_ANALISTA_DE_SUPRIMENTOS",
+                                                                 "ANALISTAS_DE_SUPRIMENTOS", "ROLE_ANALISTAS_DE_SUPRIMENTOS",
+                                                                 "SUPRIMENTOS", "ROLE_SUPRIMENTOS",
+                                                                 "SUPREIMENTOS", "ROLE_SUPREIMENTOS",
+                                                                 "ANALISATA_DE_SUPREMIMENTOSS", "ROLE_ANALISATA_DE_SUPREMIMENTOSS",
+                                                                 "ANALISATA_DE_SUPREMIMENTOS", "ROLE_ANALISATA_DE_SUPREMIMENTOS",
+                                                                 "ESTOQUE", "ROLE_ESTOQUE",
+                                                                 "COMPRAS", "ROLE_COMPRAS",
+                                                                 "ALMOXARIFADO", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de solicitações de admissão/demissão
                                                 .requestMatchers("/api/admission-requests/**")
                                                 .hasAnyAuthority("RH", "DEPARTAMENTO_PESSOAL", "SUPER_ADMIN", "ADMIN",
