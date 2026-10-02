@@ -59,7 +59,9 @@ import {
   Clock,
   User,
   X,
+  FileSpreadsheet,
 } from 'lucide-react';
+import { exportAtestadosToPdf, exportAtestadosToExcel } from '@/utils/atestadosReportGenerator';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { SimpleEmployee } from '@/services/employeeService';
@@ -245,36 +247,62 @@ const GestaoAtestados: React.FC = () => {
     return { totalDocs, totalDays, uniqueEmployees };
   }, [reportFilteredItems]);
 
-  const handleExportCsvReport = () => {
+  const handleExportExcelReport = () => {
     if (reportFilteredItems.length === 0) {
       toast({ title: 'Atenção', description: 'Nenhum atestado para exportar.', variant: 'destructive' });
       return;
     }
-    const headers = ['Funcionário', 'Empresa', 'Setor', 'Tipo', 'Data Início', 'Data Fim', 'Dias', 'CID', 'Descrição CID'];
-    const rows = reportFilteredItems.map((doc) => [
-      `"${(doc.employeeName || '').replace(/"/g, '""')}"`,
-      `"${(doc.companyName || '').replace(/"/g, '""')}"`,
-      `"${(doc.employeeDepartment || '').replace(/"/g, '""')}"`,
-      `"${MEDICAL_TYPE_LABELS[doc.documentType] || doc.documentType}"`,
-      `"${doc.startDate || ''}"`,
-      `"${doc.endDate || ''}"`,
-      doc.days ?? '',
-      `"${(doc.cidCode || '').replace(/"/g, '""')}"`,
-      `"${(doc.cidDescription || '').replace(/"/g, '""')}"`,
-    ]);
-    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `relatorio_atestados_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      exportAtestadosToExcel(
+        reportFilteredItems,
+        {
+          totalDocs: reportTotals.totalDocs,
+          totalDays: reportTotals.totalDays,
+          totalHours: reportFilteredItems.reduce((acc, d) => acc + (d.hours || 0), 0),
+          uniqueEmployees: reportTotals.uniqueEmployees,
+          inssAlertsCount: reportFilteredItems.filter(d => d.inssAlert || (d.days && d.days >= 15)).length,
+        },
+        {
+          dateFrom: reportFrom || undefined,
+          dateTo: reportTo || undefined,
+          sector: reportSector !== 'ALL' ? reportSector : undefined,
+          documentType: reportType !== 'ALL' ? reportType : undefined,
+        }
+      );
+      toast({ title: 'Sucesso', description: 'Planilha Excel profissional (.xlsx) gerada com sucesso!' });
+    } catch (err) {
+      console.error('Erro ao gerar Excel:', err);
+      toast({ title: 'Erro', description: 'Falha ao gerar o arquivo Excel.', variant: 'destructive' });
+    }
   };
 
-  const handlePrintReport = () => {
-    window.print();
+  const handlePrintPdfReport = () => {
+    if (reportFilteredItems.length === 0) {
+      toast({ title: 'Atenção', description: 'Nenhum atestado para gerar relatório PDF.', variant: 'destructive' });
+      return;
+    }
+    try {
+      exportAtestadosToPdf(
+        reportFilteredItems,
+        {
+          totalDocs: reportTotals.totalDocs,
+          totalDays: reportTotals.totalDays,
+          totalHours: reportFilteredItems.reduce((acc, d) => acc + (d.hours || 0), 0),
+          uniqueEmployees: reportTotals.uniqueEmployees,
+          inssAlertsCount: reportFilteredItems.filter(d => d.inssAlert || (d.days && d.days >= 15)).length,
+        },
+        {
+          dateFrom: reportFrom || undefined,
+          dateTo: reportTo || undefined,
+          sector: reportSector !== 'ALL' ? reportSector : undefined,
+          documentType: reportType !== 'ALL' ? reportType : undefined,
+        }
+      );
+      toast({ title: 'Sucesso', description: 'Relatório PDF executivo gerado com sucesso!' });
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err);
+      toast({ title: 'Erro', description: 'Falha ao gerar o relatório PDF.', variant: 'destructive' });
+    }
   };
 
 
@@ -1871,13 +1899,13 @@ const GestaoAtestados: React.FC = () => {
                 Fechar
               </Button>
               <div className="flex gap-2">
-                <Button onClick={handleExportCsvReport} variant="outline" className="border-emerald-600/50 text-emerald-400 hover:bg-emerald-950/40">
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar Excel (.CSV)
+                <Button onClick={handleExportExcelReport} variant="outline" className="border-emerald-600/50 text-emerald-400 hover:bg-emerald-950/40 font-medium">
+                  <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-400" />
+                  Exportar Excel (.XLSX)
                 </Button>
-                <Button onClick={handlePrintReport} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Button onClick={handlePrintPdfReport} className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-md shadow-emerald-700/20">
                   <Printer className="h-4 w-4 mr-2" />
-                  Imprimir / PDF
+                  Gerar Relatório PDF
                 </Button>
               </div>
             </DialogFooter>
