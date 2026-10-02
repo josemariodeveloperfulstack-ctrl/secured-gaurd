@@ -202,20 +202,20 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-1 md:col-span-1">
+                <div className="space-y-2 col-span-1 md:col-span-2">
                   <Label className="text-gray-300 text-sm flex items-center gap-2">
                     <User className="h-3.5 w-3.5 text-red-500" />
-                    Nome (Opcional)
+                    Nome do Fornecedor / Razão Social
                   </Label>
                   <Input
                     value={form.name}
                     onChange={e => update('name', e.target.value)}
-                    className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
-                    placeholder="Nome do fornecedor"
+                    className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20 w-full"
+                    placeholder="Nome completo ou Razão Social"
                   />
                 </div>
 
-                <div className="space-y-2 col-span-1 md:col-span-1">
+                <div className="space-y-2 col-span-1">
                   <Label className="text-gray-300 text-sm flex items-center gap-2">
                     <Hash className="h-3.5 w-3.5 text-red-500" />
                     CNPJ
@@ -228,7 +228,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
                   />
                 </div>
 
-                <div className="space-y-2 col-span-1 md:col-span-2">
+                <div className="space-y-2 col-span-1">
                   <Label className="text-gray-300 text-sm flex items-center gap-2">
                     <Hash className="h-3.5 w-3.5 text-red-500" />
                     CPF
@@ -236,7 +236,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
                   <Input
                     value={form.cpf}
                     onChange={e => update('cpf', formatCpf(e.target.value))}
-                    className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20 max-w-[50%]"
+                    className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                     placeholder="000.000.000-00"
                   />
                 </div>

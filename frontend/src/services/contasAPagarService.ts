@@ -259,15 +259,22 @@ export function formatContaPlanoDeContas(conta: ContaPlanoDeContasFields): strin
   return '';
 }
 
-const CATEGORIA_RESCISAO_FUNCIONARIOS = 'Rescisão de funcionários';
-
-// Em contas de rescisão de funcionários, exibe o nome do funcionário vinculado
-// em vez do fornecedor. Nas demais contas, mantém o fornecedor.
+// Em contas a pagar / despesas com funcionário vinculado (ex.: Pessoal / RH ou beneficiário),
+// exibe o nome do funcionário na coluna Fornecedor/Funcionário. Nas demais, exibe o fornecedor.
 function resolveFornecedorOuFuncionario(invoice: any): string {
-  if (invoice.categoriaPaiNome === CATEGORIA_RESCISAO_FUNCIONARIOS && invoice.employeeName) {
-    return invoice.employeeName;
+  if (invoice.employeeName && typeof invoice.employeeName === 'string' && invoice.employeeName.trim()) {
+    return invoice.employeeName.trim();
   }
-  return invoice.supplierName || 'Não informado';
+  if (invoice.employee?.name && typeof invoice.employee.name === 'string' && invoice.employee.name.trim()) {
+    return invoice.employee.name.trim();
+  }
+  if (invoice.supplierName && typeof invoice.supplierName === 'string' && invoice.supplierName.trim()) {
+    return invoice.supplierName.trim();
+  }
+  if (invoice.supplier?.name && typeof invoice.supplier.name === 'string' && invoice.supplier.name.trim()) {
+    return invoice.supplier.name.trim();
+  }
+  return 'Não informado';
 }
 
 export const contasAPagarService = {
@@ -505,6 +512,12 @@ export const contasAPagarService = {
   // Excluir conta
   async deleteContaAPagar(id: string): Promise<void> {
     await api.delete(`/api/invoices/${id}`);
+  },
+
+  // Exclusão em massa de alta performance
+  async bulkDeleteContasAPagar(ids: string[]): Promise<{ deletedCount: number; requestedCount: number }> {
+    const response = await api.post('/api/invoices/bulk-delete', { ids });
+    return response.data;
   },
 
   async getCategories(): Promise<string[]> {

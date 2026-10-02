@@ -103,8 +103,8 @@ export const ContasAPagarViewModal: React.FC<ContasAPagarViewModalProps> = ({
                   <p className="text-seguranca-lightgray mt-1">{conta.descricao}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-seguranca-lightgray">Fornecedor</label>
-                  <p className="text-seguranca-lightgray mt-1">{conta.fornecedor || '-'}</p>
+                  <label className="text-sm font-medium text-seguranca-lightgray">Fornecedor / Funcionário</label>
+                  <p className="text-seguranca-lightgray mt-1">{conta.employeeName || conta.fornecedor || '-'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-seguranca-lightgray">Unidade</label>

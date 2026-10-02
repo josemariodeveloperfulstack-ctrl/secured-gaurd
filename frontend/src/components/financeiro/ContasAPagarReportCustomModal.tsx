@@ -359,11 +359,11 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
                   <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray">
                     <SelectValue placeholder="Todos os fornecedores" />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
+                  <SelectContent className="bg-seguranca-black border-gray-600 max-w-[min(90vw,520px)] max-h-64 overflow-y-auto z-50">
                     <SelectItem value="TODOS" className="hover:bg-seguranca-graphite">Todos os Fornecedores</SelectItem>
                     {fornecedores.map((f) => (
                       <SelectItem key={f.id} value={f.id} className="hover:bg-seguranca-graphite">
-                        {f.name}
+                        <span className="truncate block max-w-[440px]" title={f.name}>{f.name}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>

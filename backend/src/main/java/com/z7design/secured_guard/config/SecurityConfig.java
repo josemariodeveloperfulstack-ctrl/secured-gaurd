@@ -416,15 +416,23 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/financial/**")
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
                                                                 "FINANCIAL_CREATE", "FINANCIAL_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_FINANCEIRO",
-                                                                "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "SUPER_ADMIN", "ADMIN", "ADMINISTRADOR",
+                                                                "ROLE_FINANCEIRO", "FINANCEIRO",
+                                                                "ROLE_ASSISTENTE_ADMINISTRATIVO", "ASSISTENTE_ADMINISTRATIVO",
+                                                                "ROLE_AUXILIAR_ADMINISTRATIVO", "AUXILIAR_ADMINISTRATIVO",
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ANALISTA_SUPRIMENTOS",
+                                                                "ROLE_ANALISTA_DE_SUPRIMENTOS", "ANALISTA_DE_SUPRIMENTOS",
+                                                                "ROLE_SUPRIMENTOS", "SUPRIMENTOS")
                                                 // Endpoints de invoices (contas a pagar)
                                                 .requestMatchers("/api/invoices/**")
-                                                .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "FINANCEIRO",
+                                                .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "ADMINISTRADOR", "FINANCEIRO",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
-                                                                "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS", "SUPRIMENTOS")
+                                                                "ROLE_FINANCEIRO", "FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_CREATE", "FINANCIAL_DELETE",
+                                                                "ROLE_ASSISTENTE_ADMINISTRATIVO", "ASSISTENTE_ADMINISTRATIVO",
+                                                                "ROLE_AUXILIAR_ADMINISTRATIVO", "AUXILIAR_ADMINISTRATIVO",
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ANALISTA_SUPRIMENTOS",
+                                                                "ROLE_ANALISTA_DE_SUPRIMENTOS", "ANALISTA_DE_SUPRIMENTOS",
+                                                                "ROLE_SUPRIMENTOS", "SUPRIMENTOS")
                                                 // Endpoints de suppliers (fornecedores) - requerem permissões
                                                 // administrativas
                                                 // ou financeiras

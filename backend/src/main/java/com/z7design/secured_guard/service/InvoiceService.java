@@ -299,6 +299,21 @@ public class InvoiceService {
     public void deleteById(UUID id) {
         invoiceRepository.deleteById(id);
     }
+
+    @org.springframework.transaction.annotation.Transactional
+    public int deleteInBulk(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        int totalDeleted = 0;
+        int batchSize = 500;
+        for (int i = 0; i < ids.size(); i += batchSize) {
+            List<UUID> batch = ids.subList(i, Math.min(i + batchSize, ids.size()));
+            invoiceRepository.deleteAllByIdInBatch(batch);
+            totalDeleted += batch.size();
+        }
+        return totalDeleted;
+    }
     
     public Invoice updateStatus(UUID id, ExpenseStatus status) {
         return invoiceRepository.findById(id)
@@ -733,8 +748,28 @@ public class InvoiceService {
             Unit unit = null;
             if (item.getUnitName() != null && !item.getUnitName().isBlank()) {
                 String searchUnit = item.getUnitName().trim();
+                String upperSearch = searchUnit.toUpperCase();
+                
+                // 1. Tenta correspondência direta
                 unit = unitRepository.findByNameContainingIgnoreCase(searchUnit)
-                        .stream().findFirst().orElse(defaultUnit);
+                        .stream().findFirst().orElse(null);
+                
+                // 2. Tenta por termos-chave conhecidos
+                if (unit == null) {
+                    if (upperSearch.contains("CONTAG")) {
+                        unit = unitRepository.findByNameContainingIgnoreCase("Contag").stream().findFirst().orElse(null);
+                    } else if (upperSearch.contains("UBERL")) {
+                        unit = unitRepository.findByNameContainingIgnoreCase("Uberl").stream().findFirst().orElse(null);
+                    }
+                }
+                
+                // 3. Se ainda não encontrou, auto-cria a Unidade com o nome especificado
+                if (unit == null) {
+                    Unit newUnit = new Unit();
+                    newUnit.setName(searchUnit);
+                    newUnit.setActive(true);
+                    unit = unitRepository.save(newUnit);
+                }
             }
             if (unit == null) {
                 unit = defaultUnit;
