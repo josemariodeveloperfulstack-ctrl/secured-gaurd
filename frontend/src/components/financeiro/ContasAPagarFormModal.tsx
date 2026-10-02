@@ -14,6 +14,7 @@ import { contasAPagarService, Supplier, CategoriaPai, Subcategoria } from '@/ser
 import SupplierFormModal from '@/components/estoque/SupplierFormModal';
 import { SupplierCombobox } from '@/components/ui/supplier-combobox';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import { WorkSectorCombobox } from '@/components/ui/work-sector-combobox';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/axios';
@@ -929,27 +930,18 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                   </span>
                 )}
               </label>
-              <Select
-                value={formData.workSector || 'none'}
+              <WorkSectorCombobox
+                sectors={sectoresEOptionLista}
+                value={formData.workSector || ''}
                 onValueChange={(value) => {
-                  handleInputChange('workSector', value === 'none' ? '' : value);
+                  handleInputChange('workSector', value);
                   setWorkSectorAutoFilled(false); // usuário alterou manualmente
                 }}
-              >
-                <SelectTrigger className={`border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow ${workSectorAutoFilled ? 'border-emerald-400/40' : ''}`}>
-                  <SelectValue placeholder="Selecione o setor de trabalho" />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-gray-600 max-h-60">
-                  <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
-                    Selecione o setor de trabalho
-                  </SelectItem>
-                  {sectoresEOptionLista.map((setor) => (
-                    <SelectItem key={setor} value={setor} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      {setor}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                minSearchChars={3}
+                placeholder="Selecione o setor de trabalho"
+                searchPlaceholder="Digite pelo menos 3 caracteres para buscar..."
+                autoFilled={workSectorAutoFilled}
+              />
             </div>
 
 
