@@ -192,6 +192,10 @@ public class InvoiceService {
     }
     
     public Invoice update(UUID id, InvoiceDTO invoiceDTO) {
+        return update(id, invoiceDTO, null);
+    }
+
+    public Invoice update(UUID id, InvoiceDTO invoiceDTO, UUID userId) {
         log.info("Atualizando fatura com ID: {}", id);
         log.info("Dados do DTO: {}", invoiceDTO);
         
@@ -201,6 +205,9 @@ public class InvoiceService {
                         log.info("Fatura encontrada, atualizando dados...");
                         try {
                             updateInvoiceFromDTO(invoice, invoiceDTO);
+                            if (invoice.getCreatedBy() == null && userId != null) {
+                                userRepository.findById(userId).ifPresent(invoice::setCreatedBy);
+                            }
                             log.info("Dados atualizados, salvando fatura...");
                             Invoice saved = invoiceRepository.save(invoice);
                             
@@ -679,6 +686,11 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceImportResultDTO importInvoicesFromExcel(List<InvoiceImportItemDTO> items) {
+        return importInvoicesFromExcel(items, null);
+    }
+
+    @Transactional
+    public InvoiceImportResultDTO importInvoicesFromExcel(List<InvoiceImportItemDTO> items, UUID userId) {
         if (items == null || items.isEmpty()) {
             return InvoiceImportResultDTO.builder()
                     .totalRows(0)
@@ -689,6 +701,8 @@ public class InvoiceService {
                     .importedInvoices(List.of())
                     .build();
         }
+
+        User creator = userId != null ? userRepository.findById(userId).orElse(null) : null;
 
         int importedCount = 0;
         BigDecimal totalAmount = BigDecimal.ZERO;
@@ -816,6 +830,10 @@ public class InvoiceService {
             invoice.setCompanySigla(sigla.trim().toUpperCase());
             invoice.setSupplier(supplier);
             invoice.setUnit(unit);
+            
+            if (creator != null) {
+                invoice.setCreatedBy(creator);
+            }
             
             String barcode = item.getBarcode();
             if (barcode != null && barcode.length() > 255) {

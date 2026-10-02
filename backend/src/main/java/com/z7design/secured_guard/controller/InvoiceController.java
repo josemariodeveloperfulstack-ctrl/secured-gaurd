@@ -12,6 +12,7 @@ import com.z7design.secured_guard.model.enums.ExpenseType;
 import com.z7design.secured_guard.model.enums.ClientStatus;
 import com.z7design.secured_guard.service.InvoiceService;
 import com.z7design.secured_guard.service.ClientService;
+import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -46,6 +47,7 @@ public class InvoiceController {
     
     private final InvoiceService invoiceService;
     private final ClientService clientService;
+    private final UserRepository userRepository;
     
     @GetMapping
     @Operation(summary = "Listar todas as faturas", description = "Retorna uma lista paginada de todas as faturas")
@@ -259,7 +261,7 @@ public class InvoiceController {
             @ApiResponse(responseCode = "404", description = "Fatura não encontrada"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<InvoiceDTO> update(@PathVariable String id, @Valid @RequestBody InvoiceDTO invoiceDTO) {
+    public ResponseEntity<InvoiceDTO> update(@PathVariable String id, @Valid @RequestBody InvoiceDTO invoiceDTO, Authentication authentication) {
         try {
             log.info("PUT /api/invoices/{} - Atualizando fatura", id);
             log.info("Dados recebidos: {}", invoiceDTO);
@@ -290,7 +292,7 @@ public class InvoiceController {
                 return ResponseEntity.badRequest().build();
             }
             
-            Invoice updated = invoiceService.update(UUID.fromString(id), invoiceDTO);
+            Invoice updated = invoiceService.update(UUID.fromString(id), invoiceDTO, resolveUserId(authentication));
             
             log.info("✅ Fatura atualizada com sucesso - ID: {}", updated.getId());
             return ResponseEntity.ok(InvoiceDTO.fromEntity(updated));
@@ -665,22 +667,42 @@ public class InvoiceController {
     }
 
     private UUID resolveUserId(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
+        if (authentication == null) {
             return null;
         }
         Object principal = authentication.getPrincipal();
         if (principal instanceof User user && user.getId() != null) {
             return user.getId();
         }
+        String name = authentication.getName();
+        if (name != null && !name.isBlank() && !"anonymousUser".equals(name)) {
+            try {
+                Optional<User> userOpt = userRepository.findByUsername(name);
+                if (userOpt.isPresent()) {
+                    return userOpt.get().getId();
+                }
+                userOpt = userRepository.findByEmailIgnoreCase(name);
+                if (userOpt.isPresent()) {
+                    return userOpt.get().getId();
+                }
+                userOpt = userRepository.findByCpf(name.replaceAll("\\D", ""));
+                if (userOpt.isPresent()) {
+                    return userOpt.get().getId();
+                }
+            } catch (Exception e) {
+                log.warn("Erro ao resolver usuário autenticado: {}", e.getMessage());
+            }
+        }
         return null;
     }
 
     @PostMapping("/import/excel")
     @Operation(summary = "Importar faturas da planilha em lote", description = "Cadastra faturas extraídas da planilha e auto-cadastra fornecedores se inexistentes")
-    public ResponseEntity<InvoiceImportResultDTO> importFromExcel(@RequestBody List<InvoiceImportItemDTO> items) {
+    public ResponseEntity<InvoiceImportResultDTO> importFromExcel(@RequestBody List<InvoiceImportItemDTO> items, Authentication authentication) {
         try {
-            log.info("POST /api/invoices/import/excel - Recebidos {} itens para importação", items != null ? items.size() : 0);
-            InvoiceImportResultDTO result = invoiceService.importInvoicesFromExcel(items);
+            UUID userId = resolveUserId(authentication);
+            log.info("POST /api/invoices/import/excel - Recebidos {} itens para importação (usuário: {})", items != null ? items.size() : 0, userId);
+            InvoiceImportResultDTO result = invoiceService.importInvoicesFromExcel(items, userId);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("Erro ao importar faturas da planilha: {}", e.getMessage(), e);
