@@ -97,6 +97,8 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
       }
     }
     const str = String(val).trim();
+    if (!str) return '';
+    
     // Formato DD/MM/YYYY ou DD-MM-YYYY
     const matchBR = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
     if (matchBR) {
@@ -114,7 +116,46 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
       const dd = String(matchISO[3]).padStart(2, '0');
       return `${yyyy}-${mm}-${dd}`;
     }
+    // String gerada por objeto Date JS (ex: Tue Oct 20 2026 00:00:28 GMT-0300...)
+    if (str.includes('GMT') || str.includes('UTC') || str.includes('Horário') || str.includes('Horario') || str.includes('Standard Time')) {
+      const parsedD = new Date(str);
+      if (!isNaN(parsedD.getTime())) {
+        const yyyy = parsedD.getFullYear();
+        const mm = String(parsedD.getMonth() + 1).padStart(2, '0');
+        const dd = String(parsedD.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      }
+    }
     return '';
+  };
+
+  const isDateValue = (val: any): boolean => {
+    if (!val) return false;
+    if (val instanceof Date) return true;
+    const str = String(val).trim();
+    if (
+      str.includes('GMT') ||
+      str.includes('Horário') ||
+      str.includes('Horario') ||
+      str.includes('Standard Time') ||
+      str.includes('UTC')
+    ) {
+      return true;
+    }
+    if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(str) || /^\d{4}[\/\-](\d{1,2})[\/\-](\d{1,2})$/.test(str)) {
+      return true;
+    }
+    return false;
+  };
+
+  const cleanTextValue = (val: any): string => {
+    if (!val) return '';
+    if (isDateValue(val)) return '';
+    const str = String(val).trim();
+    if (!str || str.length < 2) return '';
+    // Se for apenas número sem letras (ex: '12345', '10.50')
+    if (parseNumber(str) > 0 && !/[a-zA-ZÀ-ÿ]{3,}/.test(str)) return '';
+    return str;
   };
 
   const parseNumber = (val: any): number => {
@@ -476,9 +517,9 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
           }
 
           // 3. Reconhecimento Preciso e Inteligente de Fornecedor e Descrição
-          let supplierName = colMap.supplier !== -1 ? String(row[colMap.supplier] || '').trim() : '';
-          let description = colMap.desc !== -1 ? String(row[colMap.desc] || '').trim() : '';
-          const who = colMap.who !== -1 ? String(row[colMap.who] || '').trim() : '';
+          let supplierName = colMap.supplier !== -1 ? cleanTextValue(row[colMap.supplier]) : '';
+          let description = colMap.desc !== -1 ? cleanTextValue(row[colMap.desc]) : '';
+          const who = colMap.who !== -1 ? cleanTextValue(row[colMap.who]) : '';
 
           // Se fornecedor ou descrição não foram mapeados diretamente por cabeçalho, coletar colunas de texto disponíveis
           const availableTextColumns: { colIdx: number; text: string }[] = [];
@@ -500,9 +541,9 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
               continue;
             }
 
-            const rawVal = String(row[c] || '').trim();
-            if (rawVal && rawVal.length >= 2 && parseNumber(rawVal) === 0 && !parseExcelDate(rawVal)) {
-              availableTextColumns.push({ colIdx: c, text: rawVal });
+            const cleanVal = cleanTextValue(row[c]);
+            if (cleanVal && !availableTextColumns.some(col => col.text === cleanVal)) {
+              availableTextColumns.push({ colIdx: c, text: cleanVal });
             }
           }
 
@@ -524,6 +565,14 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
             } else if (supplierName) {
               description = supplierName;
             }
+          }
+
+          // Descartar linhas fantasmas / vazias do Excel:
+          // Se a linha não tem valor financeiro (rowAmount <= 0) E não tem nenhum fornecedor/texto válido real,
+          // significa que é uma linha vazia gerada por formatação residual do Excel.
+          const hasRealText = (supplierName && supplierName.length >= 2) || (description && description.length >= 2) || availableTextColumns.length > 0;
+          if (rowAmount <= 0 && !hasRealText) {
+            continue; // Pula linha vazia/fantasma do Excel
           }
 
           if (!supplierName) supplierName = 'Fornecedor Importado';
