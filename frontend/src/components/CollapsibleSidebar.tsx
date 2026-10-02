@@ -111,8 +111,8 @@ function SidebarNavSection({
 
   if (sidebarCollapsed) {
     return (
-      <div className="mb-6">
-        <nav className="space-y-1 px-4">{children}</nav>
+      <div className="mb-3">
+        <nav className="space-y-1.5 px-2 flex flex-col items-center">{children}</nav>
       </div>
     );
   }
@@ -1039,6 +1039,47 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     persistSectionOpen,
   ]);
 
+  const renderNavItem = (item: {
+    id: string;
+    to: string;
+    text: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+  }) => {
+    const isCurrentActive = isActive(item.id);
+    const Icon = item.icon;
+
+    return (
+      <ScrollPreservingLink
+        key={item.id}
+        to={item.to}
+        preserveScroll={true}
+        ref={isCurrentActive ? activeItemRef : undefined}
+        onMouseEnter={() => prefetchByPath(item.to)}
+        title={collapsed ? item.text : undefined}
+        className={cn(
+          'group flex items-center rounded-lg text-sm font-medium transition-all duration-150',
+          collapsed
+            ? 'justify-center w-10 h-10 mx-auto p-0'
+            : 'w-full px-3 py-2',
+          isCurrentActive
+            ? 'bg-seguranca-black text-seguranca-yellow font-semibold shadow-inner'
+            : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+        )}
+      >
+        <Icon
+          size={18}
+          className={cn(
+            'shrink-0 transition-colors',
+            collapsed ? 'mx-0' : 'mr-3 text-seguranca-lightgray group-hover:text-seguranca-yellow'
+          )}
+        />
+        {!collapsed && (
+          <span className="truncate">{item.text}</span>
+        )}
+      </ScrollPreservingLink>
+    );
+  };
+
   return (
     <>
       {/* Overlay para mobile */}
@@ -1068,7 +1109,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             )}
 
             {collapsed && (
-              <div className="flex items-center justify-center mx-auto pr-1">
+              <div className="flex items-center justify-center mx-auto">
                 <Logo size="sm" />
               </div>
             )}
@@ -1100,30 +1141,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             open={isSectionOpen('main')}
             onOpenChange={(v) => setSectionKey('main', v)}
           >
-            {filteredMainMenuItems.map((item) => (
-              <ScrollPreservingLink
-                key={item.id}
-                to={item.to}
-                preserveScroll={true}
-                ref={isActive(item.id) ? activeItemRef : undefined}
-                onMouseEnter={() => prefetchByPath(item.to)}
-                className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                      ? 'bg-seguranca-black text-seguranca-yellow'
-                      : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                    }
-                    `}
-              >
-                <item.icon
-                  size={18}
-                  className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                />
-                {!collapsed && (
-                  <span className="truncate">{item.text}</span>
-                )}
-              </ScrollPreservingLink>
-            ))}
+            {filteredMainMenuItems.map(renderNavItem)}
           </SidebarNavSection>
 
           {/* Módulo Financeiro */}
@@ -1134,30 +1152,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             open={isSectionOpen('financeiro')}
             onOpenChange={(v) => setSectionKey('financeiro', v)}
           >
-            {visibleFinanceiroItems.map((item) => (
-              <ScrollPreservingLink
-                key={item.id}
-                to={item.to}
-                preserveScroll={true}
-                ref={isActive(item.id) ? activeItemRef : undefined}
-                onMouseEnter={() => prefetchByPath(item.to)}
-                className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-              >
-                <item.icon
-                  size={18}
-                  className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                />
-                {!collapsed && (
-                  <span className="truncate">{item.text}</span>
-                )}
-              </ScrollPreservingLink>
-            ))}
+            {visibleFinanceiroItems.map(renderNavItem)}
           </SidebarNavSection>
 
           {/* Módulo Fiscal */}
@@ -1168,30 +1163,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             open={isSectionOpen('fiscal')}
             onOpenChange={(v) => setSectionKey('fiscal', v)}
           >
-            {visibleFiscalItems.map((item) => (
-              <ScrollPreservingLink
-                key={item.id}
-                to={item.to}
-                preserveScroll={true}
-                ref={isActive(item.id) ? activeItemRef : undefined}
-                onMouseEnter={() => prefetchByPath(item.to)}
-                className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-              >
-                <item.icon
-                  size={18}
-                  className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                />
-                {!collapsed && (
-                  <span className="truncate">{item.text}</span>
-                )}
-              </ScrollPreservingLink>
-            ))}
+            {visibleFiscalItems.map(renderNavItem)}
           </SidebarNavSection>
 
           {/* Grupo Operacional */}
@@ -1203,30 +1175,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               open={isSectionOpen('operacional')}
               onOpenChange={(v) => setSectionKey('operacional', v)}
             >
-              {filteredOperacionalItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  ref={isActive(item.id) ? activeItemRef : undefined}
-                  onMouseEnter={() => prefetchByPath(item.to)}
-                  className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                >
-                  <item.icon
-                    size={18}
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
+              {filteredOperacionalItems.map(renderNavItem)}
             </SidebarNavSection>
           )}
 
@@ -1239,30 +1188,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               open={isSectionOpen('rh')}
               onOpenChange={(v) => setSectionKey('rh', v)}
             >
-              {filteredRhItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  ref={isActive(item.id) ? activeItemRef : undefined}
-                  onMouseEnter={() => prefetchByPath(item.to)}
-                  className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                >
-                  <item.icon
-                    size={18}
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
+              {filteredRhItems.map(renderNavItem)}
             </SidebarNavSection>
           )}
 
@@ -1275,30 +1201,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               open={isSectionOpen('sst')}
               onOpenChange={(v) => setSectionKey('sst', v)}
             >
-              {filteredSstItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  ref={isActive(item.id) ? activeItemRef : undefined}
-                  onMouseEnter={() => prefetchByPath(item.to)}
-                  className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                >
-                  <item.icon
-                    size={18}
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
+              {filteredSstItems.map(renderNavItem)}
             </SidebarNavSection>
           )}
 
@@ -1311,30 +1214,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               open={isSectionOpen('dp')}
               onOpenChange={(v) => setSectionKey('dp', v)}
             >
-              {filteredDepartamentoPessoalItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  ref={isActive(item.id) ? activeItemRef : undefined}
-                  onMouseEnter={() => prefetchByPath(item.to)}
-                  className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                >
-                  <item.icon
-                    size={18}
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
+              {filteredDepartamentoPessoalItems.map(renderNavItem)}
             </SidebarNavSection>
           )}
 
@@ -1347,30 +1227,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               open={isSectionOpen('comercial')}
               onOpenChange={(v) => setSectionKey('comercial', v)}
             >
-              {filteredComercialItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  ref={isActive(item.id) ? activeItemRef : undefined}
-                  onMouseEnter={() => prefetchByPath(item.to)}
-                  className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                >
-                  <item.icon
-                    size={18}
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
+              {filteredComercialItems.map(renderNavItem)}
             </SidebarNavSection>
           )}
 
@@ -1383,31 +1240,8 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               open={isSectionOpen('estoque')}
               onOpenChange={(v) => setSectionKey('estoque', v)}
             >
-              <div className="space-y-1">
-                {filteredEstoqueItems.map((item) => (
-                  <ScrollPreservingLink
-                    key={item.id}
-                    to={item.to}
-                    preserveScroll={true}
-                    ref={isActive(item.id) ? activeItemRef : undefined}
-                    onMouseEnter={() => prefetchByPath(item.to)}
-                    className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <item.icon
-                      size={18}
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                    />
-                    {!collapsed && (
-                      <span className="truncate">{item.text}</span>
-                    )}
-                  </ScrollPreservingLink>
-                ))}
+              <div className={collapsed ? "space-y-1.5 flex flex-col items-center" : "space-y-1"}>
+                {filteredEstoqueItems.map(renderNavItem)}
               </div>
             </SidebarNavSection>
           )}
@@ -1421,69 +1255,11 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               open={isSectionOpen('compras')}
               onOpenChange={(v) => setSectionKey('compras', v)}
             >
-              <div className="space-y-1">
-                {filteredComprasItems.map((item) => (
-                  <ScrollPreservingLink
-                    key={item.id}
-                    to={item.to}
-                    preserveScroll={true}
-                    ref={isActive(item.id) ? activeItemRef : undefined}
-                    onMouseEnter={() => prefetchByPath(item.to)}
-                    className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <item.icon
-                      size={18}
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                    />
-                    {!collapsed && (
-                      <span className="truncate">{item.text}</span>
-                    )}
-                  </ScrollPreservingLink>
-                ))}
+              <div className={collapsed ? "space-y-1.5 flex flex-col items-center" : "space-y-1"}>
+                {filteredComprasItems.map(renderNavItem)}
               </div>
             </SidebarNavSection>
           )}
-
-          {/* Grupo Suporte - REMOVIDO (substituído por Gestão de Atendimento) */}
-          {/* {shouldShowModule('SUPPORT_READ') && (
-            <div className="mb-6">
-              {!collapsed && (
-                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
-                  Suporte
-                </div>
-              )}
-              <nav className="space-y-1 px-4">
-                {suporteMenuItems.map((item) => (
-                  <ScrollPreservingLink
-                    key={item.id}
-                    to={item.to}
-                    preserveScroll={true}
-                    className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
-                    />
-                    {!collapsed && (
-                      <span className="truncate">{item.text}</span>
-                    )}
-                  </ScrollPreservingLink>
-                ))}
-              </nav>
-            </div>
-          )} */}
 
           {/* Grupo Comunicação Interna (Unificado) */}
           {shouldShowModule('MESSAGES_READ') && (
@@ -1494,30 +1270,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               open={isSectionOpen('comunicacao')}
               onOpenChange={(v) => setSectionKey('comunicacao', v)}
             >
-              {filteredComunicacaoInternaItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  ref={isActive(item.id) ? activeItemRef : undefined}
-                  onMouseEnter={() => prefetchByPath(item.to)}
-                  className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                >
-                  <item.icon
-                    size={18}
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
+              {filteredComunicacaoInternaItems.map(renderNavItem)}
             </SidebarNavSection>
           )}
 
@@ -1530,30 +1283,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               open={isSectionOpen('atendimento')}
               onOpenChange={(v) => setSectionKey('atendimento', v)}
             >
-              {filteredAtendimentoItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  ref={isActive(item.id) ? activeItemRef : undefined}
-                  onMouseEnter={() => prefetchByPath(item.to)}
-                  className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                >
-                  <item.icon
-                    size={18}
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
+              {filteredAtendimentoItems.map(renderNavItem)}
             </SidebarNavSection>
           )}
 
@@ -1566,42 +1296,19 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               open={isSectionOpen('sistema')}
               onOpenChange={(v) => setSectionKey('sistema', v)}
             >
-              {filteredSistemaItems.map((item) => (
-                <ScrollPreservingLink
-                  key={item.id}
-                  to={item.to}
-                  preserveScroll={true}
-                  ref={isActive(item.id) ? activeItemRef : undefined}
-                  onMouseEnter={() => prefetchByPath(item.to)}
-                  className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                >
-                  <item.icon
-                    size={18}
-                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                  />
-                  {!collapsed && (
-                    <span className="truncate">{item.text}</span>
-                  )}
-                </ScrollPreservingLink>
-              ))}
+              {filteredSistemaItems.map(renderNavItem)}
             </SidebarNavSection>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-700">
+        <div className={cn("border-t border-gray-700", collapsed ? "p-2 flex items-center justify-center" : "p-4")}>
           {!collapsed && user && (
             <div
-              className="flex items-center space-x-3 cursor-pointer hover:bg-seguranca-black p-2 rounded-lg transition-colors"
+              className="flex items-center space-x-3 cursor-pointer hover:bg-seguranca-black p-2 rounded-lg transition-colors w-full"
               onClick={handleProfileClick}
             >
-              <div className="w-8 h-8 bg-seguranca-yellow rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-seguranca-yellow rounded-full flex items-center justify-center shrink-0">
                 <User2 size={16} className="text-seguranca-black" />
               </div>
               <div className="flex-1 min-w-0">
@@ -1611,6 +1318,18 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 <div className="text-xs text-gray-400 truncate">
                   {user?.role || 'Usuário'}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {collapsed && user && (
+            <div
+              className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-seguranca-black rounded-lg transition-colors mx-auto"
+              onClick={handleProfileClick}
+              title={user?.name || 'Usuário'}
+            >
+              <div className="w-8 h-8 bg-seguranca-yellow rounded-full flex items-center justify-center">
+                <User2 size={16} className="text-seguranca-black" />
               </div>
             </div>
           )}
