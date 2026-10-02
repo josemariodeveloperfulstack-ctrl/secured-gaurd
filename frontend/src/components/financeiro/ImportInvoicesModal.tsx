@@ -69,23 +69,49 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
     totalAmount: 0
   });
 
+  const normalizeStr = (val: any): string => {
+    return String(val || '')
+      .trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  };
+
   const parseExcelDate = (val: any): string => {
     if (!val) return '';
+    if (val instanceof Date && !isNaN(val.getTime())) {
+      const yyyy = val.getFullYear();
+      const mm = String(val.getMonth() + 1).padStart(2, '0');
+      const dd = String(val.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
     if (typeof val === 'number') {
-      const dateObj = XLSX.SSF.parse_date_code(val);
-      if (dateObj) {
-        const yyyy = dateObj.y;
-        const mm = String(dateObj.m).padStart(2, '0');
-        const dd = String(dateObj.d).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
+      if (val > 30000 && val < 70000) {
+        const dateObj = XLSX.SSF.parse_date_code(val);
+        if (dateObj && dateObj.y && dateObj.m && dateObj.d) {
+          const yyyy = dateObj.y;
+          const mm = String(dateObj.m).padStart(2, '0');
+          const dd = String(dateObj.d).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}`;
+        }
       }
     }
     const str = String(val).trim();
-    const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (match) {
-      const dd = String(match[1]).padStart(2, '0');
-      const mm = String(match[2]).padStart(2, '0');
-      const yyyy = match[3];
+    // Formato DD/MM/YYYY ou DD-MM-YYYY
+    const matchBR = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if (matchBR) {
+      const dd = String(matchBR[1]).padStart(2, '0');
+      const mm = String(matchBR[2]).padStart(2, '0');
+      let yyyy = matchBR[3];
+      if (yyyy.length === 2) yyyy = `20${yyyy}`;
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    // Formato YYYY-MM-DD
+    const matchISO = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (matchISO) {
+      const yyyy = matchISO[1];
+      const mm = String(matchISO[2]).padStart(2, '0');
+      const dd = String(matchISO[3]).padStart(2, '0');
       return `${yyyy}-${mm}-${dd}`;
     }
     return '';
@@ -93,15 +119,21 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
 
   const parseNumber = (val: any): number => {
     if (val === undefined || val === null || val === '') return 0;
-    if (typeof val === 'number') return val;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
     let str = String(val).replace(/R\$\s?/gi, '').trim();
+    // Se tiver formato brasileiro 1.250,50
     if (str.includes(',') && str.includes('.')) {
       str = str.replace(/\./g, '').replace(',', '.');
     } else if (str.includes(',')) {
       str = str.replace(',', '.');
     }
-    const num = parseFloat(str);
-    return isNaN(num) ? 0 : num;
+    // Tenta extrair dígitos e ponto decimal
+    const match = str.match(/-?\d+(\.\d+)?/);
+    if (match) {
+      const num = parseFloat(match[0]);
+      return isNaN(num) ? 0 : num;
+    }
+    return 0;
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,12 +150,108 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
     reader.onload = (evt) => {
       try {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: false });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
 
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
+        // Encontrar a primeira aba com dados válidos
+        let targetWorksheet: XLSX.WorkSheet | null = null;
+        for (const sheetName of workbook.SheetNames) {
+          const ws = workbook.Sheets[sheetName];
+          const testRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          if (testRows && testRows.length > 1) {
+            targetWorksheet = ws;
+            break;
+          }
+        }
+
+        if (!targetWorksheet) {
+          targetWorksheet = workbook.Sheets[workbook.SheetNames[0]];
+        }
         
-        const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        const rawRows: any[][] = XLSX.utils.sheet_to_json(targetWorksheet, { header: 1, defval: '' });
+
+        // 1. Detecção Dinâmica de Cabeçalhos
+        let headerRowIndex = -1;
+        const colMap = {
+          date: -1,
+          company: -1,
+          supplier: -1,
+          type: -1,
+          desc: -1,
+          who: -1,
+          amount: -1,
+          valUberlandia: -1,
+          valServicosAdm: -1,
+          valTerceirizacao: -1,
+          valVigilancia: -1,
+          status: -1,
+          barcode: -1,
+          unit: -1,
+        };
+
+        for (let r = 0; r < Math.min(20, rawRows.length); r++) {
+          const row = rawRows[r];
+          if (!row || !Array.isArray(row)) continue;
+          
+          let matches = 0;
+          const tempMap = { ...colMap };
+          
+          row.forEach((cell, colIdx) => {
+            const h = normalizeStr(cell);
+            if (!h) return;
+            
+            if (h.includes('VENC') || h === 'DATA' || h.includes('DT VENC') || h.includes('DATA VENC') || h.includes('EMISSAO') || h.includes('DATA PAG')) {
+              if (tempMap.date === -1) { tempMap.date = colIdx; matches++; }
+            } else if (h.includes('FORNEC') || h.includes('FAVOREC') || h.includes('CREDOR') || h.includes('BENEFICI') || h.includes('PRESTADOR') || h.includes('RAZAO SOCIAL') || h.includes('LOJA')) {
+              if (tempMap.supplier === -1) { tempMap.supplier = colIdx; matches++; }
+            } else if (h === 'EMPRESA' || h.includes('SIGLA') || h.includes('FILIAL') || h === 'EMP') {
+              if (tempMap.company === -1) { tempMap.company = colIdx; matches++; }
+            } else if (h.includes('UBERLANDIA') || h.includes('UBERL') || h.includes('UDI')) {
+              tempMap.valUberlandia = colIdx; matches++;
+            } else if (h.includes('VIGILAN') || h.includes('VIG')) {
+              tempMap.valVigilancia = colIdx; matches++;
+            } else if (h.includes('TERCEIR') || h.includes('TERC')) {
+              tempMap.valTerceirizacao = colIdx; matches++;
+            } else if (h.includes('SERV') || h.includes('ADM')) {
+              tempMap.valServicosAdm = colIdx; matches++;
+            } else if (h === 'VALOR' || h.includes('VALOR TOTAL') || h === 'TOTAL' || h.includes('VALOR (R$)') || h.includes('VALOR R$') || h === 'R$' || h.includes('PRECO') || h.includes('CUSTO') || h.includes('A PAGAR') || h.includes('VALOR DA NOTA') || h.includes('VALOR LIQUIDO') || h.includes('VALOR BRUTO') || h.includes('PAGAMENTO')) {
+              if (tempMap.amount === -1) { tempMap.amount = colIdx; matches++; }
+            } else if (h.includes('DESC') || h.includes('HISTORIC') || h.includes('DETALH') || h.includes('ITEM') || h.includes('PRODUTO') || h.includes('SERVICO') || h.includes('MOTIVO') || h.includes('DESPESA')) {
+              if (tempMap.desc === -1) { tempMap.desc = colIdx; matches++; }
+            } else if (h.includes('QUEM') || h.includes('SOLICIT') || h.includes('RESPONS') || h.includes('COMPRADOR') || h.includes('SOLICITANTE') || h.includes('ALMOXARIF')) {
+              if (tempMap.who === -1) { tempMap.who = colIdx; matches++; }
+            } else if (h.includes('STATUS') || h.includes('SITUAC') || h.includes('PAGO') || h.includes('BAIXA') || h.includes('QUITAD')) {
+              if (tempMap.status === -1) { tempMap.status = colIdx; matches++; }
+            } else if (h.includes('BARRA') || h.includes('BOLETO') || h.includes('DIGITAVEL') || h.includes('LINHA')) {
+              if (tempMap.barcode === -1) { tempMap.barcode = colIdx; matches++; }
+            } else if (h.includes('UNIDADE') || h.includes('POSTO') || h.includes('CIDADE') || h.includes('LOCAL') || h.includes('BASE')) {
+              if (tempMap.unit === -1) { tempMap.unit = colIdx; matches++; }
+            } else if (h.includes('TIPO') || h.includes('CATEGORIA') || h.includes('CLASSIF')) {
+              if (tempMap.type === -1) { tempMap.type = colIdx; matches++; }
+            }
+          });
+          
+          if (matches >= 2) {
+            headerRowIndex = r;
+            Object.assign(colMap, tempMap);
+            break;
+          }
+        }
+
+        // Se não identificou cabeçalho clássico, define posições padrão da planilha matriz
+        if (headerRowIndex === -1) {
+          colMap.date = 1;
+          colMap.company = 2;
+          colMap.supplier = 3;
+          colMap.type = 4;
+          colMap.desc = 5;
+          colMap.who = 6;
+          colMap.valUberlandia = 7;
+          colMap.valServicosAdm = 8;
+          colMap.valTerceirizacao = 9;
+          colMap.valVigilancia = 10;
+          colMap.status = 11;
+          colMap.barcode = 12;
+        }
 
         const parsedItems: ParsedRowItem[] = [];
         let validCount = 0;
@@ -131,69 +259,126 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
         let sumAmount = 0;
         const suppliersSet = new Set<string>();
 
-        for (let index = 0; index < rawRows.length; index++) {
+        const startRow = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
+
+        for (let index = startRow; index < rawRows.length; index++) {
           const row = rawRows[index];
-          if (!row || row.length === 0) continue;
+          if (!row || !Array.isArray(row) || row.length === 0) continue;
 
-          const colB_DateStr = parseExcelDate(row[1]);
-          const colC_Empresa = String(row[2] || '').trim();
-          const colD_Fornecedor = String(row[3] || '').trim();
+          const fullRowText = row.map((c: any) => String(c || '').trim()).join(' ');
+          const fullRowUpper = normalizeStr(fullRowText);
 
-          // Ignorar cabeçalho principal
-          if (colC_Empresa.toUpperCase().includes('EMPRESA') || colD_Fornecedor.toUpperCase().includes('FORNECEDOR')) {
+          // Ignorar linhas vazias ou de totalizador
+          if (!fullRowText || fullRowUpper.startsWith('TOTAL') || fullRowUpper.startsWith('SOMA') || fullRowUpper.startsWith('SUBTOTAL')) {
             continue;
           }
 
-          // Se não houver nem data nem empresa nem fornecedor válido, pula a linha
-          if (!colB_DateStr && !colC_Empresa && !colD_Fornecedor) {
+          // Se a linha for repetição do cabeçalho
+          if (fullRowUpper.includes('EMPRESA') && fullRowUpper.includes('FORNECEDOR')) {
             continue;
           }
 
-          // Identificar valores das 4 colunas financeiras (H, I, J, K)
-          const valUberlandia = parseNumber(row[7]);
-          const valServicosAdm2 = parseNumber(row[8]);
-          const valTerceirizacao = parseNumber(row[9]);
-          const valVigilancia = parseNumber(row[10]);
+          // 1. Data de Vencimento
+          let dateStr = colMap.date !== -1 ? parseExcelDate(row[colMap.date]) : '';
+          if (!dateStr) {
+            // Busca por qualquer célula que seja data válida na linha
+            for (let c = 0; c < row.length; c++) {
+              const d = parseExcelDate(row[c]);
+              if (d) {
+                dateStr = d;
+                break;
+              }
+            }
+          }
 
-          // Determinar o valor principal da linha
+          // 2. Identificação de Valores
           let rowAmount = 0;
-          let detectedCompany = colC_Empresa.toUpperCase();
+          let detectedCompany = colMap.company !== -1 ? normalizeStr(row[colMap.company]) : '';
           let detectedUnit = '';
 
-          if (valVigilancia > 0) {
-            rowAmount = valVigilancia;
+          const valVig = colMap.valVigilancia !== -1 ? parseNumber(row[colMap.valVigilancia]) : 0;
+          const valTerc = colMap.valTerceirizacao !== -1 ? parseNumber(row[colMap.valTerceirizacao]) : 0;
+          const valAdm = colMap.valServicosAdm !== -1 ? parseNumber(row[colMap.valServicosAdm]) : 0;
+          const valUdi = colMap.valUberlandia !== -1 ? parseNumber(row[colMap.valUberlandia]) : 0;
+
+          if (valVig > 0) {
+            rowAmount = valVig;
             if (!detectedCompany) detectedCompany = 'VIG';
-          } else if (valTerceirizacao > 0) {
-            rowAmount = valTerceirizacao;
+          } else if (valTerc > 0) {
+            rowAmount = valTerc;
             if (!detectedCompany) detectedCompany = 'TERC';
-          } else if (valServicosAdm2 > 0) {
-            rowAmount = valServicosAdm2;
+          } else if (valAdm > 0) {
+            rowAmount = valAdm;
             if (!detectedCompany) detectedCompany = 'TERC';
-          } else if (valUberlandia > 0) {
-            rowAmount = valUberlandia;
+          } else if (valUdi > 0) {
+            rowAmount = valUdi;
             detectedUnit = 'UBERLÂNDIA';
             if (!detectedCompany) detectedCompany = 'ADM';
+          } else if (colMap.amount !== -1 && parseNumber(row[colMap.amount]) > 0) {
+            rowAmount = parseNumber(row[colMap.amount]);
           }
 
-          // Varredura de todo o texto da linha para identificar menções à Unidade (Contagem vs Uberlândia)
-          const fullRowText = row.map((c: any) => String(c || '').trim()).join(' ').toUpperCase();
+          // Varredura Inteligente de Valor Fallback: se ainda for 0, procura o valor numérico mais plausível na linha
+          if (rowAmount <= 0) {
+            for (let c = 0; c < row.length; c++) {
+              if (c === colMap.date) continue;
+              const cellRaw = row[c];
+              if (cellRaw instanceof Date) continue;
+              const num = parseNumber(cellRaw);
+              // Ignorar números inteiros que parecem ano (2024..2030) ou códigos simples (1..31)
+              if (num > 0 && num !== 2024 && num !== 2025 && num !== 2026 && num !== 2027) {
+                rowAmount = num;
+                break;
+              }
+            }
+          }
 
-          if (fullRowText.includes('CONTAGEM') || fullRowText.includes('CONTAG') || fullRowText.includes('SEDE') || fullRowText.includes('MATRIZ')) {
-            detectedUnit = 'CONTAGEM';
-          } else if (fullRowText.includes('UBERLANDIA') || fullRowText.includes('UBERLÂNDIA') || fullRowText.includes('UDI')) {
-            detectedUnit = 'UBERLÂNDIA';
-          } else if (!detectedUnit) {
-            // Se não especificado no texto:
-            // Coluna H (7) com valor = UBERLÂNDIA
-            // Colunas I, J, K com valor (Vig, Terc, Serv Adm) = CONTAGEM (Sede)
-            if (valUberlandia > 0 && valVigilancia <= 0 && valTerceirizacao <= 0 && valServicosAdm2 <= 0) {
+          // 3. Fornecedor e Descrição
+          let supplierName = colMap.supplier !== -1 ? String(row[colMap.supplier] || '').trim() : '';
+          let description = colMap.desc !== -1 ? String(row[colMap.desc] || '').trim() : '';
+          const who = colMap.who !== -1 ? String(row[colMap.who] || '').trim() : '';
+
+          // Se fornecedor estiver vazio, tenta extrair da descrição ou de outra coluna de texto
+          if (!supplierName) {
+            if (description && description.length > 2) {
+              supplierName = description;
+            } else {
+              for (let c = 0; c < row.length; c++) {
+                if (c === colMap.date || c === colMap.amount) continue;
+                const text = String(row[c] || '').trim();
+                if (text && text.length > 2 && parseNumber(text) === 0 && !parseExcelDate(text)) {
+                  supplierName = text;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!description) {
+            description = supplierName || 'Pagamento / Despesa Importada';
+          }
+
+          // 4. Detecção de Unidade e Empresa
+          if (colMap.unit !== -1 && row[colMap.unit]) {
+            const uText = normalizeStr(row[colMap.unit]);
+            if (uText.includes('UBERL') || uText.includes('UDI')) {
+              detectedUnit = 'UBERLÂNDIA';
+            } else if (uText.includes('CONTAG') || uText.includes('SEDE') || uText.includes('MATRIZ')) {
+              detectedUnit = 'CONTAGEM';
+            }
+          }
+
+          if (!detectedUnit) {
+            if (fullRowUpper.includes('CONTAGEM') || fullRowUpper.includes('CONTAG') || fullRowUpper.includes('SEDE') || fullRowUpper.includes('MATRIZ')) {
+              detectedUnit = 'CONTAGEM';
+            } else if (fullRowUpper.includes('UBERLANDIA') || fullRowUpper.includes('UBERLÂNDIA') || fullRowUpper.includes('UDI')) {
               detectedUnit = 'UBERLÂNDIA';
             } else {
               detectedUnit = 'CONTAGEM';
             }
           }
 
-          // Normalizar Sigla da Empresa
+          // Normalizar Empresa
           if (detectedCompany.includes('VIG') || detectedCompany.includes('VIGILAN')) {
             detectedCompany = 'VIG';
           } else if (detectedCompany.includes('TERC') || detectedCompany.includes('SERV')) {
@@ -202,9 +387,21 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
             detectedCompany = 'ADM';
           } else if (detectedCompany.includes('UBERL')) {
             detectedCompany = 'UBERL';
-            if (!detectedUnit || detectedUnit === 'CONTAGEM') {
-              detectedUnit = 'UBERLÂNDIA';
-            }
+            detectedUnit = 'UBERLÂNDIA';
+          } else {
+            detectedCompany = 'VIG';
+          }
+
+          const colTypeStr = colMap.type !== -1 ? normalizeStr(row[colMap.type]) : '';
+          const colStatusStr = colMap.status !== -1 ? normalizeStr(row[colMap.status]) : '';
+          const barcode = colMap.barcode !== -1 ? String(row[colMap.barcode] || '').trim() : '';
+
+          const type: 'FIXA' | 'VARIAVEL' = colTypeStr.includes('FIXA') ? 'FIXA' : 'VARIAVEL';
+          const status: 'PENDENTE' | 'PAGA' = (colStatusStr.includes('PAG') || colStatusStr.includes('SIM') || colStatusStr.includes('X')) ? 'PAGA' : 'PENDENTE';
+
+          let notes = description !== supplierName ? description : '';
+          if (who) {
+            notes += (notes ? ' | ' : '') + 'Responsável: ' + who;
           }
 
           const warnings: string[] = [];
@@ -214,31 +411,14 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
             errors.push('Valor zerado ou não identificado.');
           }
 
-          if (!colB_DateStr) {
+          if (!dateStr) {
             warnings.push('Data de vencimento não informada (será usada data de hoje).');
           }
 
-          if (colD_Fornecedor) {
-            suppliersSet.add(colD_Fornecedor);
+          if (supplierName) {
+            suppliersSet.add(supplierName);
           } else {
             warnings.push('Fornecedor não especificado.');
-          }
-
-          const colE_Tipo = String(row[4] || '').toUpperCase();
-          const colF_Desc = String(row[5] || '').trim();
-          const colG_Quem = String(row[6] || '').trim();
-          const colL_Status = String(row[11] || '').toUpperCase();
-          const colM_Barcode = String(row[12] || '').trim();
-
-          const type: 'FIXA' | 'VARIAVEL' = colE_Tipo.includes('FIXA') ? 'FIXA' : 'VARIAVEL';
-          const status: 'PENDENTE' | 'PAGA' = (colL_Status.includes('PAG') || colL_Status.includes('X')) ? 'PAGA' : 'PENDENTE';
-
-          let notes = colF_Desc;
-          if (colG_Quem) {
-            notes += (notes ? ' | ' : '') + 'Responsável: ' + colG_Quem;
-          }
-          if (colE_Tipo && !colE_Tipo.includes('FIXA') && !colE_Tipo.includes('VARIAVEL')) {
-            notes += (notes ? ' | ' : '') + 'Ref: ' + colE_Tipo;
           }
 
           const isValid = errors.length === 0;
@@ -252,17 +432,17 @@ export const ImportInvoicesModal: React.FC<ImportInvoicesModalProps> = ({
 
           parsedItems.push({
             id: `row-${index}`,
-            dueDate: colB_DateStr || new Date().toISOString().split('T')[0],
-            dueDateFormatted: colB_DateStr ? colB_DateStr.split('-').reverse().join('/') : 'Hoje',
+            dueDate: dateStr || new Date().toISOString().split('T')[0],
+            dueDateFormatted: dateStr ? dateStr.split('-').reverse().join('/') : 'Hoje',
             companySigla: detectedCompany || 'VIG',
-            supplierName: colD_Fornecedor || 'Despesa Importada',
+            supplierName: supplierName || 'Despesa Importada',
             type,
-            description: colD_Fornecedor || colF_Desc || 'Pagamento Importado',
+            description: description || supplierName || 'Pagamento Importado',
             notes,
             amount: rowAmount,
             unitName: detectedUnit || 'CONTAGEM',
             status,
-            barcode: colM_Barcode,
+            barcode,
             isValid,
             warnings,
             errors
