@@ -10,6 +10,7 @@ import com.z7design.secured_guard.model.enums.VacationStatus;
 import com.z7design.secured_guard.model.enums.VacationType;
 import com.z7design.secured_guard.repository.AbsenceRepository;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.VacationRepository;
 import com.z7design.secured_guard.util.PeriodoAquisitivoUtil;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,7 @@ public class FeriasReportService {
     private final VacationRepository vacationRepository;
     private final AbsenceRepository absenceRepository;
     private final CompanyRepository companyRepository;
+    private final EmployeeRepository employeeRepository;
     private final ExcelReportLayoutService excelReportLayoutService;
     private final StandardReportLayoutService standardReportLayoutService;
 
@@ -65,6 +67,61 @@ public class FeriasReportService {
         // Estatísticas de afastamentos
         Map<String, Object> afastamentosStats = getAfastamentosStats();
         stats.put("afastamentos", afastamentosStats);
+
+        // Estatísticas de período de experiência
+        Map<String, Object> experienciaStats = getExperienciaStats();
+        stats.put("experiencia", experienciaStats);
+
+        return stats;
+    }
+
+    public Map<String, Object> getExperienciaStats() {
+        Map<String, Object> stats = new HashMap<>();
+
+        try {
+            List<Employee> employees = employeeRepository.findAll().stream()
+                    .filter(e -> e.getHireDate() != null)
+                    .collect(Collectors.toList());
+
+            LocalDate hoje = LocalDate.now();
+            LocalDate limiteProximo = hoje.plusDays(15);
+
+            long total = employees.size();
+            long emAndamento = 0;
+            long proximosVencer = 0;
+            long concluidos = 0;
+
+            for (Employee emp : employees) {
+                LocalDate admissao = emp.getHireDate();
+                int dias1 = parseDays(emp.getPrazoExperienciaTexto(), 45);
+                int dias2 = parseDays(emp.getProrrogacaoExperiencia(), 45);
+                LocalDate fim1 = admissao.plusDays(dias1);
+                LocalDate fimTotal = fim1.plusDays(dias2);
+
+                if (fimTotal.isBefore(hoje)) {
+                    concluidos++;
+                } else {
+                    emAndamento++;
+                    // Próximo de vencer se 1ª fase (fim1) ou fim total (fimTotal) ocorre nos próximos 15 dias
+                    boolean proxFim1 = (!fim1.isBefore(hoje)) && (!fim1.isAfter(limiteProximo));
+                    boolean proxFimTotal = (!fimTotal.isBefore(hoje)) && (!fimTotal.isAfter(limiteProximo));
+                    if (proxFim1 || proxFimTotal) {
+                        proximosVencer++;
+                    }
+                }
+            }
+
+            stats.put("total", total);
+            stats.put("emAndamento", emAndamento);
+            stats.put("proximosVencer", proximosVencer);
+            stats.put("concluidos", concluidos);
+
+            log.info("Estatísticas de experiência geradas: {}", stats);
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar estatísticas de período de experiência", e);
+            stats.put("error", "Erro ao gerar estatísticas de experiência");
+        }
 
         return stats;
     }
@@ -185,6 +242,88 @@ public class FeriasReportService {
         }
     }
 
+    public byte[] generateExperienciaExcelReport(FeriasReportDTO filters) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Período de Experiência");
+            Company company = resolveCompany();
+            int lastColumn = 8;
+
+            int startRow = excelReportLayoutService.addHeader(sheet, workbook, company,
+                    "RELATÓRIO DE PERÍODO DE EXPERIÊNCIA", lastColumn);
+
+            int dataStartRow = createExperienciaHeader(sheet, workbook, startRow);
+            List<Employee> employees = getExperienciaData(filters);
+            fillExperienciaData(sheet, workbook, employees, dataStartRow);
+
+            for (int i = 0; i <= lastColumn; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            excelReportLayoutService.addFooter(sheet, workbook, company, lastColumn);
+
+            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                workbook.write(outputStream);
+                return outputStream.toByteArray();
+            }
+        }
+    }
+
+    public byte[] generateExperienciaPDFReport(FeriasReportDTO filters) throws IOException {
+        List<Employee> employees = getExperienciaData(filters);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        try (PdfWriter writer = new PdfWriter(baos)) {
+            ReportLayoutConfig config = ReportLayoutConfig.builder()
+                    .reportTitle("RELATÓRIO DE PERÍODO DE EXPERIÊNCIA")
+                    .companyId(resolveCompany().getId())
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
+                    .createDocumentWithLayout(writer, config);
+            Document document = docWithPdf.getDocument();
+
+            if (employees.isEmpty()) {
+                document.add(new Paragraph("Nenhum funcionário em período de experiência encontrado.")
+                        .setTextAlignment(TextAlignment.CENTER));
+            } else {
+                Table table = new Table(new float[] { 2.5f, 1.2f, 1.5f, 1.2f, 1.2f, 1.2f, 1.2f }).useAllAvailableWidth();
+                table.addHeaderCell(createPDFHeaderCell("Funcionário"));
+                table.addHeaderCell(createPDFHeaderCell("Empresa"));
+                table.addHeaderCell(createPDFHeaderCell("Setor"));
+                table.addHeaderCell(createPDFHeaderCell("Admissão"));
+                table.addHeaderCell(createPDFHeaderCell("Fim 1ª Fase"));
+                table.addHeaderCell(createPDFHeaderCell("Fim Experiência"));
+                table.addHeaderCell(createPDFHeaderCell("Status"));
+
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                LocalDate hoje = LocalDate.now();
+
+                for (Employee emp : employees) {
+                    LocalDate admissao = emp.getHireDate();
+                    int dias1 = parseDays(emp.getPrazoExperienciaTexto(), 45);
+                    int dias2 = parseDays(emp.getProrrogacaoExperiencia(), 45);
+                    LocalDate fim1 = admissao.plusDays(dias1);
+                    LocalDate fimTotal = fim1.plusDays(dias2);
+                    String status = fimTotal.isBefore(hoje) ? "Concluída" : "Em Andamento";
+
+                    table.addCell(createPDFCell(emp.getName() != null ? emp.getName() : ""));
+                    table.addCell(createPDFCell(safeCompanySigla(emp)));
+                    table.addCell(createPDFCell(safeDepartmentName(emp)));
+                    table.addCell(createPDFCell(admissao.format(formatter)));
+                    table.addCell(createPDFCell(fim1.format(formatter)));
+                    table.addCell(createPDFCell(fimTotal.format(formatter)));
+                    table.addCell(createPDFCell(status));
+                }
+                document.add(table);
+            }
+            document.close();
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de experiência", e);
+            throw new IOException("Erro ao gerar PDF", e);
+        }
+        return baos.toByteArray();
+    }
+
     public byte[] generateConsolidadoExcelReport(FeriasReportDTO filters) throws IOException {
         try (Workbook workbook = new XSSFWorkbook()) {
             Company company = resolveCompany();
@@ -208,6 +347,16 @@ public class FeriasReportService {
             List<Absence> absences = getAfastamentosData(filters);
             fillAfastamentosData(afastamentosSheet, workbook, absences, afastDataStart);
             excelReportLayoutService.addFooter(afastamentosSheet, workbook, company, afastLastColumn);
+
+            // Aba de Período de Experiência
+            Sheet expSheet = workbook.createSheet("Experiência");
+            int expLastColumn = 8;
+            int expRowIndex = excelReportLayoutService.addHeader(expSheet, workbook, company,
+                    "RELATÓRIO DE PERÍODO DE EXPERIÊNCIA", expLastColumn);
+            int expDataStart = createExperienciaHeader(expSheet, workbook, expRowIndex);
+            List<Employee> experienceEmployees = getExperienciaData(filters);
+            fillExperienciaData(expSheet, workbook, experienceEmployees, expDataStart);
+            excelReportLayoutService.addFooter(expSheet, workbook, company, expLastColumn);
 
             // Aba de Estatísticas
             Sheet statsSheet = workbook.createSheet("Estatísticas");
@@ -349,9 +498,10 @@ public class FeriasReportService {
         int rowNum = startRow;
         for (Absence absence : absences) {
             Row row = sheet.createRow(rowNum++);
+            Employee absenceEmployee = absence.getEmployee();
 
             row.createCell(0).setCellValue(absence.getId().toString());
-            row.createCell(1).setCellValue(absence.getEmployee().getName());
+            row.createCell(1).setCellValue(absenceEmployee != null ? absenceEmployee.getName() : "Funcionário removido");
             row.createCell(2).setCellValue(absence.getAbsenceType().toString());
 
             Cell dateCell = row.createCell(3);
@@ -429,6 +579,7 @@ public class FeriasReportService {
         try (PdfWriter writer = new PdfWriter(baos)) {
             ReportLayoutConfig config = ReportLayoutConfig.builder()
                     .reportTitle("RELATÓRIO DE FÉRIAS")
+                    .companyId(resolveCompany().getId())
                     .build();
 
             StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
@@ -477,6 +628,7 @@ public class FeriasReportService {
         try (PdfWriter writer = new PdfWriter(baos)) {
             ReportLayoutConfig config = ReportLayoutConfig.builder()
                     .reportTitle("RELATÓRIO DE AFASTAMENTOS")
+                    .companyId(resolveCompany().getId())
                     .build();
 
             StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
@@ -496,10 +648,11 @@ public class FeriasReportService {
 
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
                 for (Absence a : absences) {
-                    table.addCell(createPDFCell(a.getEmployee().getName()));
-                    table.addCell(createPDFCell(a.getAbsenceType().toString()));
-                    table.addCell(createPDFCell(a.getAbsenceDate().format(formatter)));
-                    table.addCell(createPDFCell(a.getStatus().toString()));
+                    Employee absenceEmployee = a.getEmployee();
+                    table.addCell(createPDFCell(absenceEmployee != null ? absenceEmployee.getName() : "Funcionário removido"));
+                    table.addCell(createPDFCell(a.getAbsenceType() != null ? a.getAbsenceType().toString() : ""));
+                    table.addCell(createPDFCell(a.getAbsenceDate() != null ? a.getAbsenceDate().format(formatter) : ""));
+                    table.addCell(createPDFCell(a.getStatus() != null ? a.getStatus().toString() : ""));
                 }
                 document.add(table);
             }
@@ -598,6 +751,115 @@ public class FeriasReportService {
         }
         List<String> equivalentes = TIPOS_AFASTAMENTO_FRONTEND.get(tipoFiltro.toUpperCase());
         return equivalentes != null && equivalentes.contains(atual);
+    }
+
+    private int createExperienciaHeader(Sheet sheet, Workbook workbook, int startRow) {
+        Row headerRow = sheet.createRow(startRow);
+
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerStyle.setFont(headerFont);
+        headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        String[] headers = {
+                "ID", "Funcionário", "Empresa", "Cargo / Setor", "Data Admissão",
+                "Início Experiência", "Fim 1ª Fase", "Fim Experiência Total", "Status Experiência"
+        };
+
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerStyle);
+        }
+        return startRow + 1;
+    }
+
+    private void fillExperienciaData(Sheet sheet, Workbook workbook, List<Employee> employees, int startRow) {
+        CellStyle dateStyle = workbook.createCellStyle();
+        CreationHelper createHelper = workbook.getCreationHelper();
+        dateStyle.setDataFormat(createHelper.createDataFormat().getFormat("dd/mm/yyyy"));
+
+        int rowNum = startRow;
+        LocalDate hoje = LocalDate.now();
+
+        for (Employee emp : employees) {
+            Row row = sheet.createRow(rowNum++);
+            LocalDate admissao = emp.getHireDate();
+            int dias1 = parseDays(emp.getPrazoExperienciaTexto(), 45);
+            int dias2 = parseDays(emp.getProrrogacaoExperiencia(), 45);
+            LocalDate fim1 = admissao.plusDays(dias1);
+            LocalDate fimTotal = fim1.plusDays(dias2);
+
+            row.createCell(0).setCellValue(emp.getId() != null ? emp.getId().toString() : "");
+            row.createCell(1).setCellValue(emp.getName() != null ? emp.getName() : "");
+            row.createCell(2).setCellValue(safeCompanySigla(emp));
+            row.createCell(3).setCellValue(safeDepartmentName(emp));
+
+            Cell admCell = row.createCell(4);
+            admCell.setCellValue(admissao);
+            admCell.setCellStyle(dateStyle);
+
+            Cell iniCell = row.createCell(5);
+            iniCell.setCellValue(admissao);
+            iniCell.setCellStyle(dateStyle);
+
+            Cell fim1Cell = row.createCell(6);
+            fim1Cell.setCellValue(fim1);
+            fim1Cell.setCellStyle(dateStyle);
+
+            Cell fimTotCell = row.createCell(7);
+            fimTotCell.setCellValue(fimTotal);
+            fimTotCell.setCellStyle(dateStyle);
+
+            String status = fimTotal.isBefore(hoje) ? "Concluída" : "Em Andamento";
+            row.createCell(8).setCellValue(status);
+        }
+    }
+
+    private List<Employee> getExperienciaData(FeriasReportDTO filters) {
+        List<Employee> allEmployees = employeeRepository.findAll();
+        if (filters == null) {
+            return allEmployees.stream().filter(e -> e.getHireDate() != null).collect(Collectors.toList());
+        }
+
+        UUID employeeId = filters.getEmployeeId();
+        String empresa = normalizar(filters.getEmpresa());
+        LocalDate dataInicio = filters.getDataInicio();
+        LocalDate dataFim = filters.getDataFim();
+
+        return allEmployees.stream()
+                .filter(e -> e.getHireDate() != null)
+                .filter(e -> employeeId == null || employeeId.equals(e.getId()))
+                .filter(e -> empresa == null || empresa.equalsIgnoreCase("TODAS")
+                        || empresa.equalsIgnoreCase(safeCompanySigla(e)))
+                .filter(e -> {
+                    LocalDate admissao = e.getHireDate();
+                    int dias1 = parseDays(e.getPrazoExperienciaTexto(), 45);
+                    int dias2 = parseDays(e.getProrrogacaoExperiencia(), 45);
+                    LocalDate fimTotal = admissao.plusDays(dias1 + dias2);
+
+                    if (dataInicio != null && fimTotal.isBefore(dataInicio)) {
+                        return false;
+                    }
+                    if (dataFim != null && admissao.isAfter(dataFim)) {
+                        return false;
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private int parseDays(String text, int defaultValue) {
+        if (text == null || text.isBlank()) return defaultValue;
+        String digits = text.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) return defaultValue;
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 
     private String normalizar(String valor) {

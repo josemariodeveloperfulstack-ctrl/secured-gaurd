@@ -129,6 +129,15 @@ export const medicalDocumentService = {
     };
   },
 
+  async getMedicalDocuments(filters: MedicalDocumentFilters = {}) {
+    return this.search(filters);
+  },
+
+  async getAll() {
+    const res = await this.search({ size: 1000 });
+    return res.content || [];
+  },
+
   async dashboard(from?: string, to?: string, companyId?: string) {
     const params = new URLSearchParams();
     if (from) params.append('from', from);

@@ -68,6 +68,20 @@ public class FeriasReportController {
         }
     }
 
+    @GetMapping("/stats/experiencia")
+    @Operation(summary = "Estatísticas de período de experiência", description = "Retorna estatísticas específicas de período de experiência")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    public ResponseEntity<Map<String, Object>> getExperienciaStats() {
+        try {
+            log.info("Gerando estatísticas de período de experiência");
+            Map<String, Object> stats = feriasReportService.getExperienciaStats();
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Erro ao gerar estatísticas de experiência", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @GetMapping("/ferias/excel")
     @Operation(summary = "Relatório de férias em Excel", description = "Gera relatório detalhado de férias em Excel")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
@@ -247,6 +261,80 @@ public class FeriasReportController {
                     .body(pdfBytes);
         } catch (Exception e) {
             log.error("Erro ao gerar relatório PDF de afastamentos: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/experiencia/excel")
+    @Operation(summary = "Relatório de período de experiência em Excel", description = "Gera relatório detalhado de período de experiência em Excel")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    public ResponseEntity<ByteArrayResource> generateExperienciaExcelReport(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) LocalDate dataInicio,
+            @RequestParam(required = false) LocalDate dataFim,
+            @RequestParam(required = false) String empresa) {
+
+        try {
+            log.info("Gerando relatório Excel de período de experiência");
+
+            FeriasReportDTO filters = FeriasReportDTO.builder()
+                    .employeeId(employeeId)
+                    .status(status)
+                    .tipo(tipo)
+                    .dataInicio(dataInicio)
+                    .dataFim(dataFim)
+                    .empresa(empresa)
+                    .build();
+
+            byte[] excelBytes = feriasReportService.generateExperienciaExcelReport(filters);
+            ByteArrayResource resource = new ByteArrayResource(excelBytes);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=relatorio_experiencia.xlsx")
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .contentLength(excelBytes.length)
+                    .body(resource);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório Excel de período de experiência: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/experiencia/pdf")
+    @Operation(summary = "Relatório de período de experiência em PDF", description = "Gera relatório detalhado de período de experiência em PDF")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    public ResponseEntity<byte[]> generateExperienciaPDFReport(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) LocalDate dataInicio,
+            @RequestParam(required = false) LocalDate dataFim,
+            @RequestParam(required = false) String empresa) {
+
+        try {
+            log.info("Gerando relatório PDF de período de experiência");
+
+            FeriasReportDTO filters = FeriasReportDTO.builder()
+                    .employeeId(employeeId)
+                    .status(status)
+                    .tipo(tipo)
+                    .dataInicio(dataInicio)
+                    .dataFim(dataFim)
+                    .empresa(empresa)
+                    .build();
+
+            byte[] pdfBytes = feriasReportService.generateExperienciaPDFReport(filters);
+            String fileName = "relatorio_experiencia_" + java.time.LocalDate.now().toString() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório PDF de experiência: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
