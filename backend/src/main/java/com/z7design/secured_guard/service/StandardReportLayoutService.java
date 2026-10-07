@@ -526,13 +526,17 @@ public class StandardReportLayoutService {
         // Título do relatório (centralizado, FORA da barra gradiente)
         // O título deve ficar abaixo da barra gradiente com margin top de 55pt e margin
         // bottom de 45pt
+        // Título do relatório (centralizado, FORA da barra gradiente)
+        // O título deve ficar abaixo da barra gradiente com margin top de 55pt e margin
+        // bottom de 45pt
         if (config.getReportTitle() != null && !config.getReportTitle().isEmpty()) {
             // Barra gradiente tem ~30pt de altura
             // Título fica FORA da barra, abaixo dela, com margin top de 55pt
             float titleY = headerTop - 30f - 55f; // Fora da barra gradiente, 55pt abaixo da base
-            String reportTitle = config.getReportTitle().trim();
-            int titleLength = reportTitle.length();
-            float titleFontSize = titleLength > 55 ? 10f : titleLength > 40 ? 11f : 14f;
+            String rawReportTitle = config.getReportTitle().trim();
+            String reportTitle = formatReportTitle(rawReportTitle);
+            int titleLength = rawReportTitle.length();
+            float titleFontSize = titleLength > 55 ? 10f : titleLength > 40 ? 11f : 13f;
 
             Paragraph title = new Paragraph(reportTitle)
                     .setFontSize(titleFontSize)
@@ -556,6 +560,48 @@ public class StandardReportLayoutService {
                 canvas.add(subTitle.setFixedPosition(0, subTitleY, pageWidth));
             }
         }
+    }
+
+    /**
+     * Formata o título do relatório para quebrar linhas em títulos longos,
+     * evitando sobreposição com a logo / background no canto superior esquerdo.
+     */
+    private String formatReportTitle(String rawTitle) {
+        if (rawTitle == null || rawTitle.isEmpty()) {
+            return "";
+        }
+        String title = rawTitle.trim();
+        if (title.contains("\n") || title.length() <= 32) {
+            return title;
+        }
+
+        // Casos comuns de minutas de contratos de prestação de serviço
+        if (title.contains(" DE SERVIÇOS DE ")) {
+            return title.replace(" DE SERVIÇOS DE ", " DE SERVIÇOS\nDE ");
+        }
+        if (title.contains(" SERVIÇOS DE ")) {
+            return title.replace(" SERVIÇOS DE ", " SERVIÇOS\nDE ");
+        }
+        if (title.contains(" PRESTAÇÃO DE SERVIÇOS ")) {
+            return title.replace(" PRESTAÇÃO DE SERVIÇOS ", " PRESTAÇÃO DE SERVIÇOS\n");
+        }
+
+        // Quebra inteligente no espaço mais próximo do ponto central
+        int mid = title.length() / 2;
+        int spaceAfter = title.indexOf(' ', mid);
+        int spaceBefore = title.lastIndexOf(' ', mid);
+        int splitIdx = -1;
+        if (spaceBefore != -1 && spaceAfter != -1) {
+            splitIdx = (mid - spaceBefore < spaceAfter - mid) ? spaceBefore : spaceAfter;
+        } else if (spaceBefore != -1) {
+            splitIdx = spaceBefore;
+        } else if (spaceAfter != -1) {
+            splitIdx = spaceAfter;
+        }
+        if (splitIdx > 0) {
+            return title.substring(0, splitIdx) + "\n" + title.substring(splitIdx + 1);
+        }
+        return title;
     }
 
     private PdfFont loadCalibriLightFont(PdfDocument pdfDoc) {
@@ -590,7 +636,7 @@ public class StandardReportLayoutService {
         float yPosition = 0;
 
         // Informações da empresa no rodapé (retrato e paisagem — dados da vigilância/empresa)
-        // O rodapé deve ficar acima da linha gradiente (4pt de altura)
+        // O rodapé deve ficar abaixo da linha gradiente amarela/laranja/vermelha
 
         boolean removeBold = config.isRemoveBoldFromFooterCompanyName();
         boolean useCalibriLight = config.isUseCalibriLightFooter();
@@ -644,9 +690,9 @@ public class StandardReportLayoutService {
             leftBlock.add(addressText);
         }
 
-        // Adiciona o bloco em yPosition + 43.35f: 1cm de margem inferior + 15pt (20px) de espaçamento
-        // entre o topo da linha gradiente e o início do texto do rodapé.
-        canvas.add(leftBlock.setFixedPosition(leftFooterX, yPosition + 43.35f, leftFooterWidth));
+        // Adiciona o bloco em yPosition + 18.0f para que todo o texto (Nome, CNPJ, Endereço)
+        // fique posicionado perfeitamente ABAIXO da linha gradiente amarela/vermelha do rodapé.
+        canvas.add(leftBlock.setFixedPosition(leftFooterX, yPosition + 18.0f, leftFooterWidth));
 
         // Bloco direito: apenas numeração de página (em applyPageNumbers).
         // Usuário e data do relatório removidos do rodapé.
@@ -666,8 +712,8 @@ public class StandardReportLayoutService {
                 .setTextAlignment(TextAlignment.RIGHT)
                 .setFontColor(pageNumColor)
                 .setMarginBottom(0f);
-        // Mesmo deslocamento do bloco esquerdo (+15pt / 20px) para manter alinhamento entre as colunas.
-        canvas.add(pageNumFooter.setFixedPosition(rightFooterX, yPosition + 43.35f, rightFooterWidth));
+        // Alinhado verticalmente com o bloco esquerdo (abaixo da linha gradiente).
+        canvas.add(pageNumFooter.setFixedPosition(rightFooterX, yPosition + 18.0f, rightFooterWidth));
     }
 
     /**

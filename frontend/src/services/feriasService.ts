@@ -522,5 +522,27 @@ export const feriasService = {
       responseType: 'blob'
     });
     return response.data;
+  },
+
+  async exportExperiencia(filters: FeriasFilters = {}): Promise<Blob> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+    const response = await api.get(`/api/reports/ferias/experiencia/excel?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  async exportExperienciaPDF(filters: FeriasFilters = {}): Promise<Blob> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+    const response = await api.get(`/api/reports/ferias/experiencia/pdf?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
   }
 }; 
