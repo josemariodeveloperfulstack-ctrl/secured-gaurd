@@ -308,6 +308,8 @@ jobs:
             chmod 755 /var/www/secured_guard/ci/redis_data
             
             # Iniciar primeiro PostgreSQL e Redis
+            echo "🔄 Garantindo remoção de containers com nome em conflito..."
+            docker rm -f secured-guard-redis-ci secured-guard-db-ci 2>/dev/null || true
             echo "🔄 Iniciando PostgreSQL e Redis..."
             docker-compose -f docker-compose.ci.yml up -d postgres-ci redis-ci
             
