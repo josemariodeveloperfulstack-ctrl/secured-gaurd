@@ -13,6 +13,7 @@ import {
   validarInicioFeriasClt, 
   CltValidationResult 
 } from '../../utils/feriasCltValidator';
+import { SearchableSelect, Option } from '../ui/searchable-select';
 import { X, Calendar, User, FileText, AlertTriangle, CheckCircle2, Clock, Users, UserCheck, ShieldAlert, Award, Ban } from 'lucide-react';
 
 interface Props {
@@ -182,9 +183,73 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
     }
   };
 
+  // Helper para verificar se a escala do colaborador é 12x36
+  const isEmployee12x36 = (emp?: Employee): boolean => {
+    if (!emp) return false;
+    const dias = (emp.diasTrabalho || '').toLowerCase();
+    const escala = (emp.escalaTrabalho || '').toLowerCase();
+    const horario = (emp.horarioTrabalho || '').toLowerCase();
+    const reg = /12\s*[xX/-]\s*36/;
+    return reg.test(dias) || reg.test(escala) || reg.test(horario);
+  };
+
+  const selectedEmployee = employees.find(e => e.id === form.employeeId);
+  const isCurrentEmployee12x36 = isEmployee12x36(selectedEmployee);
+
+  // Opções para o SearchableSelect de Funcionário
+  const employeeOptions: Option[] = React.useMemo(() => {
+    return employees.map(emp => {
+      const escalaBadge = isEmployee12x36(emp) ? 'Escala 12x36' : (emp.diasTrabalho || emp.escalaTrabalho || '');
+      const descParts = [
+        emp.cpf ? `CPF: ${emp.cpf}` : '',
+        emp.company?.name || emp.empresaNome || '',
+        escalaBadge
+      ].filter(Boolean);
+
+      return {
+        value: emp.id,
+        label: emp.name,
+        description: descParts.join(' • '),
+        searchTerms: [emp.cpf || '', emp.registrationNumber || '', emp.workPost?.name || '']
+      };
+    });
+  }, [employees]);
+
+  // Opções para o SearchableSelect de Substituto (exclui o próprio funcionário)
+  const substituteOptions: Option[] = React.useMemo(() => {
+    const list: Option[] = [
+      {
+        value: 'sem_cobertura',
+        label: 'Sem cobertura (o sistema registrará como "Sem Cobertura")',
+        description: 'Nenhum substituto escalado'
+      }
+    ];
+
+    employees
+      .filter(emp => emp.id !== form.employeeId)
+      .forEach(emp => {
+        const escalaBadge = isEmployee12x36(emp) ? 'Escala 12x36' : (emp.diasTrabalho || emp.escalaTrabalho || '');
+        const descParts = [
+          emp.cpf ? `CPF: ${emp.cpf}` : '',
+          emp.company?.name || emp.empresaNome || '',
+          escalaBadge
+        ].filter(Boolean);
+
+        list.push({
+          value: emp.id,
+          label: emp.name,
+          description: descParts.join(' • '),
+          searchTerms: [emp.cpf || '', emp.registrationNumber || '', emp.workPost?.name || '']
+        });
+      });
+
+    return list;
+  }, [employees, form.employeeId]);
+
   // Função centralizada para aplicar e validar Data de Início
-  const aplicarDataInicio = (novaDataInicio: string) => {
-    const validacao = validarInicioFeriasClt(novaDataInicio);
+  const aplicarDataInicio = (novaDataInicio: string, customIs12x36?: boolean) => {
+    const is12x36 = customIs12x36 !== undefined ? customIs12x36 : isCurrentEmployee12x36;
+    const validacao = validarInicioFeriasClt(novaDataInicio, [], is12x36);
     setCltValidacao(validacao);
     const novaFim = calcularDataFimFerias(novaDataInicio, diasGozo);
     setForm(prev => ({
@@ -193,6 +258,14 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
       dataFim: novaFim
     }));
   };
+
+  // Revalida a data de início quando o colaborador selecionado mudar (ex: se for 12x36, libera sexta-feira)
+  useEffect(() => {
+    if (form.dataInicio) {
+      const validacao = validarInicioFeriasClt(form.dataInicio, [], isCurrentEmployee12x36);
+      setCltValidacao(validacao);
+    }
+  }, [form.employeeId, isCurrentEmployee12x36]);
 
   // Ao alterar Data de Início -> valida regras CLT e calcula automaticamente a Data de Fim
   const handleDataInicioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -415,18 +488,24 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
                 <label className="block text-seguranca-lightgray mb-1 text-sm font-medium">
                   Funcionário
                 </label>
-                <select 
-                  name="employeeId" 
-                  value={form.employeeId} 
-                  onChange={handleChange} 
-                  className="w-full p-2.5 rounded bg-seguranca-graphite text-seguranca-lightgray border border-gray-600 focus:border-seguranca-yellow focus:outline-none text-sm" 
-                  required
-                >
-                  <option value="">Selecione o funcionário...</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.name}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  options={employeeOptions}
+                  value={form.employeeId}
+                  onChange={(val) => {
+                    const chosenId = val === 'all' ? '' : val;
+                    const chosenEmp = employees.find(e => e.id === chosenId);
+                    const is12x36 = isEmployee12x36(chosenEmp);
+                    setForm(prev => ({ ...prev, employeeId: chosenId }));
+                    if (form.dataInicio) {
+                      aplicarDataInicio(form.dataInicio, is12x36);
+                    }
+                  }}
+                  placeholder="Selecione o funcionário..."
+                  searchPlaceholder="Digite nome, CPF ou posto para buscar..."
+                  emptyPlaceholder="Nenhum funcionário encontrado."
+                  minSearchChars={0}
+                  className="w-full text-sm"
+                />
               </div>
               <div>
                 <label className="block text-seguranca-lightgray mb-1 text-sm font-medium">
@@ -660,18 +739,18 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
                         <UserCheck className="h-4 w-4" />
                         Substituto
                       </label>
-                      <select
-                        value={coberturaSubstituto}
-                        onChange={(e) => setCoberturaSubstituto(e.target.value)}
-                        className="w-full p-2 rounded bg-seguranca-graphite text-seguranca-lightgray border border-gray-600 focus:border-seguranca-yellow focus:outline-none text-sm"
-                      >
-                        <option value="">Sem cobertura (o sistema registrará como "Sem Cobertura")</option>
-                        {employees
-                          .filter(emp => emp.id !== form.employeeId)
-                          .map(emp => (
-                            <option key={emp.id} value={emp.id}>{emp.name}</option>
-                          ))}
-                      </select>
+                      <SearchableSelect
+                        options={substituteOptions}
+                        value={coberturaSubstituto || 'sem_cobertura'}
+                        onChange={(val) => {
+                          setCoberturaSubstituto(val === 'sem_cobertura' || val === 'all' ? '' : val);
+                        }}
+                        placeholder="Selecione o substituto..."
+                        searchPlaceholder="Digite nome, CPF ou posto para buscar..."
+                        emptyPlaceholder="Nenhum substituto encontrado."
+                        minSearchChars={0}
+                        className="w-full text-sm"
+                      />
                     </div>
                     <div>
                       <label className="block text-seguranca-lightgray mb-1 text-sm font-medium">

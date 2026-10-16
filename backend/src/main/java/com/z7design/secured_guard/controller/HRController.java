@@ -18,13 +18,18 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/hr")
-@RequiredArgsConstructor
 @Tag(name = "RH", description = "Endpoints para gestão de recursos humanos")
 public class HRController {
     
     private final EmployeeService employeeService;
     private final HRService hrService;
     private final VacationService vacationService;
+
+    public HRController(EmployeeService employeeService, HRService hrService, VacationService vacationService) {
+        this.employeeService = employeeService;
+        this.hrService = hrService;
+        this.vacationService = vacationService;
+    }
     
     @GetMapping("/employees/probation-expiring")
     @Operation(summary = "Buscar funcionários com experiência vencendo", 

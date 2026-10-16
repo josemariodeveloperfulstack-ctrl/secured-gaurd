@@ -27,6 +27,8 @@ interface MultiSearchableSelectProps {
   emptyPlaceholder?: string;
   disabled?: boolean;
   className?: string;
+  icon?: string;
+  typeLabel?: string;
 }
 
 export function MultiSearchableSelect({
@@ -35,9 +37,11 @@ export function MultiSearchableSelect({
   onChange,
   placeholder = "Todos os setores de trabalho",
   searchPlaceholder = "Buscar setor de trabalho...",
-  emptyPlaceholder = "Nenhum setor encontrado.",
+  emptyPlaceholder = "Nenhum item encontrado.",
   disabled = false,
   className,
+  icon = "🏢",
+  typeLabel = "Setores",
 }: Readonly<MultiSearchableSelectProps>) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -70,16 +74,17 @@ export function MultiSearchableSelect({
   };
 
   const renderTriggerLabel = () => {
+    const iconPrefix = icon ? `${icon} ` : "";
     if (selectedValues.length === 0) {
-      return <span className="text-gray-300">🏢 {placeholder}</span>;
+      return <span className="text-gray-300">{iconPrefix}{placeholder}</span>;
     }
     if (selectedValues.length === 1) {
       const opt = options.find((o) => o.value === selectedValues[0]);
-      return <span className="text-white font-medium">🏢 {opt?.label || selectedValues[0]}</span>;
+      return <span className="text-white font-medium">{iconPrefix}{opt?.label || selectedValues[0]}</span>;
     }
     return (
       <div className="flex items-center gap-1.5 overflow-hidden">
-        <span className="text-white font-medium">🏢 {selectedValues.length} Setores</span>
+        <span className="text-white font-medium truncate">{iconPrefix}{selectedValues.length} {typeLabel}</span>
         <Badge variant="secondary" className="bg-seguranca-yellow text-seguranca-black text-[10px] font-bold px-1.5 py-0 h-4 shrink-0">
           +{selectedValues.length}
         </Badge>
@@ -113,7 +118,7 @@ export function MultiSearchableSelect({
                   }
                 }}
                 className="p-0.5 hover:bg-gray-700 rounded text-gray-400 hover:text-white cursor-pointer"
-                title="Limpar seleção de setores"
+                title={`Limpar seleção de ${typeLabel.toLowerCase()}`}
               >
                 <X className="h-3.5 w-3.5" />
               </span>
@@ -143,7 +148,7 @@ export function MultiSearchableSelect({
                 isAllSelected ? "text-seguranca-yellow font-bold" : "text-gray-400"
               )}
             >
-              Todos os Setores
+              Todos ({typeLabel})
             </button>
             {selectedValues.length > 0 && (
               <button

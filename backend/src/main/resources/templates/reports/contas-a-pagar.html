@@ -1,10 +1,25 @@
 <div class="report-content">
     <div class="report-header">
-        <h1>Relatório de Contas a Pagar</h1>
-        <div class="report-period">
-            Período: {{startDate}} a {{endDate}}
+        <div class="header-brand-block">
+            <div class="logo-dark-box">
+                <img src="/promover-logo.png" alt="Promover Vigilância" class="brand-logo" onerror="this.onerror=null; this.src='/logo-sistema.png';" />
+            </div>
+            <div class="company-text-meta">
+                <div class="company-name">PROMOVER VIGILÂNCIA PATRIMONIAL LTDA</div>
+                <div class="company-subinfo">CNPJ: 43.576.260/0001-12 • Rua Marte, 526 - Jardim Riacho das Pedras - Contagem/MG</div>
+            </div>
+        </div>
+
+        <div class="header-title-block">
+            <h1 class="report-main-title">RELATÓRIO DE CONTAS A PAGAR</h1>
+            <div class="report-badges-row">
+                <span class="report-badge-status">CONTAS A PAGAR</span>
+                <span class="report-period-pill">{{startDate}} a {{endDate}}</span>
+            </div>
         </div>
     </div>
+    
+    <div class="header-divider-gradient"></div>
     
     <div class="summary-section">
         <h2>Resumo Executivo</h2>
@@ -83,22 +98,93 @@
     }
     
     .report-header {
-        text-align: center;
-        margin-bottom: 30px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #ddd;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        padding-bottom: 12px;
     }
-    
-    .report-header h1 {
-        font-size: 24px;
-        color: #e74c3c;
-        margin-bottom: 10px;
+
+    .header-brand-block {
+        display: flex;
+        align-items: center;
+        gap: 14px;
     }
-    
-    .report-period {
-        font-size: 14px;
-        color: #666;
-        font-weight: 600;
+
+    .logo-dark-box {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 6px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+    }
+
+    .brand-logo {
+        height: 38px;
+        width: auto;
+        object-fit: contain;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+    }
+
+    .company-name {
+        font-size: 13px;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: 0.02em;
+        margin-bottom: 3px;
+    }
+
+    .company-subinfo {
+        font-size: 9px;
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .header-title-block {
+        text-align: right;
+    }
+
+    .report-main-title {
+        font-size: 17px;
+        font-weight: 900;
+        color: #dc2626;
+        margin: 0 0 6px 0;
+        letter-spacing: -0.01em;
+    }
+
+    .report-badges-row {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    .report-badge-status {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: #ffffff;
+        font-size: 9px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 4px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .report-period-pill {
+        color: #b91c1c;
+        font-size: 9.5px;
+        font-weight: 700;
+    }
+
+    .header-divider-gradient {
+        height: 3px;
+        width: 100%;
+        background: linear-gradient(90deg, #0f172a 0%, #dc2626 45%, #f97316 75%, #eab308 100%);
+        border-radius: 2px;
+        margin-bottom: 18px;
     }
     
     .summary-section {

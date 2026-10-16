@@ -43,7 +43,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
 public class PaymentReportService {
@@ -56,6 +55,25 @@ public class PaymentReportService {
     private final CompanyRepository companyRepository;
     private final SubcategoriaRepository subcategoriaRepository;
     private final UnitRepository unitRepository;
+
+    public PaymentReportService(
+            AccountsReceivableRepository accountsReceivableRepository,
+            ScheduledPaymentRepository scheduledPaymentRepository,
+            ScheduledPaymentService scheduledPaymentService,
+            JasperReportService jasperReportService,
+            StandardReportLayoutService standardReportLayoutService,
+            CompanyRepository companyRepository,
+            SubcategoriaRepository subcategoriaRepository,
+            UnitRepository unitRepository) {
+        this.accountsReceivableRepository = accountsReceivableRepository;
+        this.scheduledPaymentRepository = scheduledPaymentRepository;
+        this.scheduledPaymentService = scheduledPaymentService;
+        this.jasperReportService = jasperReportService;
+        this.standardReportLayoutService = standardReportLayoutService;
+        this.companyRepository = companyRepository;
+        this.subcategoriaRepository = subcategoriaRepository;
+        this.unitRepository = unitRepository;
+    }
 
     /**
      * Gerar relatório de contas a receber

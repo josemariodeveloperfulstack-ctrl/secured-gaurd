@@ -64,6 +64,7 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
     new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
   );
   const [dateField, setDateField] = useState<'dueDate' | 'issueDate' | 'paymentDate'>('dueDate');
+  const [expiringInDays, setExpiringInDays] = useState<string>('ALL');
   const [status, setStatus] = useState<string>('TODOS');
   const [tipo, setTipo] = useState<string>('TODOS');
   const [unitId, setUnitId] = useState<string>('TODAS');
@@ -147,6 +148,17 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
     setSelectedColumns(AVAILABLE_COLUMNS.filter((c) => c.defaultChecked).map((c) => c.id));
   };
 
+  const handleQuickExpiringFilter = (days: number) => {
+    setExpiringInDays(String(days));
+    setDateField('dueDate');
+    setStatus('PENDENTE');
+    const today = new Date();
+    setStartDate(today);
+    const end = new Date();
+    end.setDate(today.getDate() + days);
+    setEndDate(end);
+  };
+
   const handleGeneratePdf = async () => {
     if (selectedColumns.length === 0) {
       toast({
@@ -160,6 +172,8 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
     try {
       setGenerating(true);
 
+      const parsedExpiring = expiringInDays !== 'ALL' ? parseInt(expiringInDays, 10) : undefined;
+
       const requestPayload = {
         startDate: startDate ? formatDateForBackend(startDate) : undefined,
         endDate: endDate ? formatDateForBackend(endDate) : undefined,
@@ -170,6 +184,7 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
         workSector: workSector && workSector !== 'TODOS' ? workSector : undefined,
         companySigla: companySigla !== 'TODAS' ? companySigla : undefined,
         supplierId: supplierId !== 'TODOS' ? supplierId : undefined,
+        expiringInDays: parsedExpiring,
         selectedColumns,
         groupBy,
       };
@@ -206,76 +221,174 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700 text-gray-100">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2 text-seguranca-lightgray">
-            <FileText className="w-5 h-5 text-seguranca-yellow" />
+      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto bg-slate-950 border-slate-800 text-slate-100 shadow-2xl p-0">
+        {/* Top Header com gradiente sutil */}
+        <div className="p-6 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950">
+          <DialogTitle className="text-xl font-bold flex items-center gap-2.5 text-white">
+            <span className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+              <FileText className="w-5 h-5" />
+            </span>
             Relatório Personalizado de Contas a Pagar
           </DialogTitle>
-          <DialogDescription className="text-gray-400 text-xs">
-            Selecione o período, filtros avançados e exatamente quais colunas deseja incluir no PDF gerado.
+          <DialogDescription className="text-slate-400 text-xs mt-1.5 ml-11">
+            Configure filtros avançados, selecione o período ou vencimentos iminentes e defina as colunas do PDF oficial.
           </DialogDescription>
-        </DialogHeader>
+        </div>
 
-        <div className="space-y-6 py-2">
-          {/* Seção 1: Filtros de Período e Parâmetros */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-seguranca-yellow">
-              <Filter className="w-4 h-4" />
-              1. Filtros e Parâmetros
+        <div className="p-6 space-y-6">
+          {/* Seção 1: Período e Alerta de Vencimento */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-amber-400">
+                <Calendar className="w-4 h-4" />
+                1. Período & Vencimentos Próximos
+              </div>
+              {/* Botões Rápidos de Vencimento */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-slate-400 mr-1 hidden sm:inline">Vencendo em:</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleQuickExpiringFilter(7)}
+                  className={`text-xs h-7 px-2.5 rounded-full border transition-all ${
+                    expiringInDays === '7'
+                      ? 'bg-amber-500 text-black font-bold border-amber-400'
+                      : 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  ⚡ Próx. 7 dias
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleQuickExpiringFilter(15)}
+                  className={`text-xs h-7 px-2.5 rounded-full border transition-all ${
+                    expiringInDays === '15'
+                      ? 'bg-amber-500 text-black font-bold border-amber-400'
+                      : 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  15 dias
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleQuickExpiringFilter(30)}
+                  className={`text-xs h-7 px-2.5 rounded-full border transition-all ${
+                    expiringInDays === '30'
+                      ? 'bg-amber-500 text-black font-bold border-amber-400'
+                      : 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  30 dias
+                </Button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {/* Campo de Data */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-300 flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Filtrar Data por
-                </Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Campo Base de Data */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-300">Base da Data</Label>
                 <Select value={dateField} onValueChange={(val: any) => setDateField(val)}>
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray">
+                  <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200 focus:ring-amber-500">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem value="dueDate" className="hover:bg-seguranca-graphite">Data de Vencimento</SelectItem>
-                    <SelectItem value="issueDate" className="hover:bg-seguranca-graphite">Data de Emissão</SelectItem>
-                    <SelectItem value="paymentDate" className="hover:bg-seguranca-graphite">Data de Pagamento</SelectItem>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
+                    <SelectItem value="dueDate" className="hover:bg-slate-800">Data de Vencimento</SelectItem>
+                    <SelectItem value="issueDate" className="hover:bg-slate-800">Data de Emissão</SelectItem>
+                    <SelectItem value="paymentDate" className="hover:bg-slate-800">Data de Pagamento</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Data Inicial */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-300">Data Inicial</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-300">Data Inicial</Label>
                 <DatePicker
                   date={startDate}
-                  onSelect={setStartDate}
-                  className="w-full border-gray-600 bg-seguranca-black text-seguranca-lightgray"
+                  onDateChange={setStartDate}
+                  className="w-full border-slate-700 bg-slate-950 text-slate-200"
                 />
               </div>
 
               {/* Data Final */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-300">Data Final</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-300">Data Final</Label>
                 <DatePicker
                   date={endDate}
-                  onSelect={setEndDate}
-                  className="w-full border-gray-600 bg-seguranca-black text-seguranca-lightgray"
+                  onDateChange={setEndDate}
+                  className="w-full border-slate-700 bg-slate-950 text-slate-200"
                 />
               </div>
 
-              {/* Unidade */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-300 flex items-center gap-1">
-                  <Building2 className="w-3 h-3" /> Unidade
+              {/* Filtro de Vencimento Iminente */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-300 flex items-center justify-between">
+                  <span>Vencendo em Breve</span>
+                  {expiringInDays !== 'ALL' && (
+                    <span className="text-[10px] text-amber-400 font-semibold">Ativo ({expiringInDays}d)</span>
+                  )}
                 </Label>
+                <Select value={expiringInDays} onValueChange={(val) => {
+                  setExpiringInDays(val);
+                  if (val !== 'ALL') {
+                    handleQuickExpiringFilter(parseInt(val, 10));
+                  }
+                }}>
+                  <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
+                    <SelectItem value="ALL" className="hover:bg-slate-800">Qualquer período</SelectItem>
+                    <SelectItem value="7" className="hover:bg-slate-800">Próximos 7 dias (Urgente)</SelectItem>
+                    <SelectItem value="15" className="hover:bg-slate-800">Próximos 15 dias</SelectItem>
+                    <SelectItem value="30" className="hover:bg-slate-800">Próximos 30 dias (Mensal)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Seção 2: Filtros Organizacionais e Cadastrais */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-amber-400 border-b border-slate-800 pb-3">
+              <Filter className="w-4 h-4" />
+              2. Filtros Corporativos e Status
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {/* Empresa (Sigla) */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-300">Empresa (SIGLA)</Label>
+                <Select value={companySigla} onValueChange={setCompanySigla}>
+                  <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200">
+                    <SelectValue placeholder="Todas as empresas" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
+                    <SelectItem value="TODAS" className="hover:bg-slate-800">Todas as Empresas</SelectItem>
+                    {empresas.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.sigla || emp.name} className="hover:bg-slate-800">
+                        {emp.sigla ? `${emp.sigla} - ${emp.name}` : emp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Unidade */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-300">Unidade Operacional</Label>
                 <Select value={unitId} onValueChange={setUnitId}>
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray">
+                  <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200">
                     <SelectValue placeholder="Todas as unidades" />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem value="TODAS" className="hover:bg-seguranca-graphite">Todas as Unidades</SelectItem>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 max-h-56">
+                    <SelectItem value="TODAS" className="hover:bg-slate-800">Todas as Unidades</SelectItem>
                     {unidades.map((u) => (
-                      <SelectItem key={u.id} value={u.id} className="hover:bg-seguranca-graphite">
+                      <SelectItem key={u.id} value={u.id} className="hover:bg-slate-800">
                         {u.name}
                       </SelectItem>
                     ))}
@@ -284,18 +397,16 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
               </div>
 
               {/* Setor de Trabalho */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-300 flex items-center gap-1">
-                  <Tag className="w-3 h-3" /> Setor de Trabalho
-                </Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-300">Setor de Trabalho</Label>
                 <Select value={workSector || 'TODOS'} onValueChange={setWorkSector}>
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray">
+                  <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200">
                     <SelectValue placeholder="Todos os setores" />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600 max-h-60">
-                    <SelectItem value="TODOS" className="hover:bg-seguranca-graphite">Todos os Setores de Trabalho</SelectItem>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 max-h-56">
+                    <SelectItem value="TODOS" className="hover:bg-slate-800">Todos os Setores</SelectItem>
                     {setoresSugeridos.map((s, idx) => (
-                      <SelectItem key={idx} value={s} className="hover:bg-seguranca-graphite">
+                      <SelectItem key={idx} value={s} className="hover:bg-slate-800">
                         {s}
                       </SelectItem>
                     ))}
@@ -303,134 +414,116 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
                 </Select>
               </div>
 
-              {/* Empresa (Sigla) */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-300">Empresa (SIGLA)</Label>
-                <Select value={companySigla} onValueChange={setCompanySigla}>
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray">
-                    <SelectValue placeholder="Todas as empresas" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem value="TODAS" className="hover:bg-seguranca-graphite">Todas as Empresas</SelectItem>
-                    {empresas.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.sigla || emp.name} className="hover:bg-seguranca-graphite">
-                        {emp.sigla ? `${emp.sigla} - ${emp.name}` : emp.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               {/* Status */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-300">Status</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-300">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray">
+                  <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem value="TODOS" className="hover:bg-seguranca-graphite">Todos os Status</SelectItem>
-                    <SelectItem value="PENDENTE" className="hover:bg-seguranca-graphite">Aberta (Pendente)</SelectItem>
-                    <SelectItem value="PAGA" className="hover:bg-seguranca-graphite">Paga</SelectItem>
-                    <SelectItem value="CANCELADA" className="hover:bg-seguranca-graphite">Cancelada</SelectItem>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
+                    <SelectItem value="TODOS" className="hover:bg-slate-800">Todos os Status</SelectItem>
+                    <SelectItem value="PENDENTE" className="hover:bg-slate-800">Aberta (Pendente)</SelectItem>
+                    <SelectItem value="PAGA" className="hover:bg-slate-800">Paga</SelectItem>
+                    <SelectItem value="CANCELADA" className="hover:bg-slate-800">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Tipo */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-300">Tipo de Despesa</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-300">Tipo de Despesa</Label>
                 <Select value={tipo} onValueChange={setTipo}>
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray">
+                  <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem value="TODOS" className="hover:bg-seguranca-graphite">Todos os Tipos</SelectItem>
-                    <SelectItem value="FIXA" className="hover:bg-seguranca-graphite">Fixa</SelectItem>
-                    <SelectItem value="VARIAVEL" className="hover:bg-seguranca-graphite">Variável</SelectItem>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
+                    <SelectItem value="TODOS" className="hover:bg-slate-800">Todos os Tipos</SelectItem>
+                    <SelectItem value="FIXA" className="hover:bg-slate-800">Fixa</SelectItem>
+                    <SelectItem value="VARIAVEL" className="hover:bg-slate-800">Variável</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Fornecedor */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-300">Fornecedor</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-300">Fornecedor</Label>
                 <Select value={supplierId} onValueChange={setSupplierId}>
-                  <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray">
+                  <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200">
                     <SelectValue placeholder="Todos os fornecedores" />
                   </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600 max-w-[min(90vw,520px)] max-h-64 overflow-y-auto z-50">
-                    <SelectItem value="TODOS" className="hover:bg-seguranca-graphite">Todos os Fornecedores</SelectItem>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 max-h-56">
+                    <SelectItem value="TODOS" className="hover:bg-slate-800">Todos os Fornecedores</SelectItem>
                     {fornecedores.map((f) => (
-                      <SelectItem key={f.id} value={f.id} className="hover:bg-seguranca-graphite">
-                        <span className="truncate block max-w-[440px]" title={f.name}>{f.name}</span>
+                      <SelectItem key={f.id} value={f.id} className="hover:bg-slate-800">
+                        <span className="truncate block max-w-[340px]" title={f.name}>{f.name}</span>
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Agrupamento */}
-            <div className="pt-2 border-t border-gray-800">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <Label className="text-sm font-medium text-white">Agrupamento e Subtotais</Label>
-                  <p className="text-xs text-gray-400">
-                    Agrupa as despesas por Unidade e Setor de Trabalho, exibindo subtotais automáticos por grupo.
-                  </p>
-                </div>
-                <Select value={groupBy} onValueChange={(val: any) => setGroupBy(val)}>
-                  <SelectTrigger className="w-[260px] border-gray-600 bg-seguranca-black text-seguranca-lightgray">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem value="UNIT_SECTOR" className="hover:bg-seguranca-graphite">
-                      🏢 Agrupar por Unidade e Setor
-                    </SelectItem>
-                    <SelectItem value="WORK_SECTOR" className="hover:bg-seguranca-graphite">
-                      🏷️ Agrupar por Setor de Trabalho
-                    </SelectItem>
-                    <SelectItem value="UNIT" className="hover:bg-seguranca-graphite">
-                      🏢 Agrupar por Unidade
-                    </SelectItem>
-                    <SelectItem value="COMPANY" className="hover:bg-seguranca-graphite">
-                      🏢 Agrupar por Empresa
-                    </SelectItem>
-                    <SelectItem value="PERIOD" className="hover:bg-seguranca-graphite">
-                      📅 Agrupar por Período (Mês/Ano)
-                    </SelectItem>
-                    <SelectItem value="STATUS" className="hover:bg-seguranca-graphite">
-                      📊 Agrupar por Status (Pendente/Paga/Cancelada)
-                    </SelectItem>
-                    <SelectItem value="NONE" className="hover:bg-seguranca-graphite">
-                      📄 Listagem Simples (Sem Agrupamento)
-                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </div>
 
-          {/* Seção 2: Seleção de Colunas */}
-          <div className="rounded-lg border border-gray-700 bg-seguranca-black/50 p-4 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          {/* Seção 3: Agrupamento e Subtotais */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <h4 className="text-sm font-semibold text-seguranca-yellow flex items-center gap-2">
-                  <Columns className="w-4 h-4" />
-                  2. Colunas do Relatório ({selectedColumns.length} selecionadas)
-                </h4>
-                <p className="text-xs text-gray-400 mt-1">
-                  Marque ou desmarque os campos que deseja visualizar nas colunas do PDF.
+                <Label className="text-sm font-semibold text-white">Agrupamento e Subtotais Automáticos</Label>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Organiza a quebra de tabela no PDF calculando totais parciais para cada grupo selecionado.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <Select value={groupBy} onValueChange={(val: any) => setGroupBy(val)}>
+                <SelectTrigger className="w-full sm:w-[280px] border-slate-700 bg-slate-950 text-slate-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
+                  <SelectItem value="UNIT_SECTOR" className="hover:bg-slate-800">
+                    🏢 Agrupar por Unidade e Setor
+                  </SelectItem>
+                  <SelectItem value="WORK_SECTOR" className="hover:bg-slate-800">
+                    🏷️ Agrupar por Setor de Trabalho
+                  </SelectItem>
+                  <SelectItem value="UNIT" className="hover:bg-slate-800">
+                    🏢 Agrupar por Unidade
+                  </SelectItem>
+                  <SelectItem value="COMPANY" className="hover:bg-slate-800">
+                    🏢 Agrupar por Empresa
+                  </SelectItem>
+                  <SelectItem value="PERIOD" className="hover:bg-slate-800">
+                    📅 Agrupar por Período (Mês/Ano)
+                  </SelectItem>
+                  <SelectItem value="STATUS" className="hover:bg-slate-800">
+                    📊 Agrupar por Status (Pendente/Paga)
+                  </SelectItem>
+                  <SelectItem value="NONE" className="hover:bg-slate-800">
+                    📄 Listagem Simples (Sem Agrupamento)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Seção 4: Seleção de Colunas */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div>
+                <h4 className="text-sm font-semibold text-amber-400 flex items-center gap-2">
+                  <Columns className="w-4 h-4" />
+                  3. Colunas do Relatório ({selectedColumns.length} de {AVAILABLE_COLUMNS.length} selecionadas)
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Escolha as informações que serão impressas no documento.
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   onClick={handleSelectAllColumns}
-                  className="text-xs h-7 border-gray-600 text-gray-300 hover:bg-seguranca-graphite"
+                  className="text-xs h-7 border-slate-700 text-slate-300 hover:bg-slate-800"
                 >
                   <CheckSquare className="w-3 h-3 mr-1" /> Todas
                 </Button>
@@ -439,7 +532,7 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
                   size="sm"
                   variant="outline"
                   onClick={handleDeselectAllColumns}
-                  className="text-xs h-7 border-gray-600 text-gray-300 hover:bg-seguranca-graphite"
+                  className="text-xs h-7 border-slate-700 text-slate-300 hover:bg-slate-800"
                 >
                   <Square className="w-3 h-3 mr-1" /> Mínimas
                 </Button>
@@ -448,35 +541,35 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
                   size="sm"
                   variant="outline"
                   onClick={handleResetColumns}
-                  className="text-xs h-7 border-gray-600 text-gray-300 hover:bg-seguranca-graphite"
+                  className="text-xs h-7 border-slate-700 text-slate-300 hover:bg-slate-800"
                 >
                   <RotateCcw className="w-3 h-3 mr-1" /> Padrão
                 </Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
               {AVAILABLE_COLUMNS.map((col) => {
                 const checked = selectedColumns.includes(col.id);
                 return (
                   <div
                     key={col.id}
                     onClick={() => handleToggleColumn(col.id)}
-                    className={`flex items-center space-x-3 p-2.5 rounded-md border cursor-pointer transition-colors ${
+                    className={`flex items-center space-x-3 p-2.5 rounded-lg border cursor-pointer transition-all ${
                       checked
-                        ? 'bg-seguranca-yellow/10 border-seguranca-yellow/50 text-white'
-                        : 'bg-black/20 border-gray-700 text-gray-400 hover:bg-gray-800'
+                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-200 font-medium'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
                     }`}
                   >
                     <Checkbox
                       id={`col-${col.id}`}
                       checked={checked}
                       onCheckedChange={() => handleToggleColumn(col.id)}
-                      className="border-gray-500 data-[state=checked]:bg-seguranca-yellow data-[state=checked]:text-black"
+                      className="border-slate-600 data-[state=checked]:bg-amber-500 data-[state=checked]:text-black"
                     />
                     <Label
                       htmlFor={`col-${col.id}`}
-                      className="text-xs font-medium cursor-pointer flex-1"
+                      className="text-xs cursor-pointer flex-1 select-none"
                     >
                       {col.label}
                     </Label>
@@ -487,34 +580,44 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="border-gray-600 text-gray-300 hover:bg-seguranca-graphite"
-            disabled={generating}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={handleGeneratePdf}
-            disabled={generating}
-            className="bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-black font-semibold"
-          >
-            {generating ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Gerando PDF...
-              </>
+        {/* Footer com botões de ação */}
+        <DialogFooter className="p-4 px-6 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row justify-between items-center gap-2">
+          <div className="text-xs text-slate-400">
+            {selectedColumns.length === 0 ? (
+              <span className="text-red-400">Selecione ao menos 1 coluna</span>
             ) : (
-              <>
-                <Download className="w-4 h-4 mr-2" />
-                Gerar Relatório (PDF)
-              </>
+              <span>Pronto para gerar em formato paisagem A4</span>
             )}
-          </Button>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              disabled={generating}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleGeneratePdf}
+              disabled={generating || selectedColumns.length === 0}
+              className="bg-amber-500 hover:bg-amber-400 text-black font-bold shadow-lg shadow-amber-500/10"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Gerando PDF...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Gerar Relatório (PDF)
+                </>
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

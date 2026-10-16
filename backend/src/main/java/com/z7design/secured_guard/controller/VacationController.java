@@ -37,17 +37,19 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.Parameter;
 
-import lombok.RequiredArgsConstructor;
-
 @RestController
 @RequestMapping("/api/vacations")
-@RequiredArgsConstructor
 @Tag(name = "Férias", description = "Endpoints para gestão de solicitações de férias de funcionários.")
 @SecurityRequirement(name = "bearerAuth")
 public class VacationController {
     
     private final VacationService vacationService;
     private final EmployeeService employeeService;
+
+    public VacationController(VacationService vacationService, EmployeeService employeeService) {
+        this.vacationService = vacationService;
+        this.employeeService = employeeService;
+    }
     
     @Operation(summary = "Cria uma nova solicitação de férias",
                description = "Adiciona uma nova solicitação de férias ao sistema. Requer o papel de ADMIN, GESTOR ou o próprio funcionário.")

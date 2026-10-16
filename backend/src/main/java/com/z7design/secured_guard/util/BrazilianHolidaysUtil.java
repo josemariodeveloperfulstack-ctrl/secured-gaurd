@@ -76,6 +76,22 @@ public class BrazilianHolidaysUtil {
      * @return ValidationResult indicando se é válida ou motivo do bloqueio impeditivo.
      */
     public static ValidationResult validateStartDateCLT(LocalDate startDate, List<HolidayInfo> customHolidays) {
+        return validateStartDateCLT(startDate, customHolidays, false);
+    }
+
+    /**
+     * Valida se a data de início das férias respeita o Artigo 134, § 3º da CLT.
+     * Na escala 12x36 (Art. 59-A da CLT), a compensação de descanso é de 36 horas ininterruptas
+     * e o regime não segue o descanso semanal tradicional exclusivo em domingos/sábados.
+     * Portanto, colaboradores em escala 12x36 podem iniciar férias na sexta-feira ou qualquer outro dia útil escalado,
+     * respeitando-se a vedação nos 2 dias que antecedem feriados nacionais/locais.
+     *
+     * @param startDate Data de início proposta para as férias
+     * @param customHolidays Feriados adicionais
+     * @param isEscala12x36 Indica se o colaborador trabalha em regime de 12x36
+     * @return ValidationResult indicando se é válida ou motivo do bloqueio impeditivo.
+     */
+    public static ValidationResult validateStartDateCLT(LocalDate startDate, List<HolidayInfo> customHolidays, boolean isEscala12x36) {
         if (startDate == null) {
             return new ValidationResult(false, "Data de início das férias não informada.");
         }
@@ -83,20 +99,21 @@ public class BrazilianHolidaysUtil {
         DayOfWeek dow = startDate.getDayOfWeek();
 
         // 1. Validação de DSR (Sábado e Domingo):
-        // Se as férias começarem na sexta-feira -> antecede em 1 dia o sábado e 2 dias o domingo.
-        // Se as férias começarem na quinta-feira -> antecede em 2 dias o sábado (descanso remunerado/compensado).
-        // Se começarem no sábado ou domingo -> começa no próprio DSR/descanso.
-        if (dow == DayOfWeek.FRIDAY) {
-            return new ValidationResult(false, 
-                "Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Sexta-feira, pois antecede em 2 dias o Repouso Semanal Remunerado (DSR no domingo). Escolha a Segunda, Terça ou Quarta-feira.");
-        }
-        if (dow == DayOfWeek.THURSDAY) {
-            return new ValidationResult(false, 
-                "Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Quinta-feira, pois antecede em 2 dias o descanso semanal remunerado de sábado/domingo.");
-        }
-        if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) {
-            return new ValidationResult(false, 
-                "Violação do Art. 134, § 3º da CLT: As férias não podem iniciar em dia de Repouso Semanal Remunerado (DSR / Fim de Semana).");
+        // Para escalas normais (ex: 5x2, 6x1), quinta e sexta antecedem o descanso tradicional.
+        // Para colaboradores 12x36, o regime possui descanso compensado contínuo e permite início regular.
+        if (!isEscala12x36) {
+            if (dow == DayOfWeek.FRIDAY) {
+                return new ValidationResult(false, 
+                    "Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Sexta-feira, pois antecede em 2 dias o Repouso Semanal Remunerado (DSR no domingo). Escolha a Segunda, Terça ou Quarta-feira.");
+            }
+            if (dow == DayOfWeek.THURSDAY) {
+                return new ValidationResult(false, 
+                    "Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Quinta-feira, pois antecede em 2 dias o descanso semanal remunerado de sábado/domingo.");
+            }
+            if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) {
+                return new ValidationResult(false, 
+                    "Violação do Art. 134, § 3º da CLT: As férias não podem iniciar em dia de Repouso Semanal Remunerado (DSR / Fim de Semana).");
+            }
         }
 
         // 2. Validação de Feriados:

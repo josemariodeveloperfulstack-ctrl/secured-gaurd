@@ -30,13 +30,22 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/accounts-receivable")
-@RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Contas a Receber", description = "Endpoints para gestão de contas a receber")
 public class AccountsReceivableController {
     
     private final AccountsReceivableService accountsReceivableService;
     private final PaymentReportService paymentReportService;
+    private final com.z7design.secured_guard.service.CustomFinancialReportService customFinancialReportService;
+
+    public AccountsReceivableController(
+            AccountsReceivableService accountsReceivableService,
+            PaymentReportService paymentReportService,
+            com.z7design.secured_guard.service.CustomFinancialReportService customFinancialReportService) {
+        this.accountsReceivableService = accountsReceivableService;
+        this.paymentReportService = paymentReportService;
+        this.customFinancialReportService = customFinancialReportService;
+    }
     
     @GetMapping
     @Operation(summary = "Listar todas as contas a receber", description = "Retorna uma lista paginada de todas as contas a receber")
@@ -259,6 +268,25 @@ public class AccountsReceivableController {
                     
         } catch (IOException e) {
             log.error("Erro ao gerar relatório PDF de contas a receber", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping({"/custom-pdf", "/reports/custom-pdf"})
+    @Operation(summary = "Relatório Personalizado de Contas a Receber em PDF", description = "Gera relatório PDF executivo com filtros avançados, agrupamento e colunas selecionadas")
+    public ResponseEntity<byte[]> generateCustomPdfReport(
+            @RequestBody com.z7design.secured_guard.dto.CustomContasAReceberReportRequestDTO request) {
+        log.info("POST /api/accounts-receivable/custom-pdf - Gerando relatório PDF personalizado de contas a receber: {}", request);
+        try {
+            byte[] pdfBytes = customFinancialReportService.generateCustomAccountsReceivableReportPDF(request);
+            String filename = "relatorio-contas-a-receber-personalizado-" + LocalDate.now() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório personalizado de contas a receber em PDF: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

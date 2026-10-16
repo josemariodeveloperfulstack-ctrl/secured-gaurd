@@ -50,6 +50,7 @@ import {
 } from 'lucide-react';
 import { ContasAReceberGuard } from './FinanceiroPermissionGuard';
 import { ContasAReceberFormModal } from './ContasAReceberFormModal';
+import { ContasAReceberReportCustomModal } from './ContasAReceberReportCustomModal';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -232,6 +233,7 @@ export const ContasAReceber: React.FC = () => {
   const [selectedPaymentDate, setSelectedPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   
   // Relatórios estados
+  const [showCustomReportModal, setShowCustomReportModal] = useState(false);
   const [showReportPeriodModal, setShowReportPeriodModal] = useState(false);
   const [reportStartDate, setReportStartDate] = useState<Date>(startOfMonth(new Date()));
   const [reportEndDate, setReportEndDate] = useState<Date>(endOfMonth(new Date()));
@@ -812,12 +814,20 @@ export const ContasAReceber: React.FC = () => {
     <ContasAReceberGuard requiredPermission="VIEW_ACCOUNTS_RECEIVABLE">
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-seguranca-lightgray">Contas a Receber</h1>
-            <p className="text-gray-400">Gerencie suas contas a receber e controle de inadimplência</p>
+            <h1 className="text-2xl lg:text-3xl font-bold text-seguranca-lightgray">Contas a Receber</h1>
+            <p className="text-gray-400 mt-1">Gerencie suas contas a receber e controle de inadimplência</p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCustomReportModal(true)}
+              className="flex items-center gap-2 border-seguranca-yellow/50 text-seguranca-yellow hover:bg-seguranca-yellow/10 font-semibold"
+            >
+              <FileText className="w-4 h-4" />
+              Relatório Personalizado (PDF)
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -2153,6 +2163,12 @@ export const ContasAReceber: React.FC = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Modal de Relatório Personalizado (PDF) */}
+        <ContasAReceberReportCustomModal
+          open={showCustomReportModal}
+          onOpenChange={setShowCustomReportModal}
+        />
       </div>
     </ContasAReceberGuard>
   );

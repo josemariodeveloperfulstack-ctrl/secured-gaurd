@@ -13,12 +13,15 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/plano-contas/subcategorias")
-@RequiredArgsConstructor
+@RequestMapping({"/api/plano-contas/subcategorias", "/api/subcategorias"})
 @Tag(name = "Plano de Contas", description = "Gestão de subcategorias do Plano de Contas")
 public class SubcategoriaController {
 
     private final SubcategoriaService service;
+
+    public SubcategoriaController(SubcategoriaService service) {
+        this.service = service;
+    }
 
     @GetMapping
     @Operation(summary = "Listar todas as subcategorias")

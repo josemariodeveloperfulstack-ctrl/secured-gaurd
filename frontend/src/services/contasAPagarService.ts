@@ -41,6 +41,7 @@ export interface CustomContasAPagarReportRequest {
   companySigla?: string;
   subcategoriaId?: string;
   employeeId?: string;
+  expiringInDays?: number;
   selectedColumns?: string[];
   groupBy?: 'UNIT_SECTOR' | 'NONE';
 }
@@ -259,22 +260,56 @@ export function formatContaPlanoDeContas(conta: ContaPlanoDeContasFields): strin
   return '';
 }
 
+// Extrai nome de funcionário presente em descrições de rescisão, ex:
+// "Rescisao - Juliana Flavia Batista de Jesus - B2 pedido de demissao" -> "Juliana Flavia Batista de Jesus"
+export function extractPersonNameFromDescription(description?: string | null): string | null {
+  if (!description || typeof description !== 'string') return null;
+  const trimmed = description.trim();
+  const match = trimmed.match(/^rescis[aã]o\s*[-–—:]\s*([A-Za-zÀ-ÿ\s]{4,60}?)(?:\s*[-–—:]|\s*\()/i);
+  if (match && match[1]) {
+    const candidate = match[1].trim();
+    if (candidate.length >= 3 && !/^(valor|pagamento|folha|empresa|terc|vig|adm)$/i.test(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 // Em contas a pagar / despesas com funcionário vinculado (ex.: Pessoal / RH ou beneficiário),
-// exibe o nome do funcionário na coluna Fornecedor/Funcionário. Nas demais, exibe o fornecedor.
-function resolveFornecedorOuFuncionario(invoice: any): string {
+// exibe apenas o nome do funcionário ou o nome do fornecedor na coluna Fornecedor / Beneficiário.
+// Nunca exibe a descrição completa da conta nesta coluna.
+export function resolveFornecedorOuFuncionario(invoice: any): string {
   if (invoice.employeeName && typeof invoice.employeeName === 'string' && invoice.employeeName.trim()) {
     return invoice.employeeName.trim();
   }
   if (invoice.employee?.name && typeof invoice.employee.name === 'string' && invoice.employee.name.trim()) {
     return invoice.employee.name.trim();
   }
-  if (invoice.supplierName && typeof invoice.supplierName === 'string' && invoice.supplierName.trim()) {
-    return invoice.supplierName.trim();
+
+  // Tenta extrair o nome do funcionário da descrição (ex.: Rescisão - Fulano de Tal - ...)
+  const extractedEmployee = extractPersonNameFromDescription(invoice.description || invoice.descricao);
+  if (extractedEmployee) {
+    return extractedEmployee;
   }
-  if (invoice.supplier?.name && typeof invoice.supplier.name === 'string' && invoice.supplier.name.trim()) {
-    return invoice.supplier.name.trim();
+
+  const desc = (invoice.description || invoice.descricao || '').trim();
+
+  // Fornecedor direto por objeto ou nome
+  const suppName = (invoice.supplierName || invoice.supplier?.name || invoice.fornecedor || '').trim();
+  if (suppName) {
+    // Se o fornecedor foi gravado com a descrição completa idêntica, tenta extrair o nome ou verifica se parece descrição
+    if (desc && suppName.toLowerCase() === desc.toLowerCase()) {
+      const fromDesc = extractPersonNameFromDescription(desc);
+      if (fromDesc) return fromDesc;
+      // Se a descrição for uma frase longa de rescisão ou despesa sem fornecedor real
+      if (/^rescis[aã]o/i.test(desc)) {
+        return '-';
+      }
+    }
+    return suppName;
   }
-  return 'Não informado';
+
+  return '-';
 }
 
 export const contasAPagarService = {

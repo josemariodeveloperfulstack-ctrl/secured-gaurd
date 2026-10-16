@@ -110,7 +110,8 @@ export function sugerirProximaDataValida(dataAtual: Date, feriadosMap: Map<strin
  */
 export function validarInicioFeriasClt(
   dataInicioStr: string,
-  feriadosAdicionais: HolidayItem[] = []
+  feriadosAdicionais: HolidayItem[] = [],
+  isEscala12x36: boolean = false
 ): CltValidationResult {
   if (!dataInicioStr) {
     return { valid: true };
@@ -135,31 +136,35 @@ export function validarInicioFeriasClt(
   const sugestao = sugerirProximaDataValida(dataInicio, mapaFeriados);
 
   // 1. Validação de DSR (Sexta-feira, Quinta-feira, Sábado e Domingo)
-  if (diaSemana === 5) { // Sexta-feira
-    return {
-      valid: false,
-      motivo: 'DSR',
-      mensagem: 'Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Sexta-feira, pois antecede em 2 dias o Repouso Semanal Remunerado (DSR no domingo).',
-      sugestaoData: sugestao
-    };
-  }
+  // Para escalas padrão (ex: 5x2, 6x1), o DSR fixo em domingos/sábados impede o início na quinta ou sexta.
+  // Para a escala 12x36 (Art. 59-A da CLT), a compensação de descanso é de 36h contínuas e o colaborador pode iniciar na sexta-feira ou em seu dia útil correspondente.
+  if (!isEscala12x36) {
+    if (diaSemana === 5) { // Sexta-feira
+      return {
+        valid: false,
+        motivo: 'DSR',
+        mensagem: 'Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Sexta-feira em escala padrão (5x2), pois antecede em 2 dias o Repouso Semanal Remunerado (DSR no domingo).',
+        sugestaoData: sugestao
+      };
+    }
 
-  if (diaSemana === 4) { // Quinta-feira
-    return {
-      valid: false,
-      motivo: 'DSR',
-      mensagem: 'Violação do Art. 134, § 3º da CLT: É vedado iniciar férias na Quinta-feira, pois antecede em 2 dias o descanso semanal de sábado/domingo.',
-      sugestaoData: sugestao
-    };
-  }
+    if (diaSemana === 4) { // Quinta-feira
+      return {
+        valid: false,
+        motivo: 'DSR',
+        mensagem: 'Violação do Art. 134, § 3º da CLT: É vedado iniciar férias na Quinta-feira, pois antecede em 2 dias o descanso semanal de sábado/domingo.',
+        sugestaoData: sugestao
+      };
+    }
 
-  if (diaSemana === 6 || diaSemana === 0) { // Sábado ou Domingo
-    return {
-      valid: false,
-      motivo: 'DSR',
-      mensagem: 'Violação do Art. 134, § 3º da CLT: As férias não podem iniciar em dia de Repouso Semanal Remunerado (DSR / Fim de Semana).',
-      sugestaoData: sugestao
-    };
+    if (diaSemana === 6 || diaSemana === 0) { // Sábado ou Domingo
+      return {
+        valid: false,
+        motivo: 'DSR',
+        mensagem: 'Violação do Art. 134, § 3º da CLT: As férias não podem iniciar em dia de Repouso Semanal Remunerado (DSR / Fim de Semana).',
+        sugestaoData: sugestao
+      };
+    }
   }
 
   // 2. Validação de Feriados (Próprio dia, Dia + 1 e Dia + 2)

@@ -35,7 +35,6 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class AccountingFormStandardPdfService {
 
@@ -44,6 +43,19 @@ public class AccountingFormStandardPdfService {
         private final StandardReportLayoutService standardReportLayoutService;
         private final ExcelReportLayoutService excelReportLayoutService;
         private final EmployeeDocumentDateResolver documentDateResolver;
+
+        public AccountingFormStandardPdfService(
+                EmployeeRepository employeeRepository,
+                CompanyRepository companyRepository,
+                StandardReportLayoutService standardReportLayoutService,
+                ExcelReportLayoutService excelReportLayoutService,
+                EmployeeDocumentDateResolver documentDateResolver) {
+            this.employeeRepository = employeeRepository;
+            this.companyRepository = companyRepository;
+            this.standardReportLayoutService = standardReportLayoutService;
+            this.excelReportLayoutService = excelReportLayoutService;
+            this.documentDateResolver = documentDateResolver;
+        }
 
         @Transactional(readOnly = true)
         public byte[] generateAccountingFormPdf(UUID employeeId) throws Exception {

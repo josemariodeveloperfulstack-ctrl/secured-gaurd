@@ -27,7 +27,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/reports")
-@RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Relatórios", description = "Endpoints para geração de relatórios")
 public class ReportController {
@@ -37,8 +36,25 @@ public class ReportController {
     private final com.z7design.secured_guard.service.ReportService reportService;
     private final com.z7design.secured_guard.service.EmailService emailService;
     private final com.z7design.secured_guard.service.PaymentReportService paymentReportService;
+    private final com.z7design.secured_guard.service.CustomFinancialReportService customFinancialReportService;
+
     @Value("${accounting.email:contabilidade@empresa.com}")
     private String defaultAccountingEmail;
+
+    public ReportController(
+            ContasAPagarReportService contasAPagarReportService,
+            ReportTemplateService reportTemplateService,
+            com.z7design.secured_guard.service.ReportService reportService,
+            com.z7design.secured_guard.service.EmailService emailService,
+            com.z7design.secured_guard.service.PaymentReportService paymentReportService,
+            com.z7design.secured_guard.service.CustomFinancialReportService customFinancialReportService) {
+        this.contasAPagarReportService = contasAPagarReportService;
+        this.reportTemplateService = reportTemplateService;
+        this.reportService = reportService;
+        this.emailService = emailService;
+        this.paymentReportService = paymentReportService;
+        this.customFinancialReportService = customFinancialReportService;
+    }
 
     @GetMapping("/contas-a-pagar")
     @Operation(summary = "Relatório de Contas a Pagar por Período", description = "Gera relatório de contas a pagar para um período específico")
@@ -122,6 +138,44 @@ public class ReportController {
                     .body(pdfBytes);
         } catch (Exception e) {
             log.error("Erro ao gerar relatório personalizado de contas a pagar em PDF: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping({"/contas-a-receber/custom-pdf", "/accounts-receivable/custom-pdf"})
+    @Operation(summary = "Relatório Personalizado de Contas a Receber em PDF", description = "Gera relatório PDF dinâmico de contas a receber com filtros avançados, colunas selecionadas e agrupamento executivo com subtotais")
+    public ResponseEntity<byte[]> generateCustomContasAReceberReportPdf(
+            @RequestBody com.z7design.secured_guard.dto.CustomContasAReceberReportRequestDTO request) {
+        try {
+            log.info("Recebida requisição para relatório PDF personalizado de contas a receber: {}", request);
+            byte[] pdfBytes = customFinancialReportService.generateCustomAccountsReceivableReportPDF(request);
+            String filename = "relatorio-contas-a-receber-personalizado-" + LocalDate.now() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório personalizado de contas a receber em PDF: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping({"/pagamentos/custom-pdf", "/scheduled-payments/custom-pdf"})
+    @Operation(summary = "Relatório Personalizado de Pagamentos Agendados em PDF", description = "Gera relatório PDF dinâmico de pagamentos agendados com filtros avançados, colunas selecionadas e agrupamento executivo com subtotais")
+    public ResponseEntity<byte[]> generateCustomPagamentosReportPdf(
+            @RequestBody com.z7design.secured_guard.dto.CustomPagamentosReportRequestDTO request) {
+        try {
+            log.info("Recebida requisição para relatório PDF personalizado de pagamentos agendados: {}", request);
+            byte[] pdfBytes = customFinancialReportService.generateCustomScheduledPaymentReportPDF(request);
+            String filename = "relatorio-pagamentos-personalizado-" + LocalDate.now() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório personalizado de pagamentos agendados em PDF: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

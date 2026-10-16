@@ -7,11 +7,14 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class AccountingFormService {
 
     private final AccountingFormStandardPdfService accountingFormStandardPdfService;
+
+    public AccountingFormService(AccountingFormStandardPdfService accountingFormStandardPdfService) {
+        this.accountingFormStandardPdfService = accountingFormStandardPdfService;
+    }
 
     /**
      * Gera HTML da ficha de contabilidade para um funcionário (mesmo layout do PDF).

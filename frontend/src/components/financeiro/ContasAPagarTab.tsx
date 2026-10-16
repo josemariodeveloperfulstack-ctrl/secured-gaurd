@@ -30,7 +30,7 @@ import { ContasAPagarTable } from '@/components/financeiro/ContasAPagarTable';
 import { ContasAPagarDashboard } from '@/components/financeiro/ContasAPagarDashboard';
 import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewModal';
 import { ContasAPagarReportCustomModal } from '@/components/financeiro/ContasAPagarReportCustomModal';
-import { contasAPagarService, formatContaPlanoDeContas } from '@/services/contasAPagarService';
+import { contasAPagarService, formatContaPlanoDeContas, resolveFornecedorOuFuncionario } from '@/services/contasAPagarService';
 import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import { format, addDays, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -50,6 +50,7 @@ const ContasAPagarTab: React.FC = () => {
   const [editingConta, setEditingConta] = useState<ContaAPagar | null>(null);
   const [viewingConta, setViewingConta] = useState<ContaAPagar | null>(null);
   const [alertasVencimento, setAlertasVencimento] = useState<ContaAPagar[]>([]);
+  const [alertasSlideIndex, setAlertasSlideIndex] = useState<number>(0);
   const [showDashboard, setShowDashboard] = useState(false);
 
   // Estados para filtros
@@ -851,42 +852,160 @@ const ContasAPagarTab: React.FC = () => {
         {/* Aba de Contas */}
         <TabsContent value="contas" className="space-y-6">
 
-          {/* Alertas de Vencimento */}
-          {alertasVencimento.length > 0 && (
-            <Card className="border-yellow-200 bg-yellow-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-yellow-800">
-                  <Bell className="text-yellow-600" />
-                  Alertas de Vencimento
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {alertasVencimento.slice(0, 3).map(conta => (
-                    <div key={conta.id} className="flex justify-between items-center p-2 bg-white rounded border">
-                      <div>
-                        <span className="font-medium">{conta.fornecedor}</span>
-                        <span className="text-sm text-gray-600 ml-2">{conta.descricao}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-yellow-700">
-                          {formatCurrency(conta.valor)}
-                        </div>
-                        <div className="text-sm text-yellow-600">
-                          Vence em {format(conta.vencimento, 'dd/MM/yyyy', { locale: ptBR })}
-                        </div>
-                      </div>
+          {/* Alertas de Vencimento com Slider Interativo e Design Dark Executivo */}
+          {alertasVencimento.length > 0 && (() => {
+            const itemsPerPage = 3;
+            const totalSlides = Math.ceil(alertasVencimento.length / itemsPerPage);
+            const currentSlide = Math.min(alertasSlideIndex, totalSlides - 1);
+            const startIdx = currentSlide * itemsPerPage;
+            const visibleAlerts = alertasVencimento.slice(startIdx, startIdx + itemsPerPage);
+            const totalValorAlertas = alertasVencimento.reduce((acc, c) => acc + (c.valor || 0), 0);
+
+            return (
+              <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950/40 p-4 sm:p-5 shadow-2xl backdrop-blur-md transition-all">
+                {/* Glow decorativo no topo */}
+                <div className="absolute -top-12 -left-12 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                
+                {/* Cabeçalho do Card de Alertas */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3.5 mb-3.5">
+                  <div className="flex items-center gap-3">
+                    <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30 text-amber-400 shadow-inner">
+                      <Bell className="w-5 h-5 animate-pulse" />
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                      </span>
                     </div>
-                  ))}
-                  {alertasVencimento.length > 3 && (
-                    <p className="text-sm text-yellow-600 text-center">
-                      E mais {alertasVencimento.length - 3} conta(s) vencendo em breve...
-                    </p>
-                  )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                          Alertas de Vencimento
+                        </h3>
+                        <Badge className="bg-amber-500/20 border-amber-500/40 text-amber-300 text-xs px-2 py-0.5">
+                          {alertasVencimento.length} {alertasVencimento.length === 1 ? 'conta' : 'contas'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Despesas em aberto com vencimento previsto para os próximos 7 dias • Total: <span className="text-amber-300 font-semibold">{formatCurrency(totalValorAlertas)}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Controles de Slides / Paginação */}
+                  <div className="flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowCustomReportModal(true)}
+                      className="text-xs h-8 border-amber-500/30 text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/60 transition-colors"
+                    >
+                      <FileText size={14} className="mr-1.5" />
+                      Relatório PDF
+                    </Button>
+
+                    {totalSlides > 1 && (
+                      <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 rounded-lg p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setAlertasSlideIndex(prev => Math.max(0, prev - 1))}
+                          disabled={currentSlide === 0}
+                          className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 rounded transition-colors"
+                          title="Despesas anteriores"
+                        >
+                          <ChevronLeft size={16} />
+                        </button>
+                        <span className="text-[11px] font-medium text-slate-400 px-1.5 min-w-[40px] text-center">
+                          {currentSlide + 1} / {totalSlides}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setAlertasSlideIndex(prev => Math.min(totalSlides - 1, prev + 1))}
+                          disabled={currentSlide === totalSlides - 1}
+                          className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 rounded transition-colors"
+                          title="Próximas despesas"
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+
+                {/* Lista de Contas com Transição e Visual Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {visibleAlerts.map((conta) => {
+                    const isVencendoHoje = isBefore(new Date(conta.vencimento), addDays(new Date(), 1)) &&
+                      !isBefore(new Date(conta.vencimento), new Date(new Date().setHours(0, 0, 0, 0)));
+                    
+                    return (
+                      <div
+                        key={conta.id}
+                        onClick={() => {
+                          setViewingConta(conta);
+                          setShowViewModal(true);
+                        }}
+                        className="group relative flex flex-col justify-between p-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/40 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md hover:shadow-amber-500/5 hover:-translate-y-0.5"
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors line-clamp-1">
+                              {conta.fornecedor || 'Fornecedor não informado'}
+                            </span>
+                            {isVencendoHoje ? (
+                              <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px] px-1.5 py-0 shrink-0">
+                                Vence Hoje
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-amber-500/10 text-amber-300 border-amber-500/20 text-[10px] px-1.5 py-0 shrink-0">
+                                Próximo
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                            {conta.descricao || 'Sem descrição'}
+                          </p>
+                        </div>
+
+                        <div className="flex items-baseline justify-between pt-3 mt-2 border-t border-slate-800/60">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <Clock size={12} className="text-amber-400 shrink-0" />
+                            <span>{format(new Date(conta.vencimento), 'dd/MM/yyyy')}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm sm:text-base font-extrabold text-amber-400 tracking-tight">
+                              {formatCurrency(conta.valor)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Barra de Paginação / Dots quando houver mais de 1 página */}
+                {totalSlides > 1 && (
+                  <div className="flex items-center justify-center gap-1.5 pt-3 mt-1">
+                    {Array.from({ length: Math.min(totalSlides, 8) }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setAlertasSlideIndex(idx)}
+                        className={`h-1.5 rounded-full transition-all ${
+                          idx === currentSlide
+                            ? 'w-6 bg-amber-400 shadow-sm shadow-amber-400/50'
+                            : 'w-1.5 bg-slate-700 hover:bg-slate-500'
+                        }`}
+                        aria-label={`Slide ${idx + 1}`}
+                      />
+                    ))}
+                    {totalSlides > 8 && (
+                      <span className="text-[10px] text-slate-500 ml-1">+{totalSlides - 8}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Dashboard Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1398,8 +1517,8 @@ const ContasAPagarTab: React.FC = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">
-                                <div className="max-w-xs truncate" title={conta.employeeName || conta.fornecedor || '-'}>
-                                  {conta.employeeName || conta.fornecedor || '-'}
+                                <div className="max-w-xs truncate" title={resolveFornecedorOuFuncionario(conta)}>
+                                  {resolveFornecedorOuFuncionario(conta)}
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-green-400 font-medium border-b border-gray-700/30">{formatCurrency(conta.valor)}</td>

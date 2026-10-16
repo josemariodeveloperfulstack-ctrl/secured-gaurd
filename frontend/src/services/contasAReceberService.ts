@@ -47,6 +47,24 @@ export interface UpdateContaAReceberRequest extends Partial<CreateContaAReceberR
   id: string;
 }
 
+export interface CustomContasAReceberReportRequest {
+  startDate?: string;
+  endDate?: string;
+  dateField?: 'dueDate' | 'issueDate' | 'paymentDate';
+  status?: string;
+  paymentMethod?: string;
+  clientId?: string;
+  unitId?: string;
+  companyId?: string;
+  companySigla?: string;
+  category?: string;
+  subcategoriaId?: string;
+  expiringInDays?: number;
+  reportSegment?: string;
+  selectedColumns?: string[];
+  groupBy?: string;
+}
+
 export interface ContasAReceberFilters {
   status?: string;
   type?: string;
@@ -549,6 +567,31 @@ export const contasAReceberService = {
       if (error.response?.data?.message) {
         console.error('❌ Mensagem de erro do servidor:', error.response.data.message);
       }
+      throw error;
+    }
+  },
+
+  /**
+   * Gerar Relatório PDF Personalizado de Contas a Receber com Layout Executivo
+   */
+  async generateCustomPdfReport(request: CustomContasAReceberReportRequest): Promise<Blob> {
+    try {
+      const response = await api.post('/api/reports/contas-a-receber/custom-pdf', request, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        try {
+          const fallback = await api.post('/api/accounts-receivable/custom-pdf', request, {
+            responseType: 'blob'
+          });
+          return fallback.data;
+        } catch (fbErr) {
+          console.error('Erro no fallback de relatório de contas a receber:', fbErr);
+        }
+      }
+      console.error('Erro ao gerar relatório personalizado em PDF de contas a receber:', error);
       throw error;
     }
   },
