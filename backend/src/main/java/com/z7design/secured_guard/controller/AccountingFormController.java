@@ -18,7 +18,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/accounting-forms")
-@RequiredArgsConstructor
 @Slf4j
 @CrossOrigin(origins = "*")
 public class AccountingFormController {
@@ -26,6 +25,15 @@ public class AccountingFormController {
     private final AccountingFormService accountingFormService;
     private final AccountingFormStandardPdfService accountingFormPdfService;
     private final DocumentoGeradoPersistenceService persistenceService;
+
+    public AccountingFormController(
+            AccountingFormService accountingFormService,
+            AccountingFormStandardPdfService accountingFormPdfService,
+            DocumentoGeradoPersistenceService persistenceService) {
+        this.accountingFormService = accountingFormService;
+        this.accountingFormPdfService = accountingFormPdfService;
+        this.persistenceService = persistenceService;
+    }
 
     /**
      * Gera ficha de contabilidade em HTML para um funcionário

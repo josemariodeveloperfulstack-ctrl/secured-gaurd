@@ -27,8 +27,9 @@ import { FloatingChat } from './FloatingChat';
 
 interface MainLayoutProps {
   children: React.ReactNode;
-  title?: string;
+  title?: React.ReactNode;
   subtitle?: string;
+  headerActions?: React.ReactNode;
   noPadding?: boolean;
 }
 
@@ -36,6 +37,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   children,
   title,
   subtitle,
+  headerActions,
   noPadding = false
 }) => {
   const { user, logout } = useAuth();
@@ -195,18 +197,25 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           {/* Breadcrumb */}
           {!noPadding && <Breadcrumb />}
 
-          {/* Título da página (se fornecido) */}
-          {!noPadding && (title || subtitle) && (
-            <div className="mb-6">
-              {title && (
-                <h1 className="text-2xl md:text-3xl font-bold text-seguranca-lightgray mb-2">
-                  {title}
-                </h1>
-              )}
-              {subtitle && (
-                <p className="text-seguranca-lightgray text-sm md:text-base">
-                  {subtitle}
-                </p>
+          {/* Título da página (se fornecido) e ações do topo */}
+          {!noPadding && (title || subtitle || headerActions) && (
+            <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                {title && (
+                  <h1 className="text-2xl md:text-3xl font-bold text-seguranca-lightgray mb-2">
+                    {title}
+                  </h1>
+                )}
+                {subtitle && (
+                  <p className="text-seguranca-lightgray text-sm md:text-base">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
+              {headerActions && (
+                <div className="flex items-center flex-wrap gap-2 shrink-0">
+                  {headerActions}
+                </div>
               )}
             </div>
           )}

@@ -35,6 +35,17 @@ import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Pagamento, AgendamentoPagamento } from '@/services/pagamentosService';
 
+const safeFormatDate = (dateVal: any, formatStr: string = 'dd/MM/yyyy'): string => {
+  if (!dateVal) return '-';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '-';
+    return format(d, formatStr, { locale: ptBR });
+  } catch {
+    return '-';
+  }
+};
+
 interface PagamentoViewModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -140,8 +151,9 @@ export const PagamentoViewModal: React.FC<PagamentoViewModalProps> = ({
 
   const isVencimentoProximo = () => {
     if (!pagamento.dataVencimento) return false;
-    const hoje = new Date();
     const vencimento = new Date(pagamento.dataVencimento);
+    if (isNaN(vencimento.getTime())) return false;
+    const hoje = new Date();
     const diffTime = vencimento.getTime() - hoje.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays <= 3 && diffDays >= 0;
@@ -149,8 +161,9 @@ export const PagamentoViewModal: React.FC<PagamentoViewModalProps> = ({
 
   const isVencido = () => {
     if (!pagamento.dataVencimento) return false;
-    const hoje = new Date();
     const vencimento = new Date(pagamento.dataVencimento);
+    if (isNaN(vencimento.getTime())) return false;
+    const hoje = new Date();
     return vencimento < hoje && pagamento.status === 'PENDING';
   };
 
@@ -211,17 +224,14 @@ export const PagamentoViewModal: React.FC<PagamentoViewModalProps> = ({
                   <Label className="text-sm font-medium text-gray-500">Data de Vencimento</Label>
                   <p className="flex items-center">
                     <Calendar className="w-4 h-4 mr-2" />
-                    {format(new Date(pagamento.dataVencimento), 'dd/MM/yyyy', { locale: ptBR })}
+                    {safeFormatDate(pagamento.dataVencimento)}
                   </p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Data de Pagamento</Label>
                   <p className="flex items-center">
                     <Calendar className="w-4 h-4 mr-2" />
-                    {pagamento.dataPagamento 
-                      ? format(new Date(pagamento.dataPagamento), 'dd/MM/yyyy', { locale: ptBR })
-                      : 'Não pago'
-                    }
+                    {pagamento.dataPagamento ? safeFormatDate(pagamento.dataPagamento) : 'Não pago'}
                   </p>
                 </div>
               </div>
@@ -327,7 +337,7 @@ export const PagamentoViewModal: React.FC<PagamentoViewModalProps> = ({
                     <Label className="text-sm font-medium text-gray-500">Data Agendada</Label>
                     <p className="flex items-center">
                       <Calendar className="w-4 h-4 mr-2" />
-                      {format(new Date(pagamento.agendamento.dataAgendamento), 'dd/MM/yyyy', { locale: ptBR })}
+                      {safeFormatDate(pagamento.agendamento.dataAgendamento)}
                     </p>
                   </div>
                 </div>
@@ -337,7 +347,7 @@ export const PagamentoViewModal: React.FC<PagamentoViewModalProps> = ({
                     <Label className="text-sm font-medium text-gray-500">Data de Execução</Label>
                     <p className="flex items-center">
                       <CheckCircle className="w-4 h-4 mr-2" />
-                      {format(new Date(pagamento.agendamento.dataExecucao), 'dd/MM/yyyy', { locale: ptBR })}
+                      {safeFormatDate(pagamento.agendamento.dataExecucao)}
                     </p>
                   </div>
                 )}
@@ -375,14 +385,14 @@ export const PagamentoViewModal: React.FC<PagamentoViewModalProps> = ({
                   <Label className="text-sm font-medium text-gray-500">Data de Criação</Label>
                   <p className="flex items-center">
                     <Calendar className="w-4 h-4 mr-2" />
-                    {format(new Date(pagamento.createdAt), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                    {safeFormatDate(pagamento.createdAt, 'dd/MM/yyyy HH:mm')}
                   </p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Última Atualização</Label>
                   <p className="flex items-center">
                     <Calendar className="w-4 h-4 mr-2" />
-                    {format(new Date(pagamento.updatedAt), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                    {safeFormatDate(pagamento.updatedAt, 'dd/MM/yyyy HH:mm')}
                   </p>
                 </div>
               </div>

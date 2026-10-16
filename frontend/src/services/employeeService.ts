@@ -620,6 +620,9 @@ export const employeeService = {
         workPostName: emp.workPostName || emp.work_post_name || emp.workPost?.name || emp.work_post?.name || emp.departmentName || emp.department?.name,
         workPostId: emp.workPostId || emp.work_post_id || emp.workPost?.id || emp.work_post?.id,
         unitName: emp.unitName || emp.unit_name || emp.unit?.name,
+        companyId: emp.companyId || emp.company_id || emp.company?.id,
+        companyName: emp.companyName || emp.company_name || emp.company?.name,
+        companySigla: emp.companySigla || emp.company_sigla || emp.company?.sigla,
         status: emp.status
       });
 

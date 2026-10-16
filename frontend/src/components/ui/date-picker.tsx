@@ -11,27 +11,72 @@ import { cn } from "@/lib/utils";
 interface DatePickerProps {
   date?: Date;
   onDateChange?: (date: Date | undefined) => void;
+  onSelect?: (date: Date | undefined) => void;
+  onChange?: (date: Date | undefined) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  minDate?: Date;
+  maxDate?: Date;
 }
 
 export function DatePicker({
   date,
   onDateChange,
+  onSelect,
+  onChange,
   placeholder = "dd/mm/aaaa",
   disabled = false,
-  className
+  className,
+  minDate,
+  maxDate
 }: DatePickerProps) {
+  const handleDateChange = (val: Date | null) => {
+    const nextDate = val || undefined;
+    onDateChange?.(nextDate);
+    onSelect?.(nextDate);
+    onChange?.(nextDate);
+  };
   return (
     <div className="relative w-full">
       <ReactDatePicker
         selected={date || null}
-        onChange={(val: Date | null) => onDateChange?.(val || undefined)}
+        onChange={handleDateChange}
         dateFormat="dd/MM/yyyy"
         locale={ptBR}
         placeholderText={placeholder}
         disabled={disabled}
+        showMonthDropdown
+        showYearDropdown
+        dropdownMode="select"
+        scrollableYearDropdown
+        yearDropdownItemNumber={60}
+        onYearChange={(newYearDate: Date) => {
+          const current = date ? new Date(date) : new Date();
+          const targetDay = current.getDate();
+          const targetMonth = current.getMonth();
+          const year = newYearDate.getFullYear();
+          // Ajusta respeitando o último dia do mês se necessário
+          const daysInMonth = new Date(year, targetMonth + 1, 0).getDate();
+          const finalDay = Math.min(targetDay, daysInMonth);
+          const updatedDate = new Date(year, targetMonth, finalDay, current.getHours(), current.getMinutes(), current.getSeconds());
+          handleDateChange(updatedDate);
+        }}
+        onMonthChange={(newMonthDate: Date) => {
+          const current = date ? new Date(date) : new Date();
+          const targetDay = current.getDate();
+          const targetYear = newMonthDate.getFullYear();
+          const targetMonth = newMonthDate.getMonth();
+          const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+          const finalDay = Math.min(targetDay, daysInMonth);
+          const updatedDate = new Date(targetYear, targetMonth, finalDay, current.getHours(), current.getMinutes(), current.getSeconds());
+          handleDateChange(updatedDate);
+        }}
+        popperPlacement="bottom-start"
+        popperClassName="!z-[10150]"
+        minDate={minDate}
+        maxDate={maxDate}
+        autoComplete="off"
         className={cn(
           "w-full pr-10 bg-seguranca-black border border-gray-600 text-seguranca-lightgray text-sm rounded-lg h-10 sm:h-11",
           "focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow",

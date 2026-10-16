@@ -38,7 +38,8 @@ import { ContasAPagarDashboard } from '@/components/financeiro/ContasAPagarDashb
 import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewModal';
 import { ContasAPagarReportCustomModal } from '@/components/financeiro/ContasAPagarReportCustomModal';
 import ImportInvoicesModal from '@/components/financeiro/ImportInvoicesModal';
-import { contasAPagarService, formatContaPlanoDeContas } from '@/services/contasAPagarService';
+import { contasAPagarService, formatContaPlanoDeContas, resolveFornecedorOuFuncionario } from '@/services/contasAPagarService';
+import { companyService } from '@/services/companyService';
 import { format, addDays, isBefore, parseISO } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 
@@ -55,6 +56,7 @@ const ContasAPagar: React.FC = () => {
   const [editingConta, setEditingConta] = useState<ContaAPagar | null>(null);
   const [viewingConta, setViewingConta] = useState<ContaAPagar | null>(null);
   const [alertasVencimento, setAlertasVencimento] = useState<ContaAPagar[]>([]);
+  const [alertasSlideIndex, setAlertasSlideIndex] = useState<number>(0);
   const [showDashboard, setShowDashboard] = useState(false);
 
   // Estados para filtros
@@ -69,12 +71,14 @@ const ContasAPagar: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'contas' | 'relatorios'>('contas');
   const [reportLoading, setReportLoading] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
+  const [empresasList, setEmpresasList] = useState<any[]>([]);
   const [reportFilters, setReportFilters] = useState({
     startDate: new Date(new Date().getFullYear(), 0, 1), // 1º de janeiro do ano atual
     endDate: new Date(new Date().getFullYear(), 11, 31), // 31 de dezembro do ano atual
     status: 'TODOS',
     tipo: 'TODOS',
-    fornecedor: 'TODOS'
+    fornecedor: 'TODOS',
+    empresa: 'TODAS'
   });
 
   // Estados para filtro por empresa no relatório
@@ -105,11 +109,16 @@ const ContasAPagar: React.FC = () => {
       setLoading(true);
       console.log('🔍 DEBUG: Iniciando carregamento de dados...');
 
-      const [contasData, estatisticas] = await Promise.all([
+      const [contasData, estatisticas, companiesData] = await Promise.all([
         // Carregar todas as contas (sem paginação do backend) para permitir paginação completa no frontend
         contasAPagarService.getAllContasAPagar(),
-        contasAPagarService.getEstatisticas()
+        contasAPagarService.getEstatisticas(),
+        companyService.getAllCompanies().catch(() => [])
       ]);
+
+      if (companiesData && companiesData.length > 0) {
+        setEmpresasList(companiesData);
+      }
 
       console.log('🔍 DEBUG: Contas carregadas da API:', contasData);
       console.log('🔍 DEBUG: Quantidade de contas:', contasData.length);
@@ -404,71 +413,29 @@ const ContasAPagar: React.FC = () => {
         const dataInicio = reportFilters.startDate;
         const dataFim = reportFilters.endDate;
 
-        console.log('🔍 DEBUG: Verificando conta:', {
-          id: conta.id,
-          vencimento: conta.vencimento,
-          dataVencimento,
-          dataInicio,
-          dataFim,
-          status: conta.status,
-          tipo: conta.tipo,
-          fornecedor: conta.fornecedor
-        });
-
         const filtroData = dataVencimento >= dataInicio && dataVencimento <= dataFim;
         const filtroStatus = reportFilters.status === 'TODOS' || conta.status === reportFilters.status;
         const filtroTipo = reportFilters.tipo === 'TODOS' || conta.tipo === reportFilters.tipo;
         const filtroFornecedor = reportFilters.fornecedor === 'TODOS' || conta.fornecedor === reportFilters.fornecedor;
+        const empresaConta = (conta.companySigla || conta.empresa || '').trim().toUpperCase();
+        const filtroEmpresa = !reportFilters.empresa || reportFilters.empresa === 'TODAS' || empresaConta === reportFilters.empresa.trim().toUpperCase();
 
-        console.log('🔍 DEBUG: Filtros aplicados:', {
-          filtroData,
-          filtroStatus,
-          filtroTipo,
-          filtroFornecedor,
-          passaFiltro: filtroData && filtroStatus && filtroTipo && filtroFornecedor
-        });
-
-        return filtroData && filtroStatus && filtroTipo && filtroFornecedor;
+        return filtroData && filtroStatus && filtroTipo && filtroFornecedor && filtroEmpresa;
       });
 
       console.log('🔍 DEBUG: Contas filtradas:', contasFiltradas.length, contasFiltradas);
 
       // Se não há dados reais, criar dados de teste para demonstração
       let contasParaRelatorio = contasFiltradas;
-      if (contasFiltradas.length === 0 && contas.length > 0) {
+      if (contasFiltradas.length === 0 && contas.length > 0 && reportFilters.empresa === 'TODAS') {
         console.log('🔍 DEBUG: Nenhuma conta passou nos filtros, usando todas as contas para demonstração');
         contasParaRelatorio = contas.slice(0, 5); // Usar apenas as primeiras 5 para demonstração
-      } else if (contas.length === 0) {
-        console.log('🔍 DEBUG: Nenhuma conta carregada, criando dados de teste');
-        contasParaRelatorio = [
-          {
-            id: '1',
-            descricao: 'Conta de teste 1',
-            fornecedor: 'Fornecedor A',
-            valor: 1500.00,
-            vencimento: new Date(),
-            status: 'ABERTA',
-            tipo: 'VARIAVEL',
-            empresa: 'Empresa Teste',
-            companySigla: 'TESTE'
-          },
-          {
-            id: '2',
-            descricao: 'Conta de teste 2',
-            fornecedor: 'Fornecedor B',
-            valor: 2300.50,
-            vencimento: new Date(),
-            status: 'PAGA',
-            tipo: 'FIXA',
-            empresa: 'Empresa Teste',
-            companySigla: 'TESTE'
-          }
-        ];
       }
 
       let reportData = {
         title: '',
         subtitle: '',
+        type: reportType,
         period: `${format(reportFilters.startDate, 'dd/MM/yyyy')} - ${format(reportFilters.endDate, 'dd/MM/yyyy')}`,
         data: contasParaRelatorio,
         summary: {}
@@ -476,10 +443,22 @@ const ContasAPagar: React.FC = () => {
 
       switch (reportType) {
         case 'resumo':
+          // Ordena as contas começando pela VIG e depois as demais
+          contasParaRelatorio.sort((a, b) => {
+            const siglaA = (a.companySigla || a.empresa || '').toUpperCase();
+            const siglaB = (b.companySigla || b.empresa || '').toUpperCase();
+            const isVigA = siglaA.includes('VIG');
+            const isVigB = siglaB.includes('VIG');
+            if (isVigA && !isVigB) return -1;
+            if (!isVigA && isVigB) return 1;
+            return siglaA.localeCompare(siglaB);
+          });
+
           reportData = {
             ...reportData,
             title: 'Relatório Resumo - Contas a Pagar',
-            subtitle: 'Visão geral das contas a pagar no período selecionado',
+            subtitle: 'Visão geral das contas organizada por empresa (iniciando pela VIG)',
+            data: [...contasParaRelatorio],
             summary: {
               totalContas: contasParaRelatorio.length,
               valorTotal: contasParaRelatorio.reduce((sum, c) => sum + c.valor, 0),
@@ -504,19 +483,25 @@ const ContasAPagar: React.FC = () => {
           };
           break;
         case 'fornecedor':
+          // Agrupa por fornecedor e/ou funcionário beneficiário
           const fornecedores = contasParaRelatorio.reduce((acc, conta) => {
-            if (!acc[conta.fornecedor]) {
-              acc[conta.fornecedor] = { count: 0, valor: 0 };
+            const benef = (conta.employeeName && conta.employeeName.trim()) 
+              ? conta.employeeName.trim() 
+              : (conta.fornecedor && conta.fornecedor.trim()) 
+                ? conta.fornecedor.trim() 
+                : 'Não informado';
+            if (!acc[benef]) {
+              acc[benef] = { count: 0, valor: 0 };
             }
-            acc[conta.fornecedor].count++;
-            acc[conta.fornecedor].valor += conta.valor;
+            acc[benef].count++;
+            acc[benef].valor += conta.valor;
             return acc;
           }, {} as any);
 
           reportData = {
             ...reportData,
-            title: 'Relatório por Fornecedor - Contas a Pagar',
-            subtitle: 'Agrupamento das contas por fornecedor',
+            title: 'Relatório por Fornecedor / Beneficiário - Contas a Pagar',
+            subtitle: 'Agrupamento das contas por fornecedor e funcionários beneficiários',
             summary: {
               totalFornecedores: Object.keys(fornecedores).length,
               fornecedores: fornecedores,
@@ -557,10 +542,22 @@ const ContasAPagar: React.FC = () => {
             return acc;
           }, {} as any);
 
+          // Ordena as contas começando pela VIG
+          contasParaRelatorio.sort((a, b) => {
+            const siglaA = (a.companySigla || a.empresa || '').toUpperCase();
+            const siglaB = (b.companySigla || b.empresa || '').toUpperCase();
+            const isVigA = siglaA.includes('VIG');
+            const isVigB = siglaB.includes('VIG');
+            if (isVigA && !isVigB) return -1;
+            if (!isVigA && isVigB) return 1;
+            return siglaA.localeCompare(siglaB);
+          });
+
           reportData = {
             ...reportData,
             title: 'Relatório por Empresa - Contas a Pagar',
-            subtitle: 'Agrupamento das contas por empresa',
+            subtitle: 'Agrupamento das contas por empresa (iniciando pela VIG)',
+            data: [...contasParaRelatorio],
             summary: {
               totalEmpresas: Object.keys(empresas).length,
               empresas: empresas,
@@ -852,18 +849,6 @@ const ContasAPagar: React.FC = () => {
 
     // Recalculate summary based on the filtered data
     switch (reportData.type) {
-      case 'resumo':
-        currentSummary = {
-          totalContas: dataToSummarize.length,
-          valorTotal: dataToSummarize.reduce((sum, conta) => sum + conta.valor, 0),
-          contasPagas: dataToSummarize.filter(c => c.status === 'PAGA').length,
-          valorPagas: dataToSummarize.filter(c => c.status === 'PAGA').reduce((sum, c) => sum + c.valor, 0),
-          contasAbertas: dataToSummarize.filter(c => c.status === 'ABERTA').length,
-          valorAbertas: dataToSummarize.filter(c => c.status === 'ABERTA').reduce((sum, c) => sum + c.valor, 0),
-          contasVencidas: dataToSummarize.filter(c => c.status === 'VENCIDA').length,
-          valorVencidas: dataToSummarize.filter(c => c.status === 'VENCIDA').reduce((sum, c) => sum + c.valor, 0),
-        };
-        break;
       case 'periodo':
         currentSummary = {
           totalContas: dataToSummarize.length,
@@ -880,7 +865,12 @@ const ContasAPagar: React.FC = () => {
           totalContas: dataToSummarize.length,
           valorTotal: dataToSummarize.reduce((sum, conta) => sum + conta.valor, 0),
           fornecedores: dataToSummarize.reduce((acc, conta) => {
-            acc[conta.fornecedor] = (acc[conta.fornecedor] || 0) + conta.valor;
+            const benef = (conta.employeeName && conta.employeeName.trim()) 
+              ? conta.employeeName.trim() 
+              : (conta.fornecedor && conta.fornecedor.trim()) 
+                ? conta.fornecedor.trim() 
+                : 'Não informado';
+            acc[benef] = (acc[benef] || 0) + conta.valor;
             return acc;
           }, {}),
         };
@@ -906,16 +896,36 @@ const ContasAPagar: React.FC = () => {
         };
         break;
       case 'empresa':
+      case 'resumo': {
+        const rawEmpresas = dataToSummarize.reduce((acc: any, conta: ContaAPagar) => {
+          const sigla = (conta.companySigla || conta.empresa || 'Não informado').trim().toUpperCase();
+          acc[sigla] = (acc[sigla] || 0) + conta.valor;
+          return acc;
+        }, {});
+
+        // Organizar empresas começando sempre pela VIG
+        const sortedEmpresas: Record<string, number> = {};
+        Object.keys(rawEmpresas)
+          .filter(k => k.includes('VIG'))
+          .forEach(k => { sortedEmpresas[k] = rawEmpresas[k]; });
+        Object.keys(rawEmpresas)
+          .filter(k => !k.includes('VIG'))
+          .sort()
+          .forEach(k => { sortedEmpresas[k] = rawEmpresas[k]; });
+
         currentSummary = {
           totalContas: dataToSummarize.length,
           valorTotal: dataToSummarize.reduce((sum, conta) => sum + conta.valor, 0),
-          empresas: dataToSummarize.reduce((acc, conta) => {
-            const sigla = conta.companySigla || conta.empresa || 'Não informado';
-            acc[sigla] = (acc[sigla] || 0) + conta.valor;
-            return acc;
-          }, {}),
+          contasPagas: dataToSummarize.filter(c => c.status === 'PAGA').length,
+          valorPagas: dataToSummarize.filter(c => c.status === 'PAGA').reduce((sum, c) => sum + c.valor, 0),
+          contasAbertas: dataToSummarize.filter(c => c.status === 'ABERTA').length,
+          valorAbertas: dataToSummarize.filter(c => c.status === 'ABERTA').reduce((sum, c) => sum + c.valor, 0),
+          contasVencidas: dataToSummarize.filter(c => c.status === 'VENCIDA').length,
+          valorVencidas: dataToSummarize.filter(c => c.status === 'VENCIDA').reduce((sum, c) => sum + c.valor, 0),
+          empresas: sortedEmpresas,
         };
         break;
+      }
       default:
         currentSummary = {};
         break;
@@ -996,42 +1006,160 @@ const ContasAPagar: React.FC = () => {
               />
             )}
 
-            {/* Alertas de Vencimento */}
-            {alertasVencimento.length > 0 && (
-              <Card className="border-yellow-200 bg-yellow-50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-yellow-800">
-                    <Bell className="text-yellow-600" />
-                    Alertas de Vencimento
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {alertasVencimento.slice(0, 3).map(conta => (
-                      <div key={conta.id} className="flex justify-between items-center p-2 bg-white rounded border">
-                        <div>
-                          <span className="font-medium">{conta.fornecedor}</span>
-                          <span className="text-sm text-gray-600 ml-2">{conta.descricao}</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-yellow-700">
-                            {formatCurrency(conta.valor)}
-                          </div>
-                          <div className="text-sm text-yellow-600">
-                            Vence em {format(conta.vencimento, 'dd/MM/yyyy')}
-                          </div>
-                        </div>
+            {/* Alertas de Vencimento com Slider Interativo e Design Dark Executivo */}
+            {alertasVencimento.length > 0 && (() => {
+              const itemsPerPage = 3;
+              const totalSlides = Math.ceil(alertasVencimento.length / itemsPerPage);
+              const currentSlide = Math.min(alertasSlideIndex, totalSlides - 1);
+              const startIdx = currentSlide * itemsPerPage;
+              const visibleAlerts = alertasVencimento.slice(startIdx, startIdx + itemsPerPage);
+              const totalValorAlertas = alertasVencimento.reduce((acc, c) => acc + (c.valor || 0), 0);
+
+              return (
+                <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950/40 p-4 sm:p-5 shadow-2xl backdrop-blur-md transition-all">
+                  {/* Glow decorativo no topo */}
+                  <div className="absolute -top-12 -left-12 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                  
+                  {/* Cabeçalho do Card de Alertas */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3.5 mb-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30 text-amber-400 shadow-inner">
+                        <Bell className="w-5 h-5 animate-pulse" />
+                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                        </span>
                       </div>
-                    ))}
-                    {alertasVencimento.length > 3 && (
-                      <p className="text-sm text-yellow-600 text-center">
-                        E mais {alertasVencimento.length - 3} conta(s) vencendo em breve...
-                      </p>
-                    )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                            Alertas de Vencimento
+                          </h3>
+                          <Badge className="bg-amber-500/20 border-amber-500/40 text-amber-300 text-xs px-2 py-0.5">
+                            {alertasVencimento.length} {alertasVencimento.length === 1 ? 'conta' : 'contas'}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Despesas em aberto com vencimento previsto para os próximos 7 dias • Total: <span className="text-amber-300 font-semibold">{formatCurrency(totalValorAlertas)}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Controles de Slides / Paginação */}
+                    <div className="flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowCustomReportModal(true)}
+                        className="text-xs h-8 border-amber-500/30 text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/60 transition-colors"
+                      >
+                        <FileText size={14} className="mr-1.5" />
+                        Relatório PDF
+                      </Button>
+
+                      {totalSlides > 1 && (
+                        <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 rounded-lg p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setAlertasSlideIndex(prev => Math.max(0, prev - 1))}
+                            disabled={currentSlide === 0}
+                            className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 rounded transition-colors"
+                            title="Despesas anteriores"
+                          >
+                            <ChevronLeft size={16} />
+                          </button>
+                          <span className="text-[11px] font-medium text-slate-400 px-1.5 min-w-[40px] text-center">
+                            {currentSlide + 1} / {totalSlides}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setAlertasSlideIndex(prev => Math.min(totalSlides - 1, prev + 1))}
+                            disabled={currentSlide === totalSlides - 1}
+                            className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 rounded transition-colors"
+                            title="Próximas despesas"
+                          >
+                            <ChevronRight size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+
+                  {/* Lista de Contas com Transição e Visual Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {visibleAlerts.map((conta) => {
+                      const isVencendoHoje = isBefore(new Date(conta.vencimento), addDays(new Date(), 1)) &&
+                        !isBefore(new Date(conta.vencimento), new Date(new Date().setHours(0, 0, 0, 0)));
+                      
+                      return (
+                        <div
+                          key={conta.id}
+                          onClick={() => {
+                            setViewingConta(conta);
+                            setShowViewModal(true);
+                          }}
+                          className="group relative flex flex-col justify-between p-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/40 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md hover:shadow-amber-500/5 hover:-translate-y-0.5"
+                        >
+                          <div className="space-y-1.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors line-clamp-1">
+                                {conta.fornecedor || 'Fornecedor não informado'}
+                              </span>
+                              {isVencendoHoje ? (
+                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px] px-1.5 py-0 shrink-0">
+                                  Vence Hoje
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-amber-500/10 text-amber-300 border-amber-500/20 text-[10px] px-1.5 py-0 shrink-0">
+                                  Próximo
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                              {conta.descricao || 'Sem descrição'}
+                            </p>
+                          </div>
+
+                          <div className="flex items-baseline justify-between pt-3 mt-2 border-t border-slate-800/60">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                              <Clock size={12} className="text-amber-400 shrink-0" />
+                              <span>{format(new Date(conta.vencimento), 'dd/MM/yyyy')}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-sm sm:text-base font-extrabold text-amber-400 tracking-tight">
+                                {formatCurrency(conta.valor)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Barra de Paginação / Dots quando houver mais de 1 página */}
+                  {totalSlides > 1 && (
+                    <div className="flex items-center justify-center gap-1.5 pt-3 mt-1">
+                      {Array.from({ length: Math.min(totalSlides, 8) }).map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setAlertasSlideIndex(idx)}
+                          className={`h-1.5 rounded-full transition-all ${
+                            idx === currentSlide
+                              ? 'w-6 bg-amber-400 shadow-sm shadow-amber-400/50'
+                              : 'w-1.5 bg-slate-700 hover:bg-slate-500'
+                          }`}
+                          aria-label={`Slide ${idx + 1}`}
+                        />
+                      ))}
+                      {totalSlides > 8 && (
+                        <span className="text-[10px] text-slate-500 ml-1">+{totalSlides - 8}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Dashboard Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1270,9 +1398,9 @@ const ContasAPagar: React.FC = () => {
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Data Início</label>
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Data Início</label>
                     <DatePicker
                       date={reportFilters.startDate}
                       onDateChange={(date) => setReportFilters(prev => ({ ...prev, startDate: date || new Date() }))}
@@ -1280,7 +1408,7 @@ const ContasAPagar: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Data Fim</label>
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Data Fim</label>
                     <DatePicker
                       date={reportFilters.endDate}
                       onDateChange={(date) => setReportFilters(prev => ({ ...prev, endDate: date || new Date() }))}
@@ -1288,11 +1416,42 @@ const ContasAPagar: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Status</label>
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Empresa</label>
+                    <select
+                      value={reportFilters.empresa || 'TODAS'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setReportFilters(prev => ({ ...prev, empresa: val }));
+                        setEmpresaFilterRelatorio(val);
+                      }}
+                      className="w-full px-3 py-2.5 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    >
+                      <option value="TODAS">Todas as Empresas</option>
+                      {empresasList && empresasList.length > 0 ? (
+                        empresasList.map((comp: any) => {
+                          const sigla = (comp.sigla || comp.name || '').trim();
+                          const label = comp.sigla ? `${comp.sigla} - ${comp.name}` : comp.name;
+                          return (
+                            <option key={comp.id || sigla} value={sigla}>
+                              {label}
+                            </option>
+                          );
+                        })
+                      ) : (
+                        <>
+                          <option value="VIG">VIG - Promover Vigilância</option>
+                          <option value="TERC">TERC - Promover Terceirização</option>
+                          <option value="ADM">ADM - Promover Administração</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Status</label>
                     <select
                       value={reportFilters.status}
                       onChange={(e) => setReportFilters(prev => ({ ...prev, status: e.target.value }))}
-                      className="w-full px-4 py-3 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                      className="w-full px-3 py-2.5 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     >
                       <option value="TODOS">Todos os Status</option>
                       <option value="ABERTA">Aberta</option>
@@ -1302,11 +1461,11 @@ const ContasAPagar: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Tipo</label>
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Tipo</label>
                     <select
                       value={reportFilters.tipo}
                       onChange={(e) => setReportFilters(prev => ({ ...prev, tipo: e.target.value }))}
-                      className="w-full px-4 py-3 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                      className="w-full px-3 py-2.5 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     >
                       <option value="TODOS">Todos os Tipos</option>
                       <option value="FIXA">Fixa</option>
@@ -1483,8 +1642,8 @@ const ContasAPagar: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Detalhamento por Empresa */}
-                      {reportData?.type === 'empresa' && displaySummary.empresas && Object.keys(displaySummary.empresas).length > 0 && (
+                      {/* Detalhamento por Empresa (exibido em Empresa e no Resumo Geral) */}
+                      {(reportData?.type === 'empresa' || reportData?.type === 'resumo') && displaySummary.empresas && Object.keys(displaySummary.empresas).length > 0 && (
                         <div className="bg-seguranca-black/30 rounded-xl border border-gray-600/30 p-6">
                           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                             <Building className="h-5 w-5 text-blue-400" />
@@ -1540,7 +1699,7 @@ const ContasAPagar: React.FC = () => {
                             <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Empresa</th>
                             <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Descrição</th>
                             <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Conta</th>
-                            <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Fornecedor</th>
+                            <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Fornecedor / Beneficiário</th>
                             <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Valor</th>
                             <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Vencimento</th>
                             <th className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600/50">Status</th>
@@ -1550,6 +1709,7 @@ const ContasAPagar: React.FC = () => {
                         <tbody>
                           {paginatedData.map((conta: ContaAPagar, index: number) => {
                             const empresaSigla = conta.companySigla || conta.empresa || 'Não informado';
+                            const beneficiario = resolveFornecedorOuFuncionario(conta);
                             return (
                               <tr key={conta.id || index} className={index % 2 === 0 ? 'bg-seguranca-graphite/30' : 'bg-seguranca-black/30'}>
                                 <td className="px-4 py-3 border-b border-gray-700/30">
@@ -1581,7 +1741,7 @@ const ContasAPagar: React.FC = () => {
                                     {formatContaPlanoDeContas(conta) || '-'}
                                   </div>
                                 </td>
-                                <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">{conta.fornecedor}</td>
+                                <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">{beneficiario}</td>
                                 <td className="px-4 py-3 text-green-400 font-medium border-b border-gray-700/30">{formatCurrency(conta.valor)}</td>
                                 <td className="px-4 py-3 text-gray-300 border-b border-gray-700/30">
                                   {conta.vencimento ? format(conta.vencimento, 'dd/MM/yyyy') : '-'}

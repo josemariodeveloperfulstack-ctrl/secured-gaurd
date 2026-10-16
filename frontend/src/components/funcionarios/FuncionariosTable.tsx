@@ -57,54 +57,65 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
   onSort
 }) => {
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; className: string }> = {
+    const statusConfig: Record<string, { label: string; dot: string; className: string }> = {
       'ACTIVE': {
         label: 'Ativo',
-        className: 'bg-green-500/20 text-green-300 border-green-500/30'
+        dot: 'bg-emerald-400',
+        className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
       },
       'INACTIVE': {
         label: 'Inativo',
-        className: 'bg-gray-500/20 text-gray-300 border-gray-500/30'
+        dot: 'bg-gray-400',
+        className: 'bg-gray-500/15 text-gray-300 border-gray-500/30'
       },
       'VACATION': {
         label: 'Férias',
-        className: 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+        dot: 'bg-sky-400',
+        className: 'bg-sky-500/15 text-sky-300 border-sky-500/30'
       },
       'MATERNITY_LEAVE': {
         label: 'Licença Maternidade',
-        className: 'bg-pink-500/20 text-pink-300 border-pink-500/30'
+        dot: 'bg-pink-400',
+        className: 'bg-pink-500/15 text-pink-300 border-pink-500/30'
       },
       'MEDICAL_CERTIFICATE': {
         label: 'Atestado',
-        className: 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+        dot: 'bg-indigo-400',
+        className: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
       },
       'TERMINATED': {
         label: 'Demitido',
-        className: 'bg-red-500/20 text-red-300 border-red-500/30'
+        dot: 'bg-rose-400',
+        className: 'bg-rose-500/15 text-rose-300 border-rose-500/30'
       },
       'SUSPENDED': {
         label: 'Suspenso',
-        className: 'bg-orange-500/20 text-orange-300 border-orange-500/30'
+        dot: 'bg-amber-400',
+        className: 'bg-amber-500/15 text-amber-300 border-amber-500/30'
       },
       'SUB_JUDICE': {
         label: 'Sub Júdice',
-        className: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+        dot: 'bg-amber-400',
+        className: 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
       },
       'INSS_LEAVE': {
         label: 'Afastamento INSS',
-        className: 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+        dot: 'bg-blue-400',
+        className: 'bg-blue-500/15 text-blue-300 border-blue-500/30'
       },
       'UNEXCUSED_ABSENCE': {
         label: 'Abandono / Falta',
-        className: 'bg-red-600/30 text-red-300 border-red-500/50'
+        dot: 'bg-rose-500',
+        className: 'bg-rose-600/20 text-rose-300 border-rose-500/40'
       }
     };
 
     const config = statusConfig[status] || statusConfig['INACTIVE'];
     return (
-      <Badge className={`${config.className} px-2 py-0.5 text-xs font-medium border`}>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold tracking-wide border ${config.className}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${config.dot} shrink-0`} />
         {config.label}
-      </Badge>
+      </span>
     );
   };
 
@@ -124,67 +135,58 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
 
     if (isReadmitido) {
       badges.push(
-        <Badge
+        <span
           key="readmitido"
-          variant="secondary"
-          className={`bg-purple-500/20 text-purple-300 border border-purple-500/30 whitespace-nowrap ${
-            isMobile ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0.5'
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-500/15 text-purple-300 border border-purple-500/30 whitespace-nowrap ${
+            isMobile ? 'text-[9px]' : ''
           }`}
         >
-          Readmitido {employee.periodCount && employee.periodCount > 1 ? `(${employee.periodCount}º contrato)` : ''}
-        </Badge>
+          Readmitido {employee.periodCount && employee.periodCount > 1 ? `(${employee.periodCount}º)` : ''}
+        </span>
       );
     } else if (employee.periodCount && employee.periodCount > 1) {
       badges.push(
-        <Badge
+        <span
           key="vinculos"
-          variant="secondary"
-          className={`bg-blue-500/10 text-blue-400 border border-blue-500/30 whitespace-nowrap ${
-            isMobile ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0.5'
+          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/30 whitespace-nowrap ${
+            isMobile ? 'text-[9px]' : ''
           }`}
         >
           {employee.periodCount} Vínculos
-        </Badge>
+        </span>
       );
     }
 
     if (employee.admissionType === 'PROMOCAO' || employee.lastPromotionDate) {
       const promoLabel = employee.lastPromotionDate
-        ? `Promovido em ${formatDatePtBr(employee.lastPromotionDate)}`
+        ? `Promovido (${formatDatePtBr(employee.lastPromotionDate)})`
         : 'Promovido';
       badges.push(
-        <Badge
+        <span
           key="promovido"
-          variant="secondary"
-          className={`bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap ${
-            isMobile ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0.5'
+          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30 whitespace-nowrap ${
+            isMobile ? 'text-[9px]' : ''
           }`}
         >
           {promoLabel}
-        </Badge>
+        </span>
       );
     }
 
     if (employee.previousStatus || employee.previousWorkPostName || employee.previousTerminationDate) {
       const prevDateStr = employee.previousTerminationDate ? formatDatePtBr(employee.previousTerminationDate) : null;
       const statusLabel = employee.previousStatus === 'TERMINATED' ? 'Demitido' : (employee.previousStatus || 'Vínculo anterior');
-      const details = [
-        statusLabel,
-        prevDateStr ? `em ${prevDateStr}` : null,
-        employee.previousWorkPostName ? `(${employee.previousWorkPostName})` : null
-      ].filter(Boolean).join(' ');
 
       badges.push(
-        <Badge
+        <div
           key="previous-status"
-          variant="outline"
-          className={`bg-gray-500/10 text-gray-300 border border-gray-500/30 whitespace-normal text-left ${
-            isMobile ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0.5'
-          }`}
-          title={`Histórico anterior: ${details}`}
+          className="flex items-center gap-1 text-[10px] text-gray-400 bg-white/[0.04] px-1.5 py-0.5 rounded border border-gray-700/50 leading-none max-w-[170px]"
+          title={`Histórico anterior: ${statusLabel}${prevDateStr ? ` em ${prevDateStr}` : ''}${employee.previousWorkPostName ? ` (${employee.previousWorkPostName})` : ''}`}
         >
-          Anterior: {details}
-        </Badge>
+          <span className="text-gray-500">Ant:</span>
+          <span className="text-gray-300 truncate font-medium">{statusLabel}</span>
+          {prevDateStr && <span className="text-gray-400 font-mono text-[9px]">({prevDateStr})</span>}
+        </div>
       );
     }
 
@@ -268,41 +270,41 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
         <Table>
           <TableHeader>
             <TableRow className="bg-seguranca-black/50 hover:bg-seguranca-black/70 border-gray-600/30">
-              <TableHead className="w-[50px]">
+              <TableHead className="w-[40px] px-2 py-2">
                 <Checkbox
                   checked={employees.length > 0 && selectedIds.length === employees.length}
                   onCheckedChange={(checked) => onSelectAll(!!checked)}
                   className="border-gray-500 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
                 />
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">
+              <TableHead className="text-seguranca-yellow font-semibold text-xs px-2 py-2">
                 <SortHead k="name">Funcionário</SortHead>
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">
+              <TableHead className="text-seguranca-yellow font-semibold text-xs px-2 py-2">
                 <SortHead k="position">Cargo/Função</SortHead>
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">
+              <TableHead className="text-seguranca-yellow font-semibold text-xs px-2 py-2">
                 <SortHead k="company">Empresa</SortHead>
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">
+              <TableHead className="text-seguranca-yellow font-semibold text-xs px-2 py-2">
                 <SortHead k="workPost">Setor de Trabalho</SortHead>
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">
+              <TableHead className="text-seguranca-yellow font-semibold text-xs px-2 py-2">
                 <SortHead k="escalaTrabalho">Escala</SortHead>
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">
+              <TableHead className="text-seguranca-yellow font-semibold text-xs px-2 py-2">
                 <SortHead k="horarioTrabalho">Horário</SortHead>
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">
+              <TableHead className="text-seguranca-yellow font-semibold text-xs px-2 py-2">
                 <SortHead k="hireDate">Admissão</SortHead>
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">
+              <TableHead className="text-seguranca-yellow font-semibold text-xs px-2 py-2">
                 <SortHead k="terminationDate">Demissão</SortHead>
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">
+              <TableHead className="text-seguranca-yellow font-semibold text-xs px-2 py-2">
                 <SortHead k="status">Status</SortHead>
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold w-[100px]">Ações</TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold text-xs w-[90px] px-2 py-2">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -312,23 +314,23 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                 className={`border-gray-600/30 hover:bg-seguranca-black/30 transition-all duration-200 group ${selectedIds.includes(employee.id) ? 'bg-seguranca-red/5' : ''}`}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <TableCell className="py-2">
+                <TableCell className="py-1.5 px-2">
                   <Checkbox
                     checked={selectedIds.includes(employee.id)}
                     onCheckedChange={(checked) => onSelect(employee.id, !!checked)}
                     className="border-gray-500 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
                   />
                 </TableCell>
-                <TableCell className="py-2">
+                <TableCell className="py-1.5 px-2">
                   <div
-                    className="flex items-start gap-3 cursor-pointer group/name"
+                    className="flex items-start gap-2 cursor-pointer group/name"
                     onClick={() => onViewDetails(employee)}
                   >
-                    <div className="mt-0.5 p-1.5 rounded-md bg-seguranca-red/10 border border-seguranca-red/20 group-hover:bg-seguranca-red/20 group-hover/name:border-seguranca-red/50 transition-colors">
-                      <User className="h-4 w-4 text-seguranca-red" />
+                    <div className="mt-0.5 p-1 rounded-md bg-seguranca-red/10 border border-seguranca-red/20 group-hover:bg-seguranca-red/20 group-hover/name:border-seguranca-red/50 transition-colors">
+                      <User className="h-3.5 w-3.5 text-seguranca-red" />
                     </div>
                     <div>
-                      <div className="font-semibold text-seguranca-lightgray group-hover:text-white group-hover/name:text-seguranca-yellow transition-colors leading-tight">
+                      <div className="font-semibold text-xs text-seguranca-lightgray group-hover:text-white group-hover/name:text-seguranca-yellow transition-colors leading-tight">
                         {(() => {
                           const name = employee.name?.trim();
                           const mat = employee.registrationNumber?.trim();
@@ -338,116 +340,114 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                         })()}
                       </div>
                       {(employee.cpf || employee.registrationNumber || (employee as any).document) && (
-                        <div className="text-xs text-gray-400 mt-0.5 font-mono leading-tight">
+                        <div className="text-[10px] text-gray-400 mt-0.5 font-mono leading-tight">
                           CPF: {formatCPF(employee.cpf || employee.registrationNumber || (employee as any).document)}
                         </div>
                       )}
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-1.5 px-2">
                   <div className="space-y-0.5">
                     {employee.position?.name && (
-                      <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
-                        <Building className="h-3.5 w-3.5 text-gray-400" />
-                        {employee.position.name}
+                      <div className="flex items-center gap-1.5 text-[11px] text-seguranca-lightgray leading-tight">
+                        <Building className="h-3 w-3 text-gray-400 shrink-0" />
+                        <span className="truncate max-w-[140px]">{employee.position.name}</span>
                       </div>
                     )}
                     {employee.position?.description && (
-                      <div className="flex items-center gap-2 text-xs text-gray-400 leading-tight">
-                        <Briefcase className="h-3.5 w-3.5" />
-                        {employee.position.description}
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-400 leading-tight">
+                        <Briefcase className="h-3 w-3 shrink-0" />
+                        <span className="truncate max-w-[140px]">{employee.position.description}</span>
                       </div>
                     )}
                     {!employee.position?.name && !employee.position?.description && (
-                      <span className="text-gray-500 italic text-xs">Não definido</span>
+                      <span className="text-gray-500 italic text-[11px]">Não definido</span>
                     )}
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                <TableCell className="py-1.5 px-2">
+                  <div className="flex items-center gap-1.5 text-[11px] text-seguranca-lightgray leading-tight">
                     {employee.company?.sigla ? (
                       <>
-                        <Building className="h-3.5 w-3.5 text-gray-400" />
-                        <span className="truncate max-w-[200px] font-semibold">{employee.company.sigla}</span>
+                        <Building className="h-3 w-3 text-gray-400 shrink-0" />
+                        <span className="truncate max-w-[140px] font-semibold">{employee.company.sigla}</span>
                       </>
                     ) : (
-                      <span className="text-gray-500 italic text-xs">Não definido</span>
+                      <span className="text-gray-500 italic text-[11px]">Não definido</span>
                     )}
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex flex-col gap-0.5 text-xs text-seguranca-lightgray leading-tight">
+                <TableCell className="py-1.5 px-2">
+                  <div className="flex flex-col gap-0.5 text-[11px] text-seguranca-lightgray leading-tight">
                     {(() => {
                       const workPostsLabel = getWorkPostsLabel(employee);
                       return workPostsLabel ? (
-                        <div className="flex items-center gap-2" title="Setor de Trabalho Atual">
-                          <MapPin className="h-3.5 w-3.5 text-seguranca-yellow flex-shrink-0" />
-                          <span className="truncate max-w-[200px]">{workPostsLabel}</span>
+                        <div className="flex items-center gap-1.5" title="Setor de Trabalho Atual">
+                          <MapPin className="h-3 w-3 text-seguranca-yellow flex-shrink-0" />
+                          <span className="truncate max-w-[150px]">{workPostsLabel}</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2" title="Sem Setor de Trabalho">
-                          <MapPin className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
-                          <span className="text-gray-500 italic text-xs">Sem setor</span>
+                        <div className="flex items-center gap-1.5" title="Sem Setor de Trabalho">
+                          <MapPin className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                          <span className="text-gray-500 italic text-[11px]">Sem setor</span>
                         </div>
                       );
                     })()}
                     {employee.previousWorkPostName && (
-                      <div className="text-[10px] text-gray-400 pl-5 truncate max-w-[200px]" title={`Posto Anterior: ${employee.previousWorkPostName}`}>
+                      <div className="text-[10px] text-gray-400 pl-4 truncate max-w-[150px]" title={`Posto Anterior: ${employee.previousWorkPostName}`}>
                         Anterior: {employee.previousWorkPostName}
                       </div>
                     )}
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                <TableCell className="py-1.5 px-2">
+                  <div className="flex items-center gap-1 text-[11px] text-seguranca-lightgray leading-tight">
                     {employee.escalaTrabalho ? (
-                      <span className="truncate max-w-[150px]">{employee.escalaTrabalho}</span>
+                      <span className="truncate max-w-[110px]">{employee.escalaTrabalho}</span>
                     ) : (
-                      <span className="text-gray-500 italic text-xs">Não definida</span>
+                      <span className="text-gray-500 italic text-[10px]">Não definida</span>
                     )}
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                <TableCell className="py-1.5 px-2">
+                  <div className="flex items-center gap-1 text-[11px] text-seguranca-lightgray leading-tight">
                     {employee.horarioTrabalho ? (
-                      <span className="truncate max-w-[150px]">{employee.horarioTrabalho}</span>
+                      <span className="truncate max-w-[110px]">{employee.horarioTrabalho}</span>
                     ) : (
-                      <span className="text-gray-500 italic text-xs">Não definido</span>
+                      <span className="text-gray-500 italic text-[10px]">Não definido</span>
                     )}
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
-                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                <TableCell className="py-1.5 px-2">
+                  <div className="flex items-center gap-1 text-[11px] text-seguranca-lightgray leading-tight whitespace-nowrap">
+                    <Calendar className="h-3 w-3 text-gray-400 shrink-0" />
                     {formatDatePtBr(employee.hireDate)}
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
-                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                <TableCell className="py-1.5 px-2">
+                  <div className="flex items-center gap-1 text-[11px] text-seguranca-lightgray leading-tight whitespace-nowrap">
+                    <Calendar className="h-3 w-3 text-gray-400 shrink-0" />
                     {formatDatePtBr(terminationDateForDisplay(employee))}
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex flex-col gap-1 items-start">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {getStatusBadge(effectiveEmploymentStatus(employee))}
-                      {renderHistoryBadges(employee)}
-                    </div>
+                <TableCell className="py-1.5 px-2">
+                  <div className="flex flex-col gap-1 items-start justify-center min-w-[120px]">
+                    {getStatusBadge(effectiveEmploymentStatus(employee))}
+                    {renderHistoryBadges(employee)}
                     {pendingAdmissionEmployeeIds?.has(employee.id) && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/70 text-amber-300 whitespace-normal text-left leading-tight">
+                      <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/40 text-amber-300 font-medium leading-tight">
                         Admissão em processo
-                      </Badge>
+                      </span>
                     )}
                     {pendingDismissalEmployeeIds?.has(employee.id) && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-orange-500/70 text-orange-300 whitespace-normal text-left leading-tight">
+                      <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-orange-500/10 border border-orange-500/40 text-orange-300 font-medium leading-tight">
                         Demissão em processo
-                      </Badge>
+                      </span>
                     )}
                   </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-1.5 px-2">
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"

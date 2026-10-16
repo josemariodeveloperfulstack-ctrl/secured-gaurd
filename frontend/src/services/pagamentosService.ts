@@ -1,4 +1,5 @@
 import axios from 'axios';
+import api from '@/lib/axios';
 import { isConnectionError } from '@/utils/connectionError';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -40,6 +41,19 @@ export interface AgendamentoPagamento {
   subcategoriaCodigo?: string;
   categoriaPaiNome?: string;
   categoriaPaiCodigo?: string;
+}
+
+export interface CustomPagamentosReportRequest {
+  startDate?: string;
+  endDate?: string;
+  dateField?: 'scheduledDate' | 'executionDate';
+  status?: string;
+  paymentMethod?: string;
+  clientId?: string;
+  subcategoriaId?: string;
+  expiringInDays?: number;
+  selectedColumns?: string[];
+  groupBy?: string;
 }
 
 export interface Cliente {
@@ -489,6 +503,31 @@ class PagamentosService {
       return response.data;
     } catch (error) {
       console.error('Erro ao gerar relatório PDF:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gerar Relatório PDF Personalizado de Pagamentos Agendados com Layout Executivo
+   */
+  async generateCustomPdfReport(request: CustomPagamentosReportRequest): Promise<Blob> {
+    try {
+      const response = await api.post('/api/reports/pagamentos/custom-pdf', request, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        try {
+          const fallback = await api.post('/api/scheduled-payments/custom-pdf', request, {
+            responseType: 'blob'
+          });
+          return fallback.data;
+        } catch (fbErr) {
+          console.error('Erro no fallback de relatório de pagamentos:', fbErr);
+        }
+      }
+      console.error('Erro ao gerar relatório personalizado em PDF de pagamentos:', error);
       throw error;
     }
   }

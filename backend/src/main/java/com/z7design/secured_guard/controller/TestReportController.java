@@ -12,11 +12,14 @@ import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/test-reports")
-@RequiredArgsConstructor
 @Slf4j
 public class TestReportController {
     
     private final ContasAPagarReportService contasAPagarReportService;
+
+    public TestReportController(ContasAPagarReportService contasAPagarReportService) {
+        this.contasAPagarReportService = contasAPagarReportService;
+    }
     
     @GetMapping("/contas-a-pagar/test")
     public ResponseEntity<String> testContasAPagarReport() {

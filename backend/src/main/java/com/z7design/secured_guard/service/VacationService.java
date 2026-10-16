@@ -22,16 +22,24 @@ import com.z7design.secured_guard.repository.HolidayRepository;
 import com.z7design.secured_guard.util.PeriodoAquisitivoUtil;
 import com.z7design.secured_guard.util.BrazilianHolidaysUtil;
 
-import lombok.RequiredArgsConstructor;
-
 @Service
-@RequiredArgsConstructor
 public class VacationService {
     
     private final VacationRepository vacationRepository;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
     private final HolidayRepository holidayRepository;
+
+    public VacationService(
+            VacationRepository vacationRepository,
+            UserRepository userRepository,
+            EmployeeRepository employeeRepository,
+            HolidayRepository holidayRepository) {
+        this.vacationRepository = vacationRepository;
+        this.userRepository = userRepository;
+        this.employeeRepository = employeeRepository;
+        this.holidayRepository = holidayRepository;
+    }
     
     @Transactional
     public Vacation create(Vacation vacation) {
@@ -178,9 +186,12 @@ public class VacationService {
             .map(h -> new BrazilianHolidaysUtil.HolidayInfo(h.getDate(), h.getName(), h.getType() != null ? h.getType().name() : "CUSTOM"))
             .toList();
 
+        boolean is12x36 = vacation.getEmployee() != null && com.z7design.secured_guard.util.WorkScheduleHelper.isEscala12x36(vacation.getEmployee());
+
         BrazilianHolidaysUtil.ValidationResult result = BrazilianHolidaysUtil.validateStartDateCLT(
             vacation.getStartDate(), 
-            customList
+            customList,
+            is12x36
         );
 
         if (!result.valid()) {

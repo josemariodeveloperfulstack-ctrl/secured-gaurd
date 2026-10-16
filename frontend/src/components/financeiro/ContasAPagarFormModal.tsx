@@ -1148,8 +1148,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                         setWorkSectorAutoFilled(false);
                       }
                     }}
-                    companyId={formData.empresaId || undefined}
-                    placeholder="Busque o funcionário pelo nome"
+                    placeholder="Busque o funcionário pelo nome (ex: Gabriel)"
                     onEmployeeSelect={(emp) => {
                       handleInputChange('employeeId', emp.id);
 

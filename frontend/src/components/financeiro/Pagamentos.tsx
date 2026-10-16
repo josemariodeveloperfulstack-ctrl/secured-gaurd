@@ -53,6 +53,7 @@ import {
 import { PagamentosGuard } from './FinanceiroPermissionGuard';
 import { PagamentoFormModal } from './PagamentoFormModal';
 import { PagamentoViewModal } from './PagamentoViewModal';
+import { PagamentosReportCustomModal } from './PagamentosReportCustomModal';
 import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -123,6 +124,7 @@ export const Pagamentos: React.FC = () => {
   const [selectedPagamento, setSelectedPagamento] = useState<Pagamento | null>(null);
   const [selectedPagamentos, setSelectedPagamentos] = useState<string[]>([]);
   const [showSelection, setShowSelection] = useState(false);
+  const [showCustomReportModal, setShowCustomReportModal] = useState(false);
 
   // Carregar dados do backend
   useEffect(() => {
@@ -553,14 +555,22 @@ export const Pagamentos: React.FC = () => {
     <PagamentosGuard>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-4">
           <div>
             <h1 className="text-3xl font-bold">Pagamentos</h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mt-1">
               Gerencie pagamentos com agendamento e alertas de vencimento
             </p>
           </div>
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCustomReportModal(true)}
+              className="border-seguranca-yellow/40 text-seguranca-yellow hover:bg-seguranca-yellow/10 font-semibold"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Relatório Personalizado (PDF)
+            </Button>
             <Button
               variant="outline"
               onClick={() => setShowSelection(!showSelection)}
@@ -1218,6 +1228,12 @@ export const Pagamentos: React.FC = () => {
           pagamento={selectedPagamento}
           onEdit={handleOpenEditModal}
           onGenerateReport={handleGenerateReport}
+        />
+
+        {/* Modal de Relatório Personalizado (PDF) */}
+        <PagamentosReportCustomModal
+          open={showCustomReportModal}
+          onOpenChange={setShowCustomReportModal}
         />
       </PagamentosGuard>
     );

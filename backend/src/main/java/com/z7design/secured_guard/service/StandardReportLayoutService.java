@@ -57,12 +57,18 @@ import jakarta.annotation.PostConstruct;
  * Inclui cache de templates e logos para melhor performance.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class StandardReportLayoutService {
 
     private final CompanyRepository companyRepository;
     private final SafetyEngineerRepository safetyEngineerRepository;
+
+    public StandardReportLayoutService(
+            CompanyRepository companyRepository,
+            SafetyEngineerRepository safetyEngineerRepository) {
+        this.companyRepository = companyRepository;
+        this.safetyEngineerRepository = safetyEngineerRepository;
+    }
 
     /** Mesmo root que {@link WebConfig} e {@code FileUploadController} ({@code app.upload.base-dir}). */
     @Value("${app.upload.base-dir:${app.upload.dir:uploads}}")
@@ -214,6 +220,10 @@ public class StandardReportLayoutService {
         }
 
         public PdfDocument getPdfDoc() {
+            return pdfDoc;
+        }
+
+        public PdfDocument getPdfDocument() {
             return pdfDoc;
         }
 

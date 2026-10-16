@@ -28,13 +28,22 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/scheduled-payments")
-@RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Pagamentos Agendados", description = "Endpoints para gestão de pagamentos agendados")
 public class ScheduledPaymentController {
 
     private final ScheduledPaymentService scheduledPaymentService;
     private final PaymentReportService paymentReportService;
+    private final com.z7design.secured_guard.service.CustomFinancialReportService customFinancialReportService;
+
+    public ScheduledPaymentController(
+            ScheduledPaymentService scheduledPaymentService,
+            PaymentReportService paymentReportService,
+            com.z7design.secured_guard.service.CustomFinancialReportService customFinancialReportService) {
+        this.scheduledPaymentService = scheduledPaymentService;
+        this.paymentReportService = paymentReportService;
+        this.customFinancialReportService = customFinancialReportService;
+    }
     
     @GetMapping
     @Operation(summary = "Listar todos os pagamentos agendados", description = "Retorna uma lista paginada de todos os pagamentos agendados")
@@ -201,6 +210,25 @@ public class ScheduledPaymentController {
                     
         } catch (IOException e) {
             log.error("Erro ao gerar relatório PDF de pagamentos agendados", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping({"/custom-pdf", "/reports/custom-pdf"})
+    @Operation(summary = "Relatório Personalizado de Pagamentos Agendados em PDF", description = "Gera relatório PDF executivo com layout padrão, filtros avançados, agrupamento e colunas selecionadas")
+    public ResponseEntity<byte[]> generateCustomPdfReport(
+            @RequestBody com.z7design.secured_guard.dto.CustomPagamentosReportRequestDTO request) {
+        log.info("POST /api/scheduled-payments/custom-pdf - Gerando relatório PDF personalizado de pagamentos agendados: {}", request);
+        try {
+            byte[] pdfBytes = customFinancialReportService.generateCustomScheduledPaymentReportPDF(request);
+            String filename = "relatorio-pagamentos-personalizado-" + LocalDate.now() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório personalizado de pagamentos agendados em PDF: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

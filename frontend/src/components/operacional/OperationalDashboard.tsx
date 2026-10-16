@@ -40,6 +40,8 @@ import { remanejamentoService, Remanejamento, CreateRemanejamentoDTO } from '@/s
 import { feriasService, FeriasPeriodo } from '@/services/feriasService';
 import { medicalDocumentService, MedicalDocument, MEDICAL_TYPE_LABELS } from '@/services/medicalDocumentService';
 import FeriasReportModal from '@/components/ferias/FeriasReportModal';
+import FeriasFormModal from '@/components/ferias/FeriasFormModal';
+import AfastamentoFormModal from '@/components/ferias/AfastamentoFormModal';
 import { Stethoscope, ShieldAlert, Building2, ExternalLink } from 'lucide-react';
 import api from '@/lib/axios';
 import axios from 'axios';
@@ -75,6 +77,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
   const [vacationSubTab, setVacationSubTab] = useState<'scheduled' | 'coverage'>('scheduled');
   const [absenceSubTab, setAbsenceSubTab] = useState<'medical' | 'manual'>('medical');
   const [showFeriasReportModal, setShowFeriasReportModal] = useState(false);
+  const [showFeriasModal, setShowFeriasModal] = useState(false);
+  const [editingFeriasId, setEditingFeriasId] = useState<string | undefined>(undefined);
+  const [editingFeriasData, setEditingFeriasData] = useState<any>(undefined);
+  const [showDeleteFeriasModal, setShowDeleteFeriasModal] = useState(false);
+  const [feriasToDelete, setFeriasToDelete] = useState<FeriasPeriodo | null>(null);
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [workPostAssignments, setWorkPostAssignments] = useState<WorkPostAssignment[]>([]);
   const [specificActivities, setSpecificActivities] = useState<SpecificActivity[]>([]);
@@ -170,6 +177,72 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
   const handleEditAbsence = (absence: Absence) => {
     setSelectedAbsence(absence);
     setShowAbsenceModal(true);
+  };
+
+  // Handlers para Gestão de Férias Operacional
+  const handleCreateFerias = () => {
+    setEditingFeriasId(undefined);
+    setEditingFeriasData(undefined);
+    setShowFeriasModal(true);
+  };
+
+  const handleEditFerias = (ferias: FeriasPeriodo) => {
+    setEditingFeriasId(ferias.id);
+    setEditingFeriasData({
+      employeeId: ferias.employeeId,
+      periodoAquisitivo: ferias.periodoAquisitivo,
+      dataInicio: ferias.dataInicio,
+      dataFim: ferias.dataFim,
+      tipo: ferias.tipo,
+      observacoes: ferias.observacoes || ''
+    });
+    setShowFeriasModal(true);
+  };
+
+  const handleDeleteFerias = (ferias: FeriasPeriodo) => {
+    setFeriasToDelete(ferias);
+    setShowDeleteFeriasModal(true);
+  };
+
+  const confirmDeleteFerias = async () => {
+    if (!feriasToDelete) return;
+    try {
+      await feriasService.cancelarFerias(feriasToDelete.id);
+      setFeriasList(prev => prev.filter(f => f.id !== feriasToDelete.id));
+      toast({
+        title: 'Sucesso',
+        description: 'Solicitação de férias cancelada com sucesso.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível cancelar a solicitação de férias.',
+        variant: 'destructive',
+      });
+    } finally {
+      setShowDeleteFeriasModal(false);
+      setFeriasToDelete(null);
+    }
+  };
+
+  const handleFeriasSuccess = async () => {
+    setShowFeriasModal(false);
+    setEditingFeriasId(undefined);
+    setEditingFeriasData(undefined);
+    try {
+      const [updatedFerias, updatedCoverages] = await Promise.all([
+        feriasService.getFerias().catch(() => []),
+        operationalService.getAllVacationCoverages().catch(() => [])
+      ]);
+      setFeriasList(updatedFerias);
+      setVacationCoverages(updatedCoverages);
+      toast({
+        title: 'Sucesso',
+        description: 'Gestão de férias atualizada com sucesso!',
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar lista de férias:', error);
+    }
   };
 
   // Handlers para Vacation Coverage
@@ -1055,9 +1128,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
                     Relatório Completo (PDF / Excel)
                   </Button>
-                  <Button onClick={handleCreateVacationCoverage} size="sm" className="bg-seguranca-red hover:bg-red-700 text-white">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nova Cobertura
+                  <Button onClick={handleCreateFerias} size="sm" className="bg-seguranca-yellow hover:bg-yellow-500 text-seguranca-black font-semibold">
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Nova Solicitação de Férias
                   </Button>
                 </div>
               </div>
@@ -1137,6 +1210,24 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
                             }>
                               {ferias.status}
                             </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditFerias(ferias)}
+                              title="Editar período de férias"
+                              className="text-gray-300 hover:text-white"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteFerias(ferias)}
+                              title="Cancelar férias"
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                       );
@@ -1813,6 +1904,30 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
       <FeriasReportModal
         isOpen={showFeriasReportModal}
         onClose={() => setShowFeriasReportModal(false)}
+      />
+
+      {/* Modal de Nova / Edição de Solicitação de Férias */}
+      {showFeriasModal && (
+        <FeriasFormModal
+          onSuccess={handleFeriasSuccess}
+          onClose={() => {
+            setShowFeriasModal(false);
+            setEditingFeriasId(undefined);
+            setEditingFeriasData(undefined);
+          }}
+          editingId={editingFeriasId}
+          initialData={editingFeriasData}
+        />
+      )}
+
+      {/* Modal de Confirmação de Exclusão/Cancelamento de Férias */}
+      <ConfirmDeleteModal
+        open={showDeleteFeriasModal}
+        onOpenChange={setShowDeleteFeriasModal}
+        onConfirm={confirmDeleteFerias}
+        title="Cancelar Solicitação de Férias"
+        description="Tem certeza que deseja cancelar esta solicitação de férias?"
+        itemName={feriasToDelete ? `${feriasToDelete.employeeName} (${formatDate(feriasToDelete.dataInicio)} a ${formatDate(feriasToDelete.dataFim)})` : ''}
       />
     </div>
   );

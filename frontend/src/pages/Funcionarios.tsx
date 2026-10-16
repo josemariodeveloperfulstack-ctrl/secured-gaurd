@@ -89,7 +89,7 @@ const Funcionarios: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE' | 'VACATION' | 'MATERNITY_LEAVE' | 'MEDICAL_CERTIFICATE' | 'TERMINATED' | 'SUSPENDED' | 'SUB_JUDICE'>('all');
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [documentsModalOpen, setDocumentsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -122,9 +122,9 @@ const Funcionarios: React.FC = () => {
   const [bulkBarPos, setBulkBarPos] = useState<{ x: number; y: number } | null>(null);
   const [bulkBarDragging, setBulkBarDragging] = useState(false);
   const [bulkBarDragOffset, setBulkBarDragOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
-  const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
-  const [positionFilter, setPositionFilter] = useState<string>('all');
+  const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [hireDateFrom, setHireDateFrom] = useState<string>('');
   const [hireDateTo, setHireDateTo] = useState<string>('');
@@ -200,6 +200,32 @@ const Funcionarios: React.FC = () => {
       label: name
     }));
   }, [filterWorkPosts, filterSectors, employees]);
+
+  // Opções para multi-select
+  const statusOptions = React.useMemo(() => [
+    { value: "ACTIVE", label: "✅ Ativo" },
+    { value: "INACTIVE", label: "⭕ Inativo" },
+    { value: "VACATION", label: "🏖️ Férias" },
+    { value: "MATERNITY_LEAVE", label: "👶 Licença Maternidade" },
+    { value: "MEDICAL_CERTIFICATE", label: "🏥 Atestado" },
+    { value: "TERMINATED", label: "❌ Demitido" },
+    { value: "SUSPENDED", label: "⏸️ Suspenso" },
+    { value: "SUB_JUDICE", label: "⚖️ Sub Júdice / Judicial" },
+  ], []);
+
+  const companyOptions = React.useMemo(() => {
+    return filterCompanies.map(c => ({
+      value: String(c.id),
+      label: c.sigla ? `${c.sigla} - ${c.name}` : (c.name || 'Sem nome')
+    }));
+  }, [filterCompanies]);
+
+  const positionOptions = React.useMemo(() => {
+    return filterPositions
+      .map(p => ({ value: p.name, label: p.name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [filterPositions]);
+
   const [statsFromApi, setStatsFromApi] = useState<{
     total: number;
     active: number;
@@ -217,10 +243,13 @@ const Funcionarios: React.FC = () => {
 
   const buildApiFilters = React.useCallback((): EmployeeFilters => {
     const activeSectors = selectedSectors.filter(s => s && s !== 'all');
+    const validCompanies = selectedCompanies.filter(c => c && c !== 'all');
+    const validStatuses = selectedStatuses.filter(s => s && s !== 'all');
+
     const base: EmployeeFilters = {
       searchTerm: searchTerm.trim() || undefined,
-      companyId: companyFilter && companyFilter !== 'all' ? companyFilter : undefined,
-      status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
+      companyId: validCompanies.length === 1 ? validCompanies[0] : undefined,
+      status: validStatuses.length === 1 ? validStatuses[0] : undefined,
       sector: activeSectors.length > 0 ? activeSectors.join(',') : undefined,
       hireDateFrom: hireDateFrom || undefined,
       hireDateTo: hireDateTo || undefined,
@@ -232,7 +261,7 @@ const Funcionarios: React.FC = () => {
       base.sortDir = sortDir;
     }
     return base;
-  }, [searchTerm, companyFilter, statusFilter, selectedSectors, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sortKey, sortDir]);
+  }, [searchTerm, selectedCompanies, selectedStatuses, selectedSectors, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sortKey, sortDir]);
 
   const loadAdmissionIntegration = async () => {
     try {
@@ -420,12 +449,12 @@ const Funcionarios: React.FC = () => {
     }
 
     setCurrentPage(0);
-    // Aplica debounce de 400ms na digitação e 300ms ao marcar múltiplos setores
+    // Aplica debounce de 400ms na digitação e 300ms ao marcar múltiplos filtros
     // Isso evita disparar múltiplas requisições paralelas durante cliques seguidos nos checkboxes.
-    const debounceMs = term ? 400 : (selectedSectors.length > 0 ? 300 : 0);
+    const debounceMs = term ? 400 : ((selectedSectors.length > 0 || selectedStatuses.length > 0 || selectedCompanies.length > 0 || selectedPositions.length > 0) ? 300 : 0);
     const timeoutId = setTimeout(() => loadEmployees(buildApiFilters(), 0), debounceMs);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, statusFilter, companyFilter, positionFilter, selectedSectors, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, buildApiFilters]);
+  }, [searchTerm, selectedStatuses, selectedCompanies, selectedPositions, selectedSectors, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, buildApiFilters]);
 
   // Carregar opções dos filtros (empresas, cargos) — sequencial para não competir com a listagem
   useEffect(() => {
@@ -613,14 +642,14 @@ const Funcionarios: React.FC = () => {
   const searchDigits = searchTerm.replace(/\D/g, '');
 
   const filteredEmployees = employees.filter(employee => {
-    const matchesStatus = isAll(statusFilter) || (employee.status || '').toUpperCase() === (statusFilter || '').toUpperCase();
+    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes('all') ||
+      selectedStatuses.some(st => (employee.status || '').toUpperCase() === (st || '').toUpperCase());
 
-    const matchesCompany = isAll(companyFilter) ||
-      String((employee.company as any)?.id) === String(companyFilter);
+    const matchesCompany = selectedCompanies.length === 0 || selectedCompanies.includes('all') ||
+      selectedCompanies.some(cId => String((employee.company as any)?.id) === String(cId) || same(employee.company?.sigla, cId) || same(employee.company?.name, cId));
 
-    const matchesPosition = isAll(positionFilter) ||
-      same((employee.position as any)?.name, positionFilter) ||
-      String((employee.position as any)?.id) === String(positionFilter);
+    const matchesPosition = selectedPositions.length === 0 || selectedPositions.includes('all') ||
+      selectedPositions.some(pos => same((employee.position as any)?.name, pos) || String((employee.position as any)?.id) === String(pos));
 
     const matchesSector = selectedSectors.length === 0 || selectedSectors.includes('all') || selectedSectors.some(sec => {
       const secNorm = norm(sec);
@@ -734,9 +763,9 @@ const Funcionarios: React.FC = () => {
   // Limpar filtros
   const clearFilters = () => {
     setSearchTerm('');
-    setStatusFilter('all');
-    setCompanyFilter('all');
-    setPositionFilter('all');
+    setSelectedStatuses([]);
+    setSelectedCompanies([]);
+    setSelectedPositions([]);
     setSelectedSectors([]);
     setHireDateFrom('');
     setHireDateTo('');
@@ -1117,8 +1146,9 @@ Para excluir este funcionário:
 
   const hasListFilters = !!(
     searchTerm.trim()
-    || (statusFilter && statusFilter !== 'all')
-    || (companyFilter && companyFilter !== 'all')
+    || (selectedStatuses && selectedStatuses.length > 0)
+    || (selectedCompanies && selectedCompanies.length > 0)
+    || (selectedPositions && selectedPositions.length > 0)
     || (selectedSectors && selectedSectors.length > 0)
     || hireDateFrom || hireDateTo || terminationDateFrom || terminationDateTo
   );
@@ -1130,9 +1160,25 @@ Para excluir este funcionário:
       ? `${subtitleTotal} funcionários no sistema (${subtitleLoaded} carregados)`
       : `${subtitleLoaded} funcionário${subtitleLoaded !== 1 ? 's' : ''} no sistema`;
 
+  // Título com regras de exclusão compacta ao lado
+  const pageTitleWithRules = (
+    <div className="flex flex-wrap items-center gap-3">
+      <span>Gestão de Funcionários</span>
+      <div
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-950/60 border border-blue-500/40 text-blue-300 text-xs font-normal"
+        title="Regras de Exclusão: Apenas funcionários com status 'Demitido' podem ser excluídos do sistema."
+      >
+        <AlertCircle className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+        <span className="font-semibold text-blue-400">Regras de Exclusão:</span>
+        <span className="hidden sm:inline text-blue-200/90">Apenas com status &quot;Demitido&quot; podem ser excluídos</span>
+        <span className="sm:hidden text-blue-200/90">Apenas &quot;Demitidos&quot;</span>
+      </div>
+    </div>
+  );
+
   return (
     <StandardLayout
-      title="Gestão de Funcionários"
+      title={pageTitleWithRules}
       subtitle={subtitleText}
     >
       <Tabs value={activeTab} onValueChange={(value) => {
@@ -1272,7 +1318,7 @@ Para excluir este funcionário:
         </TabsContent>
 
         <TabsContent value="lista">
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-animate="fadeDown">
               <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 hover:border-blue-500/50 transition-all duration-300 group">
@@ -1332,206 +1378,265 @@ Para excluir este funcionário:
               </Card>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-animate="fadeDown">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setRefreshing(true);
-                    loadEmployees();
-                    loadAdmissionIntegration();
-                    setTimeout(() => setRefreshing(false), 1000);
-                  }}
-                  disabled={refreshing}
-                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:border-seguranca-red/50"
-                >
-                  <RefreshCw size={20} className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                  Atualizar
-                </Button>
-                <Button
-                  onClick={() => setIsMobileSelectionMode(!isMobileSelectionMode)}
-                  variant={isMobileSelectionMode ? "destructive" : "outline"}
-                  className={`lg:hidden h-11 px-4 border-gray-600 transition-all duration-300 ${isMobileSelectionMode ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white'}`}
-                >
-                  {isMobileSelectionMode ? (
-                    <><CheckCircle2 className="mr-2 h-4 w-4" /> Pronto</>
-                  ) : (
-                    <><Shuffle className="mr-2 h-4 w-4" /> Selecionar</>
-                  )}
-                </Button>
-                <Button
-                  className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20"
-                  onClick={handleOpenModal}
-                >
-                  <Plus size={20} className="mr-2" />
-                  Novo Funcionário
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-emerald-600/50 text-emerald-400 hover:bg-emerald-900/20"
-                  onClick={() => setRelatoriosModalOpen(true)}
-                >
-                  <BarChart2 size={20} className="mr-2" />
-                  Relatórios
-                </Button>
-              </div>
-            </div>
+            {/* Filtros Modernos, Fluidos e Responsivos */}
+            <Card className="relative z-30 bg-gradient-to-br from-seguranca-graphite/95 via-seguranca-black/90 to-seguranca-black/95 border border-gray-700/60 shadow-xl rounded-2xl p-4 sm:p-5 backdrop-blur-md transition-all duration-300 hover:border-gray-600/80" data-animate="fadeUp">
+              {/* Top Accent Line */}
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-seguranca-red via-seguranca-yellow to-seguranca-red opacity-80 rounded-t-2xl pointer-events-none" />
 
-            {/* Notificação sobre regras de exclusão */}
-            <Card className="bg-blue-900/20 border-blue-600/50" data-animate="fadeUp">
-              <CardContent className="p-4">
-                <div className="flex items-start space-x-3">
-                  <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-blue-400 font-semibold">Regras de Exclusão de Funcionários</h4>
-                    <p className="text-blue-300 text-sm mt-1">
-                      <strong>⚠️ Importante:</strong> Apenas funcionários com status "Demitido" podem ser excluídos do sistema.
-                      Para excluir um funcionário ativo, primeiro altere seu status para "Demitido" usando o botão "Demitir".
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-
-            {/* Filtros Modernos */}
-            <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
               {/* Search Header */}
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-seguranca-red/20 border border-seguranca-red/30">
+                  <div className="p-2.5 rounded-xl bg-seguranca-red/15 border border-seguranca-red/30 shadow-inner flex items-center justify-center shrink-0">
                     <Search className="h-5 w-5 text-seguranca-red" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-white">Pesquisar Funcionários</h3>
-                    <p className="text-sm text-gray-400">Filtre e encontre funcionários rapidamente</p>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-white text-base tracking-tight">Pesquisar Funcionários</h3>
+                      {(searchTerm || selectedStatuses.length > 0 || selectedCompanies.length > 0 || selectedPositions.length > 0 || selectedSectors.length > 0 || hireDateFrom || hireDateTo || terminationDateFrom || terminationDateTo) && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-seguranca-yellow/20 text-seguranca-yellow border border-seguranca-yellow/40 animate-pulse">
+                          Filtros Ativos
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">Filtre por múltiplos status, empresas, cargos, setores de trabalho e datas</p>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setRefreshing(true);
-                    clearFilters();
-                    setTimeout(() => setRefreshing(false), 1000);
-                  }}
-                  disabled={refreshing}
-                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite"
-                >
-                  {refreshing ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw size={16} className="mr-2" />
-                  )}
-                  Limpar
-                </Button>
+
+                <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setRefreshing(true);
+                      loadEmployees();
+                      loadAdmissionIntegration();
+                      setTimeout(() => setRefreshing(false), 1000);
+                    }}
+                    disabled={refreshing}
+                    className="h-9 px-3 rounded-xl border-gray-600/80 bg-white/[0.03] text-xs font-medium text-seguranca-lightgray hover:bg-seguranca-graphite hover:border-seguranca-red/50 hover:text-white transition-all shadow-sm"
+                  >
+                    <RefreshCw size={14} className={`mr-1.5 ${refreshing ? 'animate-spin text-seguranca-yellow' : 'text-gray-400'}`} />
+                    Atualizar
+                  </Button>
+
+                  <Button
+                    onClick={() => setIsMobileSelectionMode(!isMobileSelectionMode)}
+                    variant={isMobileSelectionMode ? "destructive" : "outline"}
+                    size="sm"
+                    className={`lg:hidden h-9 px-3 rounded-xl border-gray-600/80 transition-all duration-300 ${isMobileSelectionMode ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white'}`}
+                  >
+                    {isMobileSelectionMode ? (
+                      <><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Pronto</>
+                    ) : (
+                      <><Shuffle className="mr-1.5 h-3.5 w-3.5" /> Selecionar</>
+                    )}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red text-white shadow-md shadow-seguranca-red/20 font-medium text-xs sm:text-sm active:scale-95 transition-all"
+                    onClick={handleOpenModal}
+                  >
+                    <Plus size={16} className="mr-1.5" />
+                    Novo Funcionário
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-3 rounded-xl border-emerald-600/50 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-900/30 hover:text-emerald-300 font-medium text-xs sm:text-sm transition-all"
+                    onClick={() => setRelatoriosModalOpen(true)}
+                  >
+                    <BarChart2 size={15} className="mr-1.5" />
+                    Relatórios
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setRefreshing(true);
+                      clearFilters();
+                      setTimeout(() => setRefreshing(false), 800);
+                    }}
+                    disabled={refreshing}
+                    className="h-9 px-3 rounded-xl text-xs font-medium text-gray-400 hover:text-white hover:bg-white/[0.05] transition-all"
+                    title="Redefinir filtros para o padrão"
+                  >
+                    Limpar
+                  </Button>
+                </div>
               </div>
 
-              {/* Search Filters */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <div className="relative sm:col-span-2 lg:col-span-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <Input
-                    placeholder="Digite o nome, CPF ou email..."
-                    value={searchTerm}
-                    maxLength={EMPLOYEE_SEARCH_MAX_LENGTH}
-                    onChange={(e) => setSearchTerm(e.target.value.slice(0, EMPLOYEE_SEARCH_MAX_LENGTH))}
-                    className="pl-10 h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20"
-                  />
+              {/* Grid de Filtros */}
+              <div className="space-y-3">
+                {/* Linha 1: 4 Colunas Perfeitamente Balanceadas */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {/* Busca Nome/CPF/Email */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={15} />
+                    <Input
+                      placeholder="Buscar por nome, CPF ou email..."
+                      value={searchTerm}
+                      maxLength={EMPLOYEE_SEARCH_MAX_LENGTH}
+                      onChange={(e) => setSearchTerm(e.target.value.slice(0, EMPLOYEE_SEARCH_MAX_LENGTH))}
+                      className="pl-9 pr-8 h-10 text-xs sm:text-sm bg-seguranca-black/90 border-gray-700/80 rounded-xl text-white placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-1 focus:ring-seguranca-yellow/30 transition-all"
+                    />
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-1 rounded-md transition-colors"
+                        title="Limpar texto de busca"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <MultiSearchableSelect
+                      options={statusOptions}
+                      selectedValues={selectedStatuses}
+                      onChange={setSelectedStatuses}
+                      placeholder="Todos os status"
+                      searchPlaceholder="Buscar status..."
+                      emptyPlaceholder="Nenhum status encontrado."
+                      icon="📋"
+                      typeLabel="Status"
+                      className="h-10 text-xs sm:text-sm rounded-xl bg-seguranca-black/90 border-gray-700/80 text-white focus:border-seguranca-yellow hover:border-gray-600"
+                    />
+                  </div>
+
+                  {/* Empresas */}
+                  <div>
+                    <MultiSearchableSelect
+                      options={companyOptions}
+                      selectedValues={selectedCompanies}
+                      onChange={setSelectedCompanies}
+                      placeholder="Todas as empresas"
+                      searchPlaceholder="Buscar empresa..."
+                      emptyPlaceholder="Nenhuma empresa encontrada."
+                      icon="🏢"
+                      typeLabel="Empresas"
+                      className="h-10 text-xs sm:text-sm rounded-xl bg-seguranca-black/90 border-gray-700/80 text-white focus:border-seguranca-yellow hover:border-gray-600"
+                    />
+                  </div>
+
+                  {/* Cargos */}
+                  <div>
+                    <MultiSearchableSelect
+                      options={positionOptions}
+                      selectedValues={selectedPositions}
+                      onChange={setSelectedPositions}
+                      placeholder="Todos os cargos"
+                      searchPlaceholder="Buscar cargo..."
+                      emptyPlaceholder="Nenhum cargo encontrado."
+                      icon="💼"
+                      typeLabel="Cargos"
+                      className="h-10 text-xs sm:text-sm rounded-xl bg-seguranca-black/90 border-gray-700/80 text-white focus:border-seguranca-yellow hover:border-gray-600"
+                    />
+                  </div>
                 </div>
 
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
-                >
-                  <option value="all">📋 Todos os status</option>
-                  <option value="ACTIVE">✅ Ativo</option>
-                  <option value="INACTIVE">⭕ Inativo</option>
-                  <option value="VACATION">🏖️ Férias</option>
-                  <option value="MATERNITY_LEAVE">👶 Licença Maternidade</option>
-                  <option value="MEDICAL_CERTIFICATE">🏥 Atestado</option>
-                  <option value="TERMINATED">❌ Demitido</option>
-                  <option value="SUSPENDED">⏸️ Suspenso</option>
-                  <option value="SUB_JUDICE">⚖️ Sub Júdice / Judicial</option>
-                </select>
+                {/* Linha 2: Setores de Trabalho + Períodos de Admissão e Demissão */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 items-stretch">
+                  {/* Setor de Trabalho */}
+                  <div className="flex flex-col justify-end">
+                    <MultiSearchableSelect
+                      options={sectorOptions}
+                      selectedValues={selectedSectors}
+                      onChange={setSelectedSectors}
+                      placeholder="Todos os setores de trabalho"
+                      searchPlaceholder="Buscar setor de trabalho..."
+                      emptyPlaceholder="Nenhum setor de trabalho encontrado."
+                      icon="📍"
+                      typeLabel="Setores"
+                      className="h-10 text-xs sm:text-sm rounded-xl bg-seguranca-black/90 border-gray-700/80 text-white focus:border-seguranca-yellow hover:border-gray-600"
+                    />
+                  </div>
 
-                <SearchableSelect
-                  value={companyFilter}
-                  onChange={setCompanyFilter}
-                  options={[
-                    { value: "all", label: "🏢 Todas as Empresas" },
-                    ...filterCompanies.map(c => ({
-                      value: c.id,
-                      label: c.sigla ? `${c.sigla} - ${c.name}` : (c.name || 'Sem nome')
-                    }))
-                  ]}
-                  placeholder="🏢 Todas as Empresas"
-                  searchPlaceholder="Buscar empresa..."
-                />
+                  {/* Card Agrupado de Admissão */}
+                  <div className="bg-seguranca-black/60 border border-emerald-500/25 hover:border-emerald-500/40 rounded-xl px-3 py-2 transition-all">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-emerald-400" />
+                        Período de Admissão
+                      </span>
+                      {(hireDateFrom || hireDateTo) && (
+                        <button
+                          type="button"
+                          onClick={() => { setHireDateFrom(''); setHireDateTo(''); }}
+                          className="text-[10px] text-gray-400 hover:text-white transition-colors"
+                        >
+                          Limpar
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="min-w-0">
+                        <DatePicker
+                          date={hireDateFrom ? parseISO(hireDateFrom) : undefined}
+                          onDateChange={(date) => setHireDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
+                          placeholder="De"
+                          className="!h-8 !text-xs !bg-seguranca-black/90 !border-gray-700/80 !rounded-lg !text-white focus:!border-emerald-500 !px-2.5 !pr-7"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <DatePicker
+                          date={hireDateTo ? parseISO(hireDateTo) : undefined}
+                          onDateChange={(date) => setHireDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
+                          placeholder="Até"
+                          className="!h-8 !text-xs !bg-seguranca-black/90 !border-gray-700/80 !rounded-lg !text-white focus:!border-emerald-500 !px-2.5 !pr-7"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                <SearchableSelect
-                  value={positionFilter}
-                  onChange={setPositionFilter}
-                  options={[
-                    { value: "all", label: "💼 Todos os cargos" },
-                    ...filterPositions.map(p => ({
-                      value: p.name,
-                      label: p.name
-                    }))
-                  ]}
-                  placeholder="💼 Todos os cargos"
-                  searchPlaceholder="Buscar cargo..."
-                />
-
-                <MultiSearchableSelect
-                  selectedValues={selectedSectors}
-                  onChange={setSelectedSectors}
-                  options={sectorOptions}
-                  placeholder="Todos os setores de trabalho"
-                  searchPlaceholder="Buscar setor de trabalho..."
-                  emptyPlaceholder="Nenhum setor de trabalho encontrado."
-                />
-
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="hire-date-from" className="text-xs text-gray-400">Admissão (de)</label>
-                  <DatePicker
-                    date={hireDateFrom ? parseISO(hireDateFrom) : undefined}
-                    onDateChange={(date) => setHireDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
-                    className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="hire-date-to" className="text-xs text-gray-400">Admissão (até)</label>
-                  <DatePicker
-                    date={hireDateTo ? parseISO(hireDateTo) : undefined}
-                    onDateChange={(date) => setHireDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
-                    className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="termination-date-from" className="text-xs text-gray-400">Demissão (de)</label>
-                  <DatePicker
-                    date={terminationDateFrom ? parseISO(terminationDateFrom) : undefined}
-                    onDateChange={(date) => setTerminationDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
-                    className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="termination-date-to" className="text-xs text-gray-400">Demissão (até)</label>
-                  <DatePicker
-                    date={terminationDateTo ? parseISO(terminationDateTo) : undefined}
-                    onDateChange={(date) => setTerminationDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
-                    className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
-                  />
+                  {/* Card Agrupado de Demissão */}
+                  <div className="bg-seguranca-black/60 border border-rose-500/25 hover:border-rose-500/40 rounded-xl px-3 py-2 transition-all">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-semibold text-rose-400 flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-rose-400" />
+                        Período de Demissão
+                      </span>
+                      {(terminationDateFrom || terminationDateTo) && (
+                        <button
+                          type="button"
+                          onClick={() => { setTerminationDateFrom(''); setTerminationDateTo(''); }}
+                          className="text-[10px] text-gray-400 hover:text-white transition-colors"
+                        >
+                          Limpar
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="min-w-0">
+                        <DatePicker
+                          date={terminationDateFrom ? parseISO(terminationDateFrom) : undefined}
+                          onDateChange={(date) => setTerminationDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
+                          placeholder="De"
+                          className="!h-8 !text-xs !bg-seguranca-black/90 !border-gray-700/80 !rounded-lg !text-white focus:!border-rose-500 !px-2.5 !pr-7"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <DatePicker
+                          date={terminationDateTo ? parseISO(terminationDateTo) : undefined}
+                          onDateChange={(date) => setTerminationDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
+                          placeholder="Até"
+                          className="!h-8 !text-xs !bg-seguranca-black/90 !border-gray-700/80 !rounded-lg !text-white focus:!border-rose-500 !px-2.5 !pr-7"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </Card>
 
             {/* Resumo admissão/demissão (cadastro + processos em aberto) */}
             {admissionIntegration && (
-              <Card className="bg-seguranca-black/40 border-amber-600/30 p-4">
+              <Card className="relative z-10 bg-seguranca-black/40 border-amber-600/30 p-4">
                 <div className="flex flex-col lg:flex-row lg:flex-wrap gap-3 text-sm text-gray-300">
                   {admissionIntegration.lastHire && (
                     <div className="flex items-center gap-2">
@@ -1566,7 +1671,7 @@ Para excluir este funcionário:
             )}
 
             {/* Lista de Funcionários Moderna */}
-            <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
+            <Card className="relative z-0 bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
               <FuncionariosTable
                 employees={sortedEmployees}
                 pendingAdmissionEmployeeIds={new Set(admissionIntegration?.pendingAdmissionEmployeeIds ?? [])}
