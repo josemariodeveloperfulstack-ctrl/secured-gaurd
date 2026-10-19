@@ -73,6 +73,7 @@ import {
   UserX,
   CalendarDays,
   Clock3,
+  Compass,
   FileBarChart,
   FileSignature,
   Heart,
@@ -244,6 +245,7 @@ const departamentoPessoalMenuItems = [
 
 // Módulo Comercial
 const comercialMenuItems = [
+  { icon: Compass, text: 'Prospecção', to: '/comercial/prospeccao', id: 'prospeccao', requiredPermission: 'LEADS_READ' },
   { icon: Target, text: 'Leads', to: '/leads', id: 'leads' },
   { icon: Megaphone, text: 'Marketing', to: '/comercial/marketing', id: 'marketing', requiredPermission: 'LEADS_READ' },
   { icon: Building, text: 'Empresas', to: '/comercial/empresas', id: 'empresas' },

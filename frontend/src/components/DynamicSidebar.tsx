@@ -48,7 +48,8 @@ import {
   FolderTree,
   Files,
   GraduationCap,
-  Plus
+  Plus,
+  Compass
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import {
@@ -147,7 +148,7 @@ const SUPERVISOR_FORBIDDEN_ITEM_IDS = new Set<string>([
   'gestao-patrimonial',
   'modulo-fiscal',
   // Módulo Comercial
-  'leads', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm',
+  'leads', 'prospeccao', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm',
   'commercial-dashboard',
   // Compras / Estoque / Suprimentos
   'compras', 'compras-solicitacoes', 'compras-aprovacoes', 'compras-cotacoes', 'compras-relatorios',
@@ -397,6 +398,13 @@ export function DynamicSidebar() {
       to: '/contratos',
       id: 'contratos',
       requiredPermission: 'CONTRACTS_READ'
+    },
+    {
+      icon: Compass,
+      text: 'Prospecção',
+      to: '/comercial/prospeccao',
+      id: 'prospeccao',
+      requiredPermission: 'LEADS_READ'
     },
     {
       icon: Megaphone,

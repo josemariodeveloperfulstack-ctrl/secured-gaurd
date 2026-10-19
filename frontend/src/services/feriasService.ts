@@ -180,6 +180,10 @@ export const feriasService = {
     await api.delete(`/api/vacations/${id}`);
   },
 
+  async cancelarFerias(id: string): Promise<void> {
+    await this.deleteFerias(id);
+  },
+
   async approveFerias(id: string, observacoes?: string): Promise<FeriasPeriodo> {
     const response = await api.put(`/api/vacations/${id}/approve`, { observacoes });
     return response.data;

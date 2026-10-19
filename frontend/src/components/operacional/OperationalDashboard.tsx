@@ -237,16 +237,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
   const confirmDeleteFerias = async () => {
     if (!feriasToDelete) return;
     try {
-      await feriasService.cancelarFerias(feriasToDelete.id);
+      await feriasService.deleteFerias(feriasToDelete.id);
       setFeriasList(prev => prev.filter(f => f.id !== feriasToDelete.id));
       toast({
-        title: 'Sucesso',
-        description: 'Solicitação de férias cancelada com sucesso.',
+        title: 'Excluído com sucesso',
+        description: 'A solicitação de férias foi removida com sucesso.',
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Erro ao excluir solicitação de férias:', error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível cancelar a solicitação de férias.',
+        title: 'Erro ao excluir',
+        description: error?.response?.data?.message || error?.message || 'Não foi possível excluir a solicitação de férias.',
         variant: 'destructive',
       });
     } finally {
@@ -2024,13 +2025,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
         />
       )}
 
-      {/* Modal de Confirmação de Exclusão/Cancelamento de Férias */}
+      {/* Modal de Confirmação de Exclusão de Férias */}
       <ConfirmDeleteModal
         open={showDeleteFeriasModal}
         onOpenChange={setShowDeleteFeriasModal}
         onConfirm={confirmDeleteFerias}
-        title="Cancelar Solicitação de Férias"
-        description="Tem certeza que deseja cancelar esta solicitação de férias?"
+        title="Excluir Solicitação de Férias"
+        description="Tem certeza que deseja excluir esta solicitação de férias? Esta ação removerá o registro permanentemente."
         itemName={feriasToDelete ? `${feriasToDelete.employeeName} (${formatDate(feriasToDelete.dataInicio)} a ${formatDate(feriasToDelete.dataFim)})` : ''}
       />
     </div>

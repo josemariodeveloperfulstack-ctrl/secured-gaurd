@@ -43,6 +43,7 @@ import {
   Headphones,
   Camera,
   Phone,
+  Compass,
   Clock,
   UserCog,
   GraduationCap,
@@ -270,6 +271,7 @@ const empresasMenuItems = [
 
 // Módulo Comercial
 const comercialMenuItems = [
+  { icon: Compass, text: 'Prospecção', to: '/comercial/prospeccao', id: 'prospeccao' },
   { icon: Target, text: 'Leads', to: '/leads', id: 'leads' },
   { icon: FileCheck, text: 'Propostas', to: '/propostas', id: 'propostas' },
   { icon: Calculator, text: 'Orçamentos', to: '/orcamentos', id: 'orcamentos' },
