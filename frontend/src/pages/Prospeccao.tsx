@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -197,7 +198,8 @@ const Prospeccao: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 bg-seguranca-black min-h-screen text-seguranca-lightgray">
+    <StandardLayout>
+      <div className="space-y-6 p-4 sm:p-6 bg-seguranca-black min-h-screen text-seguranca-lightgray">
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-seguranca-graphite pb-4">
         <div>
@@ -705,7 +707,8 @@ const Prospeccao: React.FC = () => {
           </DialogContent>
         </Dialog>
       )}
-    </div>
+      </div>
+    </StandardLayout>
   );
 };
 
