@@ -44,10 +44,21 @@ export interface ProspectCompany {
   rating?: number;
   userRatingsTotal?: number;
   leadImported?: boolean;
-  importedLeadId?: string | number;
   scoreConversao?: number;
   motivoConversao?: string;
+  clientePotencial?: boolean;
+  emailContabilidadeDescartado?: boolean;
 }
+
+export const isAccountingContact = (email?: string, razaoSocial?: string): boolean => {
+  if (!email) return false;
+  const lowerEmail = email.toLowerCase();
+  const forbiddenTerms = [
+    'contab', 'contabil', 'contabilidade', 'fiscal', 'assessoria', 
+    'escritorio', 'audit', 'tax', 'contador', 'balanco', 'escrituracao'
+  ];
+  return forbiddenTerms.some(term => lowerEmail.includes(term));
+};
 
 export interface ProspectionFilters {
   tipoBusca: 'CNPJ' | 'CNAE' | 'MAPS';
@@ -184,6 +195,10 @@ class ProspectionService {
     const telefone = formatTel(data.ddd_telefone_1?.split('/')[0], data.ddd_telefone_1);
     const telefoneSecundario = formatTel(data.ddd_telefone_2?.split('/')[0], data.ddd_telefone_2);
 
+    const rawEmail = data.email?.toLowerCase() || '';
+    const isContabil = isAccountingContact(rawEmail, data.razao_social);
+    const sanitizedEmail = isContabil ? '' : rawEmail;
+
     return {
       cnpj: data.cnpj,
       razaoSocial: data.razao_social,
@@ -204,7 +219,9 @@ class ProspectionService {
       cep: data.cep,
       telefone: telefone || data.ddd_telefone_1 || '',
       telefoneSecundario: telefoneSecundario || data.ddd_telefone_2 || '',
-      email: data.email?.toLowerCase() || '',
+      email: sanitizedEmail,
+      emailContabilidadeDescartado: isContabil,
+      clientePotencial: true,
       qsa,
       origem: 'CNPJ',
     };
@@ -262,23 +279,31 @@ class ProspectionService {
 
       const { data } = await api.get<any[]>(`/api/prospection/ai-search?${params.toString()}`);
       if (Array.isArray(data)) {
-        return data.map((item: any) => ({
-          cnpj: item.cnpj || '00.000.000/0001-00',
-          razaoSocial: item.razaoSocial || item.nomeFantasia,
-          nomeFantasia: item.nomeFantasia || item.razaoSocial,
-          situacaoCadastral: 'ATIVA',
-          cnaePrincipal: item.cnaeDescricao ? { codigo: 'CNAE-IA', descricao: item.cnaeDescricao } : undefined,
-          logradouro: item.logradouro || '',
-          bairro: item.bairro || '',
-          municipio: item.municipio || cidade,
-          uf: item.uf || uf,
-          telefone: item.telefone || '',
-          email: item.email || '',
-          scoreConversao: item.scoreConversao || 80,
-          motivoConversao: item.motivoConversao || 'Necessidade contínua de controle de acesso e segurança patrimonial.',
-          qsa: Array.isArray(item.qsa) ? item.qsa : [],
-          origem: 'GEMINI_AI',
-        }));
+        return data.map((item: any) => {
+          const rawEmail = (item.email || '').toLowerCase().trim();
+          const isContabil = isAccountingContact(rawEmail, item.razaoSocial || item.nomeFantasia);
+          const sanitizedEmail = isContabil ? '' : rawEmail;
+
+          return {
+            cnpj: item.cnpj || '00.000.000/0001-00',
+            razaoSocial: item.razaoSocial || item.nomeFantasia,
+            nomeFantasia: item.nomeFantasia || item.razaoSocial,
+            situacaoCadastral: 'ATIVA',
+            cnaePrincipal: item.cnaeDescricao ? { codigo: 'CNAE-IA', descricao: item.cnaeDescricao } : undefined,
+            logradouro: item.logradouro || '',
+            bairro: item.bairro || '',
+            municipio: item.municipio || cidade,
+            uf: item.uf || uf,
+            telefone: item.telefone || '',
+            email: sanitizedEmail,
+            emailContabilidadeDescartado: isContabil,
+            clientePotencial: item.clientePotencial !== undefined ? Boolean(item.clientePotencial) : true,
+            scoreConversao: item.scoreConversao || 85,
+            motivoConversao: item.motivoConversao || 'Necessidade contínua de controle de acesso, portaria e segurança patrimonial.',
+            qsa: Array.isArray(item.qsa) ? item.qsa : [],
+            origem: 'GEMINI_AI',
+          };
+        });
       }
       return [];
     } catch (err: any) {
@@ -322,9 +347,9 @@ class ProspectionService {
       position: contactPosition,
       phone: company.telefone || company.telefoneSecundario || '',
       email: company.email || '',
-      source: 'PROSPECTION',
+      source: 'OTHER',
       status: 'NEW',
-      description: `[PROSPECÇÃO COMERCIAL]\nCNPJ: ${company.cnpj}\nNome Fantasia: ${company.nomeFantasia || '-'}\nCNAE: ${company.cnaePrincipal?.codigo || ''} - ${company.cnaePrincipal?.descricao || ''}\nPorte: ${company.porte || '-'}\nSituação: ${company.situacaoCadastral}\nEndereço: ${enderecoDesc}${sociosDesc}`,
+      description: `[PROSPECÇÃO ATIVA IA]\nCNPJ: ${company.cnpj}\nNome Fantasia: ${company.nomeFantasia || '-'}\nCNAE: ${company.cnaePrincipal?.codigo || ''} - ${company.cnaePrincipal?.descricao || ''}\nPorte: ${company.porte || '-'}\nSituação: ${company.situacaoCadastral}\nEndereço: ${enderecoDesc}${sociosDesc}`,
       assignedToId: assignedUserId,
     };
 
@@ -337,15 +362,13 @@ class ProspectionService {
         ? statuses.sort((a: any, b: any) => (a.orderIndex || 0) - (b.orderIndex || 0))[0]
         : null;
 
-      if (firstStatus) {
+      if (firstStatus && firstStatus.id) {
         await createOpportunity({
           title: `Prospecção: ${company.nomeFantasia || company.razaoSocial}`,
           description: `Novo lead qualificado via Prospecção Comercial.\nSegmento: ${company.cnaePrincipal?.descricao || 'Segurança / Serviços'}\nContato: ${contactName} (${contactPosition})`,
           statusId: firstStatus.id,
           leadId: createdLead.id,
-          priority: 'MEDIUM',
-          value: company.capitalSocial && company.capitalSocial > 500000 ? 15000 : 5000,
-          probability: 20,
+          estimatedValue: company.capitalSocial && company.capitalSocial > 500000 ? 15000 : 5000,
         });
       }
     } catch (oppErr) {

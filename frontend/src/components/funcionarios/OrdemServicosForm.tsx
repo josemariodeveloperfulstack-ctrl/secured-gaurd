@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -1190,7 +1190,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                 />
               </div>
 
-              {form.layoutType === 'BOMBEIRO_CIVIL' && (
+              {(form.layoutType === 'BOMBEIRO_CIVIL' || Boolean(form.accidentProcedure?.trim()) || (form.position || '').toUpperCase().includes('BOMBEIRO')) && (
                 <div className="space-y-2">
                   <Label>Procedimento em Caso de Acidentes</Label>
                   <Textarea

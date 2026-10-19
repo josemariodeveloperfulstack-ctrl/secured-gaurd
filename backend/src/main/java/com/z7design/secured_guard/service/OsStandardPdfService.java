@@ -136,6 +136,9 @@ public class OsStandardPdfService {
                 }
                 addSection(document, uniformSectionTitle.toUpperCase(), safeStr(request.getUniform()));
                 addSection(document, "TREINAMENTOS OBRIGATÓRIOS", safeStr(request.getMandatoryTrainings()));
+                if (request.getAccidentProcedure() != null && !request.getAccidentProcedure().isBlank()) {
+                        addSection(document, "PROCEDIMENTO EM CASO DE ACIDENTES", safeStr(request.getAccidentProcedure()));
+                }
 
                 String warningText1 = "O descumprimento desta Ordem de Serviço caracteriza ato de indisciplina do empregado. Permitindo aplicar as penalidades que a critério da empresa poderá ser advertência verbal por escrito e até rescisão de contrato de trabalho por justa causa, independentemente de outras medidas de ordem jurídicas aplicáveis no art. 158 da CLT, norma regulamentadora nº 01 da portaria 3214/78 (subitens 1.8 e 1.8.1).";
                 String warningText2 = "Declara o empregado que recebeu cópia da presente Ordem de Serviço, que fica em seu poder passando o original a fazer parte do seu contrato de trabalho, para todos os fins previstos em lei.";

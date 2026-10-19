@@ -94,37 +94,45 @@ public class GeminiProspectionService {
 
     private String buildProspectionPrompt(String cidade, String uf, String segmento, int limit) {
         return """
-            Você é um agente de inteligência comercial especializado em prospecção B2B de empresas para serviços de:
+            Você é um agente sênior de inteligência comercial B2B para o setor de:
             - Segurança Patrimonial Armada e Desarmada
-            - Portaria e Controle de Acesso
-            - Limpeza e Facilities corporativos/industriais
+            - Portaria, Recepção e Controle de Acesso
+            - Facilities, Zeladoria e Limpeza Predial / Industrial
 
             Localização Alvo: Cidade de %s - %s
-            Segmento/Nicho: %s
+            Segmento ou Palavra-Chave Alvo: %s
 
-            Gere uma lista de até %d empresas ou estabelecimentos REAIS ou de alto potencial de contratação nessa cidade/região (condomínios comerciais/residenciais de alto padrão, grandes indústrias, centros de distribuição, hospitais, concessionárias, redes varejistas).
-            
-            Avalie o potencial de conversão de 1 a 100%% e justifique por que essa empresa precisa de facilities e segurança patrimonial.
+            Objetivo:
+            Gere uma lista de até %d estabelecimentos e empresas de ALTO POTENCIAL com necessidade imediata ou contínua desses serviços nesta cidade (ex: condomínios residenciais/comerciais expressivos, hospitais, centros de distribuição/logística, indústrias, hipermercados, concessionárias, shopping centers).
 
-            IMPORTANTE: Retorne ESTRITAMENTE um array JSON válido sem nenhum markdown ou texto em volta, seguindo o esquema:
+            REGRAS OBRIGATÓRIAS DE HIGIENIZAÇÃO (ANTI-CONTABILIDADE):
+            1. NÃO traga e-mails ou telefones de escritórios de contabilidade (ex: descartar domínios com 'contab', 'assessoria', 'fiscal', 'consultoria contabil').
+            2. Priorize o TELEFONE DIRETO do estabelecimento (recepção comercial, portaria ou gerência geral).
+            3. Priorize E-MAIL CORPORATIVO REAL da empresa (ex: compras@, contato@, diretoria@, administracao@ ou sindico@).
+            4. Identifique o TOMADOR DE DECISÃO REAL (ex: Síndico, Gerente Geral, Diretor de Operações, Gerente Predial ou Sócio Principal) com nome e cargo.
+            5. Avalie se é um 'CLIENTE EM POTENCIAL' (true/false) e atribua o score de conversão (1 a 100).
+            6. Justifique em 'motivoConversao' a dor específica da empresa que a Segurança/Facilities resolve.
+
+            IMPORTANTE: Retorne ESTRITAMENTE um array JSON válido sem markdown ou caracteres fora do JSON:
             [
               {
-                "cnpj": "CNPJ formatado ou gerado verossímil",
-                "razaoSocial": "Razão Social",
-                "nomeFantasia": "Nome Fantasia ou do Condomínio/Empresa",
+                "cnpj": "CNPJ formatado ou verossímil",
+                "razaoSocial": "Razão Social Oficial",
+                "nomeFantasia": "Nome Comercial / Nome do Condomínio ou Empresa",
                 "municipio": "%s",
                 "uf": "%s",
                 "bairro": "Bairro relevante da cidade",
-                "logradouro": "Endereço aproximado ou avenida principal",
+                "logradouro": "Avenida ou Rua principal",
                 "telefone": "(DDD) 3XXX-XXXX ou 9XXXX-XXXX",
-                "email": "compras@empresa.com.br ou contato@empresa.com.br",
-                "cnaeDescricao": "Descrição do ramo de atividade",
-                "scoreConversao": 85,
-                "motivoConversao": "Grande circulação de pessoas e alto risco patrimonial, demandando portaria 24h e rondas.",
+                "email": "contato@empresa.com.br",
+                "cnaeDescricao": "Ramo de atividade",
+                "clientePotencial": true,
+                "scoreConversao": 92,
+                "motivoConversao": "Condomínio de grande porte com portaria 24h e alta demanda por controle rigoroso de visitantes e rondas perimetrais.",
                 "qsa": [
                   {
-                    "nome": "Nome do Síndico / Diretor de Operações / Sócio",
-                    "qualificacao": "Diretor / Síndico / Sócio-Administrador"
+                    "nome": "Nome do Tomador de Decisão",
+                    "qualificacao": "Síndico Profissional / Diretor de Operações"
                   }
                 ]
               }
@@ -171,7 +179,8 @@ public class GeminiProspectionService {
             p.put("telefone", "(34) 32" + (10 + i) + "-40" + (20 + i));
             p.put("email", "compras." + cidade.toLowerCase().replace(" ", "") + (i + 1) + "@empresa.com.br");
             p.put("cnaeDescricao", segmento != null && !segmento.isBlank() ? segmento : "Condomínios e Serviços Combinados");
-            p.put("scoreConversao", 75 + (i * 3));
+            p.put("clientePotencial", true);
+            p.put("scoreConversao", 80 + (i * 2));
             p.put("motivoConversao", "Alto fluxo diário de colaboradores e visitantes; necessidade contínua de controle de acesso e monitoramento patrimonial.");
             p.put("qsa", List.of(
                     Map.of("nome", "Administrador / Gerente Operacional", "qualificacao", "Diretoria de Compras")

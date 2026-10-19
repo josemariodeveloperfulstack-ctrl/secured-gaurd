@@ -160,7 +160,7 @@ Riscos Físicos: Radiações não-ionizantes.`,
 export const OS_SAFETY_TEMPLATES: OrdemServicoSafetyTemplate[] = [
   {
     id: 'bombeiro-civil',
-    layoutType: 'BOMBEIRO_CIVIL',
+    layoutType: 'STANDARD_NR01',
     matchKeywords: ['BOMBEIRO CIVIL', 'BOMBEIRO'],
     label: 'Bombeiro Civil',
     defaultServiceType: 'Bombeiro Civil',

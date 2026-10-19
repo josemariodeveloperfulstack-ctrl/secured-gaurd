@@ -12,8 +12,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "whatsapp_messages")
 @Data
-@NoArgsConstructor
 public class WhatsAppMessage {
+
+    public WhatsAppMessage() {
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

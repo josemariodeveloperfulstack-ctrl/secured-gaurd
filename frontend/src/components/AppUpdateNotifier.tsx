@@ -46,15 +46,22 @@ export const AppUpdateNotifier: React.FC = () => {
           onRegistered(registration) {
             if (import.meta.env.DEV) return;
             if (registration?.update) {
-              setInterval(() => registration.update(), 60 * 60 * 1000);
+              setInterval(() => {
+                registration.update().catch((err: unknown) => {
+                  console.debug('[PWA] Falha silenciosa ao verificar atualização do SW:', err);
+                });
+              }, 60 * 60 * 1000);
             }
+          },
+          onRegisterError(error) {
+            console.warn('[PWA] Erro ao registrar Service Worker:', error);
           },
         });
       } catch (err) {
         if (import.meta.env.DEV) {
           console.debug('[PWA] registerSW não disponível em dev');
         } else {
-          console.warn('[PWA] Falha ao registrar Service Worker:', err);
+          console.warn('[PWA] Falha ao carregar módulo do Service Worker:', err);
         }
       }
     };

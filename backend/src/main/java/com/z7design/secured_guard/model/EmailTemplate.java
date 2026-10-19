@@ -21,6 +21,11 @@ import java.util.UUID;
 @Builder
 public class EmailTemplate {
 
+    public static class EmailTemplateBuilder {
+        public EmailTemplateBuilder() {
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

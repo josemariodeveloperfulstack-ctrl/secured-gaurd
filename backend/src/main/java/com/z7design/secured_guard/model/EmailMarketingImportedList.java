@@ -23,6 +23,11 @@ import java.util.UUID;
 @Builder
 public class EmailMarketingImportedList {
 
+    public static class EmailMarketingImportedListBuilder {
+        public EmailMarketingImportedListBuilder() {
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

@@ -93,23 +93,27 @@ const Prospeccao: React.FC = () => {
     }
   };
 
-  // Busca Segmentada com IA Gemini
+  // Busca com IA por Nicho / Palavra-chave e Região
   const handleSearchSegmento = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cidade = municipioInput.trim() || 'Uberlândia';
+    const termoNicho = mapsKeyword.trim() 
+      ? `${mapsKeyword.trim()} (CNAE: ${selectedCnae})` 
+      : selectedCnae;
+
     try {
       setLoading(true);
-      const results = await prospectionService.searchWithAi(cidade, selectedUf, selectedCnae, 8);
+      const results = await prospectionService.searchWithAi(cidade, selectedUf, termoNicho, 10);
       if (results.length > 0) {
         setProspects(results);
         toast({
-          title: `🤖 IA Gemini qualificou ${results.length} empresas em ${cidade}!`,
-          description: 'Avaliadas com potencial de conversão para Facilities e Segurança Patrimonial.',
+          title: `🎯 ${results.length} leads qualificados em ${cidade}!`,
+          description: 'Higienizados sem contatos de contabilidade e com decisores prioritários.',
         });
       } else {
         toast({
           title: 'Nenhum prospecto retornado',
-          description: 'Tente alterar a cidade ou o segmento desejado.',
+          description: 'Tente alterar a palavra-chave ou a cidade.',
           variant: 'destructive',
         });
       }
@@ -122,26 +126,6 @@ const Prospeccao: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Busca no Google Maps / Places
-  const handleSearchMaps = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!mapsKeyword.trim() && !municipioInput.trim()) {
-      toast({
-        title: 'Termo de pesquisa obrigatório',
-        description: 'Digite o tipo de negócio ou bairro que deseja prospectar.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const query = encodeURIComponent(`${mapsKeyword || 'empresas condomínios'} ${municipioInput} ${selectedUf}`);
-    window.open(`https://www.google.com/maps/search/${query}`, '_blank');
-    toast({
-      title: 'Google Maps aberto para Prospecção',
-      description: 'Copie os CNPJs ou nomes encontrados para enriquecer instantaneamente na aba CNPJ.',
-    });
   };
 
   // Enviar para o CRM (Kanban)
@@ -249,25 +233,94 @@ const Prospeccao: React.FC = () => {
                 className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-xs sm:text-sm font-medium flex items-center gap-1.5"
               >
                 <Sparkles className="h-4 w-4 text-amber-400 data-[state=active]:text-black" />
-                Prospecção IA Gemini (Cidade / Nicho)
+                🎯 Prospecção Inteligente por Nicho & Região
               </TabsTrigger>
               <TabsTrigger 
                 value="cnpj" 
-                className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-xs sm:text-sm font-medium"
+                className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-xs sm:text-sm font-medium flex items-center gap-1.5"
               >
-                <Building2 className="h-4 w-4 mr-2" />
-                Busca Rápida por CNPJ
-              </TabsTrigger>
-              <TabsTrigger 
-                value="maps" 
-                className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-xs sm:text-sm font-medium"
-              >
-                <MapPin className="h-4 w-4 mr-2" />
-                Google Maps / Região Local
+                <Building2 className="h-4 w-4" />
+                🏢 Consulta e Enriquecimento de CNPJ
               </TabsTrigger>
             </TabsList>
 
-            {/* ABA 1: CNPJ DIRETO */}
+            {/* ABA 1: PROSPECÇÃO COM IA & PALAVRA-CHAVE */}
+            <TabsContent value="segmento" className="space-y-4">
+              <form onSubmit={handleSearchSegmento} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-1 md:col-span-2">
+                  <Label className="text-xs text-gray-300 font-semibold">Palavra-chave ou Nicho Específico</Label>
+                  <Input
+                    placeholder="Ex: Condomínio Edifício, Centro Logístico, Hospital, Concessionária..."
+                    value={mapsKeyword}
+                    onChange={(e) => setMapsKeyword(e.target.value)}
+                    className="bg-seguranca-black border-gray-600 text-white h-10 placeholder-gray-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-300 font-semibold">Cidade Alvo *</Label>
+                  <Input
+                    placeholder="Ex: Uberlândia, Araguari, Campinas..."
+                    value={municipioInput}
+                    onChange={(e) => setMunicipioInput(e.target.value)}
+                    className="bg-seguranca-black border-gray-600 text-white h-10"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-300 font-semibold">Estado (UF)</Label>
+                  <Select value={selectedUf} onValueChange={setSelectedUf}>
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-white h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-700 text-white max-h-72">
+                      {ESTADOS_BRASIL.map((uf) => (
+                        <SelectItem key={uf.sigla} value={uf.sigla}>
+                          {uf.sigla} - {uf.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="md:col-span-3 space-y-1">
+                  <Label className="text-xs text-gray-300 font-semibold">CNAE / Atividade Complementar (Opcional)</Label>
+                  <Select value={selectedCnae} onValueChange={setSelectedCnae}>
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-white h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-700 text-white max-h-72">
+                      {STRATEGIC_CNAES.map((c) => (
+                        <SelectItem key={c.codigo} value={c.codigo}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="md:col-span-1 flex items-end">
+                  <Button 
+                    type="submit" 
+                    disabled={loading}
+                    className="w-full bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold h-10 px-4 shadow-md"
+                  >
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                    Prospectar Leads
+                  </Button>
+                </div>
+
+                <div className="md:col-span-4 flex items-center justify-between pt-1 border-t border-gray-800 text-xs">
+                  <span className="text-amber-400/90 flex items-center gap-1.5">
+                    <Bot className="h-4 w-4 text-amber-400" />
+                    Higienização automática ativa: ignora e-mails de escritórios contábeis e prioriza contatos diretos e decisores reais.
+                  </span>
+                </div>
+              </form>
+            </TabsContent>
+
+            {/* ABA 2: CNPJ DIRETO */}
             <TabsContent value="cnpj" className="space-y-4">
               <form onSubmit={handleSearchCnpj} className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1 relative">
@@ -288,103 +341,8 @@ const Prospeccao: React.FC = () => {
                 </Button>
               </form>
               <p className="text-xs text-gray-400">
-                💡 Retorna Razão Social, Sócios/Decisores (QSA), Telefones com WhatsApp, E-mail, Endereço completo e CNAE.
+                💡 Consulta a base oficial, higieniza contatos de contabilidade e traz Sócios/Decisores (QSA), Telefones comerciais e CNAE.
               </p>
-            </TabsContent>
-
-            {/* ABA 2: CNAE & REGIÃO */}
-            <TabsContent value="segmento" className="space-y-4">
-              <form onSubmit={handleSearchSegmento} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-300">Segmento / CNAE Alvo</Label>
-                  <Select value={selectedCnae} onValueChange={setSelectedCnae}>
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-white h-10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-black border-gray-700 text-white max-h-72">
-                      {STRATEGIC_CNAES.map((c) => (
-                        <SelectItem key={c.codigo} value={c.codigo}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-300">Estado (UF)</Label>
-                  <Select value={selectedUf} onValueChange={setSelectedUf}>
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-white h-10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-black border-gray-700 text-white max-h-72">
-                      {ESTADOS_BRASIL.map((uf) => (
-                        <SelectItem key={uf.sigla} value={uf.sigla}>
-                          {uf.sigla} - {uf.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-300">Cidade Alvo *</Label>
-                  <Input
-                    placeholder="Ex: Uberlândia, Araguari, São Paulo..."
-                    value={municipioInput}
-                    onChange={(e) => setMunicipioInput(e.target.value)}
-                    className="bg-seguranca-black border-gray-600 text-white h-10"
-                  />
-                </div>
-
-                <div className="md:col-span-3 flex items-center justify-between pt-2">
-                  <span className="text-xs text-amber-400/90 flex items-center gap-1.5">
-                    <Bot className="h-4 w-4 text-amber-400" />
-                    Agente IA analisa o potencial de contratação para vigilância, portaria e limpeza predial.
-                  </span>
-                  <Button 
-                    type="submit" 
-                    disabled={loading}
-                    className="bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold h-10 px-6 shadow-md"
-                  >
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                    Prospectar com IA Gemini
-                  </Button>
-                </div>
-              </form>
-            </TabsContent>
-
-            {/* ABA 3: GOOGLE MAPS / REGIONAL */}
-            <TabsContent value="maps" className="space-y-4">
-              <form onSubmit={handleSearchMaps} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1 md:col-span-2">
-                  <Label className="text-xs text-gray-300">Palavra-chave ou Nicho</Label>
-                  <Input
-                    placeholder="Ex: Condomínio Edifício, Indústria, Hospital, Centro Logístico..."
-                    value={mapsKeyword}
-                    onChange={(e) => setMapsKeyword(e.target.value)}
-                    className="bg-seguranca-black border-gray-600 text-white h-10"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-300">Cidade / Bairro</Label>
-                  <Input
-                    placeholder="Ex: Jardins, Barueri, Santos..."
-                    value={municipioInput}
-                    onChange={(e) => setMunicipioInput(e.target.value)}
-                    className="bg-seguranca-black border-gray-600 text-white h-10"
-                  />
-                </div>
-                <div className="md:col-span-3 flex justify-end">
-                  <Button 
-                    type="submit"
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold h-10 px-6"
-                  >
-                    <Globe className="h-4 w-4 mr-2" />
-                    Abrir no Google Maps para Radar
-                  </Button>
-                </div>
-              </form>
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -434,6 +392,11 @@ const Prospeccao: React.FC = () => {
                           <Badge className="bg-seguranca-yellow text-black font-bold text-[10px]">
                             CNPJ: {company.cnpj}
                           </Badge>
+                          {company.clientePotencial && (
+                            <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] flex items-center gap-1 font-bold">
+                              🔥 Lead com Alto Potencial
+                            </Badge>
+                          )}
                           {company.scoreConversao && (
                             <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] flex items-center gap-1 font-semibold">
                               <Sparkles className="h-3 w-3 text-emerald-400" />
@@ -532,6 +495,11 @@ const Prospeccao: React.FC = () => {
                         <div className="flex items-center gap-1.5 text-xs text-gray-300">
                           <Mail className="h-3.5 w-3.5 text-seguranca-yellow shrink-0" />
                           <span className="truncate" title={company.email}>{company.email}</span>
+                        </div>
+                      ) : company.emailContabilidadeDescartado ? (
+                        <div className="text-xs text-amber-400/90 italic flex items-center gap-1" title="E-mail de escritório de contabilidade descartado automaticamente para evitar contatos inválidos.">
+                          <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                          <span>E-mail contábil descartado</span>
                         </div>
                       ) : (
                         <div className="text-xs text-gray-500 italic">E-mail não listado</div>

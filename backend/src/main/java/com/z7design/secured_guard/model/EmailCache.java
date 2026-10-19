@@ -19,6 +19,11 @@ import java.util.UUID;
 @Setter
 public class EmailCache {
 
+    public static class EmailCacheBuilder {
+        public EmailCacheBuilder() {
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

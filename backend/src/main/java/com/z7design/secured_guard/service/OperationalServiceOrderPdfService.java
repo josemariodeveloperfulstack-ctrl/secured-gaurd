@@ -17,10 +17,7 @@ public class OperationalServiceOrderPdfService {
     }
 
     public byte[] generatePdf(OperationalServiceOrderRequest request) {
-        if (request.getLayoutType() != null
-                && "BOMBEIRO_CIVIL".equalsIgnoreCase(request.getLayoutType().trim())) {
-            return bombeiroCivilPdfService.generatePdf(request);
-        }
+        // Aplica o layout oficial padronizado com cabeçalho de 3 colunas (Logo | ORDEM DE SERVIÇO | Carimbo SST) para todos os cargos
         return standardPdfService.generatePdf(request);
     }
 }

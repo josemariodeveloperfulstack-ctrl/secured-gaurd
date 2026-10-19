@@ -20,6 +20,11 @@ import java.util.UUID;
 @Builder
 public class EmailLog {
 
+    public static class EmailLogBuilder {
+        public EmailLogBuilder() {
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
