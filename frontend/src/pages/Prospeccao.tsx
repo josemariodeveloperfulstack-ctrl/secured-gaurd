@@ -29,7 +29,9 @@ import {
   Map, 
   Compass, 
   ExternalLink,
-  Briefcase
+  Briefcase,
+  Sparkles,
+  Bot
 } from 'lucide-react';
 import prospectionService, { 
   ProspectCompany, 
@@ -91,23 +93,29 @@ const Prospeccao: React.FC = () => {
     }
   };
 
-  // Busca Segmentada / CNAE
+  // Busca Segmentada com IA Gemini
   const handleSearchSegmento = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    const cidade = municipioInput.trim() || 'Uberlândia';
     try {
       setLoading(true);
-      const results = await prospectionService.searchByCnaeAndRegion(selectedCnae, selectedUf, municipioInput);
+      const results = await prospectionService.searchWithAi(cidade, selectedUf, selectedCnae, 8);
       if (results.length > 0) {
         setProspects(results);
+        toast({
+          title: `🤖 IA Gemini qualificou ${results.length} empresas em ${cidade}!`,
+          description: 'Avaliadas com potencial de conversão para Facilities e Segurança Patrimonial.',
+        });
       } else {
         toast({
-          title: 'Dica de Prospecção',
-          description: 'Para listar por segmento em lote, você também pode consultar CNPJs específicos da região ou buscar no Google Maps.',
+          title: 'Nenhum prospecto retornado',
+          description: 'Tente alterar a cidade ou o segmento desejado.',
+          variant: 'destructive',
         });
       }
     } catch (err: any) {
       toast({
-        title: 'Erro na busca segmentada',
+        title: 'Erro na busca com IA',
         description: err.message || 'Falha ao buscar empresas.',
         variant: 'destructive',
       });
@@ -237,18 +245,18 @@ const Prospeccao: React.FC = () => {
           <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
             <TabsList className="bg-seguranca-black border border-gray-700 p-1 mb-6">
               <TabsTrigger 
+                value="segmento" 
+                className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-xs sm:text-sm font-medium flex items-center gap-1.5"
+              >
+                <Sparkles className="h-4 w-4 text-amber-400 data-[state=active]:text-black" />
+                Prospecção IA Gemini (Cidade / Nicho)
+              </TabsTrigger>
+              <TabsTrigger 
                 value="cnpj" 
                 className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-xs sm:text-sm font-medium"
               >
                 <Building2 className="h-4 w-4 mr-2" />
                 Busca Rápida por CNPJ
-              </TabsTrigger>
-              <TabsTrigger 
-                value="segmento" 
-                className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-xs sm:text-sm font-medium"
-              >
-                <Briefcase className="h-4 w-4 mr-2" />
-                CNAE & Região
               </TabsTrigger>
               <TabsTrigger 
                 value="maps" 
@@ -320,23 +328,27 @@ const Prospeccao: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs text-gray-300">Cidade (Opcional)</Label>
+                  <Label className="text-xs text-gray-300">Cidade Alvo *</Label>
                   <Input
-                    placeholder="Ex: São Paulo, Campinas..."
+                    placeholder="Ex: Uberlândia, Araguari, São Paulo..."
                     value={municipioInput}
                     onChange={(e) => setMunicipioInput(e.target.value)}
                     className="bg-seguranca-black border-gray-600 text-white h-10"
                   />
                 </div>
 
-                <div className="md:col-span-3 flex justify-end">
+                <div className="md:col-span-3 flex items-center justify-between pt-2">
+                  <span className="text-xs text-amber-400/90 flex items-center gap-1.5">
+                    <Bot className="h-4 w-4 text-amber-400" />
+                    Agente IA analisa o potencial de contratação para vigilância, portaria e limpeza predial.
+                  </span>
                   <Button 
                     type="submit" 
                     disabled={loading}
-                    className="bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold h-10 px-6"
+                    className="bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold h-10 px-6 shadow-md"
                   >
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
-                    Pesquisar Empresas no Segmento
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                    Prospectar com IA Gemini
                   </Button>
                 </div>
               </form>
@@ -418,9 +430,17 @@ const Prospeccao: React.FC = () => {
                   <CardHeader className="pb-3 border-b border-gray-700/60">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <Badge className="bg-seguranca-yellow text-black font-bold text-[10px] mb-1">
-                          CNPJ: {company.cnpj}
-                        </Badge>
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <Badge className="bg-seguranca-yellow text-black font-bold text-[10px]">
+                            CNPJ: {company.cnpj}
+                          </Badge>
+                          {company.scoreConversao && (
+                            <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] flex items-center gap-1 font-semibold">
+                              <Sparkles className="h-3 w-3 text-emerald-400" />
+                              Score IA: {company.scoreConversao}%
+                            </Badge>
+                          )}
+                        </div>
                         <CardTitle className="text-base sm:text-lg font-bold text-white leading-tight">
                           {company.nomeFantasia || company.razaoSocial}
                         </CardTitle>
@@ -432,11 +452,18 @@ const Prospeccao: React.FC = () => {
                       </div>
                       <Badge 
                         variant="outline" 
-                        className={company.situacaoCadastral === 'ATIVA' ? 'border-green-500 text-green-400' : 'border-amber-500 text-amber-400'}
+                        className={company.situacaoCadastral === 'ATIVA' ? 'border-green-500 text-green-400 shrink-0' : 'border-amber-500 text-amber-400 shrink-0'}
                       >
                         {company.situacaoCadastral}
                       </Badge>
                     </div>
+
+                    {company.motivoConversao && (
+                      <div className="mt-2 text-[11px] bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded p-2 flex items-start gap-1.5">
+                        <Bot className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                        <span><strong>Diagnóstico IA:</strong> {company.motivoConversao}</span>
+                      </div>
+                    )}
                   </CardHeader>
 
                   <CardContent className="py-4 space-y-3 text-xs sm:text-sm">

@@ -39,12 +39,14 @@ export interface ProspectCompany {
   telefoneSecundario?: string;
   email?: string;
   qsa: Socio[];
-  origem: 'CNPJ' | 'CNAE' | 'GOOGLE_MAPS';
+  origem: 'CNPJ' | 'CNAE' | 'GOOGLE_MAPS' | 'GEMINI_AI';
   googleMapsUrl?: string;
   rating?: number;
   userRatingsTotal?: number;
   leadImported?: boolean;
   importedLeadId?: string | number;
+  scoreConversao?: number;
+  motivoConversao?: string;
 }
 
 export interface ProspectionFilters {
@@ -248,27 +250,48 @@ class ProspectionService {
   }
 
   /**
+   * Busca e qualificação inteligente de prospectos via IA Gemini
+   */
+  async searchWithAi(cidade: string, uf: string, segmento?: string, quantidade = 8): Promise<ProspectCompany[]> {
+    try {
+      const params = new URLSearchParams();
+      if (cidade) params.append('cidade', cidade);
+      if (uf) params.append('uf', uf);
+      if (segmento) params.append('segmento', segmento);
+      params.append('quantidade', String(quantidade));
+
+      const { data } = await api.get<any[]>(`/api/prospection/ai-search?${params.toString()}`);
+      if (Array.isArray(data)) {
+        return data.map((item: any) => ({
+          cnpj: item.cnpj || '00.000.000/0001-00',
+          razaoSocial: item.razaoSocial || item.nomeFantasia,
+          nomeFantasia: item.nomeFantasia || item.razaoSocial,
+          situacaoCadastral: 'ATIVA',
+          cnaePrincipal: item.cnaeDescricao ? { codigo: 'CNAE-IA', descricao: item.cnaeDescricao } : undefined,
+          logradouro: item.logradouro || '',
+          bairro: item.bairro || '',
+          municipio: item.municipio || cidade,
+          uf: item.uf || uf,
+          telefone: item.telefone || '',
+          email: item.email || '',
+          scoreConversao: item.scoreConversao || 80,
+          motivoConversao: item.motivoConversao || 'Necessidade contínua de controle de acesso e segurança patrimonial.',
+          qsa: Array.isArray(item.qsa) ? item.qsa : [],
+          origem: 'GEMINI_AI',
+        }));
+      }
+      return [];
+    } catch (err: any) {
+      console.error('Erro na prospecção com IA Gemini:', err);
+      throw new Error(err.response?.data?.message || err.message || 'Falha ao executar prospecção com IA.');
+    }
+  }
+
+  /**
    * Busca segmentada por CNAE e Região com enriquecimento
    */
   async searchByCnaeAndRegion(cnae: string, uf: string, municipio?: string): Promise<ProspectCompany[]> {
-    // 1. Tentar endpoint do backend se disponível
-    try {
-      const params = new URLSearchParams();
-      if (cnae) params.append('cnae', cnae);
-      if (uf) params.append('uf', uf);
-      if (municipio) params.append('municipio', municipio);
-
-      const res = await api.get(`/api/prospection/search?${params.toString()}`);
-      if (Array.isArray(res.data) && res.data.length > 0) {
-        return res.data;
-      }
-    } catch {
-      // Backend custom route opcional
-    }
-
-    // 2. Prospecção assistida com base aberta ou busca estruturada
-    // Se o backend ainda não possuir base offline do CNPJ baixada, geramos resultados para a busca por filtros
-    return [];
+    return this.searchWithAi(municipio || 'Uberlândia', uf || 'MG', cnae);
   }
 
   /**
