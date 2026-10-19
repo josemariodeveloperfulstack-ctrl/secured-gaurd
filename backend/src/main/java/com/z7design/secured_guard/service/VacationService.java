@@ -22,6 +22,8 @@ import com.z7design.secured_guard.repository.HolidayRepository;
 import com.z7design.secured_guard.util.PeriodoAquisitivoUtil;
 import com.z7design.secured_guard.util.BrazilianHolidaysUtil;
 
+import com.z7design.secured_guard.repository.VacationCoverageRepository;
+
 @Service
 public class VacationService {
     
@@ -29,16 +31,19 @@ public class VacationService {
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
     private final HolidayRepository holidayRepository;
+    private final VacationCoverageRepository vacationCoverageRepository;
 
     public VacationService(
             VacationRepository vacationRepository,
             UserRepository userRepository,
             EmployeeRepository employeeRepository,
-            HolidayRepository holidayRepository) {
+            HolidayRepository holidayRepository,
+            VacationCoverageRepository vacationCoverageRepository) {
         this.vacationRepository = vacationRepository;
         this.userRepository = userRepository;
         this.employeeRepository = employeeRepository;
         this.holidayRepository = holidayRepository;
+        this.vacationCoverageRepository = vacationCoverageRepository;
     }
     
     @Transactional
@@ -136,6 +141,8 @@ public class VacationService {
         if (!vacationRepository.existsById(id)) {
             throw new ResourceNotFoundException("Vacation not found with id: " + id);
         }
+        // Excluir coberturas vinculadas para evitar violação de integridade referencial (FK)
+        vacationCoverageRepository.deleteByVacationId(id);
         vacationRepository.deleteById(id);
     }
     

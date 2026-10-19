@@ -170,7 +170,7 @@
   }
   
   .react-datepicker__input-container input {
-    @apply bg-seguranca-black border border-gray-600 text-seguranca-lightgray rounded w-full h-10 px-3 focus:ring-2 focus:ring-seguranca-yellow focus:outline-none placeholder-gray-400;
+    @apply bg-seguranca-black border border-gray-600 text-seguranca-lightgray rounded-lg w-full h-10 px-3 pr-10 focus:ring-2 focus:ring-seguranca-yellow focus:outline-none placeholder-gray-400 text-sm transition-all duration-200;
   }
   
   /* DatePicker com fundo branco (para modais) */

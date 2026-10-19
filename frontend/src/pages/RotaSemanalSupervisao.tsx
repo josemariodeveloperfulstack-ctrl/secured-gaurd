@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
-// import { StandardLayout } from '@/components/StandardLayout'; // Removido para evitar navbar duplicada
+import React, { useState, useEffect } from 'react';
+import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -118,26 +118,49 @@ const RotaSemanalSupervisao: React.FC = () => {
 
   const loadInitialData = async () => {
     try {
-      const [employeesData, clientsData] = await Promise.all([
-        employeeService.getAllEmployees(),
-        clientService.getAllClients()
-      ]);
-      
-      // Verificar se os dados são arrays
-      const employeesList = Array.isArray(employeesData) ? employeesData : [];
-      const clientsList = Array.isArray(clientsData) ? clientsData : [];
-      
-      const supervisorsList = employeesList.filter(emp => 
-        emp.position?.name?.toLowerCase().includes('supervisor') ||
-        emp.jobInfo?.position?.toLowerCase().includes('supervisor')
-      );
-      
-      setSupervisors(supervisorsList);
+      let clientsList: any[] = [];
+      try {
+        const clientsRes = await clientService.getAllClients();
+        if (Array.isArray(clientsRes) && clientsRes.length > 0) {
+          clientsList = clientsRes;
+        } else {
+          const selectRes = await clientService.getClientsForSelect();
+          clientsList = Array.isArray(selectRes) ? selectRes : [];
+        }
+      } catch (err) {
+        console.warn('Fallback para getClientsForSelect:', err);
+        try {
+          const selectRes = await clientService.getClientsForSelect();
+          clientsList = Array.isArray(selectRes) ? selectRes : [];
+        } catch (e2) {
+          console.error('Falha ao carregar clientes:', e2);
+        }
+      }
       setClients(clientsList);
+
+      let supervisorsList: Employee[] = [];
+      try {
+        const employeesData = await employeeService.getAllEmployees(undefined, 0, 500);
+        const list = Array.isArray(employeesData) ? employeesData : [];
+        
+        const filtered = list.filter((emp: any) => {
+          const posName = String(emp.position?.name || emp.positionName || emp.jobInfo?.position || '').toLowerCase();
+          const role = String(emp.role || emp.user?.roles || '').toLowerCase();
+          const dept = String(emp.department?.name || '').toLowerCase();
+          return posName.includes('supervisor') || 
+                 posName.includes('supervis') || 
+                 role.includes('supervisor') ||
+                 dept.includes('supervis');
+        });
+
+        supervisorsList = filtered.length > 0 ? filtered : list;
+      } catch (err) {
+        console.error('Falha ao carregar funcionários para supervisão:', err);
+      }
+      setSupervisors(supervisorsList);
     } catch (error) {
       console.error('Erro ao carregar dados iniciais:', error);
       toast.error('Erro ao carregar dados');
-      // Definir arrays vazios em caso de erro
       setSupervisors([]);
       setClients([]);
     }
@@ -284,8 +307,11 @@ const RotaSemanalSupervisao: React.FC = () => {
   };
 
   return (
-    // <StandardLayout title="Rota Semanal de Supervisão" subtitle="Controle de visitas de supervisores">
-    <div className="space-y-6">
+    <StandardLayout 
+      title={showCreateForm ? "Criar Nova Escala de Visitas" : "Rota Semanal de Supervisão"} 
+      subtitle={showCreateForm ? "Configure uma nova escala de visitas otimizada com cálculo de rotas" : "Controle de visitas de supervisores"}
+    >
+      <div className="space-y-6">
       {showCreateForm ? (
         <CreateVisitSchedule 
           onSubmit={handleCreateSchedule}
@@ -435,8 +461,8 @@ const RotaSemanalSupervisao: React.FC = () => {
           </Card>
           
           {/* Abas */}
-          <div className="flex justify-between items-center">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="flex justify-between items-center mb-4">
               <TabsList className="bg-seguranca-black border-gray-600">
                 <TabsTrigger value="calendar" className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black">
                   <Calendar className="w-4 h-4 mr-2" />
@@ -451,16 +477,15 @@ const RotaSemanalSupervisao: React.FC = () => {
                   Estatísticas
                 </TabsTrigger>
               </TabsList>
-            </Tabs>
-            
-            <Button 
-              onClick={() => setShowCreateForm(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Rota
-            </Button>
-          </div>
+              
+              <Button 
+                onClick={() => setShowCreateForm(true)}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Rota
+              </Button>
+            </div>
 
           <TabsContent value="calendar">
             <div className="space-y-6">
@@ -789,10 +814,11 @@ const RotaSemanalSupervisao: React.FC = () => {
               </div>
             </div>
           </TabsContent>
+          </Tabs>
         </div>
       )}
-    </div>
-    // </StandardLayout>
+      </div>
+    </StandardLayout>
   );
 };
 

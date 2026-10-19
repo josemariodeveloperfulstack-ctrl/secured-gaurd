@@ -28,6 +28,7 @@ import { employeeAdmissionIsoDate, employeeAdmissionIsoDateOrToday } from '@/uti
 import {
   applyOrdemServicoTemplate,
   findOrdemServicoTemplate,
+  resolveServiceTypesForContext,
   type OrdemServicoTemplateContext,
   type OsLayoutType,
 } from '@/data/ordemServicoSafetyTemplates';
@@ -379,15 +380,18 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     }
   };
 
-  // Pre-fill position when employee changes
+  // Pre-fill position and suggested serviceType when employee changes
   useEffect(() => {
     if (funcionario) {
+      const pos =
+        (funcionario as any).position?.name ||
+        funcionario.positionName ||
+        form.position;
+      const isBombeiro = (pos || '').toUpperCase().includes('BOMBEIRO');
       setForm(prev => ({
         ...prev,
-        position:
-          (funcionario as any).position?.name ||
-          funcionario.positionName ||
-          prev.position
+        position: pos || prev.position,
+        serviceType: prev.serviceType || (isBombeiro ? 'Bombeiro Civil' : prev.serviceType)
       }));
     }
   }, [funcionario]);
@@ -531,18 +535,13 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     };
   };
 
-  const serviceTypes = [
-    'Vigilância Patrimonial',
-    'Segurança Pessoal',
-    'Escolta de Valores',
-    'Controle de Acesso',
-    'Monitoramento',
-    'Ronda',
-    'Recepção',
-    'Portaria',
-    'Eventos',
-    'Emergência',
-  ];
+  const serviceTypes = useMemo(() => {
+    return resolveServiceTypesForContext({
+      positionName: form.position || funcionario?.positionName,
+      activities: form.activities,
+      currentServiceType: form.serviceType,
+    });
+  }, [form.position, funcionario?.positionName, form.activities, form.serviceType]);
 
   const priorityLevels = [
     'Baixa',

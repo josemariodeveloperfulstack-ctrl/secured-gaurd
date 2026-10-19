@@ -31,6 +31,14 @@ public class SupervisorVisitCheckinRequest {
     private String description;
     private String observations;
 
+    private String checkoutTime;
+    private Integer durationMinutes;
+    private String signatureData;
+    private Boolean epiDelivered;
+    private String epiDescription;
+    private String epiSignatureData;
+    private java.util.List<String> photos;
+
     /** Opcional: força o supervisor (quando o usuário logado não tem vínculo de funcionário). */
     private String supervisorId;
 }

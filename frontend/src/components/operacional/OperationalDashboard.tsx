@@ -1,4 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +31,8 @@ import {
   ArrowRightLeft,
   FileText,
   Truck,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 import OccurrenceMap from './OccurrenceMap';
 
@@ -41,7 +43,9 @@ import { feriasService, FeriasPeriodo } from '@/services/feriasService';
 import { medicalDocumentService, MedicalDocument, MEDICAL_TYPE_LABELS } from '@/services/medicalDocumentService';
 import FeriasReportModal from '@/components/ferias/FeriasReportModal';
 import FeriasFormModal from '@/components/ferias/FeriasFormModal';
+import FeriasDetailsModal from '@/components/ferias/FeriasDetailsModal';
 import AfastamentoFormModal from '@/components/ferias/AfastamentoFormModal';
+import { generateAvisoFeriasPDF, viewAvisoFeriasPDF } from '@/utils/feriasAvisoPdfGenerator';
 import { Stethoscope, ShieldAlert, Building2, ExternalLink } from 'lucide-react';
 import api from '@/lib/axios';
 import axios from 'axios';
@@ -82,6 +86,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
   const [editingFeriasData, setEditingFeriasData] = useState<any>(undefined);
   const [showDeleteFeriasModal, setShowDeleteFeriasModal] = useState(false);
   const [feriasToDelete, setFeriasToDelete] = useState<FeriasPeriodo | null>(null);
+  const [showFeriasDetailsModal, setShowFeriasDetailsModal] = useState(false);
+  const [selectedFeriasForDetails, setSelectedFeriasForDetails] = useState<FeriasPeriodo | null>(null);
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [workPostAssignments, setWorkPostAssignments] = useState<WorkPostAssignment[]>([]);
   const [specificActivities, setSpecificActivities] = useState<SpecificActivity[]>([]);
@@ -117,6 +123,25 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
   const [showRemanejamentoReportModal, setShowRemanejamentoReportModal] = useState(false);
 
   const { toast } = useToast();
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const subtabParam = searchParams.get('subtab');
+  const [activeTab, setActiveTab] = useState<string>(subtabParam || 'vacations');
+
+  useEffect(() => {
+    if (subtabParam) {
+      setActiveTab(subtabParam);
+    }
+  }, [subtabParam]);
+
+  const handleTabChange = (val: string) => {
+    setActiveTab(val);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('subtab', val);
+      return next;
+    }, { replace: true });
+  };
 
   useEffect(() => {
     loadAllData();
@@ -197,6 +222,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
       observacoes: ferias.observacoes || ''
     });
     setShowFeriasModal(true);
+  };
+
+  const handleViewFeriasDetails = (ferias: FeriasPeriodo) => {
+    setSelectedFeriasForDetails(ferias);
+    setShowFeriasDetailsModal(true);
   };
 
   const handleDeleteFerias = (ferias: FeriasPeriodo) => {
@@ -914,7 +944,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
         </div>
       </div>
 
-      <Tabs defaultValue="vacations" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         {/* Tabs com Padrão SST Mobile */}
         <TooltipProvider>
           <div className="relative overflow-hidden rounded-lg glass-card border-slate-700/50 shadow-xl">
@@ -1202,7 +1232,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
                               <p className="text-xs text-muted-foreground italic">💬 {ferias.observacoes}</p>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 self-start sm:self-center">
+                          <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-center">
                             <Badge className={
                               ferias.status === 'APROVADO' ? 'bg-emerald-600 text-white font-medium' :
                               ferias.status === 'PENDENTE' ? 'bg-amber-600 text-white font-medium' :
@@ -1210,21 +1240,76 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
                             }>
                               {ferias.status}
                             </Badge>
+
+                            {/* Botão Ver Detalhes */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewFeriasDetails(ferias)}
+                              title="Visualizar todos os detalhes da solicitação"
+                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 p-1.5 h-8 w-8"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+
+                            {/* Botão Visualizar PDF - Ativo somente se Aprovado */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={ferias.status !== 'APROVADO'}
+                              onClick={() => {
+                                if (ferias.status === 'APROVADO') {
+                                  viewAvisoFeriasPDF(ferias);
+                                }
+                              }}
+                              title={
+                                ferias.status === 'APROVADO' 
+                                  ? 'Visualizar PDF do Aviso de Férias' 
+                                  : 'Visualização de PDF disponível apenas após aprovação'
+                              }
+                              className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/10 p-1.5 h-8 w-8 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+
+                            {/* Botão Baixar PDF - Ativo somente se Aprovado */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={ferias.status !== 'APROVADO'}
+                              onClick={() => {
+                                if (ferias.status === 'APROVADO') {
+                                  generateAvisoFeriasPDF(ferias);
+                                }
+                              }}
+                              title={
+                                ferias.status === 'APROVADO' 
+                                  ? 'Baixar PDF do Aviso de Férias' 
+                                  : 'Download de PDF disponível apenas após aprovação'
+                              }
+                              className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10 p-1.5 h-8 w-8 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+
+                            {/* Botão Editar */}
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEditFerias(ferias)}
                               title="Editar período de férias"
-                              className="text-gray-300 hover:text-white"
+                              className="text-gray-300 hover:text-white hover:bg-gray-700/50 p-1.5 h-8 w-8"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
+
+                            {/* Botão Excluir */}
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteFerias(ferias)}
-                              title="Cancelar férias"
-                              className="text-red-400 hover:text-red-300"
+                              title="Excluir ou cancelar solicitação"
+                              className="text-red-400 hover:text-red-300 hover:bg-red-400/10 p-1.5 h-8 w-8"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1917,6 +2002,25 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
           }}
           editingId={editingFeriasId}
           initialData={editingFeriasData}
+        />
+      )}
+
+      {/* Modal de Detalhes Completos da Solicitação de Férias */}
+      {showFeriasDetailsModal && selectedFeriasForDetails && (
+        <FeriasDetailsModal
+          isOpen={showFeriasDetailsModal}
+          onClose={() => {
+            setShowFeriasDetailsModal(false);
+            setSelectedFeriasForDetails(null);
+          }}
+          ferias={selectedFeriasForDetails}
+          onEdit={(ferias) => {
+            handleEditFerias(ferias);
+          }}
+          onDelete={(ferias) => {
+            setShowFeriasDetailsModal(false);
+            handleDeleteFerias(ferias);
+          }}
         />
       )}
 

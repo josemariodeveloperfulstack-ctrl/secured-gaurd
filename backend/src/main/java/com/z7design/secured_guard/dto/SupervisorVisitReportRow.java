@@ -32,6 +32,18 @@ public class SupervisorVisitReportRow {
     @JsonFormat(pattern = "HH:mm:ss")
     private LocalTime visitTime;
 
+    @JsonFormat(pattern = "HH:mm:ss")
+    private LocalTime checkoutTime;
+
+    private Integer durationMinutes;
+    private String description;
+    private String observations;
+    private String signatureData;
+    private Boolean epiDelivered;
+    private String epiDescription;
+    private String epiSignatureData;
+    private java.util.List<String> photos;
+
     private String supervisorName;
     private String employeeName;
     private String workPostName;

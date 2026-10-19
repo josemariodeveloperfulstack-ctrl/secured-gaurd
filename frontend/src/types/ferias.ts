@@ -1,6 +1,15 @@
+import { MedicalDocumentType } from '../services/medicalDocumentService';
+
 export type FeriasStatus = 'PENDENTE' | 'APROVADO' | 'REJECTED' | 'CANCELADO' | 'REJEITADO' | 'EM_ANDAMENTO' | 'CONCLUIDO';
 export type FeriasTipo = 'FERIAS_NORMAIS' | 'FERIAS_VENDIDAS' | 'ABONO_PECUNIARIO';
-export type AfastamentoTipo = 'ATESTADO' | 'LICENCA_MEDICA' | 'LICENCA_MATERNIDADE' | 'LICENCA_PATERNIDADE' | 'SUSPENSAO' | 'OUTROS';
+export type AfastamentoTipo = 
+  | MedicalDocumentType
+  | 'LICENCA_MEDICA'
+  | 'LICENCA_MATERNIDADE'
+  | 'LICENCA_PATERNIDADE'
+  | 'SUSPENSAO'
+  | 'OUTROS';
+
 
 export interface FeriasPeriodo {
   id: string;
@@ -88,4 +97,18 @@ export interface AfastamentoFilters {
   tipo?: AfastamentoTipo;
   dataInicio?: string;
   dataFim?: string;
+}
+
+export interface CustomFeriasReportRequest {
+  reportType: 'ferias' | 'afastamentos' | 'experiencia' | 'consolidado';
+  format: 'pdf' | 'excel';
+  employeeId?: string;
+  empresa?: string;
+  status?: string;
+  tipo?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  periodoAquisitivo?: string;
+  selectedColumns?: string[];
+  groupBy?: string;
 } 

@@ -213,7 +213,15 @@ public class CustomFinancialReportService {
             if (req.getStartDate() != null && req.getEndDate() != null) {
                 periodBadge = req.getStartDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " a " + req.getEndDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
             }
-            addExecutiveHeader(document, company, "RELATÓRIO DE CONTAS A RECEBER", "CONTAS A RECEBER", periodBadge);
+
+            boolean isInadimplenciaReport = (req.getReportSegment() != null &&
+                    ("INADIMPLENCIA".equalsIgnoreCase(req.getReportSegment().trim()) || "VENCIDOS".equalsIgnoreCase(req.getReportSegment().trim()))) ||
+                    (req.getStatus() == ReceivableStatus.OVERDUE);
+
+            String mainTitle = isInadimplenciaReport ? "RELATÓRIO DE INADIMPLENTES" : "RELATÓRIO DE CONTAS A RECEBER";
+            String badgeSubtitle = isInadimplenciaReport ? "INADIMPLENTES / ATRASO" : "CONTAS A RECEBER";
+
+            addExecutiveHeader(document, company, mainTitle, badgeSubtitle, periodBadge);
 
             // 2. Identificação e Filtros do Relatório
             addSectionHeader(document, "IDENTIFICAÇÃO E FILTROS DO RELATÓRIO");
@@ -245,6 +253,72 @@ public class CustomFinancialReportService {
             addGridRow(filterGrid, "EMPRESA/UNIDADE:", empStr, "VALOR RECEBIDO:", formatCurrency(totalRecebido));
 
             document.add(filterGrid);
+
+            // Seção Especial de Inadimplência: Ranking de Clientes com Mais Dias de Atraso (Ordenado do maior para o menor)
+            if (isInadimplenciaReport && !accounts.isEmpty()) {
+                addSectionHeader(document, "RANKING DE CLIENTES EM ATRASO (MAIOR PARA O MENOR ATRASO)");
+
+                LocalDate today = LocalDate.now();
+                class ClientDelaySummary {
+                    String clientName;
+                    long maxDelayDays;
+                    int countOverdue;
+                    BigDecimal totalOverdueAmount = BigDecimal.ZERO;
+                }
+
+                Map<String, ClientDelaySummary> delayMap = new HashMap<>();
+                for (AccountsReceivable acc : accounts) {
+                    String cName = acc.getClient() != null && acc.getClient().getName() != null && !acc.getClient().getName().isBlank()
+                            ? acc.getClient().getName()
+                            : "Cliente não informado";
+
+                    long days = 0;
+                    if (acc.getDueDate() != null && acc.getDueDate().isBefore(today)) {
+                        days = java.time.temporal.ChronoUnit.DAYS.between(acc.getDueDate(), today);
+                    }
+
+                    ClientDelaySummary summary = delayMap.computeIfAbsent(cName, k -> {
+                        ClientDelaySummary s = new ClientDelaySummary();
+                        s.clientName = k;
+                        return s;
+                    });
+
+                    if (days > summary.maxDelayDays) {
+                        summary.maxDelayDays = days;
+                    }
+                    summary.countOverdue++;
+                    if (acc.getAmount() != null) {
+                        summary.totalOverdueAmount = summary.totalOverdueAmount.add(acc.getAmount());
+                    }
+                }
+
+                List<ClientDelaySummary> delayRanking = delayMap.values().stream()
+                        .sorted(Comparator.comparingLong((ClientDelaySummary s) -> s.maxDelayDays).reversed()
+                                .thenComparing(s -> s.totalOverdueAmount, Comparator.reverseOrder()))
+                        .collect(Collectors.toList());
+
+                Table rankingTable = new Table(UnitValue.createPercentArray(new float[]{6f, 44f, 15f, 15f, 20f})).useAllAvailableWidth();
+                rankingTable.setMarginBottom(10f);
+
+                // Header do Ranking
+                rankingTable.addHeaderCell(createHeaderCell("# Pos", TextAlignment.CENTER, 8f, 3f));
+                rankingTable.addHeaderCell(createHeaderCell("Cliente Inadimplente", TextAlignment.LEFT, 8f, 3f));
+                rankingTable.addHeaderCell(createHeaderCell("Maior Atraso", TextAlignment.CENTER, 8f, 3f));
+                rankingTable.addHeaderCell(createHeaderCell("Qtd. Contas", TextAlignment.CENTER, 8f, 3f));
+                rankingTable.addHeaderCell(createHeaderCell("Valor Total em Atraso", TextAlignment.RIGHT, 8f, 3f));
+
+                int pos = 1;
+                boolean alt = false;
+                for (ClientDelaySummary s : delayRanking) {
+                    rankingTable.addCell(createDataCell(String.valueOf(pos++), TextAlignment.CENTER, alt, true, 8f, 3.5f));
+                    rankingTable.addCell(createDataCell(s.clientName, TextAlignment.LEFT, alt, true, 8f, 3.5f));
+                    rankingTable.addCell(createDataCell(s.maxDelayDays + " dias", TextAlignment.CENTER, alt, true, 8f, 3.5f));
+                    rankingTable.addCell(createDataCell(s.countOverdue + (s.countOverdue > 1 ? " contas" : " conta"), TextAlignment.CENTER, alt, false, 8f, 3.5f));
+                    rankingTable.addCell(createDataCell(formatCurrency(s.totalOverdueAmount), TextAlignment.RIGHT, alt, true, 8f, 3.5f));
+                    alt = !alt;
+                }
+                document.add(rankingTable);
+            }
 
             // 3. Detalhamento das Contas a Receber
             addSectionHeader(document, "DETALHAMENTO DAS CONTAS A RECEBER");

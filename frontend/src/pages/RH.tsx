@@ -222,20 +222,33 @@ const RH: React.FC = () => {
 
             {/* Alertas e Notificações */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Funcionários com Experiência Vencendo - Apenas 30, 45 ou 90 dias, com 3 dias de antecedência ou no dia */}
-              {expiringProbation && expiringProbation.length > 0 ? (
-                <Card className="bg-seguranca-graphite border-gray-600">
-                  <CardHeader>
-                    <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
-                      Experiência Vencendo
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+              {/* Funcionários com Experiência Vencendo */}
+              <Card 
+                className="bg-seguranca-graphite border-gray-600 hover:border-red-500/60 transition-all cursor-pointer shadow-md"
+                onClick={() => navigate('/operacional?tab=gestao-operacional&subtab=vacations')}
+              >
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-500" />
+                    Experiência Vencendo
+                  </CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 h-7 px-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/operacional?tab=gestao-operacional&subtab=vacations');
+                    }}
+                  >
+                    Ver detalhes →
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {expiringProbation && expiringProbation.length > 0 ? (
                     <div className="space-y-3">
                       {expiringProbation
                         .filter((employee) => {
-                          // Verificar se a data é válida
                           const probationEndDate = employee.jobInfo?.probationEndDate;
                           if (!probationEndDate || 
                               probationEndDate === '1969-12-31' || 
@@ -243,22 +256,7 @@ const RH: React.FC = () => {
                               isNaN(new Date(probationEndDate).getTime())) {
                             return false;
                           }
-                          
-                          // Calcular período de experiência sem fuso horário
-                          const admissionDate = employee.jobInfo?.admissionDate;
-                          if (!admissionDate) return false;
-                          
-                          const parseLocalDate = (dateStr: string) => {
-                            const parts = dateStr.split('-');
-                            return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-                          };
-                          
-                          const endDate = parseLocalDate(probationEndDate);
-                          const admDate = parseLocalDate(admissionDate);
-                          const daysBetween = Math.round((endDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));
-                          
-                          // Apenas períodos de 30, 45 ou 90 dias
-                          return daysBetween === 30 || daysBetween === 45 || daysBetween === 90;
+                          return true;
                         })
                         .map((employee) => {
                           const probationEndDate = employee.jobInfo?.probationEndDate!;
@@ -272,47 +270,75 @@ const RH: React.FC = () => {
                           endDate.setHours(0, 0, 0, 0);
                           const daysUntil = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                           
-                          // Calcular período de experiência
-                          const admDate = parseLocalDate(employee.jobInfo!.admissionDate!);
-                          const daysBetween = Math.round((endDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));
+                          const admDate = employee.jobInfo?.admissionDate ? parseLocalDate(employee.jobInfo.admissionDate) : null;
+                          const daysBetween = admDate ? Math.round((endDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
                           
                           return (
-                            <div key={employee.id} className="flex items-center justify-between p-3 bg-seguranca-black rounded-lg border border-red-500">
+                            <div key={employee.id} className="flex items-center justify-between p-3 bg-seguranca-black rounded-lg border border-red-500/50 hover:border-red-500 transition-colors">
                               <div>
                                 <p className="font-medium text-seguranca-lightgray">{employee.name}</p>
                                 <p className="text-sm text-gray-400">
-                                  {employee.jobInfo?.position || 'Cargo não definido'} • {daysBetween} dias
+                                  {employee.jobInfo?.position || 'Cargo não definido'}{daysBetween ? ` • ${daysBetween} dias` : ''}
                                 </p>
                               </div>
-                              <Badge className={daysUntil === 0 ? "bg-red-600 text-white" : "bg-red-100 text-red-800"}>
-                                {daysUntil === 0 ? 'Hoje' : daysUntil === 1 ? 'Amanhã' : `${daysUntil} dias`}
+                              <Badge className={daysUntil <= 0 ? "bg-red-600 text-white" : daysUntil === 1 ? "bg-red-500 text-white" : "bg-red-100 text-red-800"}>
+                                {daysUntil <= 0 ? 'Hoje' : daysUntil === 1 ? 'Amanhã' : `${daysUntil} dias`}
                               </Badge>
                             </div>
                           );
                         })}
                     </div>
-                  </CardContent>
-                </Card>
-              ) : null}
+                  ) : (
+                    <div className="text-center py-6">
+                      <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                      <p className="text-seguranca-lightgray">Nenhum contrato de experiência vencendo nos próximos dias</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-3 border-gray-600 text-gray-300 hover:text-white hover:bg-seguranca-black"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/operacional?tab=gestao-operacional&subtab=vacations');
+                        }}
+                      >
+                        Abrir Gestão de Contratos de Experiência
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Funcionários com Férias a Vencer */}
-              <Card className="bg-seguranca-graphite border-gray-600">
-                <CardHeader>
+              <Card 
+                className="bg-seguranca-graphite border-gray-600 hover:border-orange-500/60 transition-all cursor-pointer shadow-md"
+                onClick={() => navigate('/rh/ferias')}
+              >
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
                     <Calendar className="h-5 w-5 text-orange-500" />
                     Férias a Vencer
                   </CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 h-7 px-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/rh/ferias');
+                    }}
+                  >
+                    Ver todas →
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   {expiringVacations && expiringVacations.length > 0 ? (
                     <div className="space-y-3">
                       {expiringVacations
                         .filter(vacation => {
-                          // Filtrar apenas férias que começam nos próximos 30 dias
                           const startDate = new Date(vacation.startDate);
                           const today = new Date();
                           const daysUntil = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                          return daysUntil >= 0 && daysUntil <= 30;
+                          return daysUntil >= 0 && daysUntil <= 60;
                         })
                         .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
                         .slice(0, 5)
@@ -322,11 +348,11 @@ const RH: React.FC = () => {
                           const daysUntil = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                           
                           return (
-                            <div key={vacation.id} className="flex items-center justify-between p-3 bg-seguranca-black rounded-lg border border-orange-500/50">
+                            <div key={vacation.id} className="flex items-center justify-between p-3 bg-seguranca-black rounded-lg border border-orange-500/50 hover:border-orange-500 transition-colors">
                               <div>
                                 <p className="font-medium text-seguranca-lightgray">{vacation.employeeName}</p>
                                 <p className="text-sm text-gray-400">
-                                  {vacation.days} dias • {startDate.toLocaleDateString('pt-BR')}
+                                  {vacation.days} dias • Início em {startDate.toLocaleDateString('pt-BR')}
                                 </p>
                               </div>
                               <Badge className={daysUntil <= 7 ? "bg-red-100 text-red-800" : "bg-orange-100 text-orange-800"}>
@@ -335,26 +361,27 @@ const RH: React.FC = () => {
                             </div>
                           );
                         })}
-                      {expiringVacations.filter(vacation => {
-                        const startDate = new Date(vacation.startDate);
-                        const today = new Date();
-                        const daysUntil = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                        return daysUntil >= 0 && daysUntil <= 30;
-                      }).length > 5 && (
+                      {expiringVacations.length > 5 && (
                         <p className="text-sm text-gray-400 text-center">
-                          +{expiringVacations.filter(vacation => {
-                            const startDate = new Date(vacation.startDate);
-                            const today = new Date();
-                            const daysUntil = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                            return daysUntil >= 0 && daysUntil <= 30;
-                          }).length - 5} mais funcionários
+                          +{expiringVacations.length - 5} mais férias programadas
                         </p>
                       )}
                     </div>
                   ) : (
                     <div className="text-center py-6">
                       <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                      <p className="text-seguranca-lightgray">Nenhuma férias a vencer nos próximos 30 dias</p>
+                      <p className="text-seguranca-lightgray">Nenhuma férias a vencer nos próximos dias</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-3 border-gray-600 text-gray-300 hover:text-white hover:bg-seguranca-black"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/rh/ferias');
+                        }}
+                      >
+                        Abrir Módulo de Férias
+                      </Button>
                     </div>
                   )}
                 </CardContent>
@@ -371,7 +398,7 @@ const RH: React.FC = () => {
                   <Button 
                     variant="outline" 
                     onClick={() => navigate('/rh/funcionarios')}
-                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col"
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col cursor-pointer transition-colors"
                   >
                     <Users size={20} />
                     <span className="text-sm mt-1">Funcionários</span>
@@ -380,7 +407,7 @@ const RH: React.FC = () => {
                   <Button 
                     variant="outline" 
                     onClick={() => navigate('/rh/vagas')}
-                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col"
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col cursor-pointer transition-colors"
                   >
                     <Briefcase size={20} />
                     <span className="text-sm mt-1">Vagas</span>
@@ -389,7 +416,7 @@ const RH: React.FC = () => {
                   <Button 
                     variant="outline" 
                     onClick={() => navigate('/rh/ferias')}
-                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col"
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col cursor-pointer transition-colors"
                   >
                     <Calendar size={20} />
                     <span className="text-sm mt-1">Férias</span>
@@ -398,7 +425,7 @@ const RH: React.FC = () => {
                   <Button 
                     variant="outline" 
                     onClick={() => navigate('/rh/aniversariantes')}
-                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col"
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col cursor-pointer transition-colors"
                   >
                     <Gift size={20} />
                     <span className="text-sm mt-1">Aniversariantes</span>
@@ -406,8 +433,8 @@ const RH: React.FC = () => {
                   
                   <Button 
                     variant="outline" 
-                    onClick={() => navigate('/operacional?tab=gestao-operacional')}
-                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col"
+                    onClick={() => navigate('/operacional?tab=gestao-operacional&subtab=absences')}
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col cursor-pointer transition-colors"
                   >
                     <UserX size={20} />
                     <span className="text-sm mt-1">Faltas</span>
@@ -416,7 +443,7 @@ const RH: React.FC = () => {
                   <Button 
                     variant="outline" 
                     onClick={() => navigate('/rh/ocorrencias')}
-                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col"
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col cursor-pointer transition-colors"
                   >
                     <FileText size={20} />
                     <span className="text-sm mt-1">Ocorrências</span>

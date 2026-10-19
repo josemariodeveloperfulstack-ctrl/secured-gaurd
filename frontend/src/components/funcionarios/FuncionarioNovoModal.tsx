@@ -1830,6 +1830,16 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       return;
     }
 
+    if (!form.escalaTrabalho || !form.escalaTrabalho.trim()) {
+      setError('Escala de Trabalho é obrigatória.');
+      toast({
+        title: 'Campo obrigatório',
+        description: 'Informe a escala de trabalho do funcionário (Ex: 12x36, 6x1, etc.).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!form.hireDate) {
       setError(
         isRehireFormMode
@@ -4592,7 +4602,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                         <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Escala de Trabalho</span>
-                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
                           <Input
                             name="escalaTrabalho"

@@ -24,6 +24,8 @@ import com.z7design.secured_guard.repository.UnitRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Unit;
+import java.util.Map;
+import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -274,6 +276,77 @@ public class PaymentReportService {
                     .setBold()
                     .setMarginBottom(15);
             document.add(stats);
+
+            // Ranking de Clientes com Mais Dias de Atraso (Ordenado do maior para o menor)
+            if ("INADIMPLENCIA".equalsIgnoreCase(reportSegment) && !accounts.isEmpty()) {
+                Paragraph rankingTitle = new Paragraph("RANKING DE CLIENTES EM ATRASO (MAIOR PARA O MENOR ATRASO)")
+                        .setFontSize(11)
+                        .setBold()
+                        .setMarginBottom(8);
+                document.add(rankingTitle);
+
+                LocalDate today = LocalDate.now();
+                class ClientDelaySummary {
+                    String clientName;
+                    long maxDelayDays;
+                    int countOverdue;
+                    BigDecimal totalOverdueAmount = BigDecimal.ZERO;
+                }
+
+                Map<String, ClientDelaySummary> delayMap = new HashMap<>();
+                for (AccountsReceivable acc : accounts) {
+                    String cName = acc.getClient() != null && acc.getClient().getName() != null && !acc.getClient().getName().isBlank()
+                            ? acc.getClient().getName()
+                            : "Cliente não informado";
+
+                    long days = 0;
+                    if (acc.getDueDate() != null && acc.getDueDate().isBefore(today)) {
+                        days = java.time.temporal.ChronoUnit.DAYS.between(acc.getDueDate(), today);
+                    }
+
+                    ClientDelaySummary summary = delayMap.computeIfAbsent(cName, k -> {
+                        ClientDelaySummary s = new ClientDelaySummary();
+                        s.clientName = k;
+                        return s;
+                    });
+
+                    if (days > summary.maxDelayDays) {
+                        summary.maxDelayDays = days;
+                    }
+                    summary.countOverdue++;
+                    if (acc.getAmount() != null) {
+                        summary.totalOverdueAmount = summary.totalOverdueAmount.add(acc.getAmount());
+                    }
+                }
+
+                List<ClientDelaySummary> delayRanking = delayMap.values().stream()
+                        .sorted(Comparator.comparingLong((ClientDelaySummary s) -> s.maxDelayDays).reversed()
+                                .thenComparing(s -> s.totalOverdueAmount, Comparator.reverseOrder()))
+                        .collect(Collectors.toList());
+
+                Table rankingTable = new Table(5).setWidth(UnitValue.createPercentValue(100));
+                rankingTable.setMarginBottom(15);
+                rankingTable.addHeaderCell(createHeaderCell("# Pos"));
+                rankingTable.addHeaderCell(createHeaderCell("Cliente Inadimplente"));
+                rankingTable.addHeaderCell(createHeaderCell("Maior Atraso"));
+                rankingTable.addHeaderCell(createHeaderCell("Qtd. Contas"));
+                rankingTable.addHeaderCell(createHeaderCell("Valor Total em Atraso"));
+
+                int pos = 1;
+                for (ClientDelaySummary s : delayRanking) {
+                    rankingTable.addCell(createCell(String.valueOf(pos++)));
+                    rankingTable.addCell(createCell(s.clientName));
+                    rankingTable.addCell(createCell(s.maxDelayDays + " dias"));
+                    rankingTable.addCell(createCell(s.countOverdue + (s.countOverdue > 1 ? " contas" : " conta")));
+                    rankingTable.addCell(createCell("R$ " + s.totalOverdueAmount.setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",")));
+                }
+                document.add(rankingTable);
+
+                document.add(new Paragraph("DETALHAMENTO DAS CONTAS A RECEBER")
+                        .setFontSize(11)
+                        .setBold()
+                        .setMarginBottom(8));
+            }
 
             // Tabela de contas
             if (accounts.isEmpty()) {
@@ -689,10 +762,10 @@ public class PaymentReportService {
             return "RELATÓRIO DE CONTAS A RECEBER";
         }
         return switch (segment) {
-            case "INADIMPLENCIA" -> "RELATÓRIO DE INADIMPLÊNCIA";
+            case "INADIMPLENCIA" -> "RELATÓRIO DE INADIMPLENTES";
             case "RECEBIDOS" -> "RELATÓRIO DE CONTAS RECEBIDAS";
             case "A_VENCER" -> "RELATÓRIO DE CONTAS A VENCER";
-            case "VENCIDOS" -> "RELATÓRIO DE CONTAS VENCIDAS";
+            case "VENCIDOS" -> "RELATÓRIO DE INADIMPLENTES";
             default -> "RELATÓRIO DE CONTAS A RECEBER";
         };
     }

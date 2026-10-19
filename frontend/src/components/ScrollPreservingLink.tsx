@@ -47,8 +47,11 @@ export const ScrollPreservingLink = React.forwardRef<HTMLAnchorElement, ScrollPr
     const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
       const targetPath = normalizePath(to);
       const currentPath = normalizePath(location.pathname);
+      const targetSearch = to.includes('?') ? to.slice(to.indexOf('?')) : '';
+      const currentSearch = location.search || '';
 
-      if (currentPath === targetPath) {
+      // Se for exatamente a mesma rota e exatamente a mesma query string, não precisa navegar
+      if (currentPath === targetPath && currentSearch === targetSearch) {
         e.preventDefault();
         return;
       }
@@ -61,7 +64,7 @@ export const ScrollPreservingLink = React.forwardRef<HTMLAnchorElement, ScrollPr
         onClick(e);
       }
 
-      // Garante navegação mesmo com React transition mantendo a tela anterior
+      // Garante navegação mesmo quando mudando query params na mesma rota (ex: /operacional?tab=...)
       e.preventDefault();
       navigate(to);
     };

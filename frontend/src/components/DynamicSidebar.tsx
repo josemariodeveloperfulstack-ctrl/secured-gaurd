@@ -270,6 +270,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   SUPERVISOR: new Set([
     // Principal / Operacional core
     'dashboard',
+    'area-funcionario',
     'operacional',
     'controle-visitas',
     'controle-visitas-avancado',
@@ -362,6 +363,12 @@ export function DynamicSidebar() {
       to: '/dashboard',
       id: 'dashboard',
       requiredPermission: 'DASHBOARD_READ'
+    },
+    {
+      icon: User2,
+      text: 'Área do Funcionário',
+      to: '/area-funcionario',
+      id: 'area-funcionario',
     },
     {
       icon: Shield,

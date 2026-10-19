@@ -61,6 +61,25 @@ public class SupervisorVisit {
     @Column(nullable = false)
     private LocalTime visitTime;
 
+    @Column(name = "checkout_time")
+    private LocalTime checkoutTime;
+
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
+
+    @Column(name = "signature_data", columnDefinition = "TEXT")
+    private String signatureData;
+
+    @Column(name = "epi_delivered")
+    @Builder.Default
+    private Boolean epiDelivered = false;
+
+    @Column(name = "epi_description", columnDefinition = "TEXT")
+    private String epiDescription;
+
+    @Column(name = "epi_signature_data", columnDefinition = "TEXT")
+    private String epiSignatureData;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 

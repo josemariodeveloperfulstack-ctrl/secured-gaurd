@@ -126,6 +126,210 @@ export const Pagamentos: React.FC = () => {
   const [showSelection, setShowSelection] = useState(false);
   const [showCustomReportModal, setShowCustomReportModal] = useState(false);
 
+  // Estado e Controle de Limites
+  const [limites, setLimites] = useState<LimitePagamento[]>(() => {
+    const saved = localStorage.getItem('secured_guard_limites_pagamento');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Erro ao ler limites salvos:', e);
+      }
+    }
+    return [
+      {
+        id: 'LIM-001',
+        tipo: 'mensal',
+        valor: 150000,
+        valorUtilizado: 0,
+        periodo: 'mensal',
+        ativo: true
+      },
+      {
+        id: 'LIM-002',
+        tipo: 'diario',
+        valor: 30000,
+        valorUtilizado: 0,
+        periodo: 'diario',
+        ativo: true
+      },
+      {
+        id: 'LIM-003',
+        tipo: 'categoria',
+        categoria: 'SERVICO',
+        valor: 80000,
+        valorUtilizado: 0,
+        periodo: 'mensal',
+        ativo: true
+      },
+      {
+        id: 'LIM-004',
+        tipo: 'categoria',
+        categoria: 'EQUIPAMENTO',
+        valor: 40000,
+        valorUtilizado: 0,
+        periodo: 'mensal',
+        ativo: true
+      }
+    ];
+  });
+
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [editingLimitId, setEditingLimitId] = useState<string | null>(null);
+  const [limitFormData, setLimitFormData] = useState<Partial<LimitePagamento>>({
+    tipo: 'mensal',
+    valor: 50000,
+    periodo: 'mensal',
+    categoria: 'SERVICO',
+    fornecedor: '',
+    ativo: true
+  });
+
+  const persistLimites = (novosLimites: LimitePagamento[]) => {
+    setLimites(novosLimites);
+    localStorage.setItem('secured_guard_limites_pagamento', JSON.stringify(novosLimites));
+  };
+
+  const calcularUtilizacao = (limite: LimitePagamento): number => {
+    const hoje = new Date();
+    const anoAtual = hoje.getFullYear();
+    const mesAtual = hoje.getMonth();
+    const hojeStr = hoje.toISOString().split('T')[0];
+
+    return pagamentos.reduce((total, p) => {
+      // Considerar apenas pagamentos pagos ou pendentes ativos (ignorar cancelados)
+      if (p.status === 'CANCELLED') return total;
+
+      const valor = p.valor || 0;
+      let dataPgto: Date | null = null;
+      if (p.dataVencimento) {
+        dataPgto = new Date(p.dataVencimento);
+      }
+
+      if (limite.tipo === 'diario') {
+        const dtStr = p.dataVencimento ? p.dataVencimento.split('T')[0] : '';
+        if (dtStr === hojeStr) {
+          return total + valor;
+        }
+        return total;
+      }
+
+      if (limite.tipo === 'mensal') {
+        if (dataPgto && !isNaN(dataPgto.getTime())) {
+          if (dataPgto.getFullYear() === anoAtual && dataPgto.getMonth() === mesAtual) {
+            return total + valor;
+          }
+        }
+        return total;
+      }
+
+      if (limite.tipo === 'categoria') {
+        const catP = (p.categoria || '').toUpperCase();
+        const catL = (limite.categoria || '').toUpperCase();
+        if (catP === catL) {
+          // Se for mensal, filtra por mês também
+          if (limite.periodo === 'mensal') {
+            if (dataPgto && !isNaN(dataPgto.getTime())) {
+              if (dataPgto.getFullYear() === anoAtual && dataPgto.getMonth() === mesAtual) {
+                return total + valor;
+              }
+            }
+          } else {
+            return total + valor;
+          }
+        }
+        return total;
+      }
+
+      if (limite.tipo === 'fornecedor') {
+        const alvo = (limite.fornecedor || '').toLowerCase().trim();
+        const clienteOuFornec = (p.clienteNome || (p as any).fornecedor || '').toLowerCase().trim();
+        if (alvo && clienteOuFornec.includes(alvo)) {
+          return total + valor;
+        }
+        return total;
+      }
+
+      return total;
+    }, 0);
+  };
+
+  const handleOpenLimitModal = (limite?: LimitePagamento) => {
+    if (limite) {
+      setEditingLimitId(limite.id);
+      setLimitFormData({ ...limite });
+    } else {
+      setEditingLimitId(null);
+      setLimitFormData({
+        tipo: 'mensal',
+        valor: 50000,
+        periodo: 'mensal',
+        categoria: 'SERVICO',
+        fornecedor: '',
+        ativo: true
+      });
+    }
+    setShowLimitModal(true);
+  };
+
+  const handleSaveLimit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!limitFormData.valor || limitFormData.valor <= 0) {
+      toast({
+        title: 'Valor inválido',
+        description: 'Informe um teto maior que zero.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (editingLimitId) {
+      const atualizados = limites.map(l => l.id === editingLimitId ? { ...l, ...limitFormData } as LimitePagamento : l);
+      persistLimites(atualizados);
+      toast({
+        title: 'Limite Atualizado',
+        description: 'Política de limite operacional atualizada com sucesso.'
+      });
+    } else {
+      const novo: LimitePagamento = {
+        id: `LIM-${Date.now().toString().slice(-4)}`,
+        tipo: limitFormData.tipo || 'mensal',
+        valor: limitFormData.valor || 0,
+        valorUtilizado: 0,
+        periodo: limitFormData.periodo || 'mensal',
+        categoria: limitFormData.categoria,
+        fornecedor: limitFormData.fornecedor,
+        ativo: limitFormData.ativo !== false
+      };
+      persistLimites([...limites, novo]);
+      toast({
+        title: 'Limite Criado',
+        description: 'Nova política de limite cadastrada com sucesso.'
+      });
+    }
+    setShowLimitModal(false);
+  };
+
+  const handleToggleLimiteAtivo = (id: string) => {
+    const atualizados = limites.map(l => l.id === id ? { ...l, ativo: !l.ativo } : l);
+    persistLimites(atualizados);
+    toast({
+      title: 'Status alterado',
+      description: 'A política de limite teve seu status alterado.'
+    });
+  };
+
+  const handleDeleteLimite = (id: string) => {
+    if (window.confirm('Deseja realmente remover esta política de limite?')) {
+      const atualizados = limites.filter(l => l.id !== id);
+      persistLimites(atualizados);
+      toast({
+        title: 'Limite Removido',
+        description: 'Política excluída com sucesso.'
+      });
+    }
+  };
+
   // Carregar dados do backend
   useEffect(() => {
     loadData();
@@ -141,8 +345,32 @@ export const Pagamentos: React.FC = () => {
         pagamentosService.getAgendamentos()
       ]);
       
-      setPagamentos(Array.isArray(pagamentosData) ? pagamentosData : []);
-      setClientes(Array.isArray(clientesData) ? clientesData : []);
+      const rawPagamentos = Array.isArray(pagamentosData) ? pagamentosData : [];
+      const clientesList = Array.isArray(clientesData) ? clientesData : [];
+      
+      // Criar mapa de clientes por ID para resolução rápida
+      const clientMap = new Map<string, string>();
+      clientesList.forEach(c => {
+        if (c.id && (c.nome || (c as any).name)) {
+          clientMap.set(String(c.id), c.nome || (c as any).name);
+        }
+      });
+
+      // Garantir resolução robusta do nome do cliente em cada pagamento
+      const pagamentosResolvidos = rawPagamentos.map(p => {
+        const idDoCliente = p.clienteId || (p as any).clientId || (p as any).client?.id;
+        const nomeEncontrado = (p.clienteNome && p.clienteNome !== '-') 
+          ? p.clienteNome 
+          : ((p as any).client?.name || (p as any).clientName || (idDoCliente ? clientMap.get(String(idDoCliente)) : null) || '-');
+
+        return {
+          ...p,
+          clienteNome: nomeEncontrado
+        };
+      });
+
+      setPagamentos(pagamentosResolvidos);
+      setClientes(clientesList);
       setFornecedores(Array.isArray(fornecedoresData) ? fornecedoresData : []);
       setAgendamentos(Array.isArray(agendamentosData) ? agendamentosData : []);
     } catch (error) {
@@ -1165,37 +1393,383 @@ export const Pagamentos: React.FC = () => {
               </div>
             </TabsContent>
 
-            {/* Aba Limites - Temporariamente desabilitada */}
-            <TabsContent value="limites" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Controle de Limites
-                  </CardTitle>
-                  <CardDescription>
-                    Funcionalidade em desenvolvimento
-                  </CardDescription>
+            {/* Aba Limites - Controle Completo de Limites Financeiros */}
+            <TabsContent value="limites" className="space-y-6">
+              {/* Header da aba com botão de novo limite e estatísticas */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-5 rounded-xl border border-slate-800">
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2.5 text-white">
+                    <Shield className="h-6 w-6 text-seguranca-yellow" />
+                    Controle e Governança de Limites Financeiros
+                  </h3>
+                  <p className="text-sm text-slate-400 mt-1">
+                    Defina tetos operacionais por período (diário, mensal), categoria contábil ou fornecedor/cliente com alerta de extrapolação.
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => handleOpenLimitModal()}
+                  className="bg-seguranca-yellow text-black hover:bg-yellow-400 font-semibold self-start sm:self-auto shadow-md"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Novo Limite Operacional
+                </Button>
+              </div>
+
+              {/* Cards de Resumo dos Limites */}
+              {(() => {
+                const totalLimitesConfigurados = limites.filter(l => l.ativo).reduce((acc, l) => acc + (l.valor || 0), 0);
+                const totalUtilizadoGeral = limites.filter(l => l.ativo).reduce((acc, l) => acc + (calcularUtilizacao(l) || 0), 0);
+                const limitesEstourados = limites.filter(l => l.ativo && calcularUtilizacao(l) > l.valor).length;
+                const limitesAlerta = limites.filter(l => {
+                  if (!l.ativo) return false;
+                  const util = calcularUtilizacao(l);
+                  const pct = l.valor > 0 ? (util / l.valor) * 100 : 0;
+                  return pct >= 80 && pct <= 100;
+                }).length;
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card className="bg-slate-900/80 border-slate-800">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                            <Shield className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold text-white">{limites.length}</p>
+                            <p className="text-xs text-slate-400">Políticas Cadastradas ({limites.filter(l => l.ativo).length} ativas)</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-slate-900/80 border-slate-800">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <DollarSign className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold text-emerald-400">
+                              R$ {totalLimitesConfigurados.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-xs text-slate-400">Teto Total Definido</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-slate-900/80 border-slate-800">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            <Clock className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold text-amber-400">{limitesAlerta}</p>
+                            <p className="text-xs text-slate-400">Em Atenção (&ge; 80% do teto)</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-slate-900/80 border-slate-800">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20">
+                            <AlertTriangle className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold text-red-500">{limitesEstourados}</p>
+                            <p className="text-xs text-slate-400">Limites Excedidos (&gt; 100%)</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })()}
+
+              {/* Tabela de Políticas e Limites */}
+              <Card className="bg-slate-900/90 border-slate-800 shadow-xl">
+                <CardHeader className="border-b border-slate-800 pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-seguranca-yellow" />
+                        Políticas de Limite Operacional
+                      </CardTitle>
+                      <CardDescription className="text-slate-400 text-xs mt-0.5">
+                        Consumo real calculado automaticamente sobre as contas e pagamentos registrados
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <Shield className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                      Controle de Limites
-                    </h3>
-                    <p className="text-gray-500 mb-4">
-                      Esta funcionalidade será implementada em uma versão futura.
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Aqui você poderá gerenciar limites de pagamento por categoria, período e valor.
-                    </p>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-slate-950/80 text-xs font-semibold text-slate-300 uppercase tracking-wider border-b border-slate-800">
+                        <tr>
+                          <th className="px-5 py-3.5">Escopo / Tipo</th>
+                          <th className="px-4 py-3.5">Alvo / Referência</th>
+                          <th className="px-4 py-3.5">Período</th>
+                          <th className="px-4 py-3.5">Teto Limite (R$)</th>
+                          <th className="px-4 py-3.5 min-w-[200px]">Consumo Real / Barra</th>
+                          <th className="px-4 py-3.5">Saldo Disponível</th>
+                          <th className="px-4 py-3.5">Status</th>
+                          <th className="px-4 py-3.5 text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 text-sm">
+                        {limites.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                              Nenhum limite cadastrado. Clique em "+ Novo Limite Operacional" para criar uma política.
+                            </td>
+                          </tr>
+                        ) : (
+                          limites.map((limite) => {
+                            const utilizado = calcularUtilizacao(limite);
+                            const teto = limite.valor || 1;
+                            const porcentagem = Math.min(Math.round((utilizado / teto) * 100), 999);
+                            const disponivel = teto - utilizado;
+                            const isExcedido = utilizado > teto;
+                            const isAlerta = porcentagem >= 80 && !isExcedido;
+
+                            return (
+                              <tr key={limite.id} className="hover:bg-slate-800/40 transition-colors">
+                                <td className="px-5 py-3.5 font-medium text-white flex items-center gap-2">
+                                  {limite.tipo === 'diario' && <Badge className="bg-sky-500/20 text-sky-300 border-sky-500/30">Diário</Badge>}
+                                  {limite.tipo === 'mensal' && <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">Mensal</Badge>}
+                                  {limite.tipo === 'categoria' && <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30">Por Categoria</Badge>}
+                                  {limite.tipo === 'fornecedor' && <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30">Por Entidade</Badge>}
+                                </td>
+                                <td className="px-4 py-3.5 text-slate-300 font-medium">
+                                  {limite.categoria || limite.fornecedor || 'Global / Geral'}
+                                </td>
+                                <td className="px-4 py-3.5 text-slate-400 capitalize">
+                                  {limite.periodo}
+                                </td>
+                                <td className="px-4 py-3.5 font-semibold text-white">
+                                  R$ {limite.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className={isExcedido ? 'text-red-400 font-bold' : isAlerta ? 'text-amber-400 font-semibold' : 'text-slate-300'}>
+                                        R$ {utilizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </span>
+                                      <span className={`text-[11px] font-bold ${isExcedido ? 'text-red-400' : isAlerta ? 'text-amber-400' : 'text-slate-400'}`}>
+                                        {porcentagem}%
+                                      </span>
+                                    </div>
+                                    <Progress 
+                                      value={Math.min(porcentagem, 100)} 
+                                      className={`h-2 bg-slate-800 ${
+                                        isExcedido ? '[&>div]:bg-red-500' : isAlerta ? '[&>div]:bg-amber-500' : '[&>div]:bg-emerald-500'
+                                      }`}
+                                    />
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3.5 font-medium">
+                                  {disponivel >= 0 ? (
+                                    <span className="text-emerald-400">
+                                      R$ {disponivel.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </span>
+                                  ) : (
+                                    <span className="text-red-400 font-bold flex items-center gap-1">
+                                      <AlertTriangle className="w-3.5 h-3.5" />
+                                      -R$ {Math.abs(disponivel).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleLimiteAtivo(limite.id)}
+                                    className={`px-2.5 py-1 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+                                      limite.ativo 
+                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30' 
+                                        : 'bg-slate-700/50 text-slate-400 border border-slate-600 hover:bg-slate-700'
+                                    }`}
+                                  >
+                                    {limite.ativo ? 'Ativo' : 'Inativo'}
+                                  </button>
+                                </td>
+                                <td className="px-4 py-3.5 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleOpenLimitModal(limite)}
+                                      className="h-8 w-8 p-0 text-slate-300 hover:text-white hover:bg-slate-800"
+                                      title="Editar Limite"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteLimite(limite.id)}
+                                      className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                      title="Excluir Limite"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Dica de Governança e Regras de Bloqueio */}
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3 text-amber-300 text-xs leading-relaxed">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" />
+                <div>
+                  <strong className="block text-sm text-amber-200 mb-0.5">Alçada e Aprovação por Teto</strong>
+                  Quando um pagamento registrado atinge ou excede 80% do teto operacional estipulado para a categoria ou período, o status de governança entra em atenção e pode ser enviado para a aba de <span className="underline font-semibold cursor-pointer" onClick={() => setActiveTab('aprovacoes')}>Aprovações</span> para validação de diretoria antes da execução bancária.
+                </div>
+              </div>
             </TabsContent>
 
           </Tabs>
         </div>
+
+        {/* Modal de Cadastro / Edição de Limite Operacional */}
+        <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>
+          <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg text-white">
+                <Shield className="w-5 h-5 text-seguranca-yellow" />
+                {editingLimitId ? 'Editar Limite Operacional' : 'Novo Limite Operacional'}
+              </DialogTitle>
+              <DialogDescription className="text-slate-400 text-xs">
+                Configure os parâmetros de teto financeiro para monitoramento e governança.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleSaveLimit} className="space-y-4 pt-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-300">Tipo de Escopo *</Label>
+                <Select
+                  value={limitFormData.tipo}
+                  onValueChange={(val: any) => setLimitFormData(prev => ({ ...prev, tipo: val }))}
+                >
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                    <SelectItem value="mensal">Limite Mensal Global</SelectItem>
+                    <SelectItem value="diario">Limite Diário</SelectItem>
+                    <SelectItem value="categoria">Limite por Categoria Contábil</SelectItem>
+                    <SelectItem value="fornecedor">Limite por Fornecedor / Cliente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {limitFormData.tipo === 'categoria' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-300">Categoria Contábil *</Label>
+                  <Select
+                    value={limitFormData.categoria || 'SERVICO'}
+                    onValueChange={(val) => setLimitFormData(prev => ({ ...prev, categoria: val }))}
+                  >
+                    <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                      <SelectValue placeholder="Selecione a categoria" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                      <SelectItem value="SERVICO">Serviço</SelectItem>
+                      <SelectItem value="FORNECEDOR">Fornecedor</SelectItem>
+                      <SelectItem value="EQUIPAMENTO">Equipamento</SelectItem>
+                      <SelectItem value="IMPOSTO">Imposto</SelectItem>
+                      <SelectItem value="OUTROS">Outros</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {limitFormData.tipo === 'fornecedor' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-300">Nome do Fornecedor / Cliente / Alvo *</Label>
+                  <Input
+                    placeholder="Ex.: Vigseg Fornecedor ou Cliente XYZ"
+                    value={limitFormData.fornecedor || ''}
+                    onChange={(e) => setLimitFormData(prev => ({ ...prev, fornecedor: e.target.value }))}
+                    className="bg-slate-800 border-slate-700 text-white"
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-300">Período de Apuração *</Label>
+                <Select
+                  value={limitFormData.periodo}
+                  onValueChange={(val) => setLimitFormData(prev => ({ ...prev, periodo: val }))}
+                >
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                    <SelectItem value="diario">Diário</SelectItem>
+                    <SelectItem value="mensal">Mensal</SelectItem>
+                    <SelectItem value="anual">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-300">Teto Máximo Permitido (R$) *</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  placeholder="0,00"
+                  value={limitFormData.valor || ''}
+                  onChange={(e) => setLimitFormData(prev => ({ ...prev, valor: parseFloat(e.target.value) || 0 }))}
+                  className="bg-slate-800 border-slate-700 text-white font-semibold text-base"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <Label className="text-xs text-slate-300 cursor-pointer" htmlFor="limite-ativo-switch">
+                  Política ativa imediatamente
+                </Label>
+                <input
+                  id="limite-ativo-switch"
+                  type="checkbox"
+                  checked={limitFormData.ativo}
+                  onChange={(e) => setLimitFormData(prev => ({ ...prev, ativo: e.target.checked }))}
+                  className="h-4 w-4 rounded bg-slate-800 border-slate-700 text-seguranca-yellow focus:ring-seguranca-yellow"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-800">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowLimitModal(false)}
+                  className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-seguranca-yellow text-black hover:bg-yellow-400 font-semibold"
+                >
+                  {editingLimitId ? 'Salvar Alterações' : 'Criar Limite'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Modais */}
         <PagamentoFormModal

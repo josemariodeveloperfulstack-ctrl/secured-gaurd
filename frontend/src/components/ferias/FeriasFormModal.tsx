@@ -63,7 +63,7 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
   const periodoAutoRef = React.useRef<string>('');
 
   useEffect(() => {
-    // Se estiver editando, buscar dados completos do backend
+    // Se estiver editando, tentar buscar dados completos do backend ou usar initialData como fallback
     if (editingId) {
       feriasService.getFeriasById(editingId).then((ferias) => {
         setForm({
@@ -87,8 +87,12 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
           else setModalidade('CLT');
         }
       }).catch((error) => {
-        console.error('Erro ao carregar dados das férias:', error);
-        setError('Registro de férias não encontrado ou indisponível.');
+        console.warn('Registro de férias não encontrado no backend, usando initialData como fallback:', error);
+        if (initialData) {
+          setForm(initialData);
+        } else {
+          setError('Registro de férias não encontrado ou indisponível.');
+        }
       });
     } else if (initialData) {
       setForm(initialData);
@@ -456,24 +460,33 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fadeIn" 
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fadeIn" 
       onClick={handleOverlayClick}
     >
       <div 
-        className="bg-seguranca-darkgray border border-seguranca-graphite rounded-xl w-full max-w-2xl sm:max-w-3xl overflow-hidden shadow-2xl my-4 sm:my-8 animate-scaleIn max-h-[90vh] flex flex-col" 
+        className="bg-seguranca-darkgray border border-seguranca-graphite rounded-xl w-full max-w-2xl sm:max-w-3xl overflow-hidden shadow-2xl my-auto animate-scaleIn max-h-[92vh] flex flex-col" 
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex justify-between items-center p-3 sm:p-4 border-b border-seguranca-graphite bg-seguranca-graphite/40">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-seguranca-yellow" />
-            <h2 className="text-base sm:text-lg font-bold text-seguranca-lightgray">
-              {editingId ? 'Editar Solicitação de Férias' : 'Nova Solicitação de Férias (CLT)'}
-            </h2>
+        {/* Header - Fixed & Always Visible */}
+        <div className="shrink-0 flex justify-between items-center px-4 py-3.5 sm:px-6 sm:py-4 border-b border-seguranca-graphite bg-seguranca-graphite/60">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-seguranca-yellow">
+              <Calendar className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                {editingId ? 'Editar Solicitação de Férias' : 'Nova Solicitação de Férias (CLT)'}
+              </h2>
+              <p className="text-xs text-gray-400 hidden sm:block">
+                Agendamento e controle de período de gozo em conformidade trabalhista
+              </p>
+            </div>
           </div>
           <button 
+            type="button"
             onClick={onClose} 
-            className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-seguranca-graphite"
+            className="text-gray-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-seguranca-graphite"
+            title="Fechar modal"
           >
             <X className="w-5 h-5" />
           </button>

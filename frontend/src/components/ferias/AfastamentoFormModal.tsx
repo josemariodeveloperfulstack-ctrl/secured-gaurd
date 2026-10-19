@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { feriasService } from '../../services/feriasService';
-import { employeeService, Employee } from '../../services/employeeService';
+import { employeeService, Employee, SimpleEmployee } from '../../services/employeeService';
 import { AfastamentoTipo, CreateAfastamentoRequest } from '../../types/ferias';
+import { MEDICAL_FORM_TYPES, MEDICAL_TYPE_LABELS, MedicalDocumentType } from '../../services/medicalDocumentService';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { X, AlertTriangle, User, FileText, Upload } from 'lucide-react';
 
 interface Props {
@@ -11,14 +13,7 @@ interface Props {
   initialData?: CreateAfastamentoRequest;
 }
 
-const tipoOptions = [
-  { value: 'ATESTADO', label: 'Atestado Médico' },
-  { value: 'LICENCA_MEDICA', label: 'Licença Médica' },
-  { value: 'LICENCA_MATERNIDADE', label: 'Licença Maternidade' },
-  { value: 'LICENCA_PATERNIDADE', label: 'Licença Paternidade' },
-  { value: 'SUSPENSAO', label: 'Suspensão' },
-  { value: 'OUTROS', label: 'Outros' },
-];
+const tipoOptions = MEDICAL_FORM_TYPES;
 
 const AfastamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initialData }) => {
   const [form, setForm] = useState<CreateAfastamentoRequest>({
@@ -30,7 +25,7 @@ const AfastamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, 
     documento: '',
     observacoes: ''
   });
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
@@ -48,6 +43,9 @@ const AfastamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, 
           documento: afastamento.documento || '',
           observacoes: afastamento.observacoes || ''
         });
+        if (afastamento.employeeName) {
+          setSelectedEmployeeName(afastamento.employeeName);
+        }
         setStatus(afastamento.status);
       }).catch((error) => {
         console.error('Erro ao carregar dados do afastamento:', error);
@@ -55,9 +53,12 @@ const AfastamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, 
       });
     } else if (initialData) {
       setForm(initialData);
+      if (initialData.employeeId) {
+        employeeService.getEmployeeById(initialData.employeeId).then((emp) => {
+          if (emp) setSelectedEmployeeName(emp.name);
+        }).catch(() => {});
+      }
     }
-    // Buscar funcionários
-    employeeService.getAllEmployees().then(setEmployees);
   }, [editingId, initialData]);
 
   // Fechar com ESC
@@ -158,24 +159,26 @@ const AfastamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, 
               <div>
                 <label className="block text-seguranca-lightgray mb-1 text-sm font-medium flex items-center gap-1">
                   <User className="h-4 w-4" />
-                  Funcionário
+                  Funcionário *
                 </label>
-                <select 
-                  name="employeeId" 
-                  value={form.employeeId} 
-                  onChange={handleChange} 
-                  className="w-full p-2 rounded bg-seguranca-graphite text-seguranca-lightgray border border-gray-600 focus:border-seguranca-yellow focus:outline-none text-sm" 
-                  required
-                >
-                  <option value="">Selecione o funcionário...</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.name}</option>
-                  ))}
-                </select>
+                <EmployeeCombobox
+                  value={form.employeeId}
+                  onChange={(val) => {
+                    setForm(prev => ({ ...prev, employeeId: val }));
+                  }}
+                  onEmployeeSelect={(emp) => {
+                    setSelectedEmployeeName(emp.name);
+                  }}
+                  placeholder="Selecione o funcionário..."
+                  searchPlaceholder="Digite ao menos 3 caracteres..."
+                  minChars={3}
+                  initialDisplayName={selectedEmployeeName}
+                  className="w-full bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite/80 focus:border-seguranca-yellow"
+                />
               </div>
               <div>
                 <label className="block text-seguranca-lightgray mb-1 text-sm font-medium">
-                  Tipo de Afastamento
+                  Tipo de Afastamento *
                 </label>
                 <select 
                   name="tipo" 
@@ -187,6 +190,11 @@ const AfastamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, 
                   {tipoOptions.map(t => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
+                  {form.tipo && !tipoOptions.some(t => t.value === form.tipo) && (
+                    <option key={form.tipo} value={form.tipo}>
+                      {(MEDICAL_TYPE_LABELS as any)[form.tipo] || form.tipo}
+                    </option>
+                  )}
                 </select>
               </div>
             </div>

@@ -32,6 +32,13 @@ export interface SupervisorVisitResult {
   qrCodeVerified?: boolean;
   visitDate?: string;
   visitTime?: string;
+  checkoutTime?: string;
+  durationMinutes?: number;
+  signatureData?: string;
+  epiDelivered?: boolean;
+  epiDescription?: string;
+  epiSignatureData?: string;
+  photos?: string[];
   createdAt?: string;
 }
 
@@ -49,6 +56,13 @@ export interface SupervisorVisitReportRow {
   longitude?: number;
   locationAddress?: string;
   qrCodeVerified?: boolean;
+  description?: string;
+  observations?: string;
+  photos?: string[];
+  signatureData?: string;
+  epiDelivered?: boolean;
+  epiDescription?: string;
+  epiSignatureData?: string;
   /** Quando true, a visita coincide com a escala de visita → destacar em azul. */
   visitedAsScheduled?: boolean;
   matchedScheduleId?: string;
@@ -83,6 +97,13 @@ export interface CheckinPayload {
   description?: string;
   observations?: string;
   supervisorId?: string;
+  checkoutTime?: string;
+  durationMinutes?: number;
+  photos?: string[];
+  signatureData?: string;
+  epiDelivered?: boolean;
+  epiDescription?: string;
+  epiSignatureData?: string;
 }
 
 interface ApiEnvelope<T> {

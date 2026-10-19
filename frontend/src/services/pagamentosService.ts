@@ -122,21 +122,30 @@ class PagamentosService {
 
   async getPagamentos(): Promise<Pagamento[]> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/accounts-receivable/all`, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await api.get('/api/accounts-receivable/all');
       // Garantir que sempre retornamos um array válido
       const pagamentos = Array.isArray(response.data) ? response.data : [];
       // Filtrar e validar cada pagamento
       return pagamentos
         .filter((p: any) => p && p.id) // Remover itens inválidos
-        .map((p: any) => ({
-          ...p,
-          dataVencimento: p.dataVencimento || p.dueDate || '',
-          clienteNome: p.clienteNome || p.clientName || '-',
-          descricao: p.descricao || p.description || '-',
-          valor: p.valor || p.amount || 0
-        }));
+        .map((p: any) => {
+          const nomeCliente = p.clienteNome || 
+                              p.clientName || 
+                              p.client?.name || 
+                              p.client?.nome || 
+                              p.cliente || 
+                              '-';
+          return {
+            ...p,
+            clienteId: p.clientId || p.clienteId || p.client?.id || '',
+            clienteNome: nomeCliente,
+            clienteEmail: p.clienteEmail || p.clientEmail || p.client?.email,
+            clienteTelefone: p.clienteTelefone || p.clientPhone || p.client?.phone || p.client?.mobile,
+            dataVencimento: p.dataVencimento || p.dueDate || '',
+            descricao: p.descricao || p.description || '-',
+            valor: p.valor || p.amount || 0
+          };
+        });
     } catch (error: any) {
       if (isConnectionError(error)) {
         console.warn('⚠️ Backend não está disponível. Usando dados mockados para pagamentos.');
@@ -316,9 +325,7 @@ class PagamentosService {
 
   async getAgendamentos(): Promise<AgendamentoPagamento[]> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/scheduled-payments/all`, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await api.get('/api/scheduled-payments/all');
       return response.data;
     } catch (error: any) {
       if (isConnectionError(error)) {
@@ -386,9 +393,7 @@ class PagamentosService {
 
   async getClientes(): Promise<Cliente[]> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/clients/all`, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await api.get('/api/clients/all');
       // Garantir que sempre retornamos um array válido
       const clientes = Array.isArray(response.data) ? response.data : [];
       // Filtrar clientes inválidos e garantir que têm nome
