@@ -6,7 +6,7 @@
 # ============================================
 # STAGE 1: Build
 # ============================================
-FROM public.ecr.aws/docker/library/node:20-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /build
 
@@ -47,7 +47,7 @@ RUN npm run build
 # ============================================
 # STAGE 2: Runtime com Nginx
 # ============================================
-FROM public.ecr.aws/docker/library/nginx:1.25-alpine AS production
+FROM nginx:1.25-alpine AS production
 
 # Metadados
 LABEL maintainer="Secured Guard Team"
