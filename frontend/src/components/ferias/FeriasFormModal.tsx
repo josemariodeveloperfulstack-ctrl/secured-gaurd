@@ -15,7 +15,7 @@ import {
 } from '../../utils/feriasCltValidator';
 import { isEscala12x36 as checkIsEscala12x36 } from '../../utils/workSchedule';
 import { SearchableSelect, Option } from '../ui/searchable-select';
-import { X, Calendar, User, FileText, AlertTriangle, CheckCircle2, Clock, Users, UserCheck, ShieldAlert, Award, Ban } from 'lucide-react';
+import { X, Calendar, User, FileText, AlertTriangle, CheckCircle2, Clock, Users, UserCheck, ShieldAlert, Award, Ban, Building, MapPin, Briefcase } from 'lucide-react';
 
 interface Props {
   onSuccess: () => void;
@@ -540,27 +540,56 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
                   className="w-full text-sm"
                 />
                 {form.employeeId && (
-                  <div className="mt-2 flex items-center justify-between text-xs">
-                    <label className="flex items-center gap-1.5 cursor-pointer text-gray-300 select-none">
-                      <input
-                        type="checkbox"
-                        checked={isEffective12x36}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setManual12x36(checked);
-                          if (form.dataInicio) {
-                            aplicarDataInicio(form.dataInicio, checked);
-                          }
-                        }}
-                        className="accent-seguranca-yellow h-3.5 w-3.5"
-                      />
-                      <span>Regime Escala 12x36 (Permite início em sexta, sábado ou domingo)</span>
-                    </label>
-                    {isEffective12x36 && (
-                      <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded font-medium">
-                        12x36 Ativo
-                      </span>
-                    )}
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <label className="flex items-center gap-1.5 cursor-pointer text-gray-300 select-none">
+                        <input
+                          type="checkbox"
+                          checked={isEffective12x36}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setManual12x36(checked);
+                            if (form.dataInicio) {
+                              aplicarDataInicio(form.dataInicio, checked);
+                            }
+                          }}
+                          className="accent-seguranca-yellow h-3.5 w-3.5"
+                        />
+                        <span>Regime Escala 12x36 (Permite início em sexta, sábado ou domingo)</span>
+                      </label>
+                      {isEffective12x36 && (
+                        <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded font-medium">
+                          12x36 Ativo
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Exibição automática de Empresa, Setor e Posto de Trabalho */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      <div className="p-2 rounded-lg bg-seguranca-black/60 border border-gray-700/80 flex items-center gap-2 text-xs">
+                        <Building className="h-4 w-4 text-seguranca-yellow shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-wider">Empresa</span>
+                          <span className="text-gray-100 font-semibold truncate block" title={selectedEmployee?.company?.name || selectedEmployee?.empresaNome || selectedEmployee?.company?.sigla || 'Não informada'}>
+                            {selectedEmployee?.company?.name || selectedEmployee?.empresaNome || selectedEmployee?.company?.sigla || (
+                              <span className="text-gray-500 italic font-normal">Não vinculada</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-2 rounded-lg bg-seguranca-black/60 border border-gray-700/80 flex items-center gap-2 text-xs">
+                        <Briefcase className="h-4 w-4 text-seguranca-yellow shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-wider">Setor de Trabalho</span>
+                          <span className="text-gray-100 font-semibold truncate block" title={selectedEmployee?.department?.name || selectedEmployee?.position?.name || selectedEmployee?.workPost?.name || 'Não informado'}>
+                            {selectedEmployee?.department?.name || selectedEmployee?.position?.name || selectedEmployee?.workPost?.name || (
+                              <span className="text-gray-500 italic font-normal">Não informado</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
