@@ -15,29 +15,74 @@ import java.util.*;
 @Slf4j
 public class GeminiProspectionService {
 
-    private final WebClient webClient;
+    private WebClient webClient;
     private final ObjectMapper objectMapper;
-    private final boolean enabled;
-    private final String apiKey;
-    private final String model;
+    private boolean enabled;
+    private String apiKey;
+    private String googlePlacesApiKey;
+    private String model;
+    private final String apiUrl;
 
     public GeminiProspectionService(
             @Value("${gemini.api.url:https://generativelanguage.googleapis.com/v1beta}") String apiUrl,
             @Value("${gemini.api.key:}") String apiKey,
             @Value("${gemini.api.enabled:true}") boolean geminiEnabled,
-            @Value("${gemini.prospection.model:gemini-1.5-flash}") String model) {
-        this.apiKey = apiKey;
-        this.model = model;
-        this.enabled = apiKey != null && !apiKey.isBlank();
+            @Value("${gemini.prospection.model:gemini-1.5-flash}") String model,
+            @Value("${google.places.api.key:}") String googlePlacesApiKey) {
+        this.apiUrl = apiUrl;
+        this.apiKey = apiKey != null ? apiKey.trim() : "";
+        this.googlePlacesApiKey = googlePlacesApiKey != null ? googlePlacesApiKey.trim() : "";
+        this.model = model != null && !model.isBlank() ? model : "gemini-1.5-flash";
+        this.enabled = !this.apiKey.isBlank() && geminiEnabled;
         this.objectMapper = new ObjectMapper();
-        if (this.enabled) {
+        initWebClient();
+    }
+
+    private synchronized void initWebClient() {
+        if (!this.apiKey.isBlank()) {
             this.webClient = WebClient.builder()
                     .baseUrl(apiUrl)
                     .build();
+            this.enabled = true;
         } else {
             this.webClient = null;
-            log.info("GeminiProspectionService: Chave de API não configurada. Módulo em modo fallback heurístico.");
+            this.enabled = false;
         }
+    }
+
+    public synchronized void updateCredentials(String geminiKey, String placesKey, String customModel) {
+        if (geminiKey != null) {
+            this.apiKey = geminiKey.trim();
+        }
+        if (placesKey != null) {
+            this.googlePlacesApiKey = placesKey.trim();
+        }
+        if (customModel != null && !customModel.isBlank()) {
+            this.model = customModel.trim();
+        }
+        initWebClient();
+        log.info("GeminiProspectionService: Credenciais atualizadas via painel. Gemini ativo={}, Places ativo={}", 
+                isConfigured(), hasGooglePlacesKey());
+    }
+
+    public Map<String, Object> getCredentialsStatus() {
+        Map<String, Object> status = new HashMap<>();
+        status.put("geminiConfigured", isConfigured());
+        status.put("geminiMaskedKey", maskKey(apiKey));
+        status.put("model", model);
+        status.put("googlePlacesConfigured", hasGooglePlacesKey());
+        status.put("googlePlacesMaskedKey", maskKey(googlePlacesApiKey));
+        return status;
+    }
+
+    public boolean hasGooglePlacesKey() {
+        return googlePlacesApiKey != null && !googlePlacesApiKey.isBlank();
+    }
+
+    private String maskKey(String key) {
+        if (key == null || key.isBlank()) return "";
+        if (key.length() <= 8) return "********";
+        return key.substring(0, 4) + "..." + key.substring(key.length() - 4);
     }
 
     public boolean isConfigured() {
@@ -58,14 +103,32 @@ public class GeminiProspectionService {
                 content.put("parts", List.of(Map.of("text", prompt)));
                 body.put("contents", List.of(content));
 
-                JsonNode response = webClient.post()
-                        .uri("/models/" + model + ":generateContent?key=" + apiKey)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(body)
-                        .retrieve()
-                        .bodyToMono(JsonNode.class)
-                        .timeout(Duration.ofSeconds(25))
-                        .block();
+                String modelPath = model.startsWith("models/") ? model : "models/" + model;
+                JsonNode response = null;
+                try {
+                    response = webClient.post()
+                            .uri("/" + modelPath + ":generateContent?key=" + apiKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(body)
+                            .retrieve()
+                            .bodyToMono(JsonNode.class)
+                            .timeout(Duration.ofSeconds(25))
+                            .block();
+                } catch (Exception modelEx) {
+                    log.warn("Tentando modelo alternativo gemini-1.5-flash-latest após erro: {}", modelEx.getMessage());
+                    try {
+                        response = webClient.post()
+                                .uri("/models/gemini-1.5-flash-latest:generateContent?key=" + apiKey)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(body)
+                                .retrieve()
+                                .bodyToMono(JsonNode.class)
+                                .timeout(Duration.ofSeconds(25))
+                                .block();
+                    } catch (Exception altEx) {
+                        log.error("Erro ao consultar Gemini para prospecção: {}", altEx.getMessage());
+                    }
+                }
 
                 if (response != null && response.has("candidates")) {
                     JsonNode textNode = response.path("candidates").get(0)
@@ -88,13 +151,13 @@ public class GeminiProspectionService {
             }
         }
 
-        // Fallback heurístico inteligente se IA estiver sem chave ou der timeout
-        return generateHeuristicProspects(cidade, uf, segmento, limit);
+        // Busca dados reais de estabelecimentos via OpenStreetMap Nominatim
+        return searchRealBusinessesWithOsm(cidade, uf, segmento, limit);
     }
 
     private String buildProspectionPrompt(String cidade, String uf, String segmento, int limit) {
         return """
-            Você é um agente sênior de inteligência comercial B2B para o setor de:
+            Você é um agente sênior de inteligência comercial B2B para prospecção de clientes reais para o setor de:
             - Segurança Patrimonial Armada e Desarmada
             - Portaria, Recepção e Controle de Acesso
             - Facilities, Zeladoria e Limpeza Predial / Industrial
@@ -103,38 +166,37 @@ public class GeminiProspectionService {
             Segmento ou Palavra-Chave Alvo: %s
 
             Objetivo:
-            Gere uma lista de até %d estabelecimentos e empresas de ALTO POTENCIAL com necessidade imediata ou contínua desses serviços nesta cidade (ex: condomínios residenciais/comerciais expressivos, hospitais, centros de distribuição/logística, indústrias, hipermercados, concessionárias, shopping centers).
+            Gere uma lista de até %d ESTABELECIMENTOS, EMPRESAS E CONDOMÍNIOS REAIS E EXISTENTES nesta cidade e estado que possuam demanda contínua desses serviços (ex: condomínios residenciais e empresariais reais, hospitais, concessionárias, indústrias, shopping centers, hipermercados e centros de distribuição).
 
-            REGRAS OBRIGATÓRIAS DE HIGIENIZAÇÃO (ANTI-CONTABILIDADE):
-            1. NÃO traga e-mails ou telefones de escritórios de contabilidade (ex: descartar domínios com 'contab', 'assessoria', 'fiscal', 'consultoria contabil').
-            2. Priorize o TELEFONE DIRETO do estabelecimento (recepção comercial, portaria ou gerência geral).
-            3. Priorize E-MAIL CORPORATIVO REAL da empresa (ex: compras@, contato@, diretoria@, administracao@ ou sindico@).
-            4. Identifique o TOMADOR DE DECISÃO REAL (ex: Síndico, Gerente Geral, Diretor de Operações, Gerente Predial ou Sócio Principal) com nome e cargo.
-            5. Avalie se é um 'CLIENTE EM POTENCIAL' (true/false) e atribua o score de conversão (1 a 100).
-            6. Justifique em 'motivoConversao' a dor específica da empresa que a Segurança/Facilities resolve.
+            REGRAS OBRIGATÓRIAS DE DADOS REAIS:
+            1. NÃO INVENTE NENHUM DADO MOCKADO OU CNPJ FICTÍCIO (como '00.000.000/0001-00' ou sequências inventadas). Se o CNPJ oficial não for conhecido com certeza absoluta, deixe o campo "cnpj" vazio ("").
+            2. Busque e priorize empresas reais com presença verificável (Google Meu Negócio / Maps / Redes Sociais / Diretórios Empresariais).
+            3. Higienização Anti-Contabilidade: NÃO traga e-mails ou telefones de escritórios de contabilidade. Descarte e-mails com domínios contábeis.
+            4. Priorize TELEFONE DIRETO real (fixo comercial ou WhatsApp comercial do estabelecimento/portaria/administração).
+            5. Priorize E-MAIL REAL da empresa (compras, contato, diretoria, sindico, administracao) ou deixe vazio ("") caso não haja e-mail direto verificado.
+            6. Tomadores de Decisão (QSA): se conhecido via registro ou redes sociais/Google Meu Negócio (ex: síndico, diretor geral, gerente de compras), informe nome e cargo. Caso não haja certeza, deixe a lista "qsa" vazia []. NUNCA invente nomes genéricos.
+            7. Inclua sempre que disponível o link de busca no Google Maps ("googleMapsUrl") ou website ("website") e redes sociais ("socialMediaUrl").
 
-            IMPORTANTE: Retorne ESTRITAMENTE um array JSON válido sem markdown ou caracteres fora do JSON:
+            IMPORTANTE: Retorne ESTRITAMENTE um array JSON válido sem markdown ou texto explicativo:
             [
               {
-                "cnpj": "CNPJ formatado ou verossímil",
-                "razaoSocial": "Razão Social Oficial",
-                "nomeFantasia": "Nome Comercial / Nome do Condomínio ou Empresa",
+                "cnpj": "",
+                "razaoSocial": "Razão Social ou Nome do Estabelecimento Real",
+                "nomeFantasia": "Nome Comercial Real",
                 "municipio": "%s",
                 "uf": "%s",
-                "bairro": "Bairro relevante da cidade",
-                "logradouro": "Avenida ou Rua principal",
-                "telefone": "(DDD) 3XXX-XXXX ou 9XXXX-XXXX",
-                "email": "contato@empresa.com.br",
-                "cnaeDescricao": "Ramo de atividade",
+                "bairro": "Bairro real",
+                "logradouro": "Endereço real",
+                "telefone": "Telefone comercial real ou vazio",
+                "email": "E-mail comercial verificado ou vazio",
+                "website": "URL do site ou perfil se houver",
+                "googleMapsUrl": "https://www.google.com/maps/search/...",
+                "socialMediaUrl": "Link Instagram/LinkedIn da empresa se houver",
+                "cnaeDescricao": "Ramo real da atividade",
                 "clientePotencial": true,
-                "scoreConversao": 92,
-                "motivoConversao": "Condomínio de grande porte com portaria 24h e alta demanda por controle rigoroso de visitantes e rondas perimetrais.",
-                "qsa": [
-                  {
-                    "nome": "Nome do Tomador de Decisão",
-                    "qualificacao": "Síndico Profissional / Diretor de Operações"
-                  }
-                ]
+                "scoreConversao": 90,
+                "motivoConversao": "Justificativa comercial real para necessidade de segurança/facilities",
+                "qsa": []
               }
             ]
             """.formatted(cidade, uf, (segmento != null && !segmento.isBlank() ? segmento : "Condomínios, Indústrias e Centros Comerciais"), limit, cidade, uf);
@@ -153,39 +215,91 @@ public class GeminiProspectionService {
         return cleaned.trim();
     }
 
-    private List<Map<String, Object>> generateHeuristicProspects(String cidade, String uf, String segmento, int limit) {
+    /**
+     * Busca estabelecimentos reais via OpenStreetMap Nominatim (dados geográficos e comerciais reais)
+     */
+    private List<Map<String, Object>> searchRealBusinessesWithOsm(String cidade, String uf, String segmento, int limit) {
         List<Map<String, Object>> list = new ArrayList<>();
-        String[] templates = new String[]{
-                "Condomínio Edifício Residencial & Comercial %s Prime",
-                "Centro Logístico & Armazéns %s Express",
-                "Hospital & Maternidade Regional de %s",
-                "Indústria Metalmecânica e Manufatura %s",
-                "Shopping Center e Galerias %s",
-                "Complexo Empresarial Corporate Park %s",
-                "Concessionária e Distribuidora de Veículos %s",
-                "Centro de Distribuição Supermercadista %s"
-        };
+        try {
+            String query = (segmento != null && !segmento.isBlank() ? segmento : "empresa centro comercial") 
+                    + " " + cidade + " " + (uf != null ? uf : "");
 
-        for (int i = 0; i < Math.min(limit, templates.length); i++) {
-            Map<String, Object> p = new HashMap<>();
-            String nome = String.format(templates[i], cidade);
-            p.put("cnpj", String.format("0%d.%d0%d.0001-%d%d", (i + 1) * 2, i + 3, i + 4, i + 1, i + 8));
-            p.put("razaoSocial", nome + " LTDA");
-            p.put("nomeFantasia", nome);
-            p.put("municipio", cidade);
-            p.put("uf", uf);
-            p.put("bairro", "Centro / Distrito Industrial");
-            p.put("logradouro", "Avenida Principal de Acesso, " + ((i + 1) * 150));
-            p.put("telefone", "(34) 32" + (10 + i) + "-40" + (20 + i));
-            p.put("email", "compras." + cidade.toLowerCase().replace(" ", "") + (i + 1) + "@empresa.com.br");
-            p.put("cnaeDescricao", segmento != null && !segmento.isBlank() ? segmento : "Condomínios e Serviços Combinados");
-            p.put("clientePotencial", true);
-            p.put("scoreConversao", 80 + (i * 2));
-            p.put("motivoConversao", "Alto fluxo diário de colaboradores e visitantes; necessidade contínua de controle de acesso e monitoramento patrimonial.");
-            p.put("qsa", List.of(
-                    Map.of("nome", "Administrador / Gerente Operacional", "qualificacao", "Diretoria de Compras")
-            ));
-            list.add(p);
+            WebClient osmClient = WebClient.builder()
+                    .baseUrl("https://nominatim.openstreetmap.org")
+                    .defaultHeader("User-Agent", "SecuredGuard-Commercial/1.0 (contato@securedguard.com.br)")
+                    .build();
+
+            JsonNode results = osmClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/search")
+                            .queryParam("q", query)
+                            .queryParam("format", "json")
+                            .queryParam("addressdetails", "1")
+                            .queryParam("extratags", "1")
+                            .queryParam("limit", limit)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .timeout(Duration.ofSeconds(10))
+                    .block();
+
+            if (results != null && results.isArray() && results.size() > 0) {
+                for (JsonNode place : results) {
+                    Map<String, Object> item = new HashMap<>();
+                    String name = place.has("name") && !place.get("name").asText().isBlank()
+                            ? place.get("name").asText()
+                            : (place.has("display_name") ? place.get("display_name").asText().split(",")[0] : "Estabelecimento Comercial");
+
+                    JsonNode address = place.path("address");
+                    String road = address.path("road").asText("");
+                    String houseNumber = address.path("house_number").asText("");
+                    String logradouro = (road + (houseNumber.isBlank() ? "" : ", " + houseNumber)).trim();
+                    if (logradouro.isBlank()) logradouro = address.path("industrial").asText("");
+                    if (logradouro.isBlank()) logradouro = address.path("commercial").asText("");
+
+                    String bairro = address.path("suburb").asText("");
+                    if (bairro.isBlank()) bairro = address.path("neighbourhood").asText("");
+                    if (bairro.isBlank()) bairro = address.path("city_district").asText("");
+
+                    String city = address.path("city").asText(cidade);
+                    if (city.isBlank()) city = address.path("town").asText(cidade);
+                    if (city.isBlank()) city = address.path("municipality").asText(cidade);
+
+                    String state = address.path("state").asText(uf);
+                    String cep = address.path("postcode").asText("");
+
+                    JsonNode extratags = place.path("extratags");
+                    String phone = extratags.path("phone").asText("");
+                    if (phone.isBlank()) phone = extratags.path("contact:phone").asText("");
+
+                    String email = extratags.path("email").asText("");
+                    if (email.isBlank()) email = extratags.path("contact:email").asText("");
+
+                    String website = extratags.path("website").asText("");
+                    if (website.isBlank()) website = extratags.path("contact:website").asText("");
+
+                    item.put("cnpj", ""); // Sem CNPJ falso; será enriquecido ou preenchido na consulta
+                    item.put("razaoSocial", name);
+                    item.put("nomeFantasia", name);
+                    item.put("municipio", city);
+                    item.put("uf", state);
+                    item.put("bairro", bairro.isBlank() ? "Área Comercial / Industrial" : bairro);
+                    item.put("logradouro", logradouro.isBlank() ? "Endereço registrado na região" : logradouro);
+                    item.put("cep", cep);
+                    item.put("telefone", phone);
+                    item.put("email", email);
+                    item.put("website", website);
+                    item.put("cnaeDescricao", segmento != null && !segmento.isBlank() ? segmento : "Atividades Empresariais / Comerciais");
+                    item.put("clientePotencial", true);
+                    item.put("scoreConversao", 88);
+                    item.put("motivoConversao", "Estabelecimento real mapeado no OpenStreetMap/Google Maps com necessidade contínua de controle de acesso, portaria e segurança.");
+                    item.put("qsa", Collections.emptyList());
+                    list.add(item);
+                }
+                return list;
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao buscar empresas no OpenStreetMap: {}", e.getMessage());
         }
         return list;
     }

@@ -24,4 +24,8 @@ public interface VacationRepository extends JpaRepository<Vacation, UUID> {
     
     @Query("SELECT DISTINCT v FROM Vacation v LEFT JOIN FETCH v.employee e LEFT JOIN FETCH e.company LEFT JOIN FETCH e.department LEFT JOIN FETCH v.approvedBy WHERE v.status = :status")
     List<Vacation> findByStatusWithEmployee(VacationStatus status);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM Vacation v WHERE v.id = :id")
+    void deleteByIdDirect(@org.springframework.data.repository.query.Param("id") UUID id);
 } 

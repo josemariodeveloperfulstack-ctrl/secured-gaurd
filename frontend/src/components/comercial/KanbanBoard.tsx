@@ -27,6 +27,7 @@ import {
   Star,
   Trash2,
   Send,
+  ExternalLink,
 } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import styles from './KanbanBoard.module.css';
@@ -303,7 +304,8 @@ export default function KanbanBoard() {
     opp: Opportunity | null;
     text: string;
     destination: string;
-  }>({ open: false, type: null, opp: null, text: '', destination: '' });
+    selectedTemplateId?: string;
+  }>({ open: false, type: null, opp: null, text: '', destination: '', selectedTemplateId: 'custom' });
   const [sendingContact, setSendingContact] = useState(false);
   /** Histórico de interações por opportunityId (e fallback por leadId). */
   const [interactionsByOpp, setInteractionsByOpp] = useState<Record<string, CardInteraction[]>>({});
@@ -1096,12 +1098,39 @@ export default function KanbanBoard() {
     }
   };
 
+  const WHATSAPP_TEMPLATES = [
+    {
+      id: 'greeting',
+      label: 'Apresentação Inicial',
+      getText: (opp: Opportunity) =>
+        `Olá ${opp.lead?.name || ''}, tudo bem? Sou da Secured Guard Segurança Patrimonial. Gostaria de apresentar nossas soluções para sua empresa. Podemos conversar alguns minutos?`,
+    },
+    {
+      id: 'proposal_followup',
+      label: 'Follow-up de Proposta',
+      getText: (opp: Opportunity) =>
+        `Olá ${opp.lead?.name || ''}, tudo bem? Passando para saber se você conseguiu analisar a nossa proposta comercial referente a ${opp.title}. Ficou com alguma dúvida?`,
+    },
+    {
+      id: 'schedule_meeting',
+      label: 'Agendamento de Reunião / Visita',
+      getText: (opp: Opportunity) =>
+        `Olá ${opp.lead?.name || ''}, como vai? Gostaria de alinhar uma visita técnica ou reunião rápida para entender melhor a demanda de segurança da sua operação. Qual o melhor dia e horário para você?`,
+    },
+    {
+      id: 'feedback_check',
+      label: 'Verificação de Interesse',
+      getText: (opp: Opportunity) =>
+        `Olá ${opp.lead?.name || ''}, espero que esteja bem! Como está o andamento da avaliação dos serviços de segurança da sua empresa? Seguimos à disposição para atendê-lo.`,
+    },
+  ];
+
   const openContactModal = (opp: Opportunity, type: 'EMAIL' | 'WHATSAPP' | 'NOTE') => {
     const defaultText =
       type === 'EMAIL'
         ? `Olá ${opp.lead?.name || ''},\n\nReferente à oportunidade: ${opp.title}\n\n`
         : type === 'WHATSAPP'
-          ? `Olá ${opp.lead?.name || ''}, tudo bem?`
+          ? WHATSAPP_TEMPLATES[0].getText(opp)
           : '';
     const destination =
       type === 'EMAIL'
@@ -1109,7 +1138,59 @@ export default function KanbanBoard() {
         : type === 'WHATSAPP'
           ? opp.lead?.phone || ''
           : '';
-    setContactModal({ open: true, type, opp, text: defaultText, destination });
+    setContactModal({
+      open: true,
+      type,
+      opp,
+      text: defaultText,
+      destination,
+      selectedTemplateId: type === 'WHATSAPP' ? WHATSAPP_TEMPLATES[0].id : 'custom',
+    });
+  };
+
+  const handleSelectWhatsAppTemplate = (templateId: string) => {
+    if (!contactModal.opp) return;
+    if (templateId === 'custom') {
+      setContactModal((prev) => ({ ...prev, selectedTemplateId: 'custom' }));
+      return;
+    }
+    const tpl = WHATSAPP_TEMPLATES.find((t) => t.id === templateId);
+    if (tpl) {
+      setContactModal((prev) => ({
+        ...prev,
+        selectedTemplateId: templateId,
+        text: tpl.getText(prev.opp!),
+      }));
+    }
+  };
+
+  const handleOpenWhatsAppWeb = async () => {
+    const opp = contactModal.opp;
+    const text = contactModal.text.trim();
+    const destination = contactModal.destination.trim();
+    if (!opp || !text) return;
+
+    const phone = normalizeWhatsAppPhone(destination);
+    if (!phone) {
+      toast({
+        title: 'Telefone obrigatório',
+        description: 'Informe o número do WhatsApp com DDD para abrir a conversa.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const encodedText = encodeURIComponent(text);
+    const waUrl = `https://wa.me/${phone}?text=${encodedText}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+
+    await recordInteraction(opp, 'WHATSAPP_SENT', `[WhatsApp Web ${destination}] ${text}`);
+    appendInteractionLocally(opp, 'WHATSAPP_SENT', `[WhatsApp Web ${destination}] ${text}`);
+    setContactModal({ open: false, type: null, opp: null, text: '', destination: '', selectedTemplateId: 'custom' });
+    toast({
+      title: 'WhatsApp aberto',
+      description: 'Conversa iniciada e registrada no card.',
+    });
   };
 
   const handleSendEmail = (opp: Opportunity) => {
@@ -1559,22 +1640,63 @@ export default function KanbanBoard() {
               />
             </div>
           )}
-          <Textarea
-            value={contactModal.text}
-            onChange={(e) => setContactModal((prev) => ({ ...prev, text: e.target.value }))}
-            placeholder="Digite a mensagem..."
-            className="bg-seguranca-black border-gray-600 text-seguranca-lightgray min-h-[120px]"
-          />
-          <DialogFooter className="gap-2">
+          {contactModal.type === 'WHATSAPP' && (
+            <div className="space-y-2">
+              <Label className="text-seguranca-lightgray">Modelo / Template de Mensagem</Label>
+              <Select
+                value={contactModal.selectedTemplateId || 'custom'}
+                onValueChange={handleSelectWhatsAppTemplate}
+              >
+                <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                  <SelectValue placeholder="Selecione um modelo..." />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                  {WHATSAPP_TEMPLATES.map((tpl) => (
+                    <SelectItem key={tpl.id} value={tpl.id} className="focus:bg-gray-700 focus:text-white">
+                      {tpl.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom" className="focus:bg-gray-700 focus:text-white">
+                    Personalizado (escrever livremente)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label className="text-seguranca-lightgray">Mensagem</Label>
+            <Textarea
+              value={contactModal.text}
+              onChange={(e) =>
+                setContactModal((prev) => ({ ...prev, text: e.target.value, selectedTemplateId: 'custom' }))
+              }
+              placeholder="Digite a mensagem..."
+              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray min-h-[120px]"
+            />
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() =>
-                setContactModal({ open: false, type: null, opp: null, text: '', destination: '' })
+                setContactModal({ open: false, type: null, opp: null, text: '', destination: '', selectedTemplateId: 'custom' })
               }
               className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
             >
               Cancelar
             </Button>
+            {contactModal.type === 'WHATSAPP' && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleOpenWhatsAppWeb}
+                disabled={!contactModal.text.trim() || !contactModal.destination.trim()}
+                className="border-green-600 text-green-400 hover:bg-green-950/40 hover:text-green-300"
+                title="Abre o WhatsApp Web ou App com o texto pré-carregado e registra a interação no card"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Abrir WhatsApp Web
+              </Button>
+            )}
             <Button
               onClick={handleConfirmContact}
               className="bg-seguranca-yellow text-black hover:bg-yellow-500"

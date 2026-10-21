@@ -2,6 +2,7 @@ import api from '@/lib/axios';
 import leadService, { CreateLeadRequest, Lead } from './leadService';
 import { createOpportunity, fetchKanbanStatuses } from './crmService';
 import emailCampaignService from './emailCampaignService';
+import { validateCNPJ } from '@/utils/validation';
 
 export interface Socio {
   nome: string;
@@ -41,6 +42,8 @@ export interface ProspectCompany {
   qsa: Socio[];
   origem: 'CNPJ' | 'CNAE' | 'GOOGLE_MAPS' | 'GEMINI_AI';
   googleMapsUrl?: string;
+  website?: string;
+  socialMediaUrl?: string;
   rating?: number;
   userRatingsTotal?: number;
   leadImported?: boolean;
@@ -70,20 +73,66 @@ export interface ProspectionFilters {
   raioKm?: number;
 }
 
-// Lista curada de CNAEs estratégicos para segurança, condomínios, eventos, etc.
-export const STRATEGIC_CNAES = [
-  { codigo: '8011-1/01', label: '8011-1/01 - Atividades de vigilância e segurança privada' },
-  { codigo: '8012-0/00', label: '8012-0/00 - Atividades de transporte de valores' },
-  { codigo: '8020-0/01', label: '8020-0/01 - Atividades de monitoramento de sistemas de segurança eletrônico' },
-  { codigo: '8112-5/00', label: '8112-5/00 - Condomínios prediais' },
-  { codigo: '8111-7/00', label: '8111-7/00 - Serviços combinados para apoio a edifícios (Facilities)' },
-  { codigo: '8121-4/00', label: '8121-4/00 - Limpeza em prédios e em domicílios' },
-  { codigo: '8299-7/99', label: '8299-7/99 - Outras atividades de serviços prestados a empresas' },
-  { codigo: '5211-7/99', label: '5211-7/99 - Depósitos de mercadorias para terceiros / Armazéns' },
-  { codigo: '8230-0/01', label: '8230-0/01 - Serviços de organização de feiras, congressos e eventos' },
-  { codigo: '8610-1/01', label: '8610-1/01 - Atividades de atendimento hospitalar' },
-  { codigo: '4120-4/00', label: '4120-4/00 - Construção de edifícios' },
-  { codigo: '4711-3/01', label: '4711-3/01 - Hipermercados e supermercados' },
+// Lista curada de CNAEs estratégicos organizada por Setores (Indústria, Comercial, Agro, Condomínios, Saúde, etc.)
+export interface StrategicCnae {
+  codigo: string;
+  label: string;
+  setor: 'TODOS' | 'AGRO' | 'INDUSTRIA' | 'COMERCIO' | 'SEGURANCA' | 'FACILITIES' | 'SAUDE' | 'LOGISTICA';
+}
+
+export const STRATEGIC_CNAES: StrategicCnae[] = [
+  // Geral
+  { codigo: 'TODOS', label: 'Todos os Segmentos Estratégicos', setor: 'TODOS' },
+
+  // AGRONEGÓCIO & AGROINDÚSTRIA
+  { codigo: '0111-3/01', label: '0111-3/01 - Cultivo de cereais (Soja, Milho, Trigo)', setor: 'AGRO' },
+  { codigo: '0151-2/01', label: '0151-2/01 - Criação de bovinos / Confinamentos e Fazendas', setor: 'AGRO' },
+  { codigo: '0161-0/99', label: '0161-0/99 - Atividades de apoio à agricultura / Silos e Armazenagem Agro', setor: 'AGRO' },
+  { codigo: '1061-9/01', label: '1061-9/01 - Beneficiamento e moagem de grãos (Agroindústria)', setor: 'AGRO' },
+  { codigo: '4623-1/09', label: '4623-1/09 - Comércio atacadista de sementes, defensivos e insumos agro', setor: 'AGRO' },
+  { codigo: '4683-4/00', label: '4683-4/00 - Comércio atacadista de defensivos agrícolas e adubos', setor: 'AGRO' },
+  { codigo: '1011-2/01', label: '1011-2/01 - Frigoríficos e abatedouros de bovinos/aves', setor: 'AGRO' },
+  { codigo: '1071-6/00', label: '1071-6/00 - Usinas de açúcar e álcool / Bioenergia', setor: 'AGRO' },
+
+  // INDÚSTRIA & MANUFATURA
+  { codigo: '4120-4/00', label: '4120-4/00 - Construção de edifícios e obras industriais', setor: 'INDUSTRIA' },
+  { codigo: '1099-6/99', label: '1099-6/99 - Fabricação de produtos alimentícios em geral', setor: 'INDUSTRIA' },
+  { codigo: '2099-1/99', label: '2099-1/99 - Indústria química e derivados', setor: 'INDUSTRIA' },
+  { codigo: '2511-0/00', label: '2511-0/00 - Fabricação de estruturas metálicas', setor: 'INDUSTRIA' },
+  { codigo: '2869-1/00', label: '2869-1/00 - Fabricação de máquinas e equipamentos industriais', setor: 'INDUSTRIA' },
+  { codigo: '2399-1/99', label: '2399-1/99 - Mineração e transformação de minerais não-metálicos', setor: 'INDUSTRIA' },
+  { codigo: '2229-3/99', label: '2229-3/99 - Indústria de artefatos de material plástico', setor: 'INDUSTRIA' },
+  { codigo: '2910-7/01', label: '2910-7/01 - Fabricação de automóveis, caminhões e peças', setor: 'INDUSTRIA' },
+  { codigo: '2121-1/01', label: '2121-1/01 - Indústria farmacêutica e medicamentos', setor: 'INDUSTRIA' },
+
+  // COMERCIAL & VAREJO / ATACADO
+  { codigo: '4711-3/01', label: '4711-3/01 - Hipermercados e supermercados', setor: 'COMERCIO' },
+  { codigo: '4691-5/00', label: '4691-5/00 - Comércio atacadista de mercadorias em geral (Atacarejos)', setor: 'COMERCIO' },
+  { codigo: '6822-6/00', label: '6822-6/00 - Gestão e administração de shopping centers', setor: 'COMERCIO' },
+  { codigo: '4511-1/01', label: '4511-1/01 - Concessionárias de veículos novos e usados', setor: 'COMERCIO' },
+  { codigo: '4744-0/99', label: '4744-0/99 - Home centers e comércio de materiais de construção', setor: 'COMERCIO' },
+  { codigo: '4649-4/99', label: '4649-4/99 - Distribuidoras e atacado de bens de consumo', setor: 'COMERCIO' },
+  { codigo: '8230-0/01', label: '8230-0/01 - Organização de feiras, congressos e centros de convenções', setor: 'COMERCIO' },
+
+  // LOGÍSTICA & CENTROS DE DISTRIBUIÇÃO
+  { codigo: '5211-7/99', label: '5211-7/99 - Centros de distribuição / Depósitos para terceiros', setor: 'LOGISTICA' },
+  { codigo: '4930-2/02', label: '4930-2/02 - Transporte rodoviário de carga / Transportadoras', setor: 'LOGISTICA' },
+  { codigo: '5250-8/04', label: '5250-8/04 - Operadores logísticos multimodais', setor: 'LOGISTICA' },
+
+  // CONDOMÍNIOS & FACILITIES
+  { codigo: '8112-5/00', label: '8112-5/00 - Condomínios prediais e residenciais fechados', setor: 'FACILITIES' },
+  { codigo: '8111-7/00', label: '8111-7/00 - Serviços combinados de apoio a edifícios (Facilities)', setor: 'FACILITIES' },
+  { codigo: '8121-4/00', label: '8121-4/00 - Limpeza predial, comercial e industrial', setor: 'FACILITIES' },
+  { codigo: '8299-7/99', label: '8299-7/99 - Serviços prestados a empresas / Complexos empresariais', setor: 'FACILITIES' },
+
+  // SAÚDE & HOSPITALAR
+  { codigo: '8610-1/01', label: '8610-1/01 - Atividades de atendimento hospitalar (Hospitais)', setor: 'SAUDE' },
+  { codigo: '8630-5/03', label: '8630-5/03 - Clínicas médicas, pronto atendimento e centros de diagnóstico', setor: 'SAUDE' },
+
+  // SEGURANÇA PRIVADA & MONITORAMENTO
+  { codigo: '8011-1/01', label: '8011-1/01 - Atividades de vigilância e segurança privada', setor: 'SEGURANCA' },
+  { codigo: '8012-0/00', label: '8012-0/00 - Atividades de transporte de valores', setor: 'SEGURANCA' },
+  { codigo: '8020-0/01', label: '8020-0/01 - Atividades de monitoramento de sistemas de segurança eletrônico', setor: 'SEGURANCA' },
 ];
 
 export const ESTADOS_BRASIL = [
@@ -150,7 +199,7 @@ class ProspectionService {
 
     // 3. Fallback: API do backend se configurada
     try {
-      const { data } = await api.get(`/api/prospection/cnpj/${cleanCnpj}`);
+      const { data } = await api.get(`/prospection/cnpj/${cleanCnpj}`);
       return data;
     } catch {
       throw new Error(`Não foi possível localizar os dados para o CNPJ ${cnpjRaw}. Verifique o número digitado.`);
@@ -266,9 +315,6 @@ class ProspectionService {
     };
   }
 
-  /**
-   * Busca e qualificação inteligente de prospectos via IA Gemini
-   */
   async searchWithAi(cidade: string, uf: string, segmento?: string, quantidade = 8): Promise<ProspectCompany[]> {
     try {
       const params = new URLSearchParams();
@@ -277,19 +323,27 @@ class ProspectionService {
       if (segmento) params.append('segmento', segmento);
       params.append('quantidade', String(quantidade));
 
-      const { data } = await api.get<any[]>(`/api/prospection/ai-search?${params.toString()}`);
+      const { data } = await api.get<any[]>(`/prospection/ai-search?${params.toString()}`);
       if (Array.isArray(data)) {
         return data.map((item: any) => {
           const rawEmail = (item.email || '').toLowerCase().trim();
           const isContabil = isAccountingContact(rawEmail, item.razaoSocial || item.nomeFantasia);
           const sanitizedEmail = isContabil ? '' : rawEmail;
 
+          // Se tiver CNPJ válido, formata; se for string vazia ou inválida, não coloca CNPJ mockado
+          const rawCnpj = (item.cnpj || '').replace(/\D/g, '');
+          const cleanCnpj = rawCnpj.length === 14 ? item.cnpj : '';
+
+          // Monta link do Google Maps caso não venha pronto
+          const mapsQuery = encodeURIComponent(`${item.nomeFantasia || item.razaoSocial} ${cidade} ${uf}`);
+          const mapsUrl = item.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+
           return {
-            cnpj: item.cnpj || '00.000.000/0001-00',
+            cnpj: cleanCnpj,
             razaoSocial: item.razaoSocial || item.nomeFantasia,
             nomeFantasia: item.nomeFantasia || item.razaoSocial,
-            situacaoCadastral: 'ATIVA',
-            cnaePrincipal: item.cnaeDescricao ? { codigo: 'CNAE-IA', descricao: item.cnaeDescricao } : undefined,
+            situacaoCadastral: cleanCnpj ? 'ATIVA' : 'VERIFICAR NA RECEITA',
+            cnaePrincipal: item.cnaeDescricao ? { codigo: item.cnaeCodigo || '', descricao: item.cnaeDescricao } : undefined,
             logradouro: item.logradouro || '',
             bairro: item.bairro || '',
             municipio: item.municipio || cidade,
@@ -297,9 +351,12 @@ class ProspectionService {
             telefone: item.telefone || '',
             email: sanitizedEmail,
             emailContabilidadeDescartado: isContabil,
+            googleMapsUrl: mapsUrl,
+            website: item.website || '',
+            socialMediaUrl: item.socialMediaUrl || '',
             clientePotencial: item.clientePotencial !== undefined ? Boolean(item.clientePotencial) : true,
             scoreConversao: item.scoreConversao || 85,
-            motivoConversao: item.motivoConversao || 'Necessidade contínua de controle de acesso, portaria e segurança patrimonial.',
+            motivoConversao: item.motivoConversao || 'Demanda contínua por controle de acesso, portaria e segurança patrimonial.',
             qsa: Array.isArray(item.qsa) ? item.qsa : [],
             origem: 'GEMINI_AI',
           };
@@ -307,8 +364,8 @@ class ProspectionService {
       }
       return [];
     } catch (err: any) {
-      console.error('Erro na prospecção com IA Gemini:', err);
-      throw new Error(err.response?.data?.message || err.message || 'Falha ao executar prospecção com IA.');
+      console.error('Erro na prospecção comercial:', err);
+      throw new Error(err.response?.data?.message || err.message || 'Falha ao executar prospecção comercial.');
     }
   }
 
@@ -323,6 +380,11 @@ class ProspectionService {
    * Envia o prospecto diretamente para o funil do CRM (Kanban)
    */
   async sendToCrm(company: ProspectCompany, assignedUserId?: string | number): Promise<Lead> {
+    // Validação estrita de CNPJ real (dígitos verificadores oficiais)
+    if (!company.cnpj || !validateCNPJ(company.cnpj)) {
+      throw new Error(`Não é possível enviar para o CRM: O CNPJ "${company.cnpj || 'não informado'}" não é um documento oficial válido com dígitos verificadores da Receita Federal.`);
+    }
+
     // 1. Identificar o tomador de decisão preferencial (1º sócio administrador ou o próprio nome fantasia)
     const decisor = company.qsa.length > 0 ? company.qsa[0] : null;
     const contactName = decisor?.nome || company.nomeFantasia || company.razaoSocial;
@@ -447,6 +509,32 @@ class ProspectionService {
     );
 
     return `https://wa.me/${fullPhone}?text=${msg}`;
+  }
+
+  /**
+   * Obtém o status de configuração das chaves de IA e ferramentas (Google Places / Maps)
+   */
+  async getCredentialsStatus(): Promise<{
+    geminiConfigured: boolean;
+    geminiMaskedKey: string;
+    model: string;
+    googlePlacesConfigured: boolean;
+    googlePlacesMaskedKey: string;
+  }> {
+    const { data } = await api.get('/prospection/credentials');
+    return data;
+  }
+
+  /**
+   * Salva ou atualiza as chaves da IA Gemini e Google Places
+   */
+  async updateCredentials(payload: {
+    geminiApiKey?: string;
+    googlePlacesApiKey?: string;
+    model?: string;
+  }): Promise<any> {
+    const { data } = await api.post('/prospection/credentials', payload);
+    return data;
   }
 }
 

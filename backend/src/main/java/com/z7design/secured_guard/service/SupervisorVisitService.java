@@ -41,7 +41,6 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SupervisorVisitService {
 
     private final SupervisorVisitRepository supervisorVisitRepository;
@@ -52,6 +51,25 @@ public class SupervisorVisitService {
     private final EmployeePostAllocationService allocationService;
     private final VisitScheduleRepository visitScheduleRepository;
     private final UserRepository userRepository;
+
+    public SupervisorVisitService(
+            SupervisorVisitRepository supervisorVisitRepository,
+            QRCodeWorkPostRepository qrCodeWorkPostRepository,
+            WorkPostRepository workPostRepository,
+            EmployeeRepository employeeRepository,
+            EmployeeQrCodeService employeeQrCodeService,
+            EmployeePostAllocationService allocationService,
+            VisitScheduleRepository visitScheduleRepository,
+            UserRepository userRepository) {
+        this.supervisorVisitRepository = supervisorVisitRepository;
+        this.qrCodeWorkPostRepository = qrCodeWorkPostRepository;
+        this.workPostRepository = workPostRepository;
+        this.employeeRepository = employeeRepository;
+        this.employeeQrCodeService = employeeQrCodeService;
+        this.allocationService = allocationService;
+        this.visitScheduleRepository = visitScheduleRepository;
+        this.userRepository = userRepository;
+    }
 
     /**
      * Resolve posto + funcionário + vínculo SEM gravar. Usado para a confirmação na tela

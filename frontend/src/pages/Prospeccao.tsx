@@ -31,13 +31,17 @@ import {
   ExternalLink,
   Briefcase,
   Sparkles,
-  Bot
+  Bot,
+  Key,
+  Settings,
+  Save
 } from 'lucide-react';
 import prospectionService, { 
   ProspectCompany, 
   STRATEGIC_CNAES, 
   ESTADOS_BRASIL 
 } from '@/services/prospectionService';
+import { validateCNPJ, validateCPF, formatCNPJ } from '@/utils/validation';
 import { useNavigate } from 'react-router-dom';
 
 const Prospeccao: React.FC = () => {
@@ -45,11 +49,12 @@ const Prospeccao: React.FC = () => {
   const navigate = useNavigate();
 
   // Estados dos filtros
-  const [activeTab, setActiveTab] = useState<'cnpj' | 'segmento' | 'maps'>('cnpj');
+  const [activeTab, setActiveTab] = useState<'cnpj' | 'segmento' | 'maps'>('segmento');
   const [cnpjInput, setCnpjInput] = useState('');
-  const [selectedCnae, setSelectedCnae] = useState(STRATEGIC_CNAES[0].codigo);
-  const [selectedUf, setSelectedUf] = useState('SP');
-  const [municipioInput, setMunicipioInput] = useState('');
+  const [selectedSetor, setSelectedSetor] = useState<string>('TODOS');
+  const [selectedCnae, setSelectedCnae] = useState('TODOS');
+  const [selectedUf, setSelectedUf] = useState('MG');
+  const [municipioInput, setMunicipioInput] = useState('Uberlândia');
   const [mapsKeyword, setMapsKeyword] = useState('');
 
   // Estados de dados e execução
@@ -62,10 +67,122 @@ const Prospeccao: React.FC = () => {
   const [sendingCrmId, setSendingCrmId] = useState<string | null>(null);
   const [sendingMarketingId, setSendingMarketingId] = useState<string | null>(null);
 
-  // Busca por CNPJ
-  const handleSearchCnpj = async (e?: React.FormEvent) => {
+  // Estados de Configuração de Chaves/Tokens de IA e Ferramentas
+  const [credentialsModalOpen, setCredentialsModalOpen] = useState(false);
+  const [savingCredentials, setSavingCredentials] = useState(false);
+  const [credentialsStatus, setCredentialsStatus] = useState<any>(null);
+  const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('');
+  const [googlePlacesApiKeyInput, setGooglePlacesApiKeyInput] = useState('');
+  const [geminiModelInput, setGeminiModelInput] = useState('gemini-1.5-flash');
+
+  // Carregar status das credenciais
+  const loadCredentials = async () => {
+    try {
+      const data = await prospectionService.getCredentialsStatus();
+      setCredentialsStatus(data);
+      if (data.model) setGeminiModelInput(data.model);
+    } catch (err) {
+      console.warn('Não foi possível carregar o status das credenciais:', err);
+    }
+  };
+
+  React.useEffect(() => {
+    loadCredentials();
+  }, []);
+
+  const handleSaveCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSavingCredentials(true);
+      await prospectionService.updateCredentials({
+        geminiApiKey: geminiApiKeyInput,
+        googlePlacesApiKey: googlePlacesApiKeyInput,
+        model: geminiModelInput,
+      });
+      toast({
+        title: 'Chaves atualizadas com sucesso!',
+        description: 'As configurações de IA e Ferramentas de Prospecção estão ativas.',
+      });
+      setGeminiApiKeyInput('');
+      setGooglePlacesApiKeyInput('');
+      await loadCredentials();
+      setCredentialsModalOpen(false);
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao salvar credenciais',
+        description: err.message || 'Falha ao comunicar com o servidor.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingCredentials(false);
+    }
+  };
+
+  // Busca com IA por Nicho / Palavra-chave e Região
+  const handleSearchSegmento = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!cnpjInput.trim()) {
+    const cidade = municipioInput.trim() || 'Uberlândia';
+
+    // Montar termo rico combinando Nicho + CNAE + Setor (Indústria, Comercial, Agro, etc.)
+    const partesSegmento: string[] = [];
+    if (mapsKeyword.trim()) {
+      partesSegmento.push(mapsKeyword.trim());
+    }
+
+    if (selectedSetor !== 'TODOS') {
+      const setorLabels: Record<string, string> = {
+        AGRO: 'Agronegócio, Fazendas e Silos',
+        INDUSTRIA: 'Indústria, Manufatura e Fábricas',
+        COMERCIO: 'Comércio, Atacado, Supermercados e Concessionárias',
+        LOGISTICA: 'Centros de Distribuição e Logística',
+        FACILITIES: 'Condomínios e Centros Empresariais',
+        SAUDE: 'Hospitais, Clínicas e Centros de Diagnóstico',
+        SEGURANCA: 'Segurança e Vigilância',
+      };
+      partesSegmento.push(setorLabels[selectedSetor] || selectedSetor);
+    }
+
+    if (selectedCnae && selectedCnae !== 'TODOS') {
+      const cnaeObj = STRATEGIC_CNAES.find(c => c.codigo === selectedCnae);
+      if (cnaeObj) partesSegmento.push(`CNAE: ${cnaeObj.label}`);
+    }
+
+    const termoNicho = partesSegmento.length > 0 
+      ? partesSegmento.join(' | ') 
+      : 'Empresas, Indústrias, Comércios e Agronegócio';
+
+    try {
+      setLoading(true);
+      const results = await prospectionService.searchWithAi(cidade, selectedUf, termoNicho, 10);
+      if (results.length > 0) {
+        setProspects(results);
+        toast({
+          title: `🎯 ${results.length} empresas reais localizadas em ${cidade}!`,
+          description: 'Higienizados sem contatos de contabilidade e com presença real confirmada.',
+        });
+      } else {
+        toast({
+          title: 'Nenhum prospecto retornado',
+          description: 'Tente alterar a palavra-chave, setor ou cidade.',
+          variant: 'destructive',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro na busca de prospecção',
+        description: err.message || 'Falha ao buscar empresas.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Busca por CNPJ
+  const handleSearchCnpj = async (e?: React.FormEvent, cnpjToSearch?: string) => {
+    if (e) e.preventDefault();
+    const targetCnpj = cnpjToSearch || cnpjInput;
+    if (!targetCnpj.trim()) {
       toast({
         title: 'Informe o CNPJ',
         description: 'Digite um CNPJ válido com 14 números.',
@@ -74,53 +191,30 @@ const Prospeccao: React.FC = () => {
       return;
     }
 
+    if (!validateCNPJ(targetCnpj)) {
+      toast({
+        title: 'CNPJ inválido',
+        description: 'O número informado não é um CNPJ válido da Receita Federal.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setLoading(true);
-      const company = await prospectionService.searchByCnpj(cnpjInput);
-      setProspects([company]);
+      const company = await prospectionService.searchByCnpj(targetCnpj);
+      setProspects(prev => {
+        const filtered = prev.filter(p => p.cnpj !== company.cnpj);
+        return [company, ...filtered];
+      });
       toast({
-        title: 'Empresa localizada com sucesso!',
-        description: `${company.razaoSocial} carregada com dados completos e sócios.`,
+        title: 'Empresa localizada com dados oficiais!',
+        description: `${company.razaoSocial} carregada diretamente da base oficial da Receita Federal.`,
       });
     } catch (err: any) {
       toast({
         title: 'Erro na consulta',
         description: err.message || 'Não foi possível encontrar dados do CNPJ.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Busca com IA por Nicho / Palavra-chave e Região
-  const handleSearchSegmento = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const cidade = municipioInput.trim() || 'Uberlândia';
-    const termoNicho = mapsKeyword.trim() 
-      ? `${mapsKeyword.trim()} (CNAE: ${selectedCnae})` 
-      : selectedCnae;
-
-    try {
-      setLoading(true);
-      const results = await prospectionService.searchWithAi(cidade, selectedUf, termoNicho, 10);
-      if (results.length > 0) {
-        setProspects(results);
-        toast({
-          title: `🎯 ${results.length} leads qualificados em ${cidade}!`,
-          description: 'Higienizados sem contatos de contabilidade e com decisores prioritários.',
-        });
-      } else {
-        toast({
-          title: 'Nenhum prospecto retornado',
-          description: 'Tente alterar a palavra-chave ou a cidade.',
-          variant: 'destructive',
-        });
-      }
-    } catch (err: any) {
-      toast({
-        title: 'Erro na busca com IA',
-        description: err.message || 'Falha ao buscar empresas.',
         variant: 'destructive',
       });
     } finally {
@@ -206,6 +300,18 @@ const Prospeccao: React.FC = () => {
         <div className="flex gap-2">
           <Button
             variant="outline"
+            onClick={() => setCredentialsModalOpen(true)}
+            className="border-amber-500/80 text-amber-300 hover:bg-amber-500 hover:text-black text-xs sm:text-sm font-semibold flex items-center gap-1.5"
+            title="Configurar chaves de API da IA Gemini e Google Places / Meu Negócio"
+          >
+            <Key className="h-4 w-4 text-amber-400" />
+            Chaves & IA
+            {credentialsStatus?.geminiConfigured && (
+              <span className="h-2 w-2 rounded-full bg-green-500 inline-block ml-0.5" title="Gemini Ativo" />
+            )}
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => navigate('/crm')}
             className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black font-semibold text-xs sm:text-sm"
           >
@@ -284,18 +390,45 @@ const Prospeccao: React.FC = () => {
                   </Select>
                 </div>
 
-                <div className="md:col-span-3 space-y-1">
-                  <Label className="text-xs text-gray-300 font-semibold">CNAE / Atividade Complementar (Opcional)</Label>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-300 font-semibold">Setor Econômico</Label>
+                  <Select 
+                    value={selectedSetor} 
+                    onValueChange={(val) => {
+                      setSelectedSetor(val);
+                      setSelectedCnae('TODOS');
+                    }}
+                  >
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-white h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-700 text-white">
+                      <SelectItem value="TODOS">🌐 Todos os Setores</SelectItem>
+                      <SelectItem value="AGRO">🌾 Agronegócio & Silos</SelectItem>
+                      <SelectItem value="INDUSTRIA">🏭 Indústria & Manufatura</SelectItem>
+                      <SelectItem value="COMERCIO">🏬 Comercial, Varejo & Atacado</SelectItem>
+                      <SelectItem value="LOGISTICA">🚚 Centros de Distribuição & Logística</SelectItem>
+                      <SelectItem value="FACILITIES">🏢 Condomínios & Facilities</SelectItem>
+                      <SelectItem value="SAUDE">🏥 Saúde & Hospitalar</SelectItem>
+                      <SelectItem value="SEGURANCA">🛡️ Segurança & Vigilância</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="md:col-span-2 space-y-1">
+                  <Label className="text-xs text-gray-300 font-semibold">CNAE / Atividade Específica (Opcional)</Label>
                   <Select value={selectedCnae} onValueChange={setSelectedCnae}>
                     <SelectTrigger className="bg-seguranca-black border-gray-600 text-white h-10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-black border-gray-700 text-white max-h-72">
-                      {STRATEGIC_CNAES.map((c) => (
-                        <SelectItem key={c.codigo} value={c.codigo}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
+                      {STRATEGIC_CNAES
+                        .filter(c => selectedSetor === 'TODOS' || c.setor === 'TODOS' || c.setor === selectedSetor)
+                        .map((c) => (
+                          <SelectItem key={c.codigo} value={c.codigo}>
+                            {c.label}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -389,9 +522,11 @@ const Prospeccao: React.FC = () => {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                          <Badge className="bg-seguranca-yellow text-black font-bold text-[10px]">
-                            CNPJ: {company.cnpj}
-                          </Badge>
+                          {company.cnpj && company.cnpj !== '00.000.000/0001-00' && (
+                            <Badge className="bg-seguranca-yellow text-black font-bold text-[10px]">
+                              CNPJ: {company.cnpj}
+                            </Badge>
+                          )}
                           {company.clientePotencial && (
                             <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] flex items-center gap-1 font-bold">
                               🔥 Lead com Alto Potencial
@@ -504,12 +639,53 @@ const Prospeccao: React.FC = () => {
                       ) : (
                         <div className="text-xs text-gray-500 italic">E-mail não listado</div>
                       )}
+                      {/* Presença Digital Real (Maps, Website, Redes Sociais) */}
+                      {(company.googleMapsUrl || company.website || company.socialMediaUrl) && (
+                        <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-800">
+                          {company.googleMapsUrl && (
+                            <a
+                              href={company.googleMapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-950/40 px-2 py-1 rounded border border-blue-900/50"
+                            >
+                              <MapPin className="h-3 w-3" />
+                              Ver no Google Maps / Meu Negócio
+                              <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
+                            </a>
+                          )}
+                          {company.website && (
+                            <a
+                              href={company.website.startsWith('http') ? company.website : `https://${company.website}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] text-gray-300 hover:text-white flex items-center gap-1 bg-gray-800/60 px-2 py-1 rounded border border-gray-700"
+                            >
+                              <Globe className="h-3 w-3 text-seguranca-yellow" />
+                              Website Oficial
+                              <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
+                            </a>
+                          )}
+                          {company.socialMediaUrl && (
+                            <a
+                              href={company.socialMediaUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] text-pink-400 hover:text-pink-300 flex items-center gap-1 bg-pink-950/30 px-2 py-1 rounded border border-pink-900/40"
+                            >
+                              <Share2 className="h-3 w-3" />
+                              Redes Sociais
+                              <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
 
                   {/* Barra de Ações Rápidas */}
                   <div className="p-3 bg-seguranca-black border-t border-gray-700 rounded-b-lg flex flex-wrap gap-2 items-center justify-between">
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {company.telefone && (
                         <Button
                           size="sm"
@@ -539,6 +715,22 @@ const Prospeccao: React.FC = () => {
                           E-mail Mkt
                         </Button>
                       )}
+
+                      {!company.cnpj && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedCompany(company);
+                            setDetailsModalOpen(true);
+                          }}
+                          className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black h-8 px-2.5 text-xs font-medium"
+                          title="Consultar CNPJ na Receita Federal para enriquecer dados oficiais"
+                        >
+                          <Search className="h-3.5 w-3.5 mr-1" />
+                          Buscar CNPJ
+                        </Button>
+                      )}
                     </div>
 
                     <div className="flex gap-2">
@@ -566,7 +758,19 @@ const Prospeccao: React.FC = () => {
                       ) : (
                         <Button
                           size="sm"
-                          onClick={() => handleSendToCrm(company)}
+                          onClick={() => {
+                            if (!company.cnpj || !validateCNPJ(company.cnpj)) {
+                              setSelectedCompany(company);
+                              setDetailsModalOpen(true);
+                              toast({
+                                title: 'CNPJ obrigatório para CRM',
+                                description: 'Por favor, consulte ou informe um CNPJ real e válido da empresa antes de enviar para o CRM.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            handleSendToCrm(company);
+                          }}
                           disabled={sendingCrmId === company.cnpj}
                           className="bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold h-8 px-3 text-xs"
                         >
@@ -609,11 +813,41 @@ const Prospeccao: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-xs text-gray-400 block">CNPJ:</span>
-                  <span className="font-semibold text-seguranca-yellow">{selectedCompany.cnpj}</span>
+                  {selectedCompany.cnpj ? (
+                    <span className="font-semibold text-seguranca-yellow">{selectedCompany.cnpj}</span>
+                  ) : (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-amber-400 text-xs italic">Não informado</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[11px] border-seguranca-yellow text-seguranca-yellow px-2 py-0"
+                        onClick={() => {
+                          const userCnpj = prompt(`Informe o CNPJ oficial de "${selectedCompany.nomeFantasia || selectedCompany.razaoSocial}":`);
+                          if (userCnpj) {
+                            if (!validateCNPJ(userCnpj)) {
+                              toast({
+                                title: 'CNPJ inválido',
+                                description: 'O CNPJ informado não possui formato ou dígitos verificadores válidos.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            handleSearchCnpj(undefined, userCnpj);
+                            setDetailsModalOpen(false);
+                          }
+                        }}
+                      >
+                        Digitar e Consultar Receita
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <span className="text-xs text-gray-400 block">Situação Cadastral:</span>
-                  <Badge className="bg-green-600 text-white mt-1">{selectedCompany.situacaoCadastral}</Badge>
+                  <Badge className={selectedCompany.cnpj ? "bg-green-600 text-white mt-1" : "bg-amber-600 text-white mt-1"}>
+                    {selectedCompany.situacaoCadastral}
+                  </Badge>
                 </div>
                 <div>
                   <span className="text-xs text-gray-400 block">Porte da Empresa:</span>
@@ -702,6 +936,115 @@ const Prospeccao: React.FC = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Modal de Configuração de Chaves de IA & Ferramentas */}
+      <Dialog open={credentialsModalOpen} onOpenChange={setCredentialsModalOpen}>
+        <DialogContent className="max-w-lg bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-seguranca-yellow flex items-center gap-2">
+              <Key className="h-5 w-5 text-amber-400" />
+              Chaves & Tokens de Prospecção
+            </DialogTitle>
+            <DialogDescription className="text-gray-400 text-xs">
+              Informe as chaves das ferramentas para ativar raspagem inteligente e qualificação com IA.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveCredentials} className="space-y-4 text-sm mt-1">
+            {/* Google Gemini AI */}
+            <div className="space-y-1.5 p-3 rounded-lg bg-seguranca-black/60 border border-gray-700">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-amber-400" />
+                  Google Gemini API Key
+                </Label>
+                {credentialsStatus?.geminiConfigured ? (
+                  <Badge className="bg-green-950 text-green-300 border border-green-800 text-[10px]">
+                    Ativo ({credentialsStatus.geminiMaskedKey})
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-gray-400 border-gray-700 text-[10px]">
+                    Não configurada
+                  </Badge>
+                )}
+              </div>
+              <Input
+                type="password"
+                placeholder="Cole sua chave da API do Google AI Studio..."
+                value={geminiApiKeyInput}
+                onChange={(e) => setGeminiApiKeyInput(e.target.value)}
+                className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+              />
+              <p className="text-[11px] text-gray-500">
+                Obtenha gratuitamente no <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-seguranca-yellow underline">Google AI Studio</a>.
+              </p>
+            </div>
+
+            {/* Google Places / Meu Negócio */}
+            <div className="space-y-1.5 p-3 rounded-lg bg-seguranca-black/60 border border-gray-700">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-blue-400" />
+                  Google Places API Key (Maps & Meu Negócio)
+                </Label>
+                {credentialsStatus?.googlePlacesConfigured ? (
+                  <Badge className="bg-green-950 text-green-300 border border-green-800 text-[10px]">
+                    Ativo ({credentialsStatus.googlePlacesMaskedKey})
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-gray-400 border-gray-700 text-[10px]">
+                    OpenStreetMap Ativo (Fallback)
+                  </Badge>
+                )}
+              </div>
+              <Input
+                type="password"
+                placeholder="Cole sua Google Cloud Places API Key (Opcional)..."
+                value={googlePlacesApiKeyInput}
+                onChange={(e) => setGooglePlacesApiKeyInput(e.target.value)}
+                className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+              />
+              <p className="text-[11px] text-gray-500">
+                Opcional. Se não informada, o sistema utiliza o motor geoespacial livre do OpenStreetMap Nominatim.
+              </p>
+            </div>
+
+            {/* Modelo do Gemini */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-gray-300">Modelo da IA</Label>
+              <Select value={geminiModelInput} onValueChange={setGeminiModelInput}>
+                <SelectTrigger className="bg-seguranca-black border-gray-600 text-white h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-black border-gray-700 text-white text-xs">
+                  <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Rápido & Econômico - Recomendado)</SelectItem>
+                  <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro (Maior raciocínio e profundidade)</SelectItem>
+                  <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter className="pt-2 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setCredentialsModalOpen(false)}
+                className="text-gray-400 hover:text-white text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={savingCredentials}
+                className="bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold text-xs"
+              >
+                {savingCredentials ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
+                Salvar Credenciais
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       </div>
     </StandardLayout>
   );

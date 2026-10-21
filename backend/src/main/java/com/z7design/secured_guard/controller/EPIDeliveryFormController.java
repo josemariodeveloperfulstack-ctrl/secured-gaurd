@@ -41,7 +41,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/epi-delivery-forms")
-@RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Fichas de Entrega de EPI", description = "Endpoints para gestão de fichas de entrega de EPI")
 @SecurityRequirement(name = "bearerAuth")
@@ -54,6 +53,23 @@ public class EPIDeliveryFormController {
     private final AuthenticatedCpfResolver authenticatedCpfResolver;
     private final com.z7design.secured_guard.service.EPIDeliveryReportService epiDeliveryReportService;
     private final DocumentoGeradoPersistenceService persistenceService;
+
+    public EPIDeliveryFormController(
+            EPIDeliveryFormService epiDeliveryFormService,
+            EPIDeliveryStandardPdfService epiDeliveryPdfService,
+            com.z7design.secured_guard.repository.UserRepository userRepository,
+            EmployeeRepository employeeRepository,
+            AuthenticatedCpfResolver authenticatedCpfResolver,
+            com.z7design.secured_guard.service.EPIDeliveryReportService epiDeliveryReportService,
+            DocumentoGeradoPersistenceService persistenceService) {
+        this.epiDeliveryFormService = epiDeliveryFormService;
+        this.epiDeliveryPdfService = epiDeliveryPdfService;
+        this.userRepository = userRepository;
+        this.employeeRepository = employeeRepository;
+        this.authenticatedCpfResolver = authenticatedCpfResolver;
+        this.epiDeliveryReportService = epiDeliveryReportService;
+        this.persistenceService = persistenceService;
+    }
 
     @Operation(summary = "Exportar relatório analítico de EPIs para Excel")
     @GetMapping("/report/export")

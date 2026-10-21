@@ -13,6 +13,7 @@ import {
   validarInicioFeriasClt, 
   CltValidationResult 
 } from '../../utils/feriasCltValidator';
+import { isEscala12x36 as checkIsEscala12x36 } from '../../utils/workSchedule';
 import { SearchableSelect, Option } from '../ui/searchable-select';
 import { X, Calendar, User, FileText, AlertTriangle, CheckCircle2, Clock, Users, UserCheck, ShieldAlert, Award, Ban } from 'lucide-react';
 
@@ -59,6 +60,7 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
   const [coberturaAtiva, setCoberturaAtiva] = useState(false);
   const [coberturaSubstituto, setCoberturaSubstituto] = useState('');
   const [coberturaTurno, setCoberturaTurno] = useState<'DAY' | 'NIGHT' | 'MIXED'>('DAY');
+  const [manual12x36, setManual12x36] = useState<boolean>(false);
 
   const periodoAutoRef = React.useRef<string>('');
 
@@ -102,8 +104,18 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
         employeeId: initialEmployeeId
       }));
     }
-    // Buscar funcionários
-    employeeService.getAllEmployees().then(setEmployees);
+    // Buscar todos os funcionários (garantindo lista completa para seleção e substituição)
+    employeeService.fetchAllEmployeesForReport()
+      .then(emps => {
+        if (emps && emps.length > 0) {
+          setEmployees(emps);
+        } else {
+          employeeService.getAllEmployees(undefined, 0, 1000).then(setEmployees);
+        }
+      })
+      .catch(() => {
+        employeeService.getAllEmployees(undefined, 0, 1000).then(setEmployees);
+      });
   }, [editingId, initialData, initialEmployeeId]);
 
   // Período aquisitivo calculado pela admissão + últimas férias do funcionário
@@ -187,22 +199,26 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
     }
   };
 
-  // Helper para verificar se a escala do colaborador é 12x36
+  // Helper robusto para verificar se a escala do colaborador é 12x36
   const isEmployee12x36 = (emp?: Employee): boolean => {
     if (!emp) return false;
-    const dias = (emp.diasTrabalho || '').toLowerCase();
-    const escala = (emp.escalaTrabalho || '').toLowerCase();
-    const horario = (emp.horarioTrabalho || '').toLowerCase();
-    const reg = /12\s*[xX/-]\s*36/;
-    return reg.test(dias) || reg.test(escala) || reg.test(horario);
+    return checkIsEscala12x36(emp.escalaTrabalho, emp.diasTrabalho, emp.horarioTrabalho);
   };
 
   const selectedEmployee = employees.find(e => e.id === form.employeeId);
-  const isCurrentEmployee12x36 = isEmployee12x36(selectedEmployee);
+  const detected12x36 = isEmployee12x36(selectedEmployee);
+  const isEffective12x36 = manual12x36 || detected12x36;
+
+  // Atualizar manual12x36 automaticamente quando o funcionário for alterado
+  useEffect(() => {
+    if (selectedEmployee) {
+      setManual12x36(isEmployee12x36(selectedEmployee));
+    }
+  }, [selectedEmployee]);
 
   // Opções para o SearchableSelect de Funcionário
   const employeeOptions: Option[] = React.useMemo(() => {
-    return employees.map(emp => {
+    const list = employees.map(emp => {
       const escalaBadge = isEmployee12x36(emp) ? 'Escala 12x36' : (emp.diasTrabalho || emp.escalaTrabalho || '');
       const descParts = [
         emp.cpf ? `CPF: ${emp.cpf}` : '',
@@ -217,9 +233,11 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
         searchTerms: [emp.cpf || '', emp.registrationNumber || '', emp.workPost?.name || '']
       };
     });
+
+    return list.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }, [employees]);
 
-  // Opções para o SearchableSelect de Substituto (exclui o próprio funcionário)
+  // Opções para o SearchableSelect de Substituto (exclui o próprio funcionário e ordena de A a Z)
   const substituteOptions: Option[] = React.useMemo(() => {
     const list: Option[] = [
       {
@@ -229,9 +247,9 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
       }
     ];
 
-    employees
+    const subs = employees
       .filter(emp => emp.id !== form.employeeId)
-      .forEach(emp => {
+      .map(emp => {
         const escalaBadge = isEmployee12x36(emp) ? 'Escala 12x36' : (emp.diasTrabalho || emp.escalaTrabalho || '');
         const descParts = [
           emp.cpf ? `CPF: ${emp.cpf}` : '',
@@ -239,20 +257,21 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
           escalaBadge
         ].filter(Boolean);
 
-        list.push({
+        return {
           value: emp.id,
           label: emp.name,
           description: descParts.join(' • '),
           searchTerms: [emp.cpf || '', emp.registrationNumber || '', emp.workPost?.name || '']
-        });
-      });
+        };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
 
-    return list;
+    return [...list, ...subs];
   }, [employees, form.employeeId]);
 
   // Função centralizada para aplicar e validar Data de Início
   const aplicarDataInicio = (novaDataInicio: string, customIs12x36?: boolean) => {
-    const is12x36 = customIs12x36 !== undefined ? customIs12x36 : isCurrentEmployee12x36;
+    const is12x36 = customIs12x36 !== undefined ? customIs12x36 : isEffective12x36;
     const validacao = validarInicioFeriasClt(novaDataInicio, [], is12x36);
     setCltValidacao(validacao);
     const novaFim = calcularDataFimFerias(novaDataInicio, diasGozo);
@@ -263,13 +282,13 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
     }));
   };
 
-  // Revalida a data de início quando o colaborador selecionado mudar (ex: se for 12x36, libera sexta-feira)
+  // Revalida a data de início quando o colaborador selecionado ou regime 12x36 mudar
   useEffect(() => {
     if (form.dataInicio) {
-      const validacao = validarInicioFeriasClt(form.dataInicio, [], isCurrentEmployee12x36);
+      const validacao = validarInicioFeriasClt(form.dataInicio, [], isEffective12x36);
       setCltValidacao(validacao);
     }
-  }, [form.employeeId, isCurrentEmployee12x36]);
+  }, [form.employeeId, isEffective12x36]);
 
   // Ao alterar Data de Início -> valida regras CLT e calcula automaticamente a Data de Fim
   const handleDataInicioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -507,10 +526,11 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
                   onChange={(val) => {
                     const chosenId = val === 'all' ? '' : val;
                     const chosenEmp = employees.find(e => e.id === chosenId);
-                    const is12x36 = isEmployee12x36(chosenEmp);
+                    const is12 = isEmployee12x36(chosenEmp);
+                    setManual12x36(is12);
                     setForm(prev => ({ ...prev, employeeId: chosenId }));
                     if (form.dataInicio) {
-                      aplicarDataInicio(form.dataInicio, is12x36);
+                      aplicarDataInicio(form.dataInicio, is12);
                     }
                   }}
                   placeholder="Selecione o funcionário..."
@@ -519,6 +539,30 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
                   minSearchChars={0}
                   className="w-full text-sm"
                 />
+                {form.employeeId && (
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-gray-300 select-none">
+                      <input
+                        type="checkbox"
+                        checked={isEffective12x36}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setManual12x36(checked);
+                          if (form.dataInicio) {
+                            aplicarDataInicio(form.dataInicio, checked);
+                          }
+                        }}
+                        className="accent-seguranca-yellow h-3.5 w-3.5"
+                      />
+                      <span>Regime Escala 12x36 (Permite início em sexta, sábado ou domingo)</span>
+                    </label>
+                    {isEffective12x36 && (
+                      <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded font-medium">
+                        12x36 Ativo
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-seguranca-lightgray mb-1 text-sm font-medium">

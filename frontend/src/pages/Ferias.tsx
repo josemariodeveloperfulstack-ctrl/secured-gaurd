@@ -111,10 +111,18 @@ const FeriasPage: React.FC = () => {
     retryDelay: 1000
   });
 
-  // Buscar funcionários para filtros
+  // Buscar funcionários para filtros e nomes
   const { data: employees } = useQuery<Employee[]>({
     queryKey: ['employees'],
-    queryFn: () => employeeService.getAllEmployees(),
+    queryFn: async () => {
+      try {
+        const all = await employeeService.fetchAllEmployeesForReport();
+        if (all && all.length > 0) return all;
+      } catch (err) {
+        console.warn('Erro ao carregar lista completa de funcionários para férias:', err);
+      }
+      return employeeService.getAllEmployees(undefined, 0, 1000);
+    },
   });
 
   const employeesById = useMemo(() => {
@@ -131,10 +139,20 @@ const FeriasPage: React.FC = () => {
   const setorOf = (ferias: FeriasPeriodo) =>
     ferias.setor || employeesById[ferias.employeeId]?.department?.name || '';
 
+  const employeeNameOf = (ferias: FeriasPeriodo) => {
+    if (ferias.employeeName && !ferias.employeeName.toLowerCase().includes('não encontrado') && !ferias.employeeName.toLowerCase().includes('removido')) {
+      return ferias.employeeName;
+    }
+    return employeesById[ferias.employeeId]?.name || ferias.employeeName || 'Funcionário';
+  };
+
   // Filtros da lista de férias (busca por nome + empresa VIG/ADM/TERC)
   const filteredFerias = useMemo(() => {
     const termo = searchTerm.trim().toLowerCase();
-    return feriasPeriodos.filter(ferias => {
+    return feriasPeriodos.map(ferias => ({
+      ...ferias,
+      employeeName: employeeNameOf(ferias)
+    })).filter(ferias => {
       const empresa = ferias.empresa || employeesById[ferias.employeeId]?.company?.sigla || '';
       const matchBusca = !termo || ferias.employeeName.toLowerCase().includes(termo);
       const matchEmpresa = !empresaFilter || empresa === empresaFilter;
@@ -342,7 +360,11 @@ const FeriasPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['afastamentos'] });
   };
 
-  const handleDelete = async (item: FeriasPeriodo | Afastamento) => {
+  const handleDelete = async (item: FeriasPeriodo | Afastamento, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     console.log('Excluindo item:', item);
     
     const confirmMessage = isFeriasPeriodo(item)
@@ -395,10 +417,11 @@ const FeriasPage: React.FC = () => {
       ]);
       await queryClient.refetchQueries({ queryKey: ['ferias'] });
     } catch (error: any) {
-      console.error('Erro ao excluir:', error);
-      const errorMsg = error?.response?.data?.message || error?.message || "Erro ao excluir solicitação. Tente novamente.";
+      console.error('Erro ao excluir férias/afastamento:', error);
+      const status = error?.response?.status;
+      const errorMsg = error?.response?.data?.message || error?.response?.data?.error || error?.message || "Erro ao excluir solicitação. Tente novamente.";
       toast({
-        title: "Erro ao excluir",
+        title: status === 403 ? "Permissão Negada (403)" : "Erro ao excluir",
         description: errorMsg,
         variant: "destructive"
       });
@@ -684,10 +707,11 @@ const FeriasPage: React.FC = () => {
                                     </Button>
                                   )}
                                   <Button 
+                                    type="button"
                                     size="sm" 
                                     variant="outline" 
                                     className="text-red-400 border-red-400 hover:bg-red-400 hover:text-seguranca-black"
-                                    onClick={() => handleDelete(ferias)}
+                                    onClick={(e) => handleDelete(ferias, e)}
                                     disabled={isDeleting && deletingId === ferias.id}
                                     title="Excluir solicitação"
                                   >
@@ -818,10 +842,11 @@ const FeriasPage: React.FC = () => {
                                     </Button>
                                   )}
                                   <Button 
+                                    type="button"
                                     size="sm" 
                                     variant="outline" 
                                     className="text-red-400 border-red-400 hover:bg-red-400 hover:text-seguranca-black"
-                                    onClick={() => handleDelete(afastamento)}
+                                    onClick={(e) => handleDelete(afastamento, e)}
                                     disabled={isDeleting && deletingId === afastamento.id}
                                     title="Excluir afastamento"
                                   >

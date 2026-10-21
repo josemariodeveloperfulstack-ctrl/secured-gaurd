@@ -146,6 +146,7 @@ public class VacationController {
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('HR_DELETE', 'HR_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_GESTAO_SUPERVISAO', 'GESTAO_SUPERVISAO', 'RECURSOS_HUMANOS', 'RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL')")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         vacationService.delete(id);
         return ResponseEntity.noContent().build();

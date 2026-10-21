@@ -17,6 +17,7 @@ function normalizeScaleText(value: string | null | undefined): string {
 export function isEscala12x36(
   escalaTrabalho?: string | null,
   diasTrabalho?: string | null,
+  horarioTrabalho?: string | null,
 ): boolean {
   const check = (raw: string | null | undefined) => {
     const n = normalizeScaleText(raw);
@@ -29,7 +30,7 @@ export function isEscala12x36(
       /^12\s*x\s*36/.test(n)
     );
   };
-  return check(escalaTrabalho) || check(diasTrabalho);
+  return check(escalaTrabalho) || check(diasTrabalho) || check(horarioTrabalho);
 }
 
 /** Início do dia em horário local. */

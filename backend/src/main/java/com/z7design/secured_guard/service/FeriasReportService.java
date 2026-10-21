@@ -48,7 +48,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class FeriasReportService {
 
@@ -80,6 +79,21 @@ public class FeriasReportService {
     private final EmployeeRepository employeeRepository;
     private final ExcelReportLayoutService excelReportLayoutService;
     private final StandardReportLayoutService standardReportLayoutService;
+
+    public FeriasReportService(
+            VacationRepository vacationRepository,
+            AbsenceRepository absenceRepository,
+            CompanyRepository companyRepository,
+            EmployeeRepository employeeRepository,
+            ExcelReportLayoutService excelReportLayoutService,
+            StandardReportLayoutService standardReportLayoutService) {
+        this.vacationRepository = vacationRepository;
+        this.absenceRepository = absenceRepository;
+        this.companyRepository = companyRepository;
+        this.employeeRepository = employeeRepository;
+        this.excelReportLayoutService = excelReportLayoutService;
+        this.standardReportLayoutService = standardReportLayoutService;
+    }
 
     public Map<String, Object> getStats() {
         Map<String, Object> stats = new HashMap<>();

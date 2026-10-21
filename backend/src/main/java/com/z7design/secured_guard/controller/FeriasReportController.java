@@ -19,12 +19,15 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/reports/ferias")
-@RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Relatórios de Férias", description = "Endpoints para geração de relatórios de férias e afastamentos")
 public class FeriasReportController {
 
     private final FeriasReportService feriasReportService;
+
+    public FeriasReportController(FeriasReportService feriasReportService) {
+        this.feriasReportService = feriasReportService;
+    }
 
     @GetMapping("/stats")
     @Operation(summary = "Estatísticas gerais", description = "Retorna estatísticas gerais de férias e afastamentos")

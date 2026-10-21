@@ -142,8 +142,12 @@ public class VacationService {
             throw new ResourceNotFoundException("Vacation not found with id: " + id);
         }
         // Excluir coberturas vinculadas para evitar violação de integridade referencial (FK)
-        vacationCoverageRepository.deleteByVacationId(id);
-        vacationRepository.deleteById(id);
+        try {
+            vacationCoverageRepository.deleteByVacationId(id);
+        } catch (Exception e) {
+            // Logar caso não haja coberturas ou já tenham sido removidas
+        }
+        vacationRepository.deleteByIdDirect(id);
     }
     
     public Vacation findById(UUID id) {

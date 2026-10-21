@@ -68,8 +68,24 @@ public class EvolutionWhatsAppProvider extends AbstractWhatsAppProvider {
         if (!isEnabled()) {
             return false;
         }
-        return safeGet(trimUrl("/instance/connectionState/" + instance), authHeaders())
-                || safeGet(trimUrl("/"), authHeaders());
+        try {
+            String url = trimUrl("/instance/connectionState/" + instance);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(authHeaders()), String.class);
+            if (!isSuccess(response)) {
+                return false;
+            }
+            // Se o servidor retornar HTML (ex: página web/proxy landing page) em vez de JSON da Evolution, considerar indisponível
+            String body = response.getBody();
+            if (body == null || body.trim().startsWith("<") || !body.trim().startsWith("{")) {
+                setError("Evolution API indisponível: endpoint respondeu com página HTML/conteúdo inválido");
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            setError(e.getMessage());
+            return false;
+        }
     }
 
     @Override
@@ -84,7 +100,12 @@ public class EvolutionWhatsAppProvider extends AbstractWhatsAppProvider {
             if (!isSuccess(response)) {
                 return "close";
             }
-            JsonNode root = parseBody(response.getBody());
+            String body = response.getBody();
+            if (body == null || body.trim().startsWith("<") || !body.trim().startsWith("{")) {
+                setError("Evolution API: resposta não é JSON");
+                return "close";
+            }
+            JsonNode root = parseBody(body);
             if (root.has("instance") && root.get("instance").has("state")) {
                 return root.get("instance").get("state").asText("close");
             }
