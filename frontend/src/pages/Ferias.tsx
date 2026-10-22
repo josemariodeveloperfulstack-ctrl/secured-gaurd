@@ -133,11 +133,41 @@ const FeriasPage: React.FC = () => {
     return map;
   }, [employees]);
 
-  const empresaOf = (ferias: FeriasPeriodo) =>
-    ferias.empresa || employeesById[ferias.employeeId]?.company?.sigla || '';
+  const empresaOf = (ferias: FeriasPeriodo) => {
+    if (ferias.empresa) return ferias.empresa;
+    const emp = employeesById[ferias.employeeId] as any;
+    return emp?.company?.sigla || emp?.company?.name || emp?.empresaNome || '';
+  };
 
-  const setorOf = (ferias: FeriasPeriodo) =>
-    ferias.setor || employeesById[ferias.employeeId]?.department?.name || '';
+  const setorOf = (ferias: FeriasPeriodo) => {
+    if (ferias.setor && ferias.setor.trim()) return ferias.setor.trim();
+    const emp = employeesById[ferias.employeeId] as any;
+    if (!emp) return '';
+
+    // Múltiplos postos
+    if (Array.isArray(emp.workPosts) && emp.workPosts.length > 0) {
+      const names = emp.workPosts.map((wp: any) => wp?.name || wp).filter(Boolean);
+      if (names.length > 0) return names.join(', ');
+    }
+
+    // Posto único (objeto ou string)
+    const wp = emp.workPost?.name || (typeof emp.workPost === 'string' ? emp.workPost : null);
+    if (wp && String(wp).trim()) return String(wp).trim();
+
+    // Departamento / Setor cadastrado
+    const dept = emp.department?.name || (typeof emp.department === 'string' ? emp.department : null);
+    if (dept && String(dept).trim()) return String(dept).trim();
+
+    // Unidade
+    const unit = emp.unit?.name || (typeof emp.unit === 'string' ? emp.unit : null);
+    if (unit && String(unit).trim()) return String(unit).trim();
+
+    // Cargo como fallback
+    const pos = emp.position?.name || (typeof emp.position === 'string' ? emp.position : null);
+    if (pos && String(pos).trim()) return String(pos).trim();
+
+    return '';
+  };
 
   const employeeNameOf = (ferias: FeriasPeriodo) => {
     if (ferias.employeeName && !ferias.employeeName.toLowerCase().includes('não encontrado') && !ferias.employeeName.toLowerCase().includes('removido')) {

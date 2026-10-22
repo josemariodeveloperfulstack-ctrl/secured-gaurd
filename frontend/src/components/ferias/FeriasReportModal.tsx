@@ -276,7 +276,7 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
                 <Label className="text-xs text-slate-400 font-medium">Data Inicial</Label>
                 <DatePicker
                   date={startDate}
-                  setDate={setStartDate}
+                  onDateChange={setStartDate}
                   placeholder="Selecione início"
                   className="bg-slate-900 border-slate-700 text-slate-200 w-full"
                 />
@@ -286,7 +286,7 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
                 <Label className="text-xs text-slate-400 font-medium">Data Final</Label>
                 <DatePicker
                   date={endDate}
-                  setDate={setEndDate}
+                  onDateChange={setEndDate}
                   placeholder="Selecione fim"
                   className="bg-slate-900 border-slate-700 text-slate-200 w-full"
                 />

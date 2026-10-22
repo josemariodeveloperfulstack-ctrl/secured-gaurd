@@ -679,8 +679,15 @@ const FeriasFormModal: React.FC<Props> = ({ onSuccess, onClose, editingId, initi
                   name="dataInicio" 
                   value={form.dataInicio} 
                   onChange={handleDataInicioChange}
+                  onClick={(e) => {
+                    try {
+                      if ('showPicker' in e.currentTarget) {
+                        (e.currentTarget as any).showPicker();
+                      }
+                    } catch {}
+                  }}
                   disabled={isAgendamentoBloqueado}
-                  className="w-full p-2 rounded bg-seguranca-graphite text-seguranca-lightgray border border-gray-600 focus:border-seguranca-yellow focus:outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed" 
+                  className="w-full p-2 rounded bg-seguranca-graphite text-seguranca-lightgray border border-gray-600 focus:border-seguranca-yellow focus:outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" 
                   required 
                 />
               </div>

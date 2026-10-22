@@ -223,7 +223,7 @@ export const FeriasDetailsModal: React.FC<FeriasDetailsModalProps> = ({
               <div>
                 <p className="text-xs text-gray-400">Setor / Departamento</p>
                 <p className="font-medium text-gray-200">
-                  {ferias.setor || employee?.department?.name || 'Não informado'}
+                  {ferias.setor || (employee as any)?.workPost?.name || (typeof (employee as any)?.workPost === 'string' ? (employee as any).workPost : null) || employee?.department?.name || (employee as any)?.unit?.name || 'Não informado'}
                 </p>
               </div>
 
