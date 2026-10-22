@@ -17,6 +17,10 @@ public interface VacationCoverageRepository extends JpaRepository<VacationCovera
     
     // VacationCoverage não tem campo employee direto; employee está em Vacation
     List<VacationCoverage> findByVacationEmployeeId(UUID employeeId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM VacationCoverage vc WHERE vc.vacation.id = :vacationId")
+    void deleteByVacationId(@Param("vacationId") UUID vacationId);
     
     List<VacationCoverage> findByStatus(VacationCoverage.CoverageStatus status);
     

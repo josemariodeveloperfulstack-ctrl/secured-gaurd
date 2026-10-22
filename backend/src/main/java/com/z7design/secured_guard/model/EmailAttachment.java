@@ -17,6 +17,11 @@ import java.util.UUID;
 @Builder
 public class EmailAttachment {
 
+    public static class EmailAttachmentBuilder {
+        public EmailAttachmentBuilder() {
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

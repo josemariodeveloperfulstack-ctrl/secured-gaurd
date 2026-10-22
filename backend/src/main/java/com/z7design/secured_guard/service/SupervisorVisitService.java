@@ -41,7 +41,6 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SupervisorVisitService {
 
     private final SupervisorVisitRepository supervisorVisitRepository;
@@ -52,6 +51,25 @@ public class SupervisorVisitService {
     private final EmployeePostAllocationService allocationService;
     private final VisitScheduleRepository visitScheduleRepository;
     private final UserRepository userRepository;
+
+    public SupervisorVisitService(
+            SupervisorVisitRepository supervisorVisitRepository,
+            QRCodeWorkPostRepository qrCodeWorkPostRepository,
+            WorkPostRepository workPostRepository,
+            EmployeeRepository employeeRepository,
+            EmployeeQrCodeService employeeQrCodeService,
+            EmployeePostAllocationService allocationService,
+            VisitScheduleRepository visitScheduleRepository,
+            UserRepository userRepository) {
+        this.supervisorVisitRepository = supervisorVisitRepository;
+        this.qrCodeWorkPostRepository = qrCodeWorkPostRepository;
+        this.workPostRepository = workPostRepository;
+        this.employeeRepository = employeeRepository;
+        this.employeeQrCodeService = employeeQrCodeService;
+        this.allocationService = allocationService;
+        this.visitScheduleRepository = visitScheduleRepository;
+        this.userRepository = userRepository;
+    }
 
     /**
      * Resolve posto + funcionário + vínculo SEM gravar. Usado para a confirmação na tela
@@ -92,6 +110,13 @@ public class SupervisorVisitService {
         Employee supervisor = resolveSupervisor(request.getSupervisorId(), authentication);
 
         LocalDateTime now = LocalDateTime.now();
+        java.time.LocalTime checkoutTime = null;
+        if (request.getCheckoutTime() != null && !request.getCheckoutTime().isBlank()) {
+            try {
+                checkoutTime = java.time.LocalTime.parse(request.getCheckoutTime());
+            } catch (Exception ignored) {}
+        }
+
         SupervisorVisit visit = SupervisorVisit.builder()
             .supervisor(supervisor)
             .workPost(workPost)
@@ -99,6 +124,12 @@ public class SupervisorVisitService {
             .checkedEmployee(employee)
             .visitDate(now.toLocalDate())
             .visitTime(now.toLocalTime())
+            .checkoutTime(checkoutTime)
+            .durationMinutes(request.getDurationMinutes())
+            .signatureData(request.getSignatureData())
+            .epiDelivered(Boolean.TRUE.equals(request.getEpiDelivered()))
+            .epiDescription(request.getEpiDescription())
+            .epiSignatureData(request.getEpiSignatureData())
             .status(VisitStatus.COMPLETED)
             .description(request.getDescription())
             .observations(request.getObservations())
@@ -110,6 +141,7 @@ public class SupervisorVisitService {
             .allocationType(allocation.getType())
             .allocationDescription(allocation.getMessage())
             .presentEmployees(new ArrayList<>(List.of(employee.getId())))
+            .photos(request.getPhotos() != null ? new ArrayList<>(request.getPhotos()) : new ArrayList<>())
             .build();
 
         SupervisorVisit saved = supervisorVisitRepository.save(visit);
@@ -132,6 +164,13 @@ public class SupervisorVisitService {
             .qrCodeVerified(saved.getQrCodeVerified())
             .visitDate(saved.getVisitDate())
             .visitTime(saved.getVisitTime())
+            .checkoutTime(saved.getCheckoutTime())
+            .durationMinutes(saved.getDurationMinutes())
+            .signatureData(saved.getSignatureData())
+            .epiDelivered(saved.getEpiDelivered())
+            .epiDescription(saved.getEpiDescription())
+            .epiSignatureData(saved.getEpiSignatureData())
+            .photos(saved.getPhotos())
             .createdAt(saved.getCreatedAt())
             .build();
     }
@@ -167,6 +206,15 @@ public class SupervisorVisitService {
                 .id(visit.getId())
                 .visitDate(visit.getVisitDate())
                 .visitTime(visit.getVisitTime())
+                .checkoutTime(visit.getCheckoutTime())
+                .durationMinutes(visit.getDurationMinutes())
+                .description(visit.getDescription())
+                .observations(visit.getObservations())
+                .signatureData(visit.getSignatureData())
+                .epiDelivered(visit.getEpiDelivered())
+                .epiDescription(visit.getEpiDescription())
+                .epiSignatureData(visit.getEpiSignatureData())
+                .photos(visit.getPhotos())
                 .supervisorName(visit.getSupervisor() != null ? visit.getSupervisor().getName() : null)
                 .employeeName(visit.getCheckedEmployee() != null ? visit.getCheckedEmployee().getName() : null)
                 .workPostName(visit.getWorkPost() != null ? visit.getWorkPost().getName() : null)

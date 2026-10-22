@@ -49,5 +49,15 @@ public class SupervisorVisitResponse {
     @JsonFormat(pattern = "HH:mm:ss")
     private LocalTime visitTime;
 
+    @JsonFormat(pattern = "HH:mm:ss")
+    private LocalTime checkoutTime;
+
+    private Integer durationMinutes;
+    private String signatureData;
+    private Boolean epiDelivered;
+    private String epiDescription;
+    private String epiSignatureData;
+    private java.util.List<String> photos;
+
     private LocalDateTime createdAt;
 }

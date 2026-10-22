@@ -32,11 +32,17 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class EmployeePostAllocationService {
 
     private final VacationCoverageRepository vacationCoverageRepository;
     private final WorkPostAssignmentRepository workPostAssignmentRepository;
+
+    public EmployeePostAllocationService(
+            VacationCoverageRepository vacationCoverageRepository,
+            WorkPostAssignmentRepository workPostAssignmentRepository) {
+        this.vacationCoverageRepository = vacationCoverageRepository;
+        this.workPostAssignmentRepository = workPostAssignmentRepository;
+    }
 
     @Transactional(readOnly = true)
     public PostAllocationDTO resolve(Employee employee, WorkPost workPost, LocalDate date) {

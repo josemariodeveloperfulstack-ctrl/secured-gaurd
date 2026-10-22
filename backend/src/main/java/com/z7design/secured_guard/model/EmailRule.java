@@ -14,6 +14,11 @@ import java.util.UUID;
 @Getter
 @Setter
 public class EmailRule {
+
+    public static class EmailRuleBuilder {
+        public EmailRuleBuilder() {
+        }
+    }
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

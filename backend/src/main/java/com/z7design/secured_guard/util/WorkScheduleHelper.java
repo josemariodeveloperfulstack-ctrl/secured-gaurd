@@ -14,7 +14,8 @@ public final class WorkScheduleHelper {
         if (employee == null) {
             return false;
         }
-        return isEscala12x36(employee.getEscalaTrabalho(), employee.getDiasTrabalho());
+        return isEscala12x36(employee.getEscalaTrabalho(), employee.getDiasTrabalho())
+                || matches12x36(employee.getHorarioTrabalho());
     }
 
     public static boolean isEscala12x36(String escalaTrabalho, String diasTrabalho) {
@@ -28,8 +29,10 @@ public final class WorkScheduleHelper {
         String n = value.trim().toLowerCase()
                 .replace(" ", "")
                 .replace("á", "a")
-                .replace("ã", "a");
-        return n.contains("12x36") || n.contains("12/36") || n.contains("12-36");
+                .replace("ã", "a")
+                .replace(".", "")
+                .replace("_", "");
+        return n.contains("12x36") || n.contains("12/36") || n.contains("12-36") || n.contains("12x36h");
     }
 
     /** Carga horária diária sugerida conforme escala. */

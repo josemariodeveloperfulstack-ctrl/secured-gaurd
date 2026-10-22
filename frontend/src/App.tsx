@@ -234,6 +234,7 @@ const ControleRondas = lazy(() => import('@/pages/ControleRondas'));
 
 // Módulo Comercial
 const Leads = lazy(() => import('@/pages/Leads'));
+const Prospeccao = lazy(() => import('@/pages/Prospeccao'));
 const ComercialMarketing = lazy(() => import('@/pages/ComercialMarketing'));
 const Propostas = lazy(() => import('@/pages/Propostas'));
 const Orcamentos = lazy(() => import('@/pages/Orcamentos'));
@@ -734,6 +735,13 @@ function App() {
                     <Route path="/estoque/entregas" element={
                       <ProtectedRoute requiredPermissions={['STOCK_READ']}>
                         <DeliveryManagement />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/comercial/prospeccao" element={
+                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Prospeccao />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/comercial/marketing" element={

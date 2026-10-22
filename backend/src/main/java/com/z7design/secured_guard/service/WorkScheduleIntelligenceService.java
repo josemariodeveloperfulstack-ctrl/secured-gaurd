@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class WorkScheduleIntelligenceService {
 
@@ -24,6 +23,17 @@ public class WorkScheduleIntelligenceService {
     private final AbsenceRepository absenceRepository;
     private final EmployeeCertificationRepository certificationRepository;
     private final RemanejamentoRepository remanejamentoRepository;
+
+    public WorkScheduleIntelligenceService(
+            VacationRepository vacationRepository,
+            AbsenceRepository absenceRepository,
+            EmployeeCertificationRepository certificationRepository,
+            RemanejamentoRepository remanejamentoRepository) {
+        this.vacationRepository = vacationRepository;
+        this.absenceRepository = absenceRepository;
+        this.certificationRepository = certificationRepository;
+        this.remanejamentoRepository = remanejamentoRepository;
+    }
 
     /**
      * Sugere a sigla correta para uma escala baseada nas regras de inteligência

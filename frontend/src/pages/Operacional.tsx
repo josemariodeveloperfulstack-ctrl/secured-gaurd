@@ -94,7 +94,7 @@ import { useToast } from '@/hooks/use-toast';
 import NppsForm from '@/components/funcionarios/NppsForm';
 
 const Operacional: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'dashboard';
   const [activeTab, setActiveTab] = useState(initialTab);
   const [escalas, setEscalas] = useState<Schedule[]>([]);
@@ -126,16 +126,15 @@ const Operacional: React.FC = () => {
 
   const { toast } = useToast();
 
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    setSearchParams({ tab: newTab });
+  };
 
-
-
-
-
-
-  // Reage a mudanças no parâmetro de URL
+  // Reage a mudanças no parâmetro de URL (quando clicado pela Sidebar)
   useEffect(() => {
-    const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl && tabFromUrl !== activeTab) {
+    const tabFromUrl = searchParams.get('tab') || 'dashboard';
+    if (tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl);
     }
   }, [searchParams]);
@@ -801,7 +800,7 @@ const Operacional: React.FC = () => {
             </p>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             {/* Tabs Modernas com Ícones e Tooltips - Padrão SST Mobile */}
             <TooltipProvider>
               <div className="relative overflow-hidden rounded-lg glass-card border-slate-700/50 shadow-xl">

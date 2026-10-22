@@ -294,11 +294,11 @@ export default function KanbanCard({
 
         {/* Lead */}
         {opportunity.lead && (
-          <div className="p-2 bg-seguranca-graphite rounded-md space-y-1.5">
+          <div className="p-2 bg-seguranca-graphite rounded-md space-y-1.5 border border-gray-700/50">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <User className="h-3 w-3 text-gray-400 shrink-0" />
-                <span className="text-xs font-medium text-seguranca-lightgray truncate">
+                <User className="h-3 w-3 text-seguranca-yellow shrink-0" />
+                <span className="text-xs font-semibold text-seguranca-lightgray truncate" title={opportunity.lead.name}>
                   {opportunity.lead.name || 'Sem nome'}
                 </span>
               </div>
@@ -311,7 +311,25 @@ export default function KanbanCard({
             {opportunity.lead.company && (
               <div className="flex items-center gap-2">
                 <Building2 className="h-3 w-3 text-gray-400 shrink-0" />
-                <span className="text-xs text-gray-400 truncate">{opportunity.lead.company}</span>
+                <span className="text-xs text-gray-300 truncate" title={opportunity.lead.company}>
+                  {opportunity.lead.company}
+                </span>
+              </div>
+            )}
+            {opportunity.lead.email && (
+              <div className="flex items-center gap-2">
+                <Mail className="h-3 w-3 text-seguranca-yellow/80 shrink-0" />
+                <span className="text-xs text-gray-300 truncate" title={opportunity.lead.email}>
+                  {opportunity.lead.email}
+                </span>
+              </div>
+            )}
+            {opportunity.lead.phone && (
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-3 w-3 text-green-400 shrink-0" />
+                <span className="text-xs text-green-300 font-medium truncate" title={opportunity.lead.phone}>
+                  {opportunity.lead.phone}
+                </span>
               </div>
             )}
           </div>

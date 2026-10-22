@@ -17,6 +17,11 @@ import java.util.UUID;
 @Setter
 public class EmailAccount {
 
+    public static class EmailAccountBuilder {
+        public EmailAccountBuilder() {
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

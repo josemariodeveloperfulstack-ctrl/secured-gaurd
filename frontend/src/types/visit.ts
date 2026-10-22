@@ -161,3 +161,33 @@ export interface EfficiencyReport {
   totalDistanceKm: number;
   totalTimeHours: number;
 }
+
+export interface Unit {
+  id: string;
+  name: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+  state?: string;
+  postCode?: string;
+  clientId?: string;
+  clientName?: string;
+  active?: boolean;
+}
+
+export interface CreateVisitScheduleDTO {
+  supervisorId: string;
+  clientId: string;
+  scheduleDate: string;
+  unitIds: string[];
+  startTime: string;
+  endTime: string;
+  observations?: string;
+}
+
+export interface RouteOptimizationStats {
+  totalDistanceKm: number;
+  totalTravelTimeMinutes: number;
+  efficiencyScore: number;
+}

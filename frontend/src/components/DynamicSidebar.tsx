@@ -48,7 +48,8 @@ import {
   FolderTree,
   Files,
   GraduationCap,
-  Plus
+  Plus,
+  Compass
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import {
@@ -147,7 +148,7 @@ const SUPERVISOR_FORBIDDEN_ITEM_IDS = new Set<string>([
   'gestao-patrimonial',
   'modulo-fiscal',
   // Módulo Comercial
-  'leads', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm',
+  'leads', 'prospeccao', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm',
   'commercial-dashboard',
   // Compras / Estoque / Suprimentos
   'compras', 'compras-solicitacoes', 'compras-aprovacoes', 'compras-cotacoes', 'compras-relatorios',
@@ -270,6 +271,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   SUPERVISOR: new Set([
     // Principal / Operacional core
     'dashboard',
+    'area-funcionario',
     'operacional',
     'controle-visitas',
     'controle-visitas-avancado',
@@ -364,6 +366,12 @@ export function DynamicSidebar() {
       requiredPermission: 'DASHBOARD_READ'
     },
     {
+      icon: User2,
+      text: 'Área do Funcionário',
+      to: '/area-funcionario',
+      id: 'area-funcionario',
+    },
+    {
       icon: Shield,
       text: 'Operacional',
       to: '/operacional',
@@ -390,6 +398,13 @@ export function DynamicSidebar() {
       to: '/contratos',
       id: 'contratos',
       requiredPermission: 'CONTRACTS_READ'
+    },
+    {
+      icon: Compass,
+      text: 'Prospecção',
+      to: '/comercial/prospeccao',
+      id: 'prospeccao',
+      requiredPermission: 'LEADS_READ'
     },
     {
       icon: Megaphone,

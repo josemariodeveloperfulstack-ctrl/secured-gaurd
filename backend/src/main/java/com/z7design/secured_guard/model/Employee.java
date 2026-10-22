@@ -30,7 +30,6 @@ import com.z7design.secured_guard.model.Department;
 @Entity
 @Table(name = "employees")
 @NoArgsConstructor
-@AllArgsConstructor
 @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler", "documents", "benefits", "dependents", "timeRecords",
         "payrolls", "epis", "occurrences" })
 public class Employee {

@@ -71,14 +71,29 @@ import MeusHolerites from './MeusHolerites';
 import MinhasFerias from './MinhasFerias';
 import MeusEPIs from './MeusEPIs';
 import Certificacoes from './Certificacoes';
+import SupervisorAreaTab from '@/components/supervisao/SupervisorAreaTab';
 
-type TabType = 'dashboard' | 'perfil' | 'ponto' | 'holerites' | 'documentos' | 'treinamentos' | 'ferias' | 'notificacoes' | 'epis';
+type TabType = 'dashboard' | 'supervisao' | 'perfil' | 'ponto' | 'holerites' | 'documentos' | 'treinamentos' | 'ferias' | 'notificacoes' | 'epis';
 
 const EmployeePortal: React.FC = () => {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const isSupervisor = useMemo(() => {
+    if (!user) return false;
+    const role = (user.role || '').toUpperCase();
+    const position = (user.position || '').toLowerCase();
+    const department = (user.department || '').toLowerCase();
+    return (
+      role.includes('SUPERVISOR') ||
+      role.includes('GESTOR') ||
+      role.includes('ADMIN') ||
+      position.includes('supervisor') ||
+      department.includes('supervis')
+    );
+  }, [user]);
   
   // States para o Dashboard
   const [todayRecords, setTodayRecords] = useState<any[]>([]);
@@ -175,17 +190,27 @@ const EmployeePortal: React.FC = () => {
     }
   };
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Início', icon: Home },
-    { id: 'perfil', label: 'Meu Perfil', icon: User },
-    { id: 'ponto', label: 'Ponto Eletrônico', icon: Clock },
-    { id: 'holerites', label: 'Holerites', icon: FileText },
-    { id: 'documentos', label: 'Documentos', icon: FileSignature },
-    { id: 'treinamentos', label: 'Treinamentos', icon: GraduationCap },
-    { id: 'ferias', label: 'Férias', icon: Palmtree },
-    { id: 'epis', label: 'Meus EPIs', icon: HardHat },
-    { id: 'notificacoes', label: 'Notificações', icon: Bell },
-  ];
+  const menuItems = useMemo(() => {
+    const items = [
+      { id: 'dashboard', label: 'Início', icon: Home },
+    ];
+
+    if (isSupervisor) {
+      items.push({ id: 'supervisao', label: 'Área de Supervisão', icon: Shield });
+    }
+
+    items.push(
+      { id: 'perfil', label: 'Meu Perfil', icon: User },
+      { id: 'ponto', label: 'Ponto Eletrônico', icon: Clock },
+      { id: 'holerites', label: 'Holerites', icon: FileText },
+      { id: 'documentos', label: 'Documentos', icon: FileSignature },
+      { id: 'treinamentos', label: 'Treinamentos', icon: GraduationCap },
+      { id: 'ferias', label: 'Férias', icon: Palmtree },
+      { id: 'epis', label: 'Meus EPIs', icon: HardHat },
+      { id: 'notificacoes', label: 'Notificações', icon: Bell },
+    );
+    return items;
+  }, [isSupervisor]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -222,6 +247,35 @@ const EmployeePortal: React.FC = () => {
                 </Button>
               </div>
             </div>
+
+            {/* Destaque para Supervisores */}
+            {isSupervisor && (
+              <Card className="bg-gradient-to-r from-seguranca-yellow/20 via-seguranca-graphite/60 to-seguranca-black border-seguranca-yellow/40 rounded-[2.5rem] p-6 shadow-xl">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-seguranca-yellow/20 flex items-center justify-center text-seguranca-yellow shrink-0">
+                      <Shield className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                        Módulo de Supervisão Operacional
+                      </h3>
+                      <p className="text-xs text-gray-300">
+                        Acesse sua escala de visitas da semana e realize check-in nos postos via QR Code.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 w-full md:w-auto">
+                    <Button
+                      onClick={() => setActiveTab('supervisao')}
+                      className="bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-seguranca-black font-black rounded-2xl h-12 px-6 shadow-lg shadow-seguranca-yellow/20 text-xs uppercase tracking-wider"
+                    >
+                      Acessar Área de Supervisão
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             {/* Grid de Stats Rápidas */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -329,6 +383,7 @@ const EmployeePortal: React.FC = () => {
             </div>
           </div>
         );
+      case 'supervisao': return <div className="animate-in fade-in duration-500"><SupervisorAreaTab standalone={true} /></div>;
       case 'perfil': return <div className="animate-in fade-in duration-500"><MeuPerfil standalone={true} /></div>;
       case 'ponto': return <div className="animate-in fade-in duration-500"><MeuPonto standalone={true} /></div>;
       case 'holerites': return <div className="animate-in fade-in duration-500"><MeusHolerites standalone={true} /></div>;

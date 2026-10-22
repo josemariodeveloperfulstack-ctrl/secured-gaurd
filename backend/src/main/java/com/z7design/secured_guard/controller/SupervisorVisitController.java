@@ -33,7 +33,6 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("/api/supervisor-visits")
-@RequiredArgsConstructor
 @Tag(name = "Visitas do Supervisor", description = "Check-in em posto via QR Code e relatório de visitas")
 public class SupervisorVisitController {
 
@@ -43,6 +42,10 @@ public class SupervisorVisitController {
         + "'GESTAO_SUPERVISAO','OPERACIONAL')";
 
     private final SupervisorVisitService supervisorVisitService;
+
+    public SupervisorVisitController(SupervisorVisitService supervisorVisitService) {
+        this.supervisorVisitService = supervisorVisitService;
+    }
 
     @PostMapping("/preview")
     @PreAuthorize(VISIT_AUTHORITY)

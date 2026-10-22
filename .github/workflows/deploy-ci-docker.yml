@@ -427,11 +427,7 @@ jobs:
             docker image inspect z7design/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
             docker image inspect z7design/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "whatsapp.revision=unknown"
 
-            echo "🧹 Limpando redes..."
-            docker network rm secured-guard-ci 2>/dev/null || true
-            sleep 2
-            
-            echo "📦 Iniciando bando de dados e Flyway repair..."
+            echo "📦 Iniciando banco de dados e Flyway repair..."
             $DC -f docker-compose.ci.yml up -d postgres-ci redis-ci
             echo "⏳ Aguardando postgres ficar pronto..."
             for i in $(seq 1 18); do
@@ -450,6 +446,7 @@ jobs:
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || true
             
             echo "🚀 Iniciando backend primeiro (reduz contenção de RAM na VPS)..."
+            docker rm -f secured-guard-backend-ci 2>/dev/null || true
             $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing backend-ci
             echo "⏳ Aguardando backend iniciar boot (Flyway + Spring)..."
             for i in $(seq 1 36); do

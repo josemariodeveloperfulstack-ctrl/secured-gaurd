@@ -9,6 +9,7 @@ public enum LeadSource {
     GOOGLE_ADS("Google Ads"),
     EVENT("Evento"),
     PARTNER("Parceiro"),
+    PROSPECTION("Prospecção Ativa"),
     OTHER("Outro");
 
     private final String displayName;

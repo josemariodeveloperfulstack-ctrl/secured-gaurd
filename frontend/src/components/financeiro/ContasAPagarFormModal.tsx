@@ -19,6 +19,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/axios';
 import departmentService, { filterCompanyDepartments, isValidSectorName } from '@/services/departmentService';
+import { employeeService } from '@/services/employeeService';
 
 export interface ContaAPagar {
   id?: string;
@@ -824,6 +825,242 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
               />
             </div>
 
+            {/* Plano de Contas */}
+            <div className="space-y-2 md:col-span-2 rounded-lg border border-seguranca-yellow/30 bg-black/20 p-4">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <label className="text-sm font-medium text-seguranca-yellow flex items-center gap-2">
+                  <FolderTree size={14} />
+                  Plano de Contas
+                </label>
+                <Link
+                  to="/plano-contas"
+                  className="text-xs text-seguranca-yellow underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Gerenciar plano de contas
+                </Link>
+              </div>
+              <p className="text-xs text-gray-400 mb-3">
+                Use a conta contábil correta (ex.: rescisão, vale, ajuda de custo). Contas de RH pedem o funcionário e a empresa.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-seguranca-lightgray">Categoria *</label>
+                    <button
+                      type="button"
+                      onClick={handleOpenNewPlanoCategoriaModal}
+                      className="text-xs text-seguranca-yellow hover:underline flex items-center gap-1 font-medium transition-colors"
+                      title="Cadastrar nova categoria no Plano de Contas"
+                    >
+                      <Plus size={13} />
+                      <span>Cadastrar categoria</span>
+                    </button>
+                  </div>
+                  <Select
+                    value={selectedCategoriaPaiId || 'none'}
+                    onValueChange={(value) => {
+                      setSelectedCategoriaPaiId(value === 'none' ? '' : value);
+                      setSelectedSubcategoria(null);
+                      handleInputChange('subcategoriaId', '');
+                      handleInputChange('employeeId', '');
+                    }}
+                  >
+                    <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                      <SelectValue placeholder="Selecione a categoria do plano" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600">
+                      <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
+                        Nenhuma
+                      </SelectItem>
+                      {categoriasPai.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                          {cat.codigo} - {cat.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {categoriasPai.length === 0 && (
+                    <p className="text-xs text-amber-400">
+                      Nenhuma categoria cadastrada. Cadastre clicando em "+ Cadastrar categoria" acima.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-seguranca-lightgray">Conta / Subcategoria *</label>
+                    <button
+                      type="button"
+                      onClick={handleOpenNewPlanoSubcategoriaModal}
+                      disabled={!selectedCategoriaPaiId}
+                      className="text-xs text-seguranca-yellow hover:underline flex items-center gap-1 font-medium disabled:opacity-40 disabled:hover:no-underline disabled:cursor-not-allowed transition-colors"
+                      title={!selectedCategoriaPaiId ? 'Selecione uma categoria primeiro' : 'Cadastrar nova subcategoria no Plano de Contas'}
+                    >
+                      <Plus size={13} />
+                      <span>Cadastrar subcategoria</span>
+                    </button>
+                  </div>
+                  <Select
+                    value={formData.subcategoriaId || 'none'}
+                    onValueChange={(value) => {
+                      if (value === 'none') {
+                        handleInputChange('subcategoriaId', '');
+                        setSelectedSubcategoria(null);
+                        handleInputChange('employeeId', '');
+                        return;
+                      }
+                      handleInputChange('subcategoriaId', value);
+                      const sub = filteredSubcategorias.find((s) => s.id === value) || subcategorias.find((s) => s.id === value);
+                      setSelectedSubcategoria(sub || null);
+                      if (sub?.requerVinculoFuncionario) {
+                        handleInputChange('fornecedorId', '');
+                        handleInputChange('fornecedor', '');
+                      } else {
+                        handleInputChange('employeeId', '');
+                      }
+                    }}
+                    disabled={!selectedCategoriaPaiId}
+                  >
+                    <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                      <SelectValue placeholder={selectedCategoriaPaiId ? 'Selecione a conta' : 'Selecione a categoria primeiro'} />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600">
+                      <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
+                        Nenhuma
+                      </SelectItem>
+                      {filteredSubcategorias.map((sub) => (
+                        <SelectItem key={sub.id} value={sub.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                          {sub.codigo} - {sub.nome}
+                          {sub.requerVinculoFuncionario ? ' (funcionário)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {(requiresEmployee || formData.employeeId) && (
+                <div className="mt-4 space-y-3 rounded-md border border-yellow-500/40 bg-yellow-500/5 p-3">
+                  <label className="text-sm font-medium text-yellow-400 flex items-center gap-2">
+                    <Users size={14} />
+                    Funcionário beneficiário {requiresEmployee ? '*' : ''}
+                  </label>
+                  <p className="text-xs text-yellow-500/80">
+                    Pagamentos de rescisão, vale, ajuda de custo ou documentos fiscais de RH devem indicar o funcionário e a empresa (SIGLA) acima.
+                  </p>
+                  {!formData.empresaId && (
+                    <p className="text-xs text-amber-400">
+                      Selecione a Empresa (SIGLA) para filtrar os funcionários da empresa correta.
+                    </p>
+                  )}
+                  <EmployeeCombobox
+                    value={formData.employeeId || ''}
+                    onChange={(value) => {
+                      handleInputChange('employeeId', value);
+                      // Se limpar o funcionário, remove o setor auto-preenchido
+                      if (!value) {
+                        setWorkSectorAutoFilled(false);
+                      }
+                    }}
+                    placeholder="Busque o funcionário pelo nome (ex: Gabriel)"
+                    onEmployeeSelect={async (emp) => {
+                      const applyEmployeeData = (employeeData: any) => {
+                        const updates: Partial<ContaAPagar> = {
+                          employeeId: employeeData.id || emp.id
+                        };
+
+                        // 1. Preencher Empresa a partir do cadastro do funcionário
+                        const targetCompanyId = employeeData.companyId || employeeData.company?.id;
+                        const targetCompanySigla = employeeData.companySigla || employeeData.company?.sigla || '';
+                        const targetCompanyName = employeeData.companyName || employeeData.company?.name || '';
+
+                        const matchEmpresa = empresas.find((e: any) => {
+                          if (targetCompanyId && String(e.id) === String(targetCompanyId)) return true;
+                          if (targetCompanySigla && e.sigla && e.sigla.trim().toLowerCase() === targetCompanySigla.trim().toLowerCase()) return true;
+                          if (targetCompanyName && e.name && e.name.trim().toLowerCase() === targetCompanyName.trim().toLowerCase()) return true;
+                          return false;
+                        });
+
+                        if (matchEmpresa) {
+                          updates.empresaId = matchEmpresa.id;
+                          updates.empresa = matchEmpresa.name;
+                          updates.companySigla = matchEmpresa.sigla || matchEmpresa.name;
+                        } else if (targetCompanySigla || targetCompanyName || targetCompanyId) {
+                          updates.empresaId = targetCompanyId ? String(targetCompanyId) : '';
+                          updates.empresa = targetCompanyName;
+                          updates.companySigla = targetCompanySigla || targetCompanyName;
+                        }
+
+                        // 2. Preencher Unidade a partir do cadastro do funcionário
+                        const targetUnitName = employeeData.unitName || employeeData.unit?.name;
+                        const targetUnitId = employeeData.unitId || employeeData.unit?.id;
+                        if (targetUnitId || targetUnitName) {
+                          const matchUnit = unidades.find((u: any) =>
+                            (targetUnitId && String(u.id) === String(targetUnitId)) ||
+                            (targetUnitName && (u.name || '').toLowerCase() === targetUnitName.toLowerCase())
+                          );
+                          if (matchUnit) {
+                            updates.unitId = matchUnit.id;
+                            updates.unitName = matchUnit.name;
+                          } else if (targetUnitName) {
+                            updates.unitName = targetUnitName;
+                            if (targetUnitId) updates.unitId = String(targetUnitId);
+                          }
+                        }
+
+                        // 3. Preencher Setor de Trabalho a partir do cadastro do funcionário (workPost > department)
+                        const suggestedSector = employeeData.workPostName
+                          || employeeData.workPost?.name
+                          || employeeData.departmentName
+                          || employeeData.department?.name;
+
+                        if (suggestedSector) {
+                          updates.workSector = suggestedSector;
+                          setWorkSectorAutoFilled(true);
+                        } else {
+                          setWorkSectorAutoFilled(false);
+                        }
+
+                        setFormData(prev => ({
+                          ...prev,
+                          ...updates
+                        }));
+
+                        return {
+                          hasCompany: !!(matchEmpresa || targetCompanySigla || targetCompanyName),
+                          hasSector: !!suggestedSector
+                        };
+                      };
+
+                      // Aplica imediatamente com os dados disponíveis
+                      const initialResult = applyEmployeeData(emp);
+
+                      // Se faltou empresa ou setor de trabalho, busca o cadastro completo do funcionário
+                      if ((!initialResult.hasCompany || !initialResult.hasSector) && emp.id) {
+                        try {
+                          const fullEmployee = await employeeService.getEmployeeById(emp.id);
+                          if (fullEmployee) {
+                            applyEmployeeData(fullEmployee);
+                          }
+                        } catch (err) {
+                          console.warn('Não foi possível obter dados detalhados do funcionário:', err);
+                        }
+                      }
+                    }}
+                  />
+                  {workSectorAutoFilled && formData.workSector && (
+                    <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+                      <CheckCircle size={12} />
+                      Setor de trabalho preenchido automaticamente do cadastro do funcionário.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Fornecedor */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">
@@ -1006,199 +1243,6 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 className="border-red-500 bg-seguranca-black text-red-300 placeholder:text-red-400/60 focus:border-red-400 focus:ring-red-400 font-medium"
                 required
               />
-            </div>
-
-            {/* Plano de Contas */}
-            <div className="space-y-2 md:col-span-2 rounded-lg border border-seguranca-yellow/30 bg-black/20 p-4">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <label className="text-sm font-medium text-seguranca-yellow flex items-center gap-2">
-                  <FolderTree size={14} />
-                  Plano de Contas
-                </label>
-                <Link
-                  to="/plano-contas"
-                  className="text-xs text-seguranca-yellow underline"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Gerenciar plano de contas
-                </Link>
-              </div>
-              <p className="text-xs text-gray-400 mb-3">
-                Use a conta contábil correta (ex.: rescisão, vale, ajuda de custo). Contas de RH pedem o funcionário e a empresa.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-seguranca-lightgray">Categoria *</label>
-                    <button
-                      type="button"
-                      onClick={handleOpenNewPlanoCategoriaModal}
-                      className="text-xs text-seguranca-yellow hover:underline flex items-center gap-1 font-medium transition-colors"
-                      title="Cadastrar nova categoria no Plano de Contas"
-                    >
-                      <Plus size={13} />
-                      <span>Cadastrar categoria</span>
-                    </button>
-                  </div>
-                  <Select
-                    value={selectedCategoriaPaiId || 'none'}
-                    onValueChange={(value) => {
-                      setSelectedCategoriaPaiId(value === 'none' ? '' : value);
-                      setSelectedSubcategoria(null);
-                      handleInputChange('subcategoriaId', '');
-                      handleInputChange('employeeId', '');
-                    }}
-                  >
-                    <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                      <SelectValue placeholder="Selecione a categoria do plano" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-black border-gray-600">
-                      <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
-                        Nenhuma
-                      </SelectItem>
-                      {categoriasPai.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                          {cat.codigo} - {cat.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {categoriasPai.length === 0 && (
-                    <p className="text-xs text-amber-400">
-                      Nenhuma categoria cadastrada. Cadastre clicando em "+ Cadastrar categoria" acima.
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-seguranca-lightgray">Conta / Subcategoria *</label>
-                    <button
-                      type="button"
-                      onClick={handleOpenNewPlanoSubcategoriaModal}
-                      disabled={!selectedCategoriaPaiId}
-                      className="text-xs text-seguranca-yellow hover:underline flex items-center gap-1 font-medium disabled:opacity-40 disabled:hover:no-underline disabled:cursor-not-allowed transition-colors"
-                      title={!selectedCategoriaPaiId ? 'Selecione uma categoria primeiro' : 'Cadastrar nova subcategoria no Plano de Contas'}
-                    >
-                      <Plus size={13} />
-                      <span>Cadastrar subcategoria</span>
-                    </button>
-                  </div>
-                  <Select
-                    value={formData.subcategoriaId || 'none'}
-                    onValueChange={(value) => {
-                      if (value === 'none') {
-                        handleInputChange('subcategoriaId', '');
-                        setSelectedSubcategoria(null);
-                        handleInputChange('employeeId', '');
-                        return;
-                      }
-                      handleInputChange('subcategoriaId', value);
-                      const sub = filteredSubcategorias.find((s) => s.id === value) || subcategorias.find((s) => s.id === value);
-                      setSelectedSubcategoria(sub || null);
-                      if (sub?.requerVinculoFuncionario) {
-                        handleInputChange('fornecedorId', '');
-                        handleInputChange('fornecedor', '');
-                      } else {
-                        handleInputChange('employeeId', '');
-                      }
-                    }}
-                    disabled={!selectedCategoriaPaiId}
-                  >
-                    <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                      <SelectValue placeholder={selectedCategoriaPaiId ? 'Selecione a conta' : 'Selecione a categoria primeiro'} />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-black border-gray-600">
-                      <SelectItem value="none" className="text-gray-400 hover:bg-seguranca-graphite">
-                        Nenhuma
-                      </SelectItem>
-                      {filteredSubcategorias.map((sub) => (
-                        <SelectItem key={sub.id} value={sub.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                          {sub.codigo} - {sub.nome}
-                          {sub.requerVinculoFuncionario ? ' (funcionário)' : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {(requiresEmployee || formData.employeeId) && (
-                <div className="mt-4 space-y-3 rounded-md border border-yellow-500/40 bg-yellow-500/5 p-3">
-                  <label className="text-sm font-medium text-yellow-400 flex items-center gap-2">
-                    <Users size={14} />
-                    Funcionário beneficiário {requiresEmployee ? '*' : ''}
-                  </label>
-                  <p className="text-xs text-yellow-500/80">
-                    Pagamentos de rescisão, vale, ajuda de custo ou documentos fiscais de RH devem indicar o funcionário e a empresa (SIGLA) acima.
-                  </p>
-                  {!formData.empresaId && (
-                    <p className="text-xs text-amber-400">
-                      Selecione a Empresa (SIGLA) para filtrar os funcionários da empresa correta.
-                    </p>
-                  )}
-                  <EmployeeCombobox
-                    value={formData.employeeId || ''}
-                    onChange={(value) => {
-                      handleInputChange('employeeId', value);
-                      // Se limpar o funcionário, remove o setor auto-preenchido
-                      if (!value) {
-                        setWorkSectorAutoFilled(false);
-                      }
-                    }}
-                    placeholder="Busque o funcionário pelo nome (ex: Gabriel)"
-                    onEmployeeSelect={(emp) => {
-                      handleInputChange('employeeId', emp.id);
-
-                      // Preencher Empresa a partir do cadastro do funcionário (sempre, mesmo se já havia uma selecionada)
-                      if (emp.companyId) {
-                        const match = empresas.find((e: any) => String(e.id) === String(emp.companyId));
-                        if (match) {
-                          handleInputChange('empresaId', match.id);
-                          handleInputChange('empresa', match.name);
-                          handleInputChange('companySigla', match.sigla || match.name);
-                        } else if (emp.companySigla || emp.companyName) {
-                          // Empresa não encontrada na lista local, usar dados do funcionário
-                          handleInputChange('empresaId', emp.companyId);
-                          handleInputChange('empresa', emp.companyName || '');
-                          handleInputChange('companySigla', emp.companySigla || emp.companyName || '');
-                        }
-                      }
-
-                      // Preencher Unidade a partir do cadastro do funcionário
-                      if (emp.unitName) {
-                        const matchUnit = unidades.find((u: any) =>
-                          (u.name || '').toLowerCase() === (emp.unitName || '').toLowerCase()
-                        );
-                        if (matchUnit) {
-                          handleInputChange('unitId', matchUnit.id);
-                          handleInputChange('unitName', matchUnit.name);
-                        }
-                      }
-
-                      // Preencher Setor de Trabalho a partir do cadastro do funcionário (workPost > department)
-                      const suggestedSector = emp.workPostName
-                        || (emp as any).workPost?.name
-                        || emp.departmentName
-                        || (emp as any).department?.name;
-                      if (suggestedSector) {
-                        handleInputChange('workSector', suggestedSector);
-                        setWorkSectorAutoFilled(true);
-                      } else {
-                        setWorkSectorAutoFilled(false);
-                      }
-                    }}
-                  />
-                  {workSectorAutoFilled && formData.workSector && (
-                    <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
-                      <CheckCircle size={12} />
-                      Setor de trabalho preenchido automaticamente do cadastro do funcionário.
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Categoria antiga (fallback) */}

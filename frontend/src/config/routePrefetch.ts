@@ -53,6 +53,7 @@ export const ROUTE_PREFETCH_MAP: Record<string, () => Promise<unknown>> = {
   '/rh/cargos': () => import('@/pages/Cargos'),
   '/rh/epis': () => import('@/pages/EPIs'),
   '/leads': () => import('@/pages/Leads'),
+  '/comercial/prospeccao': () => import('@/pages/Prospeccao'),
   '/comercial/marketing': () => import('@/pages/ComercialMarketing'),
   '/comercial/empresas': () => import('@/pages/Empresas'),
   '/clientes': () => import('@/pages/Clientes'),

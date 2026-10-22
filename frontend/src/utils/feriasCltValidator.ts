@@ -135,10 +135,15 @@ export function validarInicioFeriasClt(
 
   const sugestao = sugerirProximaDataValida(dataInicio, mapaFeriados);
 
+  // Para colaboradores em escala 12x36, o regime especial permite iniciar férias
+  // em feriado, sábado, domingo ou qualquer dia da semana.
+  if (isEscala12x36) {
+    return { valid: true };
+  }
+
   // 1. Validação de DSR (Sexta-feira, Quinta-feira, Sábado e Domingo)
   // Para escalas padrão (ex: 5x2, 6x1), o DSR fixo em domingos/sábados impede o início na quinta ou sexta.
-  // Para a escala 12x36 (Art. 59-A da CLT), a compensação de descanso é de 36h contínuas e o colaborador pode iniciar na sexta-feira ou em seu dia útil correspondente.
-  if (!isEscala12x36) {
+  if (true) {
     if (diaSemana === 5) { // Sexta-feira
       return {
         valid: false,

@@ -12,6 +12,8 @@ export interface OrdemServicoSafetyTemplate {
   matchKeywords: string[];
   label: string;
   responsibility?: string;
+  /** Tipo de serviço padrão recomendado para este cargo/template */
+  defaultServiceType?: string;
   /** Uma obrigação por linha; quando informado, substitui a lista padrão no PDF */
   employeeObligations?: string;
   /** Título da seção de EPI/uniforme no PDF (padrão: UNIFORME DE USO OBRIGATÓRIO) */
@@ -158,9 +160,11 @@ Riscos Físicos: Radiações não-ionizantes.`,
 export const OS_SAFETY_TEMPLATES: OrdemServicoSafetyTemplate[] = [
   {
     id: 'bombeiro-civil',
-    layoutType: 'BOMBEIRO_CIVIL',
+    layoutType: 'STANDARD_NR01',
     matchKeywords: ['BOMBEIRO CIVIL', 'BOMBEIRO'],
     label: 'Bombeiro Civil',
+    defaultServiceType: 'Bombeiro Civil',
+    responsibility: 'PREVENÇÃO E COMBATE A INCÊNDIO / BOMBEIRO CIVIL',
     activities: `Avaliar os riscos através de inspeções e sugerir ações preventivas.
 Inspecionar equipamentos de combate a incêndio (mangueiras, extintores, alarmes, bombas).
 Testar sistemas de combate a incêndio.
@@ -416,6 +420,7 @@ export function findOrdemServicoTemplate(
 export function applyOrdemServicoTemplate(
   tpl: OrdemServicoSafetyTemplate,
   current: {
+    serviceType?: string;
     responsibility?: string;
     employeeObligations?: string;
     uniformSectionTitle?: string;
@@ -433,6 +438,9 @@ export function applyOrdemServicoTemplate(
   const pick = (next: string, prev?: string) => (overwrite || !prev?.trim() ? next : prev);
   return {
     layoutType: tpl.layoutType,
+    serviceType: tpl.defaultServiceType
+      ? pick(tpl.defaultServiceType, current.serviceType)
+      : current.serviceType,
     responsibility: tpl.responsibility
       ? pick(tpl.responsibility, current.responsibility)
       : current.responsibility,
@@ -451,4 +459,148 @@ export function applyOrdemServicoTemplate(
       ? pick(tpl.accidentProcedure, current.accidentProcedure)
       : current.accidentProcedure,
   };
+}
+
+/**
+ * Retorna lista de Tipos de Serviço ordenados por relevância com base no cargo,
+ * template e atividades da Ordem de Serviço.
+ */
+export function resolveServiceTypesForContext(ctx: {
+  positionName?: string | null;
+  activities?: string | null;
+  currentServiceType?: string | null;
+  template?: OrdemServicoSafetyTemplate | null;
+}): string[] {
+  const normPos = normalizeText(ctx.positionName || '');
+  const normAct = normalizeText(ctx.activities || '');
+  const haystack = `${normPos} ${normAct}`;
+
+  const recommended: string[] = [];
+
+  // 1. Bombeiro Civil / Prevenção e Combate a Incêndio
+  if (
+    haystack.includes('BOMBEIRO') ||
+    haystack.includes('INCENDIO') ||
+    haystack.includes('EXTINTOR') ||
+    haystack.includes('BRIGADA') ||
+    haystack.includes('FOGO') ||
+    haystack.includes('EVACUACAO') ||
+    ctx.template?.id === 'bombeiro-civil' ||
+    ctx.template?.layoutType === 'BOMBEIRO_CIVIL'
+  ) {
+    recommended.push(
+      'Bombeiro Civil',
+      'Prevenção e Combate a Incêndio',
+      'Atendimento de Emergência',
+      'Inspeção de Equipamentos de Incêndio',
+      'Brigada de Incêndio',
+      'Simulado e Evacuação',
+    );
+  }
+
+  // 2. Vigilante / Segurança Privada
+  if (
+    haystack.includes('VIGILANTE') ||
+    haystack.includes('VIGILANCIA') ||
+    haystack.includes('ESCOLTA') ||
+    haystack.includes('SEGURANCA PESSOAL')
+  ) {
+    recommended.push(
+      'Vigilância Patrimonial',
+      'Segurança Pessoal',
+      'Escolta de Valores',
+      'Ronda Ostensiva',
+      'Controle de Acesso',
+      'Monitoramento',
+    );
+  }
+
+  // 3. Portaria / Porteiro
+  if (haystack.includes('PORTEIRO') || haystack.includes('PORTARIA')) {
+    recommended.push('Portaria', 'Controle de Acesso', 'Recepção', 'Monitoramento');
+  }
+
+  // 4. Controlador de Acesso
+  if (haystack.includes('CONTROLADOR DE ACESSO') || haystack.includes('CONTROLE DE ACESSO')) {
+    recommended.push('Controle de Acesso', 'Portaria', 'Recepção', 'Monitoramento');
+  }
+
+  // 5. Vigia
+  if (haystack.includes('VIGIA')) {
+    recommended.push('Vigia Patrimonial', 'Ronda', 'Controle de Acesso', 'Portaria');
+  }
+
+  // 6. Limpeza / ASG / Conservação / Zeladoria
+  if (
+    haystack.includes('LIMPEZA') ||
+    haystack.includes('SERVICOS GERAIS') ||
+    haystack.includes('ASG') ||
+    haystack.includes('HIGIENIZACAO') ||
+    haystack.includes('ZELADOR')
+  ) {
+    recommended.push('Limpeza e Conservação', 'Serviços Gerais', 'Higienização de Ambientes', 'Zeladoria');
+  }
+
+  // 7. Jardinagem
+  if (haystack.includes('JARDIM') || haystack.includes('JARDINAGEM') || haystack.includes('JARDINEIRO')) {
+    recommended.push('Jardinagem', 'Manutenção de Áreas Verdes', 'Serviços Gerais');
+  }
+
+  // 8. Recepção
+  if (haystack.includes('RECEPCAO') || haystack.includes('RECEPCIONISTA')) {
+    recommended.push('Recepção', 'Atendimento ao Público', 'Controle de Acesso');
+  }
+
+  // 9. Almoxarifado
+  if (haystack.includes('ALMOXARIFADO') || haystack.includes('ESTOQUE')) {
+    recommended.push('Almoxarifado', 'Controle de Estoque e Materiais');
+  }
+
+  // 10. Supervisão
+  if (haystack.includes('SUPERVISOR') || haystack.includes('SUPERVISAO')) {
+    recommended.push('Supervisão Operacional', 'Inspeção de Posto', 'Coordenação de Equipe');
+  }
+
+  // Catálogo completo padrão do sistema
+  const defaultCatalog = [
+    'Bombeiro Civil',
+    'Vigilância Patrimonial',
+    'Controle de Acesso',
+    'Portaria',
+    'Monitoramento',
+    'Ronda',
+    'Recepção',
+    'Limpeza e Conservação',
+    'Serviços Gerais',
+    'Segurança Pessoal',
+    'Escolta de Valores',
+    'Jardinagem',
+    'Almoxarifado',
+    'Eventos',
+    'Emergência',
+  ];
+
+  if (ctx.template?.defaultServiceType && !recommended.includes(ctx.template.defaultServiceType)) {
+    recommended.unshift(ctx.template.defaultServiceType);
+  }
+
+  const result: string[] = [];
+  const seen = new Set<string>();
+
+  const add = (val?: string | null) => {
+    if (!val) return;
+    const clean = val.trim();
+    if (!clean) return;
+    const key = clean.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(clean);
+    }
+  };
+
+  recommended.forEach(add);
+  if (ctx.currentServiceType) add(ctx.currentServiceType);
+  defaultCatalog.forEach(add);
+
+  return result;
 }

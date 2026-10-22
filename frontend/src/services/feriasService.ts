@@ -180,6 +180,10 @@ export const feriasService = {
     await api.delete(`/api/vacations/${id}`);
   },
 
+  async cancelarFerias(id: string): Promise<void> {
+    await this.deleteFerias(id);
+  },
+
   async approveFerias(id: string, observacoes?: string): Promise<FeriasPeriodo> {
     const response = await api.put(`/api/vacations/${id}/approve`, { observacoes });
     return response.data;
@@ -210,32 +214,48 @@ export const feriasService = {
       'FAMILY_EMERGENCY': 'OUTROS'
     };
 
+    if (!Array.isArray(response.data)) {
+      return [];
+    }
+
     // Converter dados do backend para o formato esperado pelo frontend
-    return response.data.map((absence: any) => ({
-      id: absence.id,
-      employeeId: absence.employee?.id || absence.employeeId || null,
-      employeeName: absence.employee?.name || absence.employeeName || 'Funcionário não encontrado',
-      tipo: (tipoMapInverso[absence.absenceType] || 'OUTROS') as AfastamentoTipo,
-      dataInicio: absence.absenceDate, // Usar absenceDate em vez de startDate
-      dataFim: (() => {
-        // Calcular data fim baseado em medicalCertificateDays
+    return response.data.map((absence: any) => {
+      const dateStr = absence.absenceDate || absence.startDate || (absence.createdAt ? absence.createdAt.split('T')[0] : '');
+      const calcDataFim = () => {
+        if (!dateStr) return '';
+        if (absence.endDate) return absence.endDate;
         if (absence.medicalCertificateDays && absence.medicalCertificateDays > 1) {
-          const startDate = new Date(absence.absenceDate);
-          startDate.setDate(startDate.getDate() + absence.medicalCertificateDays - 1);
-          return startDate.toISOString().split('T')[0];
+          try {
+            const startDate = new Date(dateStr);
+            if (!isNaN(startDate.getTime())) {
+              startDate.setDate(startDate.getDate() + absence.medicalCertificateDays - 1);
+              return startDate.toISOString().split('T')[0];
+            }
+          } catch {
+            return dateStr;
+          }
         }
-        return absence.absenceDate; // Se não houver medicalCertificateDays, usar a mesma data
-      })(),
-      status: (absence.status === 'PENDING' ? 'PENDENTE' :
-        absence.status === 'APPROVED' ? 'APROVADO' :
-          absence.status === 'REJECTED' ? 'CANCELADO' :
-            absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE') as FeriasStatus,
-      motivo: absence.reason || '',
-      documento: absence.documentUrl || '',
-      observacoes: absence.coverageNotes || '',
-      createdAt: absence.createdAt,
-      updatedAt: absence.updatedAt || absence.createdAt
-    }));
+        return dateStr;
+      };
+
+      return {
+        id: absence.id,
+        employeeId: absence.employee?.id || absence.employeeId || null,
+        employeeName: absence.employee?.name || absence.employeeName || 'Funcionário não encontrado',
+        tipo: (tipoMapInverso[absence.absenceType] || 'OUTROS') as AfastamentoTipo,
+        dataInicio: dateStr,
+        dataFim: calcDataFim(),
+        status: (absence.status === 'PENDING' ? 'PENDENTE' :
+          absence.status === 'APPROVED' ? 'APROVADO' :
+            absence.status === 'REJECTED' ? 'CANCELADO' :
+              absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE') as FeriasStatus,
+        motivo: absence.reason || '',
+        documento: absence.documentUrl || '',
+        observacoes: absence.coverageNotes || '',
+        createdAt: absence.createdAt || new Date().toISOString(),
+        updatedAt: absence.updatedAt || absence.createdAt || new Date().toISOString()
+      };
+    });
   },
 
   async getAfastamentoById(id: string): Promise<Afastamento> {
@@ -290,6 +310,19 @@ export const feriasService = {
     // Mapear tipos do frontend (português) para backend (inglês)
     const tipoMap: Record<string, string> = {
       'ATESTADO': 'SICK_LEAVE',
+      'DECLARACAO_COMPARECIMENTO': 'MEDICAL_APPOINTMENT',
+      'DECLARACAO_MEDICA': 'MEDICAL_APPOINTMENT',
+      'ATESTADO_ACOMPANHAMENTO': 'SICK_LEAVE',
+      'ATESTADO_APTIDAO_SANIDADE': 'SICK_LEAVE',
+      'AFASTAMENTO_DOENCA_ACIDENTE': 'SICK_LEAVE',
+      'AFASTAMENTO_INSS': 'SICK_LEAVE',
+      'ACIDENTE_TRABALHO': 'SICK_LEAVE',
+      'LICENCA_MATERNIDADE_PATERNIDADE': 'PERSONAL_LEAVE',
+      'LICENCA_GALA_MATRIMONIAL': 'WEDDING',
+      'TESTEMUNHA_JUDICIAL': 'OTHER',
+      'PROCESSO_TRABALHISTA': 'OTHER',
+      'CAT': 'SICK_LEAVE',
+      'AFASTAMENTO': 'OTHER',
       'LICENCA_MEDICA': 'SICK_LEAVE',
       'LICENCA_MATERNIDADE': 'PERSONAL_LEAVE',
       'LICENCA_PATERNIDADE': 'PERSONAL_LEAVE',
@@ -327,6 +360,19 @@ export const feriasService = {
     // Mapear tipos do frontend (português) para backend (inglês)
     const tipoMap: Record<string, string> = {
       'ATESTADO': 'SICK_LEAVE',
+      'DECLARACAO_COMPARECIMENTO': 'MEDICAL_APPOINTMENT',
+      'DECLARACAO_MEDICA': 'MEDICAL_APPOINTMENT',
+      'ATESTADO_ACOMPANHAMENTO': 'SICK_LEAVE',
+      'ATESTADO_APTIDAO_SANIDADE': 'SICK_LEAVE',
+      'AFASTAMENTO_DOENCA_ACIDENTE': 'SICK_LEAVE',
+      'AFASTAMENTO_INSS': 'SICK_LEAVE',
+      'ACIDENTE_TRABALHO': 'SICK_LEAVE',
+      'LICENCA_MATERNIDADE_PATERNIDADE': 'PERSONAL_LEAVE',
+      'LICENCA_GALA_MATRIMONIAL': 'WEDDING',
+      'TESTEMUNHA_JUDICIAL': 'OTHER',
+      'PROCESSO_TRABALHISTA': 'OTHER',
+      'CAT': 'SICK_LEAVE',
+      'AFASTAMENTO': 'OTHER',
       'LICENCA_MEDICA': 'SICK_LEAVE',
       'LICENCA_MATERNIDADE': 'PERSONAL_LEAVE',
       'LICENCA_PATERNIDADE': 'PERSONAL_LEAVE',
@@ -541,6 +587,16 @@ export const feriasService = {
       if (value) params.append(key, value);
     });
     const response = await api.get(`/api/reports/ferias/experiencia/pdf?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  /**
+   * Gerar Relatório Personalizado de Férias/Afastamentos/Experiência (PDF / Excel) com colunas customizadas
+   */
+  async generateCustomReport(req: import('../types/ferias').CustomFeriasReportRequest): Promise<Blob> {
+    const response = await api.post('/api/reports/ferias/custom', req, {
       responseType: 'blob'
     });
     return response.data;

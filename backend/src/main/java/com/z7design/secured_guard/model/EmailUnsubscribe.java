@@ -16,6 +16,11 @@ import java.util.UUID;
 @Builder
 public class EmailUnsubscribe {
 
+    public static class EmailUnsubscribeBuilder {
+        public EmailUnsubscribeBuilder() {
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

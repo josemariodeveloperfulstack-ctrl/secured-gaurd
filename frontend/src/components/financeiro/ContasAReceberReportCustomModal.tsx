@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { FileText, Download, Filter, Columns, Loader2, Calendar, Building2, Tag, CheckSquare, Square, RotateCcw } from 'lucide-react';
 import { contasAReceberService, CustomContasAReceberReportRequest } from '@/services/contasAReceberService';
+import { contasAPagarService, CategoriaPai, Subcategoria } from '@/services/contasAPagarService';
 import { formatDateForBackend } from '@/utils/dateUtils';
 import api from '@/lib/axios';
 
@@ -49,7 +50,8 @@ export const ContasAReceberReportCustomModal: React.FC<ContasAReceberReportCusto
   // Listas de dados para filtros
   const [unidades, setUnidades] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
-  const [subcategorias, setSubcategorias] = useState<any[]>([]);
+  const [categoriasPai, setCategoriasPai] = useState<CategoriaPai[]>([]);
+  const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
 
   // Filtros
   const [startDate, setStartDate] = useState<Date | undefined>(
@@ -87,12 +89,54 @@ export const ContasAReceberReportCustomModal: React.FC<ContasAReceberReportCusto
         })
         .catch(() => setClientes([]));
 
-      api.get('/plano-contas/subcategorias')
-        .catch(() => api.get('/subcategorias'))
-        .then((res) => setSubcategorias(Array.isArray(res.data) ? res.data : []))
+      // Carregar Categorias Pai e Subcategorias do Plano de Contas
+      contasAPagarService.getCategoriasPai()
+        .then((data) => setCategoriasPai(Array.isArray(data) ? data : []))
+        .catch(() => setCategoriasPai([]));
+
+      contasAPagarService.getSubcategorias()
+        .then((data) => setSubcategorias(Array.isArray(data) ? data : []))
         .catch(() => setSubcategorias([]));
     }
   }, [open]);
+
+  // Separação de subcategorias: Receitas em destaque prioritário
+  const { subcategoriasReceitas, outrasSubcategorias } = React.useMemo(() => {
+    const receitasCatIds = new Set(
+      categoriasPai
+        .filter((c) => {
+          const code = (c.codigo || '').trim();
+          const nome = (c.nome || '').toLowerCase();
+          return (
+            code === '05' ||
+            code === '06' ||
+            nome.includes('receita') ||
+            nome.includes('prestação de serviço') ||
+            nome.includes('serviço') ||
+            nome.includes('faturamento')
+          );
+        })
+        .map((c) => c.id)
+    );
+
+    const rec: Subcategoria[] = [];
+    const outras: Subcategoria[] = [];
+
+    subcategorias.forEach((s) => {
+      const isReceita =
+        receitasCatIds.has(s.categoriaPaiId) ||
+        (s.codigo && (s.codigo.startsWith('05') || s.codigo.startsWith('06'))) ||
+        (s.nome && s.nome.toLowerCase().includes('receita'));
+
+      if (isReceita) {
+        rec.push(s);
+      } else {
+        outras.push(s);
+      }
+    });
+
+    return { subcategoriasReceitas: rec, outrasSubcategorias: outras };
+  }, [categoriasPai, subcategorias]);
 
   const toggleColumn = (colId: string) => {
     if (selectedColumns.includes(colId)) {
@@ -283,13 +327,23 @@ export const ContasAReceberReportCustomModal: React.FC<ContasAReceberReportCusto
               </div>
 
               <div>
-                <Label className="text-xs text-slate-300 mb-1.5 block">Data Inicial</Label>
-                <DatePicker date={startDate} onDateChange={setStartDate} placeholder="Início" />
+                <Label className="text-xs font-medium text-slate-300 mb-1.5 block">Data Inicial</Label>
+                <DatePicker
+                  date={startDate}
+                  onDateChange={setStartDate}
+                  placeholder="Início (dd/mm/aaaa)"
+                  className="h-9 text-xs pl-3 pr-10 border-slate-700 bg-slate-900 text-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
+                />
               </div>
 
               <div>
-                <Label className="text-xs text-slate-300 mb-1.5 block">Data Final</Label>
-                <DatePicker date={endDate} onDateChange={setEndDate} placeholder="Fim" />
+                <Label className="text-xs font-medium text-slate-300 mb-1.5 block">Data Final</Label>
+                <DatePicker
+                  date={endDate}
+                  onDateChange={setEndDate}
+                  placeholder="Fim (dd/mm/aaaa)"
+                  className="h-9 text-xs pl-3 pr-10 border-slate-700 bg-slate-900 text-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
+                />
               </div>
             </div>
           </div>
@@ -369,15 +423,32 @@ export const ContasAReceberReportCustomModal: React.FC<ContasAReceberReportCusto
               </div>
 
               <div>
-                <Label className="text-xs text-slate-300 mb-1.5 block">Plano de Contas</Label>
+                <Label className="text-xs text-slate-300 mb-1.5 block">Plano de Contas (Receitas)</Label>
                 <Select value={subcategoriaId} onValueChange={setSubcategoriaId}>
                   <SelectTrigger className="bg-slate-900 border-slate-700 text-slate-200 h-9 text-xs">
-                    <SelectValue />
+                    <SelectValue placeholder="Todas as Contas de Receita" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 max-h-56">
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 max-h-64">
                     <SelectItem value="TODAS">Todas as Contas</SelectItem>
-                    {subcategorias.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
+                    
+                    {subcategoriasReceitas.length > 0 && (
+                      <div className="px-2 py-1 text-[10px] font-bold text-emerald-400 uppercase tracking-wider bg-emerald-500/10 rounded my-1">
+                        ★ Contas de Receitas & Faturamento
+                      </div>
+                    )}
+                    {subcategoriasReceitas.map((s) => (
+                      <SelectItem key={s.id} value={s.id} className="text-emerald-300 font-medium">
+                        {s.codigo ? `${s.codigo} - ` : ''}{s.nome}
+                      </SelectItem>
+                    ))}
+
+                    {outrasSubcategorias.length > 0 && (
+                      <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-800/60 rounded my-1">
+                        Outras Contas do Plano
+                      </div>
+                    )}
+                    {outrasSubcategorias.map((s) => (
+                      <SelectItem key={s.id} value={s.id} className="text-slate-300">
                         {s.codigo ? `${s.codigo} - ` : ''}{s.nome}
                       </SelectItem>
                     ))}

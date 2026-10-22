@@ -19,12 +19,15 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/reports/ferias")
-@RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Relatórios de Férias", description = "Endpoints para geração de relatórios de férias e afastamentos")
 public class FeriasReportController {
 
     private final FeriasReportService feriasReportService;
+
+    public FeriasReportController(FeriasReportService feriasReportService) {
+        this.feriasReportService = feriasReportService;
+    }
 
     @GetMapping("/stats")
     @Operation(summary = "Estatísticas gerais", description = "Retorna estatísticas gerais de férias e afastamentos")
@@ -335,6 +338,41 @@ public class FeriasReportController {
                     .body(pdfBytes);
         } catch (Exception e) {
             log.error("Erro ao gerar relatório PDF de experiência: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/custom")
+    @Operation(summary = "Relatório personalizado executivo", description = "Gera relatório customizado de férias, afastamentos ou experiência em PDF ou Excel")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    public ResponseEntity<byte[]> generateCustomReport(@RequestBody FeriasReportDTO request) {
+        try {
+            log.info("Gerando relatório personalizado: tipo={}, formato={}, colunas={}",
+                    request.getReportType(), request.getFormato(), request.getSelectedColumns());
+
+            boolean isPdf = "PDF".equalsIgnoreCase(request.getFormato());
+            byte[] bytes;
+            String fileName;
+            MediaType mediaType;
+
+            String typePrefix = request.getReportType() != null ? request.getReportType().toLowerCase() : "ferias";
+
+            if (isPdf) {
+                bytes = feriasReportService.generateCustomFeriasPDFReport(request);
+                fileName = "relatorio_" + typePrefix + "_" + LocalDate.now() + ".pdf";
+                mediaType = MediaType.APPLICATION_PDF;
+            } else {
+                bytes = feriasReportService.generateCustomFeriasExcelReport(request);
+                fileName = "relatorio_" + typePrefix + "_" + LocalDate.now() + ".xlsx";
+                mediaType = MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            }
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentType(mediaType)
+                    .body(bytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório customizado de férias: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
