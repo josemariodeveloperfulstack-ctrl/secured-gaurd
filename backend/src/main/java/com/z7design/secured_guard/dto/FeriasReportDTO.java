@@ -160,6 +160,14 @@ public class FeriasReportDTO {
         this.formato = formato;
     }
 
+    public String getFormat() {
+        return formato;
+    }
+
+    public void setFormat(String format) {
+        this.formato = format;
+    }
+
     public List<String> getSelectedColumns() {
         return selectedColumns;
     }
