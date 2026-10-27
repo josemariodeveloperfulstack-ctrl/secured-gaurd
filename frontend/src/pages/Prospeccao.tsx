@@ -516,12 +516,15 @@ const Prospeccao: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {prospects.map((company) => {
+            {prospects.map((company, index) => {
               const decisorPrincipal = company.qsa.length > 0 ? company.qsa[0] : null;
+              const uniqueKey = (company.cnpj && company.cnpj.trim() !== '' && company.cnpj !== '00.000.000/0001-00')
+                ? company.cnpj
+                : `prospect-${company.razaoSocial || company.nomeFantasia || 'lead'}-${index}`;
 
               return (
                 <Card 
-                  key={company.cnpj} 
+                  key={uniqueKey} 
                   className="bg-seguranca-graphite border-gray-700 hover:border-seguranca-yellow/50 transition-all flex flex-col justify-between"
                 >
                   <CardHeader className="pb-3 border-b border-gray-700/60">
