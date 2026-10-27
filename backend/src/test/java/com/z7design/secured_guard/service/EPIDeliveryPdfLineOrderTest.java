@@ -71,13 +71,22 @@ class EPIDeliveryPdfLineOrderTest {
     void setUp() {
         company = new Company();
         company.setId(UUID.randomUUID());
-        company.setName("Empresa Teste Ltda");
-        company.setCnpj("12345678000199");
+        company.setName("Promover Tercerização e Serviços Ltda");
+        company.setCnpj("36698521000101");
+        company.setAddress("Rua Marte, 526 - Jardim Riacho das Pedras - Contagem/MG - 32241-250");
 
         employee = new Employee();
         employee.setId(UUID.randomUUID());
-        employee.setName("JOAO DA SILVA");
+        employee.setName("SINÉSIO RAMOS DA SILVA");
         employee.setCpf("12345678900");
+        employee.setRg("MG-12.345.678");
+        employee.setHireDate(java.time.LocalDate.of(2023, 5, 2));
+        com.z7design.secured_guard.model.Position pos = new com.z7design.secured_guard.model.Position();
+        pos.setName("VIGILANTE PATRIMONIAL LÍDER");
+        employee.setPosition(pos);
+        com.z7design.secured_guard.model.Department dept = new com.z7design.secured_guard.model.Department();
+        dept.setName("OPERACIONAL E SEGURANÇA PATRIMONIAL");
+        employee.setDepartment(dept);
 
         form = EPIDeliveryForm.builder()
                 .id(UUID.randomUUID())
@@ -230,6 +239,32 @@ class EPIDeliveryPdfLineOrderTest {
         byte[] pdf = pdfService.generateBlankEPIDeliveryPdf(company.getId(), employee.getId());
         try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdf))) {
             assertEquals(1, document.getNumberOfPages(), "A ficha de EPI em branco deve caber em EXATAMENTE 1 página");
+        }
+    }
+
+    @Test
+    void pdfComMaisDe15ItensDeveTerSegundaPagina() throws Exception {
+        StandardReportLayoutService layoutService = newLayoutService();
+        pdfService = new EPIDeliveryStandardPdfService(
+                employeeRepository, companyRepository, epiDeliveryFormRepository,
+                stockItemRepository, layoutService,
+                new com.z7design.secured_guard.service.ExcelReportLayoutService(companyRepository),
+                documentDateResolver);
+
+        lenient().when(companyRepository.findById(company.getId())).thenReturn(Optional.of(company));
+
+        List<EPIDeliveryFormItem> items = new java.util.ArrayList<>();
+        for (int i = 1; i <= 35; i++) {
+            EPIDeliveryFormItem it = item("EQUIPAMENTO " + i + " - DESCRICAO OPERACIONAL", i);
+            it.setSizeNumber("M");
+            it.setCa("12345");
+            items.add(it);
+        }
+        form.setItems(items);
+
+        byte[] pdf = pdfService.generateEPIDeliveryPdfFromForm(form);
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdf))) {
+            assertEquals(2, document.getNumberOfPages(), "A ficha de EPI com 35 itens reais preenchidos deve ter 2 páginas");
         }
     }
 

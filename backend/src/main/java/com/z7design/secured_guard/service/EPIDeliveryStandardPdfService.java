@@ -375,7 +375,7 @@ public class EPIDeliveryStandardPdfService {
                                 usedUnits += units;
                         }
 
-                        int targetUnits = 18;
+                        int targetUnits = 15;
                         int itemsToAdd = Math.max(0, targetUnits - usedUnits);
                         for (int i = 0; i < itemsToAdd; i++) {
                                 epiTable.addCell(createEpiDataCell(""));
@@ -611,8 +611,8 @@ public class EPIDeliveryStandardPdfService {
                         epiTable.addHeaderCell(createEpiHeaderCell("MOTIVO DA SUBST."));
                         epiTable.addHeaderCell(createEpiHeaderCell("ASSINATURA"));
 
-                        // Preencher com 18 linhas para ocupar verticalmente a página sem deixar espaço em branco e garantir 1 página
-                        for (int i = 0; i < 18; i++) {
+                        // Preencher com 15 linhas para ocupar verticalmente a página sem deixar espaço em branco e garantir 1 página
+                        for (int i = 0; i < 15; i++) {
                                 epiTable.addCell(createEpiDataCell(""));
                                 epiTable.addCell(createEpiDataCell(""));
                                 epiTable.addCell(createEpiDataCell(""));
