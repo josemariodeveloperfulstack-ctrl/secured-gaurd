@@ -20,9 +20,34 @@ import java.util.Map;
 public class ProspectionController {
 
     private final GeminiProspectionService geminiProspectionService;
+    private final com.z7design.secured_guard.service.prospection.CnpjLookupService cnpjLookupService;
 
-    public ProspectionController(GeminiProspectionService geminiProspectionService) {
+    public ProspectionController(
+            GeminiProspectionService geminiProspectionService,
+            com.z7design.secured_guard.service.prospection.CnpjLookupService cnpjLookupService) {
         this.geminiProspectionService = geminiProspectionService;
+        this.cnpjLookupService = cnpjLookupService;
+    }
+
+    @GetMapping("/cnpj/{cnpj}")
+    @PreAuthorize("hasAnyAuthority('LEADS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @Operation(summary = "Consulta dados oficiais completos de um CNPJ na Receita Federal")
+    public ResponseEntity<Map<String, Object>> searchByCnpj(@PathVariable String cnpj) {
+        log.info("Recebida requisição de consulta de CNPJ: {}", cnpj);
+        Map<String, Object> data = cnpjLookupService.lookupByCnpj(cnpj);
+        return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/find-cnpj")
+    @PreAuthorize("hasAnyAuthority('LEADS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @Operation(summary = "Descobre e enriquece o CNPJ de uma empresa/condomínio a partir do nome e cidade")
+    public ResponseEntity<Map<String, Object>> findCnpj(
+            @RequestParam String nome,
+            @RequestParam(required = false, defaultValue = "Uberlândia") String cidade,
+            @RequestParam(required = false, defaultValue = "MG") String uf) {
+        log.info("Recebida requisição para localizar CNPJ: nome='{}', cidade='{}', uf='{}'", nome, cidade, uf);
+        Map<String, Object> data = cnpjLookupService.findCnpjByNameAndLocation(nome, cidade, uf);
+        return ResponseEntity.ok(data);
     }
 
     @GetMapping("/ai-search")

@@ -481,4 +481,80 @@ public class GeminiProspectionService {
 
         return list;
     }
+
+    /**
+     * Tenta identificar o CNPJ oficial de uma empresa ou condomínio usando a IA Gemini.
+     */
+    public String discoverCnpjWithGemini(String companyName, String city, String uf) {
+        if (!isConfigured()) {
+            return null;
+        }
+        try {
+            String prompt = String.format(
+                    "Você é um especialista em registros cadastrais públicos do Brasil (Receita Federal / CNPJ).\n" +
+                    "Descubra o CNPJ oficial (14 dígitos numéricos) da seguinte empresa ou condomínio:\n" +
+                    "Nome / Fantasia: \"%s\"\n" +
+                    "Cidade / UF: \"%s - %s\"\n\n" +
+                    "Se souber com certeza o CNPJ ou a Razão Social oficial desse estabelecimento na Receita Federal, responda estritamente em formato JSON:\n" +
+                    "{\"cnpj\": \"XXXXXXXXXXXXXX\"}\n" +
+                    "Se não encontrar o CNPJ exato com certeza, responda: {\"cnpj\": \"\"}",
+                    companyName, city, uf);
+
+            Map<String, Object> body = new HashMap<>();
+            Map<String, Object> content = new HashMap<>();
+            content.put("parts", List.of(Map.of("text", prompt)));
+            body.put("contents", List.of(content));
+            String bodyJson = objectMapper.writeValueAsString(body);
+
+            List<String> modelsToTry = new ArrayList<>();
+            String preferred = (model != null && !model.isBlank()) ? model.trim() : "gemini-1.5-flash";
+            modelsToTry.add(preferred);
+            if (!preferred.contains("gemini-1.5-flash")) modelsToTry.add("gemini-1.5-flash");
+            if (!preferred.contains("gemini-2.0-flash")) modelsToTry.add("gemini-2.0-flash");
+            if (!preferred.contains("gemini-1.5-flash-8b")) modelsToTry.add("gemini-1.5-flash-8b");
+
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .connectTimeout(Duration.ofSeconds(6))
+                    .build();
+
+            for (String tryModel : modelsToTry) {
+                String cleanModel = tryModel.replace("models/", "");
+                String endpoint = apiUrl + "/models/" + cleanModel + ":generateContent?key=" + apiKey;
+                try {
+                    HttpRequest req = HttpRequest.newBuilder()
+                            .uri(URI.create(endpoint))
+                            .header("Content-Type", "application/json")
+                            .timeout(Duration.ofSeconds(12))
+                            .POST(HttpRequest.BodyPublishers.ofString(bodyJson, StandardCharsets.UTF_8))
+                            .build();
+
+                    HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+                    if (resp.statusCode() == 200) {
+                        JsonNode response = objectMapper.readTree(resp.body());
+                        if (response.has("candidates")) {
+                            JsonNode textNode = response.path("candidates").get(0)
+                                    .path("content").path("parts").get(0).path("text");
+                            if (!textNode.isMissingNode()) {
+                                String clean = cleanJsonOutput(textNode.asText());
+                                JsonNode parsed = objectMapper.readTree(clean);
+                                if (parsed.has("cnpj")) {
+                                    String cnpjFound = parsed.path("cnpj").asText("").replaceAll("\\D", "");
+                                    if (cnpjFound.length() == 14) {
+                                        return cnpjFound;
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    }
+                } catch (Exception ex) {
+                    log.debug("Erro ao consultar Gemini para CNPJ de '{}': {}", companyName, ex.getMessage());
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Falha geral ao descobrir CNPJ com Gemini: {}", ex.getMessage());
+        }
+        return null;
+    }
 }

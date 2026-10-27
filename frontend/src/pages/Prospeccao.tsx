@@ -63,6 +63,13 @@ const Prospeccao: React.FC = () => {
   const [selectedCompany, setSelectedCompany] = useState<ProspectCompany | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
 
+  // Estados para Busca e Localização Ativa de CNPJ
+  const [searchingCnpjFor, setSearchingCnpjFor] = useState<string | null>(null);
+  const [manualCnpjModalOpen, setManualCnpjModalOpen] = useState(false);
+  const [targetCompanyForCnpj, setTargetCompanyForCnpj] = useState<ProspectCompany | null>(null);
+  const [manualCnpjInput, setManualCnpjInput] = useState('');
+  const [searchingManualCnpj, setSearchingManualCnpj] = useState(false);
+
   // Estados de ações
   const [sendingCrmId, setSendingCrmId] = useState<string | null>(null);
   const [sendingMarketingId, setSendingMarketingId] = useState<string | null>(null);
@@ -225,6 +232,148 @@ const Prospeccao: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Localizar e enriquecer CNPJ de um card com IA e Receita Federal
+  const handleSearchCnpjForCompany = async (company: ProspectCompany) => {
+    const companyName = company.nomeFantasia || company.razaoSocial;
+    if (!companyName) {
+      toast({
+        title: 'Nome não identificado',
+        description: 'Não foi possível identificar o nome da empresa para busca.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setSearchingCnpjFor(companyName);
+      const result = await prospectionService.findCnpjByName(companyName, company.municipio, company.uf);
+
+      if (result && result.cnpj && result.cnpj !== '00.000.000/0001-00' && result.found !== false) {
+        // Encontrou e validou dados oficiais!
+        setProspects(prev => prev.map(p => {
+          const isMatch = (company.cnpj && p.cnpj === company.cnpj) ||
+            ((p.nomeFantasia || p.razaoSocial) === companyName && p.municipio === company.municipio);
+          
+          if (!isMatch) return p;
+
+          return {
+            ...p,
+            ...result,
+            // Preservar links e diagnósticos gerados previamente
+            googleMapsUrl: p.googleMapsUrl || result.googleMapsUrl,
+            website: p.website || result.website,
+            motivoConversao: p.motivoConversao || result.motivoConversao,
+            scoreConversao: p.scoreConversao || result.scoreConversao,
+            situacaoCadastral: result.situacaoCadastral || 'ATIVA',
+            clientePotencial: true,
+            origem: 'RECEITA_FEDERAL',
+            leadImported: p.leadImported,
+            importedLeadId: p.importedLeadId,
+          };
+        }));
+
+        if (selectedCompany && (
+          (company.cnpj && selectedCompany.cnpj === company.cnpj) ||
+          ((selectedCompany.nomeFantasia || selectedCompany.razaoSocial) === companyName)
+        )) {
+          setSelectedCompany(prev => prev ? {
+            ...prev,
+            ...result,
+            situacaoCadastral: result.situacaoCadastral || 'ATIVA',
+          } : null);
+        }
+
+        toast({
+          title: '🎯 CNPJ localizado e autenticado!',
+          description: `${result.razaoSocial || companyName} (${result.cnpj}) foi autenticado na base oficial da Receita Federal com sócios e endereço.`,
+        });
+      } else {
+        // Não encontrou automaticamente -> abre modal amigável com atalho do Google e campo formatado
+        setTargetCompanyForCnpj(company);
+        setManualCnpjInput('');
+        setManualCnpjModalOpen(true);
+        toast({
+          title: 'CNPJ não localizado automaticamente',
+          description: `Não encontramos um CNPJ público exato para "${companyName}". Informe o CNPJ para consultar diretamente na Receita.`,
+        });
+      }
+    } catch (err: any) {
+      console.warn('Erro na busca automática de CNPJ:', err);
+      setTargetCompanyForCnpj(company);
+      setManualCnpjInput('');
+      setManualCnpjModalOpen(true);
+    } finally {
+      setSearchingCnpjFor(null);
+    }
+  };
+
+  // Confirmar CNPJ manual e consultar dados na Receita Federal
+  const handleConfirmManualCnpj = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!targetCompanyForCnpj) return;
+
+    const rawDigits = manualCnpjInput.replace(/\D/g, '');
+    if (rawDigits.length !== 14 || !validateCNPJ(rawDigits)) {
+      toast({
+        title: 'CNPJ inválido',
+        description: 'Por favor, informe um CNPJ real com 14 dígitos e verificação válida.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setSearchingManualCnpj(true);
+      const companyOfficial = await prospectionService.searchByCnpj(rawDigits);
+      const targetName = targetCompanyForCnpj.nomeFantasia || targetCompanyForCnpj.razaoSocial;
+
+      setProspects(prev => prev.map(p => {
+        const isMatch = (targetCompanyForCnpj.cnpj && p.cnpj === targetCompanyForCnpj.cnpj) ||
+          ((p.nomeFantasia || p.razaoSocial) === targetName && p.municipio === targetCompanyForCnpj.municipio);
+
+        if (!isMatch) return p;
+
+        return {
+          ...p,
+          ...companyOfficial,
+          googleMapsUrl: p.googleMapsUrl || companyOfficial.googleMapsUrl,
+          website: p.website || companyOfficial.website,
+          motivoConversao: p.motivoConversao || companyOfficial.motivoConversao,
+          scoreConversao: p.scoreConversao || companyOfficial.scoreConversao,
+          situacaoCadastral: companyOfficial.situacaoCadastral || 'ATIVA',
+          clientePotencial: true,
+          origem: 'RECEITA_FEDERAL',
+          leadImported: p.leadImported,
+          importedLeadId: p.importedLeadId,
+        };
+      }));
+
+      if (selectedCompany && (
+        (targetCompanyForCnpj.cnpj && selectedCompany.cnpj === targetCompanyForCnpj.cnpj) ||
+        ((selectedCompany.nomeFantasia || selectedCompany.razaoSocial) === targetName)
+      )) {
+        setSelectedCompany(prev => prev ? { ...prev, ...companyOfficial, situacaoCadastral: companyOfficial.situacaoCadastral || 'ATIVA' } : null);
+      }
+
+      setManualCnpjModalOpen(false);
+      setTargetCompanyForCnpj(null);
+      setManualCnpjInput('');
+
+      toast({
+        title: 'CNPJ vinculado e dados autenticados!',
+        description: `${companyOfficial.razaoSocial} foi atualizada com dados cadastrais e societários oficiais da Receita Federal.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao consultar CNPJ',
+        description: err.message || 'Não foi possível encontrar a empresa na base da Receita Federal.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSearchingManualCnpj(false);
     }
   };
 
@@ -559,9 +708,21 @@ const Prospeccao: React.FC = () => {
                       </div>
                       <Badge 
                         variant="outline" 
-                        className={company.situacaoCadastral === 'ATIVA' ? 'border-green-500 text-green-400 shrink-0' : 'border-amber-500 text-amber-400 shrink-0'}
+                        onClick={() => !company.cnpj && handleSearchCnpjForCompany(company)}
+                        className={
+                          company.situacaoCadastral === 'ATIVA' 
+                            ? 'border-green-500 text-green-400 shrink-0' 
+                            : 'border-amber-500 text-amber-400 shrink-0 cursor-pointer hover:bg-amber-500/10 transition-colors'
+                        }
+                        title={company.cnpj ? 'Empresa com CNPJ verificado e ativo' : 'Clique para localizar e verificar CNPJ na Receita Federal'}
                       >
-                        {company.situacaoCadastral}
+                        {searchingCnpjFor === (company.nomeFantasia || company.razaoSocial) ? (
+                          <span className="flex items-center gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Verificando...
+                          </span>
+                        ) : (
+                          company.situacaoCadastral
+                        )}
                       </Badge>
                     </div>
 
@@ -725,20 +886,32 @@ const Prospeccao: React.FC = () => {
                         </Button>
                       )}
 
-                      {!company.cnpj && (
+                      {!company.cnpj ? (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => {
-                            setSelectedCompany(company);
-                            setDetailsModalOpen(true);
-                          }}
+                          onClick={() => handleSearchCnpjForCompany(company)}
+                          disabled={searchingCnpjFor === (company.nomeFantasia || company.razaoSocial)}
                           className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black h-8 px-2.5 text-xs font-medium"
                           title="Consultar CNPJ na Receita Federal para enriquecer dados oficiais"
                         >
-                          <Search className="h-3.5 w-3.5 mr-1" />
-                          Buscar CNPJ
+                          {searchingCnpjFor === (company.nomeFantasia || company.razaoSocial) ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                              Buscando...
+                            </>
+                          ) : (
+                            <>
+                              <Search className="h-3.5 w-3.5 mr-1" />
+                              Buscar CNPJ
+                            </>
+                          )}
                         </Button>
+                      ) : (
+                        <div className="flex items-center gap-1 text-[11px] text-green-400 bg-green-950/40 border border-green-800/60 px-2 py-1 rounded">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-400 shrink-0" />
+                          <span className="font-semibold">{company.cnpj}</span>
+                        </div>
                       )}
                     </div>
 
@@ -832,22 +1005,21 @@ const Prospeccao: React.FC = () => {
                         variant="outline"
                         className="h-6 text-[11px] border-seguranca-yellow text-seguranca-yellow px-2 py-0"
                         onClick={() => {
-                          const userCnpj = prompt(`Informe o CNPJ oficial de "${selectedCompany.nomeFantasia || selectedCompany.razaoSocial}":`);
-                          if (userCnpj) {
-                            if (!validateCNPJ(userCnpj)) {
-                              toast({
-                                title: 'CNPJ inválido',
-                                description: 'O CNPJ informado não possui formato ou dígitos verificadores válidos.',
-                                variant: 'destructive',
-                              });
-                              return;
-                            }
-                            handleSearchCnpj(undefined, userCnpj);
-                            setDetailsModalOpen(false);
-                          }
+                          handleSearchCnpjForCompany(selectedCompany);
                         }}
+                        disabled={searchingCnpjFor === (selectedCompany.nomeFantasia || selectedCompany.razaoSocial)}
                       >
-                        Digitar e Consultar Receita
+                        {searchingCnpjFor === (selectedCompany.nomeFantasia || selectedCompany.razaoSocial) ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Consultando...
+                          </>
+                        ) : (
+                          <>
+                            <Search className="h-3 w-3 mr-1" />
+                            Buscar CNPJ na Receita
+                          </>
+                        )}
                       </Button>
                     </div>
                   )}
@@ -945,6 +1117,120 @@ const Prospeccao: React.FC = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Modal de Localização / Informação Manual de CNPJ */}
+      <Dialog open={manualCnpjModalOpen} onOpenChange={setManualCnpjModalOpen}>
+        <DialogContent className="max-w-md bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-seguranca-yellow flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Localizar / Confirmar CNPJ
+            </DialogTitle>
+            <DialogDescription className="text-gray-400 text-xs">
+              Informe ou localize o CNPJ oficial para carregar os dados cadastrais, endereço e sócios na Receita Federal.
+            </DialogDescription>
+          </DialogHeader>
+
+          {targetCompanyForCnpj && (
+            <div className="space-y-4 text-sm mt-2">
+              <div className="p-3 bg-seguranca-black/60 rounded-lg border border-gray-700">
+                <span className="text-[11px] text-gray-400 block uppercase font-medium">Empresa / Estabelecimento</span>
+                <p className="font-semibold text-white text-sm">
+                  {targetCompanyForCnpj.nomeFantasia || targetCompanyForCnpj.razaoSocial}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {targetCompanyForCnpj.municipio} - {targetCompanyForCnpj.uf}
+                  {targetCompanyForCnpj.bairro ? ` • Bairro: ${targetCompanyForCnpj.bairro}` : ''}
+                </p>
+              </div>
+
+              {/* Atalho de Pesquisa Direta no Google / Redesim */}
+              <div className="p-2.5 rounded bg-blue-950/30 border border-blue-900/50 flex items-center justify-between gap-2">
+                <div className="text-xs text-gray-300">
+                  <span className="font-medium text-blue-300 block">Dica Rápida:</span>
+                  Consulte no Google / Redesim em 1 clique
+                </div>
+                <a
+                  href={`https://www.google.com/search?q=${encodeURIComponent(
+                    `${targetCompanyForCnpj.nomeFantasia || targetCompanyForCnpj.razaoSocial} ${targetCompanyForCnpj.municipio || ''} ${targetCompanyForCnpj.uf || ''} CNPJ`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-semibold text-seguranca-yellow hover:text-yellow-400 flex items-center gap-1 bg-seguranca-black px-2.5 py-1.5 rounded border border-gray-700 hover:border-seguranca-yellow shrink-0"
+                >
+                  <Search className="h-3 w-3" />
+                  Abrir no Google
+                  <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              </div>
+
+              <form onSubmit={handleConfirmManualCnpj} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-cnpj-input" className="text-xs font-medium text-gray-300">
+                    Número do CNPJ (14 dígitos):
+                  </Label>
+                  <Input
+                    id="manual-cnpj-input"
+                    type="text"
+                    placeholder="00.000.000/0000-00"
+                    value={manualCnpjInput}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/\D/g, '').slice(0, 14);
+                      setManualCnpjInput(formatCNPJ(clean));
+                    }}
+                    autoFocus
+                    className="bg-seguranca-black border-gray-600 text-white font-mono text-sm tracking-wide"
+                  />
+                  {manualCnpjInput && (
+                    <div className="text-[11px] pt-0.5">
+                      {validateCNPJ(manualCnpjInput) ? (
+                        <span className="text-green-400 flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Dígitos verificadores do CNPJ válidos
+                        </span>
+                      ) : (
+                        <span className="text-amber-400 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" /> CNPJ incompleto ou inválido
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter className="pt-2 flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setManualCnpjModalOpen(false);
+                      setTargetCompanyForCnpj(null);
+                    }}
+                    className="text-gray-400 hover:text-white text-xs"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={searchingManualCnpj || !validateCNPJ(manualCnpjInput)}
+                    className="bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold text-xs"
+                  >
+                    {searchingManualCnpj ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                        Consultando Receita...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-3.5 w-3.5 mr-1.5" />
+                        Consultar e Salvar
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Configuração de Chaves de IA & Ferramentas */}
       <Dialog open={credentialsModalOpen} onOpenChange={setCredentialsModalOpen}>
