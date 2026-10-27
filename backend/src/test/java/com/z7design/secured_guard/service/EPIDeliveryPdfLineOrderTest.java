@@ -166,6 +166,73 @@ class EPIDeliveryPdfLineOrderTest {
         assertTrue(idxNovo > idxLegacy, "Item novo (lineOrder 5) deve ficar abaixo do legado");
     }
 
+    @Test
+    void pdfNaoDeveConterMensagemVerdeEDeveCaberEmUmaPagina() throws Exception {
+        StandardReportLayoutService layoutService = newLayoutService();
+        pdfService = new EPIDeliveryStandardPdfService(
+                employeeRepository, companyRepository, epiDeliveryFormRepository,
+                stockItemRepository, layoutService,
+                new com.z7design.secured_guard.service.ExcelReportLayoutService(companyRepository),
+                documentDateResolver);
+
+        lenient().when(companyRepository.findById(company.getId())).thenReturn(Optional.of(company));
+
+        byte[] pdf = pdfService.generateEPIDeliveryPdfFromForm(form);
+        String text = extractText(pdf);
+
+        org.junit.jupiter.api.Assertions.assertFalse(
+                text.contains("DOCUMENTO ASSINADO ELETRONICAMENTE COM VALIDADE JURÍDICA NACIONAL"),
+                "A mensagem em verde com validade jurídica deve ser removida da ficha de EPI");
+
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdf))) {
+            assertEquals(1, document.getNumberOfPages(), "A ficha de EPI deve caber em exatamente 1 página");
+        }
+    }
+
+    @Test
+    void pdfCom13ItensDeveCaberEmExatamenteUmaPagina() throws Exception {
+        StandardReportLayoutService layoutService = newLayoutService();
+        pdfService = new EPIDeliveryStandardPdfService(
+                employeeRepository, companyRepository, epiDeliveryFormRepository,
+                stockItemRepository, layoutService,
+                new com.z7design.secured_guard.service.ExcelReportLayoutService(companyRepository),
+                documentDateResolver);
+
+        lenient().when(companyRepository.findById(company.getId())).thenReturn(Optional.of(company));
+
+        List<EPIDeliveryFormItem> items = new java.util.ArrayList<>();
+        for (int i = 1; i <= 13; i++) {
+            EPIDeliveryFormItem it = item("EQUIPAMENTO " + i + " - DESCRICAO DETALHADA OPERACIONAL BOMBEIRO CIVIL", i);
+            it.setSizeNumber("TAM " + (38 + i));
+            it.setCa("4" + (1000 + i));
+            it.setReplacementReason("Devolvido ao Estoque - Tamanho Incorreto e Substituicao");
+            items.add(it);
+        }
+        form.setItems(items);
+
+        byte[] pdf = pdfService.generateEPIDeliveryPdfFromForm(form);
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdf))) {
+            assertEquals(1, document.getNumberOfPages(), "A ficha de EPI com 13 itens deve caber em EXATAMENTE 1 página");
+        }
+    }
+
+    @Test
+    void pdfEmBrancoDeveCaberEmExatamenteUmaPagina() throws Exception {
+        StandardReportLayoutService layoutService = newLayoutService();
+        pdfService = new EPIDeliveryStandardPdfService(
+                employeeRepository, companyRepository, epiDeliveryFormRepository,
+                stockItemRepository, layoutService,
+                new com.z7design.secured_guard.service.ExcelReportLayoutService(companyRepository),
+                documentDateResolver);
+
+        lenient().when(companyRepository.findById(company.getId())).thenReturn(Optional.of(company));
+
+        byte[] pdf = pdfService.generateBlankEPIDeliveryPdf(company.getId(), employee.getId());
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdf))) {
+            assertEquals(1, document.getNumberOfPages(), "A ficha de EPI em branco deve caber em EXATAMENTE 1 página");
+        }
+    }
+
     private String extractText(byte[] pdfBytes) throws Exception {
         try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdfBytes))) {
             return new PDFTextStripper().getText(document);

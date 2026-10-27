@@ -90,8 +90,8 @@ export function sugerirProximaDataValida(dataAtual: Date, feriadosMap: Map<strin
     const dayPlus1 = formatarIso(somarDias(teste, 1));
     const dayPlus2 = formatarIso(somarDias(teste, 2));
 
-    // Dias úteis permitidos (segunda, terça, quarta) que não antecedem feriado
-    if (diaSemana >= 1 && diaSemana <= 3) {
+    // Dias úteis permitidos (segunda, terça, quarta, quinta) que não antecedem feriado
+    if (diaSemana >= 1 && diaSemana <= 4) {
       if (!feriadosMap.has(iso) && !feriadosMap.has(dayPlus1) && !feriadosMap.has(dayPlus2)) {
         return iso;
       }
@@ -141,23 +141,15 @@ export function validarInicioFeriasClt(
     return { valid: true };
   }
 
-  // 1. Validação de DSR (Sexta-feira, Quinta-feira, Sábado e Domingo)
-  // Para escalas padrão (ex: 5x2, 6x1), o DSR fixo em domingos/sábados impede o início na quinta ou sexta.
+  // 1. Validação de DSR (Sexta-feira, Sábado e Domingo)
+  // Para escalas padrão (ex: 5x2, 6x1), o DSR fixo em domingos impede o início na sexta-feira (2 dias antes do DSR).
+  // A quinta-feira (3 dias antes do DSR) é dia útil regular perfeitamente permitido pela CLT.
   if (true) {
     if (diaSemana === 5) { // Sexta-feira
       return {
         valid: false,
         motivo: 'DSR',
-        mensagem: 'Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Sexta-feira em escala padrão (5x2), pois antecede em 2 dias o Repouso Semanal Remunerado (DSR no domingo).',
-        sugestaoData: sugestao
-      };
-    }
-
-    if (diaSemana === 4) { // Quinta-feira
-      return {
-        valid: false,
-        motivo: 'DSR',
-        mensagem: 'Violação do Art. 134, § 3º da CLT: É vedado iniciar férias na Quinta-feira, pois antecede em 2 dias o descanso semanal de sábado/domingo.',
+        mensagem: 'Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Sexta-feira em escala padrão, pois antecede em 2 dias o Repouso Semanal Remunerado (DSR no domingo). Escolha de Segunda a Quinta-feira.',
         sugestaoData: sugestao
       };
     }

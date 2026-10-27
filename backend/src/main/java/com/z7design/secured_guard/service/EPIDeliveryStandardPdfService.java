@@ -244,8 +244,8 @@ public class EPIDeliveryStandardPdfService {
                         Table nameTable = new Table(UnitValue.createPercentArray(new float[] { 100f }))
                                         .useAllAvailableWidth();
                         nameTable.addCell(new Cell().add(new Paragraph("NOME DO EMPREGADO: " + name)
-                                        .setFontSize(8.5f).setBold())
-                                        .setPadding(3f));
+                                        .setFontSize(8f).setBold())
+                                        .setPadding(2f));
                         document.add(nameTable);
 
                         Table infoTable = new Table(UnitValue.createPercentArray(new float[] { 40f, 30f, 30f }))
@@ -259,9 +259,9 @@ public class EPIDeliveryStandardPdfService {
                                         : (employee.getDepartment() != null ? employee.getDepartment().getName().toUpperCase() : 
                                           (employee.getUnit() != null ? employee.getUnit().getName().toUpperCase() : ""));
 
-                        infoTable.addCell(new Cell().add(new Paragraph("FUNÇÃO: " + position).setFontSize(8f)).setPadding(2.5f));
-                        infoTable.addCell(new Cell().add(new Paragraph("CPF: " + cpf).setFontSize(8f)).setPadding(2.5f));
-                        infoTable.addCell(new Cell().add(new Paragraph("RG: " + rg).setFontSize(8f)).setPadding(2.5f));
+                        infoTable.addCell(new Cell().add(new Paragraph("FUNÇÃO: " + position).setFontSize(7.5f)).setPadding(2f));
+                        infoTable.addCell(new Cell().add(new Paragraph("CPF: " + cpf).setFontSize(7.5f)).setPadding(2f));
+                        infoTable.addCell(new Cell().add(new Paragraph("RG: " + rg).setFontSize(7.5f)).setPadding(2f));
                         document.add(infoTable);
 
                         Table secondInfoTable = new Table(UnitValue.createPercentArray(new float[] { 35f, 30f, 35f }))
@@ -271,15 +271,15 @@ public class EPIDeliveryStandardPdfService {
                         String terminationDate = formatDate(employee.getTerminationDate());
                         String responsibleName = resolveResponsibleName(form);
 
-                        secondInfoTable.addCell(new Cell().add(new Paragraph("ADMISSÃO: " + hireDate).setFontSize(8f)).setPadding(2.5f));
-                        secondInfoTable.addCell(new Cell().add(new Paragraph("DEMISSÃO: " + terminationDate).setFontSize(8f)).setPadding(2.5f));
-                        secondInfoTable.addCell(new Cell().add(new Paragraph("SETOR: " + sector).setFontSize(8f)).setPadding(2.5f));
+                        secondInfoTable.addCell(new Cell().add(new Paragraph("ADMISSÃO: " + hireDate).setFontSize(7.5f)).setPadding(2f));
+                        secondInfoTable.addCell(new Cell().add(new Paragraph("DEMISSÃO: " + terminationDate).setFontSize(7.5f)).setPadding(2f));
+                        secondInfoTable.addCell(new Cell().add(new Paragraph("SETOR: " + sector).setFontSize(7.5f)).setPadding(2f));
                         document.add(secondInfoTable);
 
                         Table respTable = new Table(UnitValue.createPercentArray(new float[] { 100f }))
-                                        .useAllAvailableWidth().setMarginBottom(4f).setMarginTop(2f);
-                        respTable.addCell(new Cell().add(new Paragraph("RESPONSÁVEL PELA ENTREGA: " + responsibleName).setFontSize(8.5f).setBold())
-                                        .setPadding(3f));
+                                        .useAllAvailableWidth().setMarginBottom(2.5f).setMarginTop(1f);
+                        respTable.addCell(new Cell().add(new Paragraph("RESPONSÁVEL PELA ENTREGA: " + responsibleName).setFontSize(8f).setBold())
+                                        .setPadding(2f));
                         document.add(respTable);
 
                         // 3. Termo e Declaração de Responsabilidade
@@ -289,22 +289,22 @@ public class EPIDeliveryStandardPdfService {
                                         + "., os EPI's abaixo especificados a serem usados no desempenho de minhas tarefas. Assumo o compromisso de usá-los durante a jornada de trabalho, zelar pela sua conservação, quando necessário solicitar a substituição ou reposição e devolvê-los à Empresa em caso de demissão. Estou ciente também que o não uso desses EPI's implicará em ato faltoso e insubordinação, sujeito a sanções disciplinares previstas no art. 158 CLT.";
                         
                         Table decTable = new Table(UnitValue.createPercentArray(new float[] { 100f }))
-                                        .useAllAvailableWidth().setMarginBottom(2f);
+                                        .useAllAvailableWidth().setMarginBottom(1.5f);
                         decTable.addCell(new Cell().add(new Paragraph(declarationText)
-                                        .setFontSize(7.5f).setTextAlignment(TextAlignment.JUSTIFIED))
-                                        .setPadding(3.5f));
+                                        .setFontSize(7f).setTextAlignment(TextAlignment.JUSTIFIED))
+                                        .setPadding(2f));
                         document.add(decTable);
 
                         Table signTable = new Table(UnitValue.createPercentArray(new float[] { 35f, 65f }))
-                                        .useAllAvailableWidth().setMarginBottom(4f);
+                                        .useAllAvailableWidth().setMarginBottom(2.5f);
                         
                         String dateStr = form.getDeliveryDate() != null
                                         ? form.getDeliveryDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                                         : "____/____/____";
                         
-                        signTable.addCell(new Cell().add(new Paragraph("Contagem: " + dateStr).setFontSize(8.5f)).setPadding(3.5f));
+                        signTable.addCell(new Cell().add(new Paragraph("Contagem: " + dateStr).setFontSize(8f)).setPadding(2.5f));
                         
-                        Cell signatureCell = new Cell().setPadding(3.5f);
+                        Cell signatureCell = new Cell().setPadding(2.5f);
                         if (form.getSignatureBase64() != null && !form.getSignatureBase64().isEmpty()) {
                                 try {
                                         String base64Data = form.getSignatureBase64();
@@ -313,15 +313,15 @@ public class EPIDeliveryStandardPdfService {
                                         }
                                         byte[] imageBytes = java.util.Base64.getDecoder().decode(base64Data);
                                         com.itextpdf.layout.element.Image img = new com.itextpdf.layout.element.Image(com.itextpdf.io.image.ImageDataFactory.create(imageBytes));
-                                        img.setMaxHeight(26f);
-                                        signatureCell.add(new Paragraph("Assinatura Digital:").setFontSize(7f).setItalic().setMarginBottom(1f));
+                                        img.setMaxHeight(18f);
+                                        signatureCell.add(new Paragraph("Assinatura Digital:").setFontSize(6.5f).setItalic().setMarginBottom(1f));
                                         signatureCell.add(img);
                                 } catch (Exception e) {
                                         log.error("Erro ao renderizar assinatura digital no PDF", e);
-                                        signatureCell.add(new Paragraph("Assinatura: _________________________________________________").setFontSize(8.5f));
+                                        signatureCell.add(new Paragraph("Assinatura: _________________________________________________").setFontSize(8f));
                                 }
                         } else {
-                                signatureCell.add(new Paragraph("Assinatura: _________________________________________________").setFontSize(8.5f));
+                                signatureCell.add(new Paragraph("Assinatura: _________________________________________________").setFontSize(8f));
                         }
                         signTable.addCell(signatureCell);
                         document.add(signTable);
@@ -330,7 +330,7 @@ public class EPIDeliveryStandardPdfService {
                         addSectionHeader(document, "DETALHAMENTO DOS EQUIPAMENTOS FORNECIDOS");
 
                         Table epiTable = new Table(UnitValue
-                                        .createPercentArray(new float[] { 22f, 4f, 8f, 10f, 10f, 12f, 14f, 20f }))
+                                        .createPercentArray(new float[] { 23f, 4f, 7f, 6f, 9f, 13f, 20f, 18f }))
                                         .useAllAvailableWidth();
 
                         epiTable.addHeaderCell(createEpiHeaderCell("EQUIPAMENTO"));
@@ -361,13 +361,22 @@ public class EPIDeliveryStandardPdfService {
                                 epiTable.addCell(createEpiSignatureCell(movement.signatureBase64()));
                         }
 
-                        // Selo de Validade Jurídica (Ficha Eletrônica de Entrega de EPI - NR-6 / Portaria MTE 671/2021 / Lei 13.874/2019)
-                        boolean hasAuditBox = form.getSignatureBase64() != null || form.getSignedAt() != null || form.getStatus() == EPIDeliveryFormStatus.COMPLETED;
+                        // Preenchimento balanceado da página: estima a altura real dos itens para não estourar 1 página
+                        int usedUnits = 0;
+                        for (EpiMovementRow m : movements) {
+                                int nameLen = m.epiName() != null ? m.epiName().length() : 0;
+                                int reasonLen = m.substitutionReason() != null ? m.substitutionReason().length() : 0;
+                                int units = 1;
+                                if (nameLen > 45 || reasonLen > 35) {
+                                        units = 3;
+                                } else if (nameLen > 22 || reasonLen > 18) {
+                                        units = 2;
+                                }
+                                usedUnits += units;
+                        }
 
-                        // Preenchimento balanceado da página: preenche até 17 linhas (com selo de auditoria) ou 20 linhas (sem selo)
-                        // para preencher o espaço vertical e eliminar o vazio no rodapé
-                        int targetRows = hasAuditBox ? 16 : 19;
-                        int itemsToAdd = Math.max(0, targetRows - movements.size());
+                        int targetUnits = 18;
+                        int itemsToAdd = Math.max(0, targetUnits - usedUnits);
                         for (int i = 0; i < itemsToAdd; i++) {
                                 epiTable.addCell(createEpiDataCell(""));
                                 epiTable.addCell(createEpiDataCell(""));
@@ -380,31 +389,6 @@ public class EPIDeliveryStandardPdfService {
                         }
 
                         document.add(epiTable);
-
-                        if (hasAuditBox) {
-                                Table auditTable = new Table(UnitValue.createPercentArray(new float[] { 100f }))
-                                                .useAllAvailableWidth().setMarginTop(5f);
-                                String signedAtStr = form.getSignedAt() != null 
-                                                ? form.getSignedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
-                                                : (form.getDeliveryDate() != null ? form.getDeliveryDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A");
-                                String sigTypeStr = form.getSignatureType() != null ? form.getSignatureType() : "ELETRÔNICA";
-                                String ipStr = form.getAuditIp() != null ? form.getAuditIp() : "Sistema Interno / Local";
-                                String hashStr = Integer.toHexString((form.getId().toString() + signedAtStr + name).hashCode()).toUpperCase();
-
-                                String auditBoxText = "DOCUMENTO ASSINADO ELETRONICAMENTE COM VALIDADE JURÍDICA NACIONAL\n" +
-                                                "Amparo Legal: NR-6 (Item 6.5.1), Portaria MTE nº 671/2021 e Lei nº 13.874/2019 (Liberdade Econômica)\n" +
-                                                "Assinado por: " + name + " (CPF: " + CompanyDataFormatter.formatCpf(employee.getCpf()) + ") | Data/Hora: " + signedAtStr + "\n" +
-                                                "Método: " + sigTypeStr + " | IP: " + ipStr + " | Hash de Autenticação SHA-256: [" + hashStr + "]";
-
-                                Cell auditCell = new Cell().add(new Paragraph(auditBoxText)
-                                                .setFontSize(6.8f).setBold().setTextAlignment(TextAlignment.CENTER)
-                                                .setFontColor(new DeviceRgb(20, 83, 45)))
-                                                .setBackgroundColor(new DeviceRgb(240, 253, 244))
-                                                .setBorder(new SolidBorder(new DeviceRgb(34, 197, 94), 1f))
-                                                .setPadding(3.5f);
-                                auditTable.addCell(auditCell);
-                                document.add(auditTable);
-                        }
 
                         document.close();
                 } catch (Exception e) {
@@ -615,7 +599,7 @@ public class EPIDeliveryStandardPdfService {
                         addSectionHeader(document, "DETALHAMENTO DOS EQUIPAMENTOS FORNECIDOS");
 
                         Table epiTable = new Table(UnitValue
-                                        .createPercentArray(new float[] { 22f, 4f, 8f, 10f, 10f, 12f, 14f, 20f }))
+                                        .createPercentArray(new float[] { 23f, 4f, 7f, 6f, 9f, 13f, 20f, 18f }))
                                         .useAllAvailableWidth();
 
                         epiTable.addHeaderCell(createEpiHeaderCell("EQUIPAMENTO"));
@@ -627,7 +611,7 @@ public class EPIDeliveryStandardPdfService {
                         epiTable.addHeaderCell(createEpiHeaderCell("MOTIVO DA SUBST."));
                         epiTable.addHeaderCell(createEpiHeaderCell("ASSINATURA"));
 
-                        // Preencher com 18 linhas para ocupar verticalmente a página sem deixar espaço em branco
+                        // Preencher com 18 linhas para ocupar verticalmente a página sem deixar espaço em branco e garantir 1 página
                         for (int i = 0; i < 18; i++) {
                                 epiTable.addCell(createEpiDataCell(""));
                                 epiTable.addCell(createEpiDataCell(""));
@@ -659,17 +643,17 @@ public class EPIDeliveryStandardPdfService {
 
         private Cell createEpiHeaderCell(String text) {
                 return new Cell()
-                                .add(new Paragraph(text).setBold().setFontSize(7f)
+                                .add(new Paragraph(text).setBold().setFontSize(6.8f)
                                                 .setTextAlignment(TextAlignment.CENTER))
-                                .setPadding(3f);
+                                .setPadding(2.5f);
         }
 
         private Cell createEpiDataCell(String text) {
                 return new Cell()
-                                .add(new Paragraph(text != null ? text : "").setFontSize(7f)
+                                .add(new Paragraph(text != null ? text : "").setFontSize(6.8f)
                                                 .setTextAlignment(TextAlignment.CENTER))
-                                .setPaddingTop(2f).setPaddingBottom(2f).setPaddingLeft(2f).setPaddingRight(2f)
-                                .setMinHeight(14f);
+                                .setPaddingTop(1.5f).setPaddingBottom(1.5f).setPaddingLeft(2f).setPaddingRight(2f)
+                                .setMinHeight(13f);
         }
 
         /**
@@ -1141,7 +1125,7 @@ public class EPIDeliveryStandardPdfService {
                 Table divider = new Table(UnitValue.createPercentArray(new float[]{40f, 35f, 25f})).useAllAvailableWidth();
                 divider.setBorder(Border.NO_BORDER);
                 divider.setMarginTop(0f);
-                divider.setMarginBottom(5f);
+                divider.setMarginBottom(3f);
 
                 divider.addCell(new Cell().setHeight(2.5f).setBackgroundColor(RED_PRIMARY).setBorder(Border.NO_BORDER).setPadding(0f));
                 divider.addCell(new Cell().setHeight(2.5f).setBackgroundColor(new DeviceRgb(249, 115, 22)).setBorder(Border.NO_BORDER).setPadding(0f));
@@ -1153,13 +1137,13 @@ public class EPIDeliveryStandardPdfService {
         private void addSectionHeader(Document document, String title) {
                 Table secTable = new Table(UnitValue.createPercentArray(new float[]{0.6f, 99.4f})).useAllAvailableWidth();
                 secTable.setBorder(Border.NO_BORDER);
-                secTable.setMarginTop(5f);
-                secTable.setMarginBottom(2.5f);
+                secTable.setMarginTop(3f);
+                secTable.setMarginBottom(1.5f);
 
                 Cell barCell = new Cell().setBackgroundColor(RED_PRIMARY).setBorder(Border.NO_BORDER).setPadding(0f);
                 Cell textCell = new Cell().setBorder(Border.NO_BORDER).setPaddingLeft(4f).setPaddingTop(0f).setPaddingBottom(0f);
                 textCell.add(new Paragraph(title.toUpperCase())
-                                .setFontSize(8f)
+                                .setFontSize(7.5f)
                                 .setBold()
                                 .setFontColor(RED_PRIMARY));
 

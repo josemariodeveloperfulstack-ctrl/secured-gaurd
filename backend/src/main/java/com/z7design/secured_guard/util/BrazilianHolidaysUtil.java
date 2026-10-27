@@ -107,11 +107,7 @@ public class BrazilianHolidaysUtil {
         // 1. Validação de DSR (Sábado e Domingo) para escalas normais (ex: 5x2, 6x1):
         if (dow == DayOfWeek.FRIDAY) {
             return new ValidationResult(false, 
-                "Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Sexta-feira, pois antecede em 2 dias o Repouso Semanal Remunerado (DSR no domingo). Escolha a Segunda, Terça ou Quarta-feira.");
-        }
-        if (dow == DayOfWeek.THURSDAY) {
-            return new ValidationResult(false, 
-                "Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Quinta-feira, pois antecede em 2 dias o descanso semanal remunerado de sábado/domingo.");
+                "Violação do Art. 134, § 3º da CLT: É expressamente proibido iniciar férias na Sexta-feira, pois antecede em 2 dias o Repouso Semanal Remunerado (DSR no domingo). Escolha de Segunda a Quinta-feira.");
         }
         if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) {
             return new ValidationResult(false, 
