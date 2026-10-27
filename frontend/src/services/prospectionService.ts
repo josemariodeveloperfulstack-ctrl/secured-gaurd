@@ -167,7 +167,7 @@ export const ESTADOS_BRASIL = [
 
 class ProspectionService {
   /**
-   * Consulta dados completos de um CNPJ com fallback entre BrasilAPI e ReceitaWS
+   * Consulta dados completos de um CNPJ com prioridade no backend seguro (sem CORS)
    */
   async searchByCnpj(cnpjRaw: string): Promise<ProspectCompany> {
     const cleanCnpj = cnpjRaw.replace(/\D/g, '');
@@ -175,35 +175,51 @@ class ProspectionService {
       throw new Error('CNPJ deve conter 14 dígitos numéricos.');
     }
 
+    // 1. Prioridade máxima: Proxy Seguro do Backend (sem erros de CORS ou bloqueios no browser)
     try {
-      // 1. Tentar BrasilAPI v2
+      const { data } = await api.get<ProspectCompany>(`/prospection/cnpj/${cleanCnpj}`);
+      if (data && data.cnpj) {
+        return data;
+      }
+    } catch (err: any) {
+      console.warn('Backend proxy CNPJ retornou erro, tentando fallbacks públicos...', err?.message);
+    }
+
+    // 2. Fallback direto caso o backend esteja oscilando
+    try {
       const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
       if (res.ok) {
         const data = await res.json();
         return this.mapBrasilApiToProspect(data);
       }
     } catch (err) {
-      console.warn('BrasilAPI indisponível ou falhou, tentando fallback ReceitaWS...', err);
+      console.warn('BrasilAPI direto indisponível:', err);
     }
 
     try {
-      // 2. Fallback: ReceitaWS JSONP ou endpoint livre
       const res2 = await fetch(`https://minhareceita.org/${cleanCnpj}`);
       if (res2.ok) {
         const data2 = await res2.json();
         return this.mapMinhaReceitaToProspect(data2);
       }
     } catch (err2) {
-      console.warn('MinhaReceita indisponível, tentando proxy backend...', err2);
+      console.warn('MinhaReceita indisponível:', err2);
     }
 
-    // 3. Fallback: API do backend se configurada
-    try {
-      const { data } = await api.get(`/prospection/cnpj/${cleanCnpj}`);
-      return data;
-    } catch {
-      throw new Error(`Não foi possível localizar os dados para o CNPJ ${cnpjRaw}. Verifique o número digitado.`);
-    }
+    throw new Error(`Não foi possível localizar os dados para o CNPJ ${cnpjRaw}. Verifique o número digitado ou a conexão.`);
+  }
+
+  /**
+   * Tenta localizar e enriquecer o CNPJ de uma empresa ou condomínio a partir do nome/fantasia e localidade
+   */
+  async findCnpjByName(nome: string, cidade?: string, uf?: string): Promise<any> {
+    const params = new URLSearchParams();
+    params.append('nome', nome);
+    if (cidade) params.append('cidade', cidade);
+    if (uf) params.append('uf', uf);
+
+    const { data } = await api.get(`/prospection/find-cnpj?${params.toString()}`);
+    return data;
   }
 
   /**
