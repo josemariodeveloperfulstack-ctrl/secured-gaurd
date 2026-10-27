@@ -51,8 +51,10 @@ public class ProspectionController {
     public ResponseEntity<Map<String, Object>> updateCredentials(@RequestBody Map<String, String> payload) {
         String geminiKey = payload.get("geminiApiKey");
         String placesKey = payload.get("googlePlacesApiKey");
+        String apifyToken = payload.get("apifyApiToken");
+        String apolloKey = payload.get("apolloApiKey");
         String model = payload.get("model");
-        geminiProspectionService.updateCredentials(geminiKey, placesKey, model);
+        geminiProspectionService.updateCredentials(geminiKey, placesKey, apifyToken, apolloKey, model);
 
         Map<String, Object> response = new HashMap<>(geminiProspectionService.getCredentialsStatus());
         response.put("message", "Credenciais de Prospecção atualizadas com sucesso!");

@@ -73,6 +73,8 @@ const Prospeccao: React.FC = () => {
   const [credentialsStatus, setCredentialsStatus] = useState<any>(null);
   const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('');
   const [googlePlacesApiKeyInput, setGooglePlacesApiKeyInput] = useState('');
+  const [apifyTokenInput, setApifyTokenInput] = useState('');
+  const [apolloApiKeyInput, setApolloApiKeyInput] = useState('');
   const [geminiModelInput, setGeminiModelInput] = useState('gemini-1.5-flash');
 
   // Carregar status das credenciais
@@ -97,14 +99,18 @@ const Prospeccao: React.FC = () => {
       await prospectionService.updateCredentials({
         geminiApiKey: geminiApiKeyInput,
         googlePlacesApiKey: googlePlacesApiKeyInput,
+        apifyApiToken: apifyTokenInput,
+        apolloApiKey: apolloApiKeyInput,
         model: geminiModelInput,
       });
       toast({
         title: 'Chaves atualizadas com sucesso!',
-        description: 'As configurações de IA e Ferramentas de Prospecção estão ativas.',
+        description: 'As configurações de IA, Google Maps, Apify e Apollo estão ativas.',
       });
       setGeminiApiKeyInput('');
       setGooglePlacesApiKeyInput('');
+      setApifyTokenInput('');
+      setApolloApiKeyInput('');
       await loadCredentials();
       setCredentialsModalOpen(false);
     } catch (err: any) {
@@ -302,12 +308,12 @@ const Prospeccao: React.FC = () => {
             variant="outline"
             onClick={() => setCredentialsModalOpen(true)}
             className="border-amber-500/80 text-amber-300 hover:bg-amber-500 hover:text-black text-xs sm:text-sm font-semibold flex items-center gap-1.5"
-            title="Configurar chaves de API da IA Gemini e Google Places / Meu Negócio"
+            title="Configurar chaves de API: Google Places, Apify Maps, Apollo.io e Gemini IA"
           >
             <Key className="h-4 w-4 text-amber-400" />
             Chaves & IA
-            {credentialsStatus?.geminiConfigured && (
-              <span className="h-2 w-2 rounded-full bg-green-500 inline-block ml-0.5" title="Gemini Ativo" />
+            {(credentialsStatus?.geminiConfigured || credentialsStatus?.apifyConfigured || credentialsStatus?.googlePlacesConfigured || credentialsStatus?.apolloConfigured) && (
+              <span className="h-2 w-2 rounded-full bg-green-500 inline-block ml-0.5" title="Serviços de Prospecção Ativos" />
             )}
           </Button>
           <Button
@@ -939,14 +945,14 @@ const Prospeccao: React.FC = () => {
 
       {/* Modal de Configuração de Chaves de IA & Ferramentas */}
       <Dialog open={credentialsModalOpen} onOpenChange={setCredentialsModalOpen}>
-        <DialogContent className="max-w-lg bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+        <DialogContent className="max-w-xl bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-h-[88vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-seguranca-yellow flex items-center gap-2">
               <Key className="h-5 w-5 text-amber-400" />
-              Chaves & Tokens de Prospecção
+              Chaves & Ferramentas de Prospecção
             </DialogTitle>
             <DialogDescription className="text-gray-400 text-xs">
-              Informe as chaves das ferramentas para ativar raspagem inteligente e qualificação com IA.
+              Configure as chaves dos motores de busca (Google Places, Apify Google Maps), enriquecimento (Apollo.io) e inteligência analítica (Gemini IA).
             </DialogDescription>
           </DialogHeader>
 
@@ -1005,7 +1011,65 @@ const Prospeccao: React.FC = () => {
                 className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
               />
               <p className="text-[11px] text-gray-500">
-                Opcional. Se não informada, o sistema utiliza o motor geoespacial livre do OpenStreetMap Nominatim.
+                Oferece busca nativa de alta precisão em empresas cadastradas no Google Meu Negócio.
+              </p>
+            </div>
+
+            {/* Apify Google Maps Crawler */}
+            <div className="space-y-1.5 p-3 rounded-lg bg-seguranca-black/60 border border-gray-700">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Compass className="h-4 w-4 text-emerald-400" />
+                  Apify API Token (Raspagem Avançada no Google Maps)
+                </Label>
+                {credentialsStatus?.apifyConfigured ? (
+                  <Badge className="bg-green-950 text-green-300 border border-green-800 text-[10px]">
+                    Ativo ({credentialsStatus.apifyMaskedToken})
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-gray-400 border-gray-700 text-[10px]">
+                    Não configurado
+                  </Badge>
+                )}
+              </div>
+              <Input
+                type="password"
+                placeholder="Cole seu token pessoal do Apify (apify_api_...)"
+                value={apifyTokenInput}
+                onChange={(e) => setApifyTokenInput(e.target.value)}
+                className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+              />
+              <p className="text-[11px] text-gray-500">
+                Raspagem de alto volume e extração profunda de contatos via crawler <a href="https://apify.com" target="_blank" rel="noreferrer" className="text-seguranca-yellow underline">Apify.com</a>.
+              </p>
+            </div>
+
+            {/* Apollo.io B2B Enrichment */}
+            <div className="space-y-1.5 p-3 rounded-lg bg-seguranca-black/60 border border-gray-700">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-cyan-400" />
+                  Apollo.io API Key (Enriquecimento de Decisores & E-mails)
+                </Label>
+                {credentialsStatus?.apolloConfigured ? (
+                  <Badge className="bg-green-950 text-green-300 border border-green-800 text-[10px]">
+                    Ativo ({credentialsStatus.apolloMaskedKey})
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-gray-400 border-gray-700 text-[10px]">
+                    Não configurada
+                  </Badge>
+                )}
+              </div>
+              <Input
+                type="password"
+                placeholder="Cole sua API Key do Apollo.io..."
+                value={apolloApiKeyInput}
+                onChange={(e) => setApolloApiKeyInput(e.target.value)}
+                className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+              />
+              <p className="text-[11px] text-gray-500">
+                Localiza automaticamente diretores, gerentes de facilities/compras e e-mails corporativos verificados via <a href="https://apollo.io" target="_blank" rel="noreferrer" className="text-seguranca-yellow underline">Apollo.io</a>.
               </p>
             </div>
 

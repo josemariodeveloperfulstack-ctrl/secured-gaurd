@@ -512,7 +512,7 @@ class ProspectionService {
   }
 
   /**
-   * Obtém o status de configuração das chaves de IA e ferramentas (Google Places / Maps)
+   * Obtém o status de configuração das chaves de IA e ferramentas (Google Places / Maps / Apify / Apollo)
    */
   async getCredentialsStatus(): Promise<{
     geminiConfigured: boolean;
@@ -520,17 +520,23 @@ class ProspectionService {
     model: string;
     googlePlacesConfigured: boolean;
     googlePlacesMaskedKey: string;
+    apifyConfigured: boolean;
+    apifyMaskedToken: string;
+    apolloConfigured: boolean;
+    apolloMaskedKey: string;
   }> {
     const { data } = await api.get('/prospection/credentials');
     return data;
   }
 
   /**
-   * Salva ou atualiza as chaves da IA Gemini e Google Places
+   * Salva ou atualiza as chaves da IA Gemini, Google Places, Apify e Apollo.io
    */
   async updateCredentials(payload: {
     geminiApiKey?: string;
     googlePlacesApiKey?: string;
+    apifyApiToken?: string;
+    apolloApiKey?: string;
     model?: string;
   }): Promise<any> {
     const { data } = await api.post('/prospection/credentials', payload);

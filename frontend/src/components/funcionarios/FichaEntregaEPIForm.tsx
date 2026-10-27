@@ -43,9 +43,22 @@ const epiOptions = [
   'Protetor Facial',
   'Uniforme de Trabalho',
   'Colete Refletivo',
+  'Colete Balístico',
   'Luminária de Cabeça',
   'Detector de Gás',
   'Protetor Solar',
+  'Crachá de Identificação',
+  'Cordão para Crachá',
+  'Porta Crachá / Roller Clip',
+  'Tonfa / Bastão',
+  'Porta Tonfa',
+  'Algema',
+  'Porta Algema',
+  'Apito com Cordão',
+  'Cinto de Guarnição / Tático',
+  'Coturno de Segurança',
+  'Boné / Boina / Quepe',
+  'Capa de Chuva',
   'Outros',
 ];
 
@@ -106,90 +119,16 @@ function buildWorkSectorSnapshot(emp: SimpleEmployee | null): string {
   return Array.from(new Set(parts)).filter(Boolean).join(' / ').toUpperCase();
 }
 
-
-
 /**
- * Verifica se um item de estoque é relacionado a EPI/Uniforme/Proteção.
- * Permite filtrar para que apenas itens de EPI apareçam na Ficha de Entrega de EPI.
+ * Verifica se um item de estoque pode ser vinculado na Ficha de Entrega de EPI e Equipamentos.
+ * Todos os itens ativos do estoque da empresa (EPIs, Uniformes, Calçados e Acessórios como Crachá, Cordão,
+ * Tonfa, Algema, Apito, etc.) estão disponíveis para seleção e movimentação de estoque.
  */
 const isEpiStockItem = (item: StockItem): boolean => {
   if (!item) return false;
-
-  // Se possui número de CA cadastrado ou exige CA obrigatoriamente
-  if (item.requiresCa || (item.caNumber && item.caNumber.trim() !== '')) {
-    return true;
-  }
-
-  // Categoria de EPI, Calçados ou Uniformes
-  const cat = String(item.category || '').toUpperCase();
-  if (
-    cat === 'EPI' ||
-    cat === 'CALCADOS' ||
-    cat.startsWith('UNIFORME') ||
-    cat.includes('SEGURANCA') ||
-    cat.includes('PROTECAO')
-  ) {
-    return true;
-  }
-
-  // Palavras-chave no nome, nome completo, descrição ou categoria
-  const textToSearch = [
-    item.name,
-    item.fullName,
-    item.description,
-    cat,
-  ].filter(Boolean).join(' ').toLowerCase();
-
-  const epiKeywords = [
-    'epi',
-    'capacete',
-    'óculos',
-    'oculos',
-    'protetor auditivo',
-    'protetor auricular',
-    'protetor facial',
-    'protetor solar',
-    'máscara',
-    'mascara',
-    'respirador',
-    'luva',
-    'calçado',
-    'calcado',
-    'bota',
-    'botina',
-    'sapato',
-    'cinto de segurança',
-    'cinto',
-    'talabarte',
-    'avental',
-    'colete',
-    'colete refletivo',
-    'colete balístico',
-    'balístico',
-    'balistico',
-    'perneira',
-    'luminária de cabeça',
-    'luminaria de cabeca',
-    'detector de gás',
-    'detector de gas',
-    'abafador',
-    'uniforme',
-    'jaleco',
-    'macacão',
-    'macacao',
-    'camisa',
-    'calça',
-    'calca',
-    'jaqueta',
-    'blaser',
-    'segurança do trabalho',
-    'equipamento de proteção',
-    'proteção auditiva',
-    'proteção visual',
-    'proteção respiratória'
-  ];
-
-  return epiKeywords.some((kw) => textToSearch.includes(kw));
+  // Itens inativos não devem aparecer para novas vinculações
+  if (item.active === false) return false;
+  return true;
 };
 
 const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
