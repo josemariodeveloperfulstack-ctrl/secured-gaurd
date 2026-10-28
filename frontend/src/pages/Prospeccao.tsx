@@ -107,13 +107,23 @@ const Prospeccao: React.FC = () => {
     }
   };
 
+  const sanitizeCompany = (c: any): ProspectCompany => ({
+    ...c,
+    qsa: Array.isArray(c?.qsa) ? c.qsa : [],
+    decisores: Array.isArray(c?.decisores) ? c.decisores : [],
+  });
+
   const loadHistory = async () => {
     try {
       setLoadingHistory(true);
-      const data = await prospectionService.getHistory(0, 30);
-      setHistorySearches(data);
+      const data: any = await prospectionService.getHistory(0, 30);
+      const items = Array.isArray(data)
+        ? data
+        : (data && Array.isArray(data.content) ? data.content : []);
+      setHistorySearches(items);
     } catch (err) {
       console.warn('Não foi possível carregar o histórico de prospecções:', err);
+      setHistorySearches([]);
     } finally {
       setLoadingHistory(false);
     }
@@ -122,12 +132,14 @@ const Prospeccao: React.FC = () => {
   const handleLoadPastSearch = async (item: ProspectionHistoryItem) => {
     try {
       setLoadingHistoryId(item.id);
-      const searchDetails = await prospectionService.getHistoryDetails(item.id);
-      if (searchDetails && searchDetails.companies && searchDetails.companies.length > 0) {
-        setProspects(searchDetails.companies);
+      const searchDetails: any = await prospectionService.getHistoryDetails(item.id);
+      const rawList = searchDetails ? (searchDetails.prospects || searchDetails.companies || []) : [];
+      if (Array.isArray(rawList) && rawList.length > 0) {
+        const safeCompanies: ProspectCompany[] = rawList.map(sanitizeCompany);
+        setProspects(safeCompanies);
         toast({
           title: 'Histórico carregado do banco de dados!',
-          description: `${searchDetails.companies.length} empresas recuperadas da pesquisa de ${item.termoPesquisa || item.cidade}.`,
+          description: `${safeCompanies.length} empresas recuperadas da pesquisa de ${item.termoPesquisa || item.cidade}.`,
         });
       } else {
         toast({
@@ -230,10 +242,11 @@ const Prospeccao: React.FC = () => {
     try {
       setLoading(true);
       const results = await prospectionService.searchWithAi(cidade, selectedUf, termoNicho, 10);
-      if (results.length > 0) {
-        setProspects(results);
+      if (Array.isArray(results) && results.length > 0) {
+        const safeResults = results.map(sanitizeCompany);
+        setProspects(safeResults);
         toast({
-          title: `🎯 ${results.length} empresas reais localizadas em ${cidade}!`,
+          title: `🎯 ${safeResults.length} empresas reais localizadas em ${cidade}!`,
           description: 'Higienizados sem contatos de contabilidade e com presença real confirmada.',
         });
       } else {
@@ -279,9 +292,11 @@ const Prospeccao: React.FC = () => {
     try {
       setLoading(true);
       const company = await prospectionService.searchByCnpj(targetCnpj);
+      const safeCompany = sanitizeCompany(company);
       setProspects(prev => {
-        const filtered = prev.filter(p => p.cnpj !== company.cnpj);
-        return [company, ...filtered];
+        const safePrev = Array.isArray(prev) ? prev : [];
+        const filtered = safePrev.filter(p => p.cnpj !== safeCompany.cnpj);
+        return [safeCompany, ...filtered];
       });
       toast({
         title: 'Empresa localizada com dados oficiais!',
@@ -316,7 +331,7 @@ const Prospeccao: React.FC = () => {
 
       if (result && result.cnpj && result.cnpj !== '00.000.000/0001-00' && result.found !== false) {
         // Encontrou e validou dados oficiais!
-        setProspects(prev => prev.map(p => {
+        setProspects(prev => (Array.isArray(prev) ? prev : []).map(p => {
           const isMatch = (company.cnpj && p.cnpj === company.cnpj) ||
             ((p.nomeFantasia || p.razaoSocial) === companyName && p.municipio === company.municipio);
           
@@ -325,6 +340,8 @@ const Prospeccao: React.FC = () => {
           return {
             ...p,
             ...result,
+            qsa: Array.isArray(result.qsa) ? result.qsa : (Array.isArray(p.qsa) ? p.qsa : []),
+            decisores: Array.isArray(result.decisores) ? result.decisores : (Array.isArray(p.decisores) ? p.decisores : []),
             // Preservar links e diagnósticos gerados previamente
             googleMapsUrl: p.googleMapsUrl || result.googleMapsUrl,
             website: p.website || result.website,
@@ -345,6 +362,8 @@ const Prospeccao: React.FC = () => {
           setSelectedCompany(prev => prev ? {
             ...prev,
             ...result,
+            qsa: Array.isArray(result.qsa) ? result.qsa : (Array.isArray(prev.qsa) ? prev.qsa : []),
+            decisores: Array.isArray(result.decisores) ? result.decisores : (Array.isArray(prev.decisores) ? prev.decisores : []),
             situacaoCadastral: result.situacaoCadastral || 'ATIVA',
           } : null);
         }
@@ -393,7 +412,7 @@ const Prospeccao: React.FC = () => {
       const companyOfficial = await prospectionService.searchByCnpj(rawDigits);
       const targetName = targetCompanyForCnpj.nomeFantasia || targetCompanyForCnpj.razaoSocial;
 
-      setProspects(prev => prev.map(p => {
+      setProspects(prev => (Array.isArray(prev) ? prev : []).map(p => {
         const isMatch = (targetCompanyForCnpj.cnpj && p.cnpj === targetCompanyForCnpj.cnpj) ||
           ((p.nomeFantasia || p.razaoSocial) === targetName && p.municipio === targetCompanyForCnpj.municipio);
 
@@ -402,6 +421,8 @@ const Prospeccao: React.FC = () => {
         return {
           ...p,
           ...companyOfficial,
+          qsa: Array.isArray(companyOfficial.qsa) ? companyOfficial.qsa : (Array.isArray(p.qsa) ? p.qsa : []),
+          decisores: Array.isArray(companyOfficial.decisores) ? companyOfficial.decisores : (Array.isArray(p.decisores) ? p.decisores : []),
           googleMapsUrl: p.googleMapsUrl || companyOfficial.googleMapsUrl,
           website: p.website || companyOfficial.website,
           motivoConversao: p.motivoConversao || companyOfficial.motivoConversao,
@@ -418,7 +439,13 @@ const Prospeccao: React.FC = () => {
         (targetCompanyForCnpj.cnpj && selectedCompany.cnpj === targetCompanyForCnpj.cnpj) ||
         ((selectedCompany.nomeFantasia || selectedCompany.razaoSocial) === targetName)
       )) {
-        setSelectedCompany(prev => prev ? { ...prev, ...companyOfficial, situacaoCadastral: companyOfficial.situacaoCadastral || 'ATIVA' } : null);
+        setSelectedCompany(prev => prev ? {
+          ...prev,
+          ...companyOfficial,
+          qsa: Array.isArray(companyOfficial.qsa) ? companyOfficial.qsa : (Array.isArray(prev.qsa) ? prev.qsa : []),
+          decisores: Array.isArray(companyOfficial.decisores) ? companyOfficial.decisores : (Array.isArray(prev.decisores) ? prev.decisores : []),
+          situacaoCadastral: companyOfficial.situacaoCadastral || 'ATIVA',
+        } : null);
       }
 
       setManualCnpjModalOpen(false);
@@ -446,7 +473,7 @@ const Prospeccao: React.FC = () => {
       setSendingCrmId(company.cnpj);
       const lead = await prospectionService.sendToCrm(company);
       
-      setProspects(prev => prev.map(p => p.cnpj === company.cnpj ? { ...p, leadImported: true, importedLeadId: lead.id } : p));
+      setProspects(prev => (Array.isArray(prev) ? prev : []).map(p => p.cnpj === company.cnpj ? { ...p, leadImported: true, importedLeadId: lead.id } : p));
       if (selectedCompany?.cnpj === company.cnpj) {
         setSelectedCompany(prev => prev ? { ...prev, leadImported: true, importedLeadId: lead.id } : null);
       }
@@ -572,7 +599,7 @@ const Prospeccao: React.FC = () => {
                 className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-xs sm:text-sm font-medium flex items-center gap-1.5"
               >
                 <History className="h-4 w-4" />
-                📜 Histórico de Pesquisas ({historySearches.length})
+                📜 Histórico de Pesquisas ({Array.isArray(historySearches) ? historySearches.length : 0})
               </TabsTrigger>
             </TabsList>
 
@@ -728,12 +755,12 @@ const Prospeccao: React.FC = () => {
                 </Button>
               </div>
 
-              {loadingHistory && historySearches.length === 0 ? (
+              {loadingHistory && (!Array.isArray(historySearches) || historySearches.length === 0) ? (
                 <div className="flex justify-center items-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-seguranca-yellow" />
                   <span className="ml-2 text-sm text-gray-400">Carregando histórico do banco de dados...</span>
                 </div>
-              ) : historySearches.length === 0 ? (
+              ) : (!Array.isArray(historySearches) || historySearches.length === 0) ? (
                 <div className="p-8 text-center bg-seguranca-black/40 rounded-lg border border-dashed border-gray-700 space-y-2">
                   <History className="h-8 w-8 text-gray-600 mx-auto" />
                   <p className="text-sm text-gray-400">Nenhuma pesquisa gravada ainda.</p>
@@ -743,7 +770,7 @@ const Prospeccao: React.FC = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {historySearches.map((h) => {
+                  {(Array.isArray(historySearches) ? historySearches : []).map((h) => {
                     const dataFormatada = h.createdAt
                       ? new Intl.DateTimeFormat('pt-BR', {
                           dateStyle: 'short',
@@ -816,9 +843,9 @@ const Prospeccao: React.FC = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Users className="h-5 w-5 text-seguranca-yellow" />
-            Leads e Empresas Encontradas ({prospects.length})
+            Leads e Empresas Encontradas ({Array.isArray(prospects) ? prospects.length : 0})
           </h2>
-          {prospects.length > 0 && (
+          {Array.isArray(prospects) && prospects.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
@@ -830,7 +857,7 @@ const Prospeccao: React.FC = () => {
           )}
         </div>
 
-        {prospects.length === 0 ? (
+        {(!Array.isArray(prospects) || prospects.length === 0) ? (
           <div className="bg-seguranca-graphite/40 border border-dashed border-gray-700 rounded-lg p-12 text-center space-y-3">
             <Building2 className="h-12 w-12 text-gray-600 mx-auto" />
             <h3 className="text-base font-semibold text-gray-300">Nenhum prospecto carregado no momento</h3>
@@ -840,8 +867,8 @@ const Prospeccao: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {prospects.map((company, index) => {
-              const decisorPrincipal = company.qsa.length > 0 ? company.qsa[0] : null;
+            {(Array.isArray(prospects) ? prospects : []).map((company, index) => {
+              const decisorPrincipal = (Array.isArray(company.qsa) && company.qsa.length > 0) ? company.qsa[0] : null;
               const uniqueKey = (company.cnpj && company.cnpj.trim() !== '' && company.cnpj !== '00.000.000/0001-00')
                 ? company.cnpj
                 : `prospect-${company.razaoSocial || company.nomeFantasia || 'lead'}-${index}`;
@@ -966,7 +993,7 @@ const Prospeccao: React.FC = () => {
                         <span className="text-xs font-semibold text-emerald-400 block mb-0.5">
                           Tomador(es) de Decisão (QSA):
                         </span>
-                        {company.qsa.length > 0 ? (
+                        {Array.isArray(company.qsa) && company.qsa.length > 0 ? (
                           <div className="space-y-1">
                             {company.qsa.slice(0, 2).map((s, idx) => (
                               <div key={idx} className="flex flex-wrap items-center justify-between gap-1 text-xs text-white">
@@ -983,7 +1010,7 @@ const Prospeccao: React.FC = () => {
                                 )}
                               </div>
                             ))}
-                            {company.qsa.length > 2 && (
+                            {Array.isArray(company.qsa) && company.qsa.length > 2 && (
                               <span className="text-[11px] text-seguranca-yellow font-medium">
                                 +{company.qsa.length - 2} outro(s) sócio(s)
                               </span>
@@ -996,7 +1023,7 @@ const Prospeccao: React.FC = () => {
                     </div>
 
                     {/* Decisores Executivos (Apollo.io / Inferred) */}
-                    {company.decisores && company.decisores.length > 0 && (
+                    {Array.isArray(company.decisores) && company.decisores.length > 0 && (
                       <div className="space-y-1.5 bg-seguranca-black/40 p-2.5 rounded border border-cyan-800/40">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-semibold text-cyan-400 flex items-center gap-1.5">
@@ -1331,7 +1358,7 @@ const Prospeccao: React.FC = () => {
               )}
 
               {/* Decisores Executivos */}
-              {selectedCompany.decisores && selectedCompany.decisores.length > 0 && (
+              {Array.isArray(selectedCompany.decisores) && selectedCompany.decisores.length > 0 && (
                 <div className="bg-seguranca-black p-4 rounded-lg border border-cyan-800/40 space-y-2">
                   <h4 className="text-xs font-bold text-cyan-400 uppercase flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
@@ -1374,7 +1401,7 @@ const Prospeccao: React.FC = () => {
                   <UserCheck className="h-4 w-4" />
                   Quadro de Sócios e Administradores (QSA)
                 </h4>
-                {selectedCompany.qsa.length > 0 ? (
+                {Array.isArray(selectedCompany.qsa) && selectedCompany.qsa.length > 0 ? (
                   <div className="divide-y divide-gray-800">
                     {selectedCompany.qsa.map((s, idx) => (
                       <div key={idx} className="py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs gap-1">
