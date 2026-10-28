@@ -35,6 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
 import leadService, { Lead, CreateLeadRequest, UpdateLeadRequest } from '@/services/leadService';
 import LeadHistory from '@/components/comercial/LeadHistory';
+import LeadViewModal, { formatSafeDate } from '@/components/comercial/LeadViewModal';
 import {
   Users,
   Plus,
@@ -466,8 +467,8 @@ const Leads = () => {
     }).format(value);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
+  const formatDate = (dateString?: string | null) => {
+    return formatSafeDate(dateString);
   };
 
   return (
@@ -759,102 +760,20 @@ const Leads = () => {
           </CardContent>
         </Card>
 
-        {/* Modal de Visualização */}
-        <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-          <DialogContent className="bg-seguranca-graphite border-gray-600 max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-seguranca-lightgray">Detalhes do Lead</DialogTitle>
-              <DialogDescription className="text-gray-400">
-                Visualize todas as informações do lead selecionado
-              </DialogDescription>
-            </DialogHeader>
-            {selectedLead && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-gray-400">Nome</Label>
-                    <p className="text-seguranca-lightgray font-medium">{selectedLead.name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400">Email</Label>
-                    <p className="text-seguranca-lightgray">{selectedLead.email}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400">Telefone</Label>
-                    <p className="text-seguranca-lightgray">{selectedLead.phone}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400">Celular</Label>
-                    <p className="text-seguranca-lightgray">{selectedLead.mobile}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400">Empresa</Label>
-                    <p className="text-seguranca-lightgray">{selectedLead.company}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400">Cargo</Label>
-                    <p className="text-seguranca-lightgray">{selectedLead.position}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400">Status</Label>
-                    <div className="mt-1">{getStatusBadge(selectedLead.status)}</div>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400">Fonte</Label>
-                    <div className="mt-1">{getSourceBadge(selectedLead.source)}</div>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400">Valor Estimado</Label>
-                    <p className="text-seguranca-lightgray font-medium">
-                      {formatCurrency(selectedLead.estimatedValue)}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400">Próximo Follow-up</Label>
-                    <p className="text-seguranca-lightgray">{formatDate(selectedLead.nextFollowUp)}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-400">Data de Criação</Label>
-                    <p className="text-seguranca-lightgray">{formatDate(selectedLead.createdAt)}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-gray-400">Observações</Label>
-                  <p className="text-seguranca-lightgray mt-1">{selectedLead.notes}</p>
-                </div>
-
-                {/* Histórico de Interações */}
-                <div>
-                  <h3 className="text-lg font-semibold text-seguranca-lightgray mb-3 flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Histórico de Interações
-                  </h3>
-                  <LeadHistory leadId={selectedLead.id} />
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                    onClick={() => setIsViewModalOpen(false)}
-                  >
-                    Fechar
-                  </Button>
-                  <Button
-                    className="bg-seguranca-red hover:bg-seguranca-darkred"
-                    onClick={() => {
-                      setIsViewModalOpen(false);
-                      handleEdit(selectedLead);
-                    }}
-                  >
-                    Editar Lead
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* Modal Executivo e Responsivo de Visualização de Lead */}
+        <LeadViewModal
+          isOpen={isViewModalOpen}
+          onClose={() => setIsViewModalOpen(false)}
+          lead={selectedLead}
+          onEdit={(lead) => {
+            setIsViewModalOpen(false);
+            handleEdit(lead);
+          }}
+          onDelete={(leadId) => {
+            setIsViewModalOpen(false);
+            handleDeleteLead(leadId);
+          }}
+        />
 
         {/* Modal de Edição */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>

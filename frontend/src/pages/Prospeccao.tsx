@@ -38,7 +38,10 @@ import {
   History,
   ShoppingCart,
   Copy,
-  Check
+  Check,
+  Edit,
+  Trash2,
+  Eye
 } from 'lucide-react';
 import prospectionService, { 
   ProspectCompany, 
@@ -85,6 +88,10 @@ const Prospeccao: React.FC = () => {
   // Estados de ações
   const [sendingCrmId, setSendingCrmId] = useState<string | null>(null);
   const [sendingMarketingId, setSendingMarketingId] = useState<string | null>(null);
+
+  // Estados de Edição e Exclusão de Prospectos
+  const [editingProspect, setEditingProspect] = useState<ProspectCompany | null>(null);
+  const [editProspectModalOpen, setEditProspectModalOpen] = useState(false);
 
   // Estados de Configuração de Chaves/Tokens de IA e Ferramentas
   const [credentialsModalOpen, setCredentialsModalOpen] = useState(false);
@@ -245,6 +252,7 @@ const Prospeccao: React.FC = () => {
       if (Array.isArray(results) && results.length > 0) {
         const safeResults = results.map(sanitizeCompany);
         setProspects(safeResults);
+        loadHistory();
         toast({
           title: `🎯 ${safeResults.length} empresas reais localizadas em ${cidade}!`,
           description: 'Higienizados sem contatos de contabilidade e com presença real confirmada.',
@@ -298,6 +306,7 @@ const Prospeccao: React.FC = () => {
         const filtered = safePrev.filter(p => p.cnpj !== safeCompany.cnpj);
         return [safeCompany, ...filtered];
       });
+      loadHistory();
       toast({
         title: 'Empresa localizada com dados oficiais!',
         description: `${company.razaoSocial} carregada diretamente da base oficial da Receita Federal.`,
@@ -311,6 +320,41 @@ const Prospeccao: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Excluir / Descartar prospecto da lista
+  const handleDeleteProspect = (company: ProspectCompany) => {
+    const compName = company.nomeFantasia || company.razaoSocial || 'Empresa';
+    setProspects(prev => (Array.isArray(prev) ? prev.filter(p => p !== company && p.cnpj !== company.cnpj) : []));
+    toast({
+      title: 'Lead descartado',
+      description: `${compName} foi removido dos resultados da busca.`,
+    });
+  };
+
+  // Iniciar edição manual de um prospecto
+  const handleStartEditProspect = (company: ProspectCompany) => {
+    setEditingProspect({ ...company });
+    setEditProspectModalOpen(true);
+  };
+
+  // Salvar alterações de um prospecto editado
+  const handleSaveEditedProspect = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProspect) return;
+
+    setProspects(prev => (Array.isArray(prev) ? prev.map(p => {
+      const isMatch = (editingProspect.cnpj && p.cnpj === editingProspect.cnpj) ||
+        (p.razaoSocial === editingProspect.razaoSocial && p.municipio === editingProspect.municipio);
+      return isMatch ? { ...editingProspect } : p;
+    }) : []));
+
+    toast({
+      title: 'Lead atualizado!',
+      description: 'As alterações na empresa e canais de contato foram salvas com sucesso.',
+    });
+    setEditProspectModalOpen(false);
+    setEditingProspect(null);
   };
 
   // Localizar e enriquecer CNPJ de um card com IA e Receita Federal
@@ -806,7 +850,7 @@ const Prospeccao: React.FC = () => {
 
                           <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
                             <Users className="h-3.5 w-3.5 shrink-0" />
-                            <span>{h.totalEmpresasEncontradas || 0} empresa(s) gravada(s)</span>
+                            <span>{h.totalEncontrados ?? (h as any).totalEmpresasEncontradas ?? 0} empresa(s) gravada(s)</span>
                           </div>
                         </div>
 
@@ -1183,7 +1227,7 @@ const Prospeccao: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1191,9 +1235,32 @@ const Prospeccao: React.FC = () => {
                           setSelectedCompany(company);
                           setDetailsModalOpen(true);
                         }}
-                        className="text-gray-300 hover:text-white h-8 px-2.5 text-xs"
+                        className="text-gray-300 hover:text-white h-8 px-2 text-xs flex items-center gap-1"
+                        title="Ver detalhes completos do prospecto"
                       >
-                        Ver Detalhes
+                        <Eye className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Detalhes</span>
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleStartEditProspect(company)}
+                        className="text-gray-300 hover:text-amber-400 h-8 px-2 text-xs flex items-center gap-1"
+                        title="Editar dados da empresa ou canais de contato"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Editar</span>
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeleteProspect(company)}
+                        className="text-red-400/80 hover:text-red-300 hover:bg-red-950/40 h-8 px-2 text-xs"
+                        title="Descartar este lead da lista atual"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
 
                       {company.leadImported ? (
@@ -1577,6 +1644,128 @@ const Prospeccao: React.FC = () => {
                 </DialogFooter>
               </form>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Edição de Prospecto */}
+      <Dialog open={editProspectModalOpen} onOpenChange={setEditProspectModalOpen}>
+        <DialogContent className="max-w-xl bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-h-[88vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-seguranca-yellow flex items-center gap-2">
+              <Edit className="h-5 w-5 text-amber-400" />
+              Editar Informações do Prospecto
+            </DialogTitle>
+            <DialogDescription className="text-gray-400 text-xs">
+              Atualize a razão social, nome fantasia ou canais de contato reais antes de enviar ao CRM ou iniciar abordagem.
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingProspect && (
+            <form onSubmit={handleSaveEditedProspect} className="space-y-4 text-xs mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs text-gray-300">Razão Social</Label>
+                  <Input
+                    value={editingProspect.razaoSocial || ''}
+                    onChange={(e) => setEditingProspect({ ...editingProspect, razaoSocial: e.target.value })}
+                    className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs text-gray-300">Nome Fantasia</Label>
+                  <Input
+                    value={editingProspect.nomeFantasia || ''}
+                    onChange={(e) => setEditingProspect({ ...editingProspect, nomeFantasia: e.target.value })}
+                    placeholder="Nome comercial da empresa..."
+                    className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-300">CNPJ</Label>
+                  <Input
+                    value={editingProspect.cnpj || ''}
+                    onChange={(e) => setEditingProspect({ ...editingProspect, cnpj: e.target.value })}
+                    placeholder="00.000.000/0000-00"
+                    className="bg-seguranca-black border-gray-600 text-seguranca-yellow font-mono text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-300">Telefone / WhatsApp</Label>
+                  <Input
+                    value={editingProspect.telefone || ''}
+                    onChange={(e) => setEditingProspect({ ...editingProspect, telefone: e.target.value })}
+                    placeholder="(00) 00000-0000"
+                    className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs text-gray-300">E-mail Corporativo</Label>
+                  <Input
+                    type="email"
+                    value={editingProspect.email || ''}
+                    onChange={(e) => setEditingProspect({ ...editingProspect, email: e.target.value })}
+                    placeholder="contato@empresa.com.br"
+                    className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-300">Cidade / Município</Label>
+                  <Input
+                    value={editingProspect.municipio || ''}
+                    onChange={(e) => setEditingProspect({ ...editingProspect, municipio: e.target.value })}
+                    className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-300">Estado (UF)</Label>
+                  <Input
+                    value={editingProspect.uf || ''}
+                    onChange={(e) => setEditingProspect({ ...editingProspect, uf: e.target.value.toUpperCase() })}
+                    maxLength={2}
+                    className="bg-seguranca-black border-gray-600 text-white text-xs h-9 uppercase"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs text-gray-300">Website Oficial</Label>
+                  <Input
+                    value={editingProspect.website || ''}
+                    onChange={(e) => setEditingProspect({ ...editingProspect, website: e.target.value })}
+                    placeholder="https://empresa.com.br"
+                    className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="pt-3 flex justify-end gap-2 border-t border-gray-700/60 mt-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setEditProspectModalOpen(false);
+                    setEditingProspect(null);
+                  }}
+                  className="text-gray-400 hover:text-white text-xs h-9"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold text-xs h-9 px-4"
+                >
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  Salvar Alterações
+                </Button>
+              </DialogFooter>
+            </form>
           )}
         </DialogContent>
       </Dialog>
