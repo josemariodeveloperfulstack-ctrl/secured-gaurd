@@ -309,7 +309,9 @@ const Login = () => {
                   </Label>
                   <Input
                     id="username"
+                    name="username"
                     type="text"
+                    autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="bg-seguranca-black border-gray-600 focus:border-seguranca-yellow text-white"
@@ -324,7 +326,9 @@ const Login = () => {
                   <div className="relative">
                     <Input
                       id="password"
+                      name="password"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="bg-seguranca-black border-gray-600 focus:border-seguranca-yellow text-white pr-10"

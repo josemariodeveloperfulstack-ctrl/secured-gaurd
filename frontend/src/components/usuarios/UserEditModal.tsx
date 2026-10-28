@@ -578,7 +578,9 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                     </Label>
                     <Input
                       id="password"
+                      name="password"
                       type="password"
+                      autoComplete="new-password"
                       value={formData.password}
                       onChange={(e) => handleInputChange('password', e.target.value)}
                       className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
@@ -592,7 +594,9 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                     </Label>
                     <Input
                       id="confirmPassword"
+                      name="confirmPassword"
                       type="password"
+                      autoComplete="new-password"
                       value={formData.confirmPassword}
                       onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                       className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
