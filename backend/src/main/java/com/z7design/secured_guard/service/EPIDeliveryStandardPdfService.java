@@ -375,7 +375,7 @@ public class EPIDeliveryStandardPdfService {
                                 usedUnits += units;
                         }
 
-                        int targetUnits = 15;
+                        int targetUnits = 27;
                         int itemsToAdd = Math.max(0, targetUnits - usedUnits);
                         for (int i = 0; i < itemsToAdd; i++) {
                                 epiTable.addCell(createEpiDataCell(""));
@@ -478,7 +478,7 @@ public class EPIDeliveryStandardPdfService {
                         }
 
                         // Completar com linhas em branco para manter a mesma quantidade da ficha em PDF
-                        final int TOTAL_TABLE_ROWS = 17;
+                        final int TOTAL_TABLE_ROWS = 27;
                         int itemsCount = movements.size();
                         for (int i = itemsCount; i < TOTAL_TABLE_ROWS; i++) {
                                 Row emptyRow = sheet.createRow(rowIndex++);
@@ -554,8 +554,8 @@ public class EPIDeliveryStandardPdfService {
                         Table nameTable = new Table(UnitValue.createPercentArray(new float[] { 100f }))
                                         .useAllAvailableWidth();
                         nameTable.addCell(new Cell().add(new Paragraph("NOME DO EMPREGADO: " + name)
-                                        .setFontSize(8.5f).setBold())
-                                        .setPadding(3f));
+                                        .setFontSize(8f).setBold())
+                                        .setPadding(2f));
                         document.add(nameTable);
 
                         Table infoTable = new Table(UnitValue.createPercentArray(new float[] { 45f, 25f, 30f }))
@@ -565,15 +565,15 @@ public class EPIDeliveryStandardPdfService {
                         String cpf = employee != null ? CompanyDataFormatter.formatCpf(employee.getCpf()) : "___.___.___-__";
                         String rg = employee != null ? buildRg(employee) : "_________________";
 
-                        infoTable.addCell(new Cell().add(new Paragraph("FUNÇÃO: " + position).setFontSize(8f)).setPadding(2.5f));
-                        infoTable.addCell(new Cell().add(new Paragraph("CPF: " + cpf).setFontSize(8f)).setPadding(2.5f));
-                        infoTable.addCell(new Cell().add(new Paragraph("RG: " + rg).setFontSize(8f)).setPadding(2.5f));
+                        infoTable.addCell(new Cell().add(new Paragraph("FUNÇÃO: " + position).setFontSize(7.5f)).setPadding(2f));
+                        infoTable.addCell(new Cell().add(new Paragraph("CPF: " + cpf).setFontSize(7.5f)).setPadding(2f));
+                        infoTable.addCell(new Cell().add(new Paragraph("RG: " + rg).setFontSize(7.5f)).setPadding(2f));
                         document.add(infoTable);
 
                         Table datesTable = new Table(UnitValue.createPercentArray(new float[] { 50f, 50f }))
-                                        .useAllAvailableWidth().setMarginBottom(4f);
-                        datesTable.addCell(new Cell().add(new Paragraph("DATA DE ADMISSÃO: " + (employee != null ? formatDate(employee.getHireDate()) : "___/___/____")).setFontSize(8f)).setPadding(2.5f));
-                        datesTable.addCell(new Cell().add(new Paragraph("DATA DE DEMISSÃO: " + (employee != null ? formatDate(employee.getTerminationDate()) : "___/___/____")).setFontSize(8f)).setPadding(2.5f));
+                                        .useAllAvailableWidth().setMarginBottom(2.5f);
+                        datesTable.addCell(new Cell().add(new Paragraph("DATA DE ADMISSÃO: " + (employee != null ? formatDate(employee.getHireDate()) : "___/___/____")).setFontSize(7.5f)).setPadding(2f));
+                        datesTable.addCell(new Cell().add(new Paragraph("DATA DE DEMISSÃO: " + (employee != null ? formatDate(employee.getTerminationDate()) : "___/___/____")).setFontSize(7.5f)).setPadding(2f));
                         document.add(datesTable);
 
                         // 3. Termo e Declaração de Responsabilidade
@@ -583,16 +583,16 @@ public class EPIDeliveryStandardPdfService {
                                         + "., os EPI's abaixo especificados a serem usados no desempenho de minhas tarefas. Assumo o compromisso de usá-los durante a jornada de trabalho, zelar pela sua conservação, quando necessário solicitar a substituição ou reposição e devolvê-los à Empresa em caso de demissão. Estou ciente também que o não uso desses EPI's implicará em ato faltoso e insubordinação, sujeito a sanções disciplinares previstas no art. 158 CLT.";
                         
                         Table decTable = new Table(UnitValue.createPercentArray(new float[] { 100f }))
-                                        .useAllAvailableWidth().setMarginBottom(2f);
+                                        .useAllAvailableWidth().setMarginBottom(1.5f);
                         decTable.addCell(new Cell().add(new Paragraph(declarationText)
-                                        .setFontSize(7.5f).setTextAlignment(TextAlignment.JUSTIFIED))
-                                        .setPadding(3.5f));
+                                        .setFontSize(7f).setTextAlignment(TextAlignment.JUSTIFIED))
+                                        .setPadding(2f));
                         document.add(decTable);
 
                         Table signTable = new Table(UnitValue.createPercentArray(new float[] { 35f, 65f }))
-                                        .useAllAvailableWidth().setMarginBottom(4f);
-                        signTable.addCell(new Cell().add(new Paragraph("Contagem: ____/____/____").setFontSize(8.5f)).setPadding(3.5f));
-                        signTable.addCell(new Cell().add(new Paragraph("Assinatura: _________________________________________________").setFontSize(8.5f)).setPadding(3.5f));
+                                        .useAllAvailableWidth().setMarginBottom(2.5f);
+                        signTable.addCell(new Cell().add(new Paragraph("Contagem: ____/____/____").setFontSize(8f)).setPadding(2.5f));
+                        signTable.addCell(new Cell().add(new Paragraph("Assinatura: _________________________________________________").setFontSize(8f)).setPadding(2.5f));
                         document.add(signTable);
 
                         // 4. Detalhamento dos Equipamentos de Proteção Individual
@@ -611,8 +611,8 @@ public class EPIDeliveryStandardPdfService {
                         epiTable.addHeaderCell(createEpiHeaderCell("MOTIVO DA SUBST."));
                         epiTable.addHeaderCell(createEpiHeaderCell("ASSINATURA"));
 
-                        // Preencher com 15 linhas para ocupar verticalmente a página sem deixar espaço em branco e garantir 1 página
-                        for (int i = 0; i < 15; i++) {
+                        // Preencher com 27 linhas para ocupar verticalmente a página completando até o rodapé e garantir 1 página
+                        for (int i = 0; i < 27; i++) {
                                 epiTable.addCell(createEpiDataCell(""));
                                 epiTable.addCell(createEpiDataCell(""));
                                 epiTable.addCell(createEpiDataCell(""));
