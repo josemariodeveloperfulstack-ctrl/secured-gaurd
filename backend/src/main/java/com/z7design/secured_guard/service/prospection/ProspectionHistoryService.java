@@ -109,12 +109,17 @@ public class ProspectionHistoryService {
         if (qsaObj instanceof List<?> qsaList) {
             for (Object item : qsaList) {
                 if (item instanceof Map<?, ?> socioMap) {
-                    String nome = (String) socioMap.get("nome");
+                    Object nomeObj = socioMap.get("nome");
+                    String nome = nomeObj != null ? nomeObj.toString() : null;
                     if (nome != null && !nome.isBlank()) {
-                        String qual = (String) socioMap.getOrDefault("qualificacao", "Sócio / Administrador");
-                        String email = (String) socioMap.get("email");
-                        String tel = (String) socioMap.get("telefone");
-                        String linkedin = (String) socioMap.get("linkedinUrl");
+                        Object qualObj = socioMap.get("qualificacao");
+                        String qual = qualObj != null ? qualObj.toString() : "Sócio / Administrador";
+                        Object emailObj = socioMap.get("email");
+                        String email = emailObj != null ? emailObj.toString() : null;
+                        Object telObj = socioMap.get("telefone");
+                        String tel = telObj != null ? telObj.toString() : null;
+                        Object linkedinObj = socioMap.get("linkedinUrl");
+                        String linkedin = linkedinObj != null ? linkedinObj.toString() : null;
 
                         contactsToSave.add(ProspectionContact.builder()
                                 .company(comp)
@@ -135,16 +140,26 @@ public class ProspectionHistoryService {
         if (decisoresObj instanceof List<?> decList) {
             for (Object item : decList) {
                 if (item instanceof Map<?, ?> decMap) {
-                    String nome = (String) decMap.get("nome");
+                    Object nomeObj = decMap.get("nome");
+                    String nome = nomeObj != null ? nomeObj.toString() : null;
                     if (nome != null && !nome.isBlank()) {
+                        Object cargoObj = decMap.get("cargo");
+                        String cargo = cargoObj != null ? cargoObj.toString() : "Tomador de Decisão";
+                        Object emailObj = decMap.get("email");
+                        String email = emailObj != null ? emailObj.toString() : null;
+                        Object telObj = decMap.get("telefone");
+                        String tel = telObj != null ? telObj.toString() : null;
+                        Object linkedinObj = decMap.get("linkedinUrl");
+                        String linkedin = linkedinObj != null ? linkedinObj.toString() : null;
+
                         contactsToSave.add(ProspectionContact.builder()
                                 .company(comp)
                                 .nome(nome)
                                 .cargoTipo("DECISOR")
-                                .cargoDescricao((String) decMap.getOrDefault("cargo", "Tomador de Decisão"))
-                                .email((String) decMap.get("email"))
-                                .telefone((String) decMap.get("telefone"))
-                                .linkedinUrl((String) decMap.get("linkedinUrl"))
+                                .cargoDescricao(cargo)
+                                .email(email)
+                                .telefone(tel)
+                                .linkedinUrl(linkedin)
                                 .build());
                     }
                 }
