@@ -34,10 +34,16 @@ import {
   Bot,
   Key,
   Settings,
-  Save
+  Save,
+  History,
+  ShoppingCart,
+  Copy,
+  Check
 } from 'lucide-react';
 import prospectionService, { 
   ProspectCompany, 
+  ProspectionHistoryItem,
+  Decisor,
   STRATEGIC_CNAES, 
   ESTADOS_BRASIL 
 } from '@/services/prospectionService';
@@ -49,7 +55,7 @@ const Prospeccao: React.FC = () => {
   const navigate = useNavigate();
 
   // Estados dos filtros
-  const [activeTab, setActiveTab] = useState<'cnpj' | 'segmento' | 'maps'>('segmento');
+  const [activeTab, setActiveTab] = useState<'cnpj' | 'segmento' | 'maps' | 'historico'>('segmento');
   const [cnpjInput, setCnpjInput] = useState('');
   const [selectedSetor, setSelectedSetor] = useState<string>('TODOS');
   const [selectedCnae, setSelectedCnae] = useState('TODOS');
@@ -62,6 +68,12 @@ const Prospeccao: React.FC = () => {
   const [prospects, setProspects] = useState<ProspectCompany[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<ProspectCompany | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+
+  // Estados de Histórico de Pesquisas Gravadas no Banco
+  const [historySearches, setHistorySearches] = useState<ProspectionHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingHistoryId, setLoadingHistoryId] = useState<number | null>(null);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
   // Estados para Busca e Localização Ativa de CNPJ
   const [searchingCnpjFor, setSearchingCnpjFor] = useState<string | null>(null);
@@ -84,7 +96,7 @@ const Prospeccao: React.FC = () => {
   const [apolloApiKeyInput, setApolloApiKeyInput] = useState('');
   const [geminiModelInput, setGeminiModelInput] = useState('gemini-1.5-flash');
 
-  // Carregar status das credenciais
+  // Carregar status das credenciais e histórico
   const loadCredentials = async () => {
     try {
       const data = await prospectionService.getCredentialsStatus();
@@ -95,8 +107,59 @@ const Prospeccao: React.FC = () => {
     }
   };
 
+  const loadHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      const data = await prospectionService.getHistory(0, 30);
+      setHistorySearches(data);
+    } catch (err) {
+      console.warn('Não foi possível carregar o histórico de prospecções:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleLoadPastSearch = async (item: ProspectionHistoryItem) => {
+    try {
+      setLoadingHistoryId(item.id);
+      const searchDetails = await prospectionService.getHistoryDetails(item.id);
+      if (searchDetails && searchDetails.companies && searchDetails.companies.length > 0) {
+        setProspects(searchDetails.companies);
+        toast({
+          title: 'Histórico carregado do banco de dados!',
+          description: `${searchDetails.companies.length} empresas recuperadas da pesquisa de ${item.termoPesquisa || item.cidade}.`,
+        });
+      } else {
+        toast({
+          title: 'Nenhum registro encontrado',
+          description: 'Esta pesquisa não continha empresas salvas.',
+          variant: 'destructive',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao carregar pesquisa',
+        description: err.message || 'Falha ao recuperar empresas do histórico.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingHistoryId(null);
+    }
+  };
+
+  const handleCopyEmail = (email: string) => {
+    navigator.clipboard.writeText(email);
+    setCopiedEmail(email);
+    setTimeout(() => setCopiedEmail(null), 2000);
+    toast({
+      title: 'E-mail copiado!',
+      description: email,
+    });
+  };
+
   React.useEffect(() => {
     loadCredentials();
+    loadHistory();
   }, []);
 
   const handleSaveCredentials = async (e: React.FormEvent) => {
@@ -488,7 +551,7 @@ const Prospeccao: React.FC = () => {
       <Card className="bg-seguranca-graphite border-gray-700 shadow-xl">
         <CardContent className="p-4 sm:p-6">
           <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-            <TabsList className="bg-seguranca-black border border-gray-700 p-1 mb-6">
+            <TabsList className="bg-seguranca-black border border-gray-700 p-1 mb-6 flex-wrap h-auto gap-1">
               <TabsTrigger 
                 value="segmento" 
                 className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-xs sm:text-sm font-medium flex items-center gap-1.5"
@@ -502,6 +565,14 @@ const Prospeccao: React.FC = () => {
               >
                 <Building2 className="h-4 w-4" />
                 🏢 Consulta e Enriquecimento de CNPJ
+              </TabsTrigger>
+              <TabsTrigger 
+                value="historico" 
+                onClick={loadHistory}
+                className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-black text-xs sm:text-sm font-medium flex items-center gap-1.5"
+              >
+                <History className="h-4 w-4" />
+                📜 Histórico de Pesquisas ({historySearches.length})
               </TabsTrigger>
             </TabsList>
 
@@ -632,6 +703,110 @@ const Prospeccao: React.FC = () => {
                 💡 Consulta a base oficial, higieniza contatos de contabilidade e traz Sócios/Decisores (QSA), Telefones comerciais e CNAE.
               </p>
             </TabsContent>
+
+            {/* ABA 3: HISTÓRICO DE PESQUISAS SALVAS NO BANCO */}
+            <TabsContent value="historico" className="space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-800 pb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <History className="h-4 w-4 text-seguranca-yellow" />
+                    Últimas Pesquisas Gravadas no Banco de Dados
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    Clique em "Carregar Resultados" para rever os prospects, sócios e e-mails de compras sem reconsultar as APIs.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadHistory}
+                  disabled={loadingHistory}
+                  className="border-gray-700 text-gray-300 hover:text-white text-xs h-8"
+                >
+                  {loadingHistory ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <History className="h-3.5 w-3.5 mr-1.5" />}
+                  Atualizar Lista
+                </Button>
+              </div>
+
+              {loadingHistory && historySearches.length === 0 ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-seguranca-yellow" />
+                  <span className="ml-2 text-sm text-gray-400">Carregando histórico do banco de dados...</span>
+                </div>
+              ) : historySearches.length === 0 ? (
+                <div className="p-8 text-center bg-seguranca-black/40 rounded-lg border border-dashed border-gray-700 space-y-2">
+                  <History className="h-8 w-8 text-gray-600 mx-auto" />
+                  <p className="text-sm text-gray-400">Nenhuma pesquisa gravada ainda.</p>
+                  <p className="text-xs text-gray-500">
+                    Faça uma busca por nicho ou por CNPJ para que ela seja registrada automaticamente aqui.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {historySearches.map((h) => {
+                    const dataFormatada = h.createdAt
+                      ? new Intl.DateTimeFormat('pt-BR', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        }).format(new Date(h.createdAt))
+                      : 'Data não informada';
+
+                    const isCurrentLoading = loadingHistoryId === h.id;
+
+                    return (
+                      <div
+                        key={h.id}
+                        className="p-3.5 rounded-lg bg-seguranca-black/60 border border-gray-700 hover:border-seguranca-yellow/50 transition-all flex flex-col justify-between space-y-3"
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] uppercase font-bold">
+                              {h.tipoPesquisa || 'PESQUISA'}
+                            </Badge>
+                            <span className="text-[11px] text-gray-400 font-mono">
+                              {dataFormatada}
+                            </span>
+                          </div>
+
+                          <div className="text-sm font-semibold text-white truncate" title={h.termoPesquisa || h.segmento || h.cidade}>
+                            {h.termoPesquisa || h.segmento || 'Busca Geral'}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                            <MapPin className="h-3.5 w-3.5 text-seguranca-yellow shrink-0" />
+                            <span>{h.cidade ? `${h.cidade} - ${h.uf || 'BR'}` : (h.uf || 'Brasil')}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+                            <Users className="h-3.5 w-3.5 shrink-0" />
+                            <span>{h.totalEmpresasEncontradas || 0} empresa(s) gravada(s)</span>
+                          </div>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          onClick={() => handleLoadPastSearch(h)}
+                          disabled={isCurrentLoading}
+                          className="w-full bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold h-8 text-xs flex items-center justify-center gap-1.5"
+                        >
+                          {isCurrentLoading ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Carregando...
+                            </>
+                          ) : (
+                            <>
+                              <History className="h-3.5 w-3.5" />
+                              Carregar Resultados
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
@@ -759,7 +934,32 @@ const Prospeccao: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Sócios / Tomadores de Decisão */}
+                    {/* Setor de Compras / Suprimentos */}
+                    {company.emailCompras && (
+                      <div className="flex items-center justify-between gap-2 p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-xs">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <ShoppingCart className="h-4 w-4 text-amber-400 shrink-0" />
+                          <div className="truncate">
+                            <span className="font-semibold text-amber-300 block text-[11px]">Setor de Compras / Suprimentos:</span>
+                            <span className="text-white font-mono">{company.emailCompras}</span>
+                            {company.contatoComprasNome && (
+                              <span className="text-gray-400 ml-1.5 font-sans">({company.contatoComprasNome})</span>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleCopyEmail(company.emailCompras!)}
+                          className="h-7 px-2 text-xs text-amber-300 hover:text-white hover:bg-amber-500/20 shrink-0"
+                          title="Copiar e-mail de compras"
+                        >
+                          {copiedEmail === company.emailCompras ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Sócios / Tomadores de Decisão (QSA) */}
                     <div className="flex items-start gap-2 text-gray-300 bg-seguranca-black/40 p-2.5 rounded border border-gray-700/50">
                       <UserCheck className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
                       <div className="w-full">
@@ -769,9 +969,19 @@ const Prospeccao: React.FC = () => {
                         {company.qsa.length > 0 ? (
                           <div className="space-y-1">
                             {company.qsa.slice(0, 2).map((s, idx) => (
-                              <p key={idx} className="text-xs text-white">
-                                • <strong>{s.nome}</strong> <span className="text-gray-400">({s.qualificacao})</span>
-                              </p>
+                              <div key={idx} className="flex flex-wrap items-center justify-between gap-1 text-xs text-white">
+                                <div>
+                                  • <strong>{s.nome}</strong> <span className="text-gray-400">({s.qualificacao})</span>
+                                </div>
+                                {s.email && (
+                                  <div className="flex items-center gap-1 font-mono text-emerald-300 text-[11px] shrink-0">
+                                    <span>{s.email}</span>
+                                    <button onClick={() => handleCopyEmail(s.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do sócio">
+                                      {copiedEmail === s.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             ))}
                             {company.qsa.length > 2 && (
                               <span className="text-[11px] text-seguranca-yellow font-medium">
@@ -784,6 +994,37 @@ const Prospeccao: React.FC = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* Decisores Executivos (Apollo.io / Inferred) */}
+                    {company.decisores && company.decisores.length > 0 && (
+                      <div className="space-y-1.5 bg-seguranca-black/40 p-2.5 rounded border border-cyan-800/40">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-cyan-400 flex items-center gap-1.5">
+                            <Briefcase className="h-3.5 w-3.5" />
+                            Decisores Executivos Identificados:
+                          </span>
+                          <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
+                            {company.decisores.length} decisor(es)
+                          </Badge>
+                        </div>
+                        {company.decisores.slice(0, 2).map((d, dIdx) => (
+                          <div key={dIdx} className="flex flex-wrap items-center justify-between text-xs py-0.5">
+                            <div>
+                              <span className="text-white font-medium">• {d.nome}</span>
+                              <span className="text-gray-400 ml-1">({d.cargo})</span>
+                            </div>
+                            {d.email && (
+                              <div className="flex items-center gap-1 font-mono text-cyan-300 text-[11px] shrink-0">
+                                <span>{d.email}</span>
+                                <button onClick={() => handleCopyEmail(d.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do decisor">
+                                  {copiedEmail === d.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Contatos Disponíveis */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -1061,6 +1302,72 @@ const Prospeccao: React.FC = () => {
                 </p>
               </div>
 
+              {/* Setor de Compras / Suprimentos */}
+              {selectedCompany.emailCompras && (
+                <div className="bg-seguranca-black p-4 rounded-lg border border-amber-500/30 space-y-2">
+                  <h4 className="text-xs font-bold text-amber-300 uppercase flex items-center gap-1.5">
+                    <ShoppingCart className="h-4 w-4" />
+                    Setor de Compras / Suprimentos
+                  </h4>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-400 block text-[11px]">E-mail Corporativo de Compras:</span>
+                      <span className="text-white font-mono font-semibold">{selectedCompany.emailCompras}</span>
+                      {selectedCompany.contatoComprasNome && (
+                        <span className="text-gray-400 ml-2 font-sans">({selectedCompany.contatoComprasNome})</span>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCopyEmail(selectedCompany.emailCompras!)}
+                      className="h-7 text-xs border-amber-500/50 text-amber-300 hover:bg-amber-500 hover:text-black"
+                    >
+                      {copiedEmail === selectedCompany.emailCompras ? <Check className="h-3.5 w-3.5 mr-1 text-green-400" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+                      Copiar E-mail
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Decisores Executivos */}
+              {selectedCompany.decisores && selectedCompany.decisores.length > 0 && (
+                <div className="bg-seguranca-black p-4 rounded-lg border border-cyan-800/40 space-y-2">
+                  <h4 className="text-xs font-bold text-cyan-400 uppercase flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Briefcase className="h-4 w-4" />
+                      Decisores Executivos & Operações
+                    </span>
+                    <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
+                      {selectedCompany.decisores.length} decisor(es)
+                    </Badge>
+                  </h4>
+                  <div className="divide-y divide-gray-800">
+                    {selectedCompany.decisores.map((d, idx) => (
+                      <div key={idx} className="py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs gap-1">
+                        <div>
+                          <p className="font-semibold text-white">{d.nome}</p>
+                          <p className="text-gray-400">{d.cargo}</p>
+                        </div>
+                        {d.email && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-cyan-300 font-mono text-[11px]">{d.email}</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleCopyEmail(d.email!)}
+                              className="h-6 px-1.5 text-xs text-gray-400 hover:text-white"
+                            >
+                              {copiedEmail === d.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Quadro de Sócios */}
               <div className="bg-seguranca-black p-4 rounded-lg border border-gray-700 space-y-2">
                 <h4 className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-1.5">
@@ -1070,16 +1377,31 @@ const Prospeccao: React.FC = () => {
                 {selectedCompany.qsa.length > 0 ? (
                   <div className="divide-y divide-gray-800">
                     {selectedCompany.qsa.map((s, idx) => (
-                      <div key={idx} className="py-2 flex justify-between items-center text-xs">
+                      <div key={idx} className="py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs gap-1">
                         <div>
                           <p className="font-semibold text-white">{s.nome}</p>
                           <p className="text-gray-400">{s.qualificacao}</p>
                         </div>
-                        {s.faixaEtaria && (
-                          <Badge variant="outline" className="border-gray-700 text-gray-400">
-                            {s.faixaEtaria}
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {s.email && (
+                            <div className="flex items-center gap-1 font-mono text-emerald-300 text-[11px]">
+                              <span>{s.email}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleCopyEmail(s.email!)}
+                                className="h-6 px-1 text-xs text-gray-400 hover:text-white"
+                              >
+                                {copiedEmail === s.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                              </Button>
+                            </div>
+                          )}
+                          {s.faixaEtaria && (
+                            <Badge variant="outline" className="border-gray-700 text-gray-400">
+                              {s.faixaEtaria}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

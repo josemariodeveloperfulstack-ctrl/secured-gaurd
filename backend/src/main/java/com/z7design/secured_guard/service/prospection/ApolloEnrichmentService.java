@@ -58,9 +58,13 @@ public class ApolloEnrichmentService {
             Map<String, Object> body = new HashMap<>();
             body.put("api_key", apolloApiKey);
             body.put("q_organization_domains", domain);
-            body.put("person_titles", List.of("CEO", "Diretor", "Gerente", "Proprietário", "Sócio", "Director", "Owner", "Facilities", "Operações"));
+            body.put("person_titles", List.of(
+                    "CEO", "Diretor", "Gerente", "Proprietário", "Sócio", "Director", "Owner", 
+                    "Facilities", "Operações", "Compras", "Suprimentos", "Procurement", "Buyer", 
+                    "Comprador", "Gerente de Compras", "Head of Procurement"
+            ));
             body.put("page", 1);
-            body.put("per_page", 4);
+            body.put("per_page", 6);
 
             JsonNode response = webClient.post()
                     .uri("/mixed_people/search")
@@ -82,8 +86,12 @@ public class ApolloEnrichmentService {
             Map<String, Object> body = new HashMap<>();
             body.put("api_key", apolloApiKey);
             body.put("q_organization_name", companyName);
+            body.put("person_titles", List.of(
+                    "CEO", "Diretor", "Gerente", "Proprietário", "Sócio", 
+                    "Facilities", "Operações", "Compras", "Suprimentos", "Procurement"
+            ));
             body.put("page", 1);
-            body.put("per_page", 3);
+            body.put("per_page", 5);
 
             JsonNode response = webClient.post()
                     .uri("/mixed_people/search")
@@ -107,8 +115,11 @@ public class ApolloEnrichmentService {
 
         JsonNode people = response.path("people");
         if (people.isArray() && people.size() > 0) {
+            List<Map<String, Object>> decisoresList = new ArrayList<>();
             List<Map<String, Object>> qsaList = new ArrayList<>();
             String directEmail = null;
+            String comprasEmail = null;
+            String comprasNome = null;
             String socialUrl = null;
 
             for (JsonNode person : people) {
@@ -118,10 +129,27 @@ public class ApolloEnrichmentService {
                 String linkedin = person.path("linkedin_url").asText("");
 
                 if (!name.isBlank()) {
-                    Map<String, Object> socio = new HashMap<>();
-                    socio.put("nome", name);
-                    socio.put("qualificacao", title + (!linkedin.isBlank() ? " (LinkedIn: " + linkedin + ")" : ""));
-                    qsaList.add(socio);
+                    Map<String, Object> contact = new HashMap<>();
+                    contact.put("nome", name);
+                    contact.put("cargo", title);
+                    contact.put("email", email);
+                    contact.put("linkedinUrl", linkedin);
+
+                    String lowerTitle = title.toLowerCase();
+                    if (lowerTitle.contains("compra") || lowerTitle.contains("suprimento") || lowerTitle.contains("procurement") || lowerTitle.contains("buyer")) {
+                        if (comprasEmail == null && !email.isBlank()) {
+                            comprasEmail = email;
+                            comprasNome = name + " (" + title + ")";
+                        }
+                        contact.put("cargoTipo", "COMPRAS");
+                        decisoresList.add(contact);
+                    } else if (lowerTitle.contains("sócio") || lowerTitle.contains("socio") || lowerTitle.contains("owner") || lowerTitle.contains("proprietário")) {
+                        contact.put("cargoTipo", "SOCIO");
+                        qsaList.add(contact);
+                    } else {
+                        contact.put("cargoTipo", "DECISOR");
+                        decisoresList.add(contact);
+                    }
                 }
 
                 if (directEmail == null && !email.isBlank() && !email.contains("noreply")) {
@@ -134,6 +162,13 @@ public class ApolloEnrichmentService {
 
             if (!qsaList.isEmpty()) {
                 prospect.put("qsa", qsaList);
+            }
+            if (!decisoresList.isEmpty()) {
+                prospect.put("decisores", decisoresList);
+            }
+            if (comprasEmail != null) {
+                prospect.put("emailCompras", comprasEmail);
+                prospect.put("contatoComprasNome", comprasNome);
             }
             if (directEmail != null && ((String) prospect.getOrDefault("email", "")).isBlank()) {
                 prospect.put("email", directEmail);

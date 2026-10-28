@@ -11,6 +11,17 @@ export interface Socio {
   nomeRepresentanteLegal?: string;
   qualificacaoRepresentanteLegal?: string;
   faixaEtaria?: string;
+  email?: string;
+  telefone?: string;
+  linkedinUrl?: string;
+}
+
+export interface Decisor {
+  nome: string;
+  cargo: string;
+  email?: string;
+  telefone?: string;
+  linkedinUrl?: string;
 }
 
 export interface CnaeInfo {
@@ -39,6 +50,9 @@ export interface ProspectCompany {
   telefone?: string;
   telefoneSecundario?: string;
   email?: string;
+  emailCompras?: string;
+  contatoComprasNome?: string;
+  decisores?: Decisor[];
   qsa: Socio[];
   origem: 'CNPJ' | 'CNAE' | 'GOOGLE_MAPS' | 'GEMINI_AI';
   googleMapsUrl?: string;
@@ -51,6 +65,17 @@ export interface ProspectCompany {
   motivoConversao?: string;
   clientePotencial?: boolean;
   emailContabilidadeDescartado?: boolean;
+}
+
+export interface ProspectionHistoryItem {
+  id: string;
+  tipoBusca: string;
+  termoPesquisa?: string;
+  cidade?: string;
+  uf?: string;
+  segmento?: string;
+  totalEncontrados: number;
+  createdAt: string;
 }
 
 export const isAccountingContact = (email?: string, razaoSocial?: string): boolean => {
@@ -556,6 +581,38 @@ class ProspectionService {
     model?: string;
   }): Promise<any> {
     const { data } = await api.post('/prospection/credentials', payload);
+    return data;
+  }
+
+  /**
+   * Recupera a lista paginada de pesquisas de prospecção salvas no banco de dados
+   */
+  async getHistory(page = 0, size = 20): Promise<{
+    content: ProspectionHistoryItem[];
+    totalElements: number;
+    totalPages: number;
+  }> {
+    const { data } = await api.get('/prospection/history', {
+      params: { page, size }
+    });
+    return data;
+  }
+
+  /**
+   * Carrega os prospectos e contatos detalhados de uma pesquisa do histórico
+   */
+  async getHistoryDetails(id: string): Promise<{
+    id: string;
+    tipoBusca: string;
+    termoPesquisa?: string;
+    cidade: string;
+    uf: string;
+    segmento?: string;
+    totalEncontrados: number;
+    createdAt: string;
+    prospects: ProspectCompany[];
+  }> {
+    const { data } = await api.get(`/prospection/history/${id}`);
     return data;
   }
 }
