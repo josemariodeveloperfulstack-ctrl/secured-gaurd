@@ -19,10 +19,14 @@ public class CnpjLookupService {
 
     private final ObjectMapper objectMapper;
     private final GeminiProspectionService geminiProspectionService;
+    private final ApolloEnrichmentService apolloEnrichmentService;
     private final HttpClient httpClient;
 
-    public CnpjLookupService(GeminiProspectionService geminiProspectionService) {
+    public CnpjLookupService(
+            GeminiProspectionService geminiProspectionService,
+            ApolloEnrichmentService apolloEnrichmentService) {
         this.geminiProspectionService = geminiProspectionService;
+        this.apolloEnrichmentService = apolloEnrichmentService;
         this.objectMapper = new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
@@ -57,7 +61,9 @@ public class CnpjLookupService {
             HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() == 200) {
                 JsonNode root = objectMapper.readTree(resp.body());
-                return mapBrasilApi(root);
+                Map<String, Object> mapped = mapBrasilApi(root);
+                enrichCorporateEmailsAndContacts(mapped);
+                return mapped;
             } else {
                 log.warn("BrasilAPI retornou status {} para CNPJ {}", resp.statusCode(), cleanCnpj);
             }
@@ -78,7 +84,9 @@ public class CnpjLookupService {
             if (resp.statusCode() == 200) {
                 JsonNode root = objectMapper.readTree(resp.body());
                 if (!"ERROR".equalsIgnoreCase(root.path("status").asText())) {
-                    return mapReceitaWs(root);
+                    Map<String, Object> mapped = mapReceitaWs(root);
+                    enrichCorporateEmailsAndContacts(mapped);
+                    return mapped;
                 }
             }
         } catch (Exception ex) {
@@ -97,7 +105,9 @@ public class CnpjLookupService {
             HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() == 200) {
                 JsonNode root = objectMapper.readTree(resp.body());
-                return mapBrasilApi(root);
+                Map<String, Object> mapped = mapBrasilApi(root);
+                enrichCorporateEmailsAndContacts(mapped);
+                return mapped;
             }
         } catch (Exception ex) {
             log.warn("Falha ao consultar MinhaReceita para CNPJ {}: {}", cleanCnpj, ex.getMessage());
@@ -279,5 +289,102 @@ public class CnpjLookupService {
             if (email.contains(t)) return true;
         }
         return false;
+    }
+
+    /**
+     * Enriquece os contatos da empresa com foco em:
+     * 1. E-mails diretos de compras (compras@, suprimentos@, procurement@)
+     * 2. Sócios e Administradores (QSA) com inferência de e-mail corporativo
+     * 3. Decisores (Diretoria, Gerência, Facilities)
+     */
+    public void enrichCorporateEmailsAndContacts(Map<String, Object> map) {
+        if (map == null) return;
+
+        String website = (String) map.get("website");
+        String email = (String) map.get("email");
+        String domain = extractDomainFromWebsiteOrEmail(website, email);
+
+        if (domain != null && !domain.isBlank()) {
+            map.putIfAbsent("domain", domain);
+            if (!map.containsKey("emailCompras") || map.get("emailCompras") == null || ((String) map.get("emailCompras")).isBlank()) {
+                map.put("emailCompras", "compras@" + domain);
+                map.put("contatoComprasNome", "Setor de Compras / Suprimentos");
+            }
+        }
+
+        // 1. Processar sócios e enriquecer com e-mails corporativos
+        Object qsaObj = map.get("qsa");
+        List<Map<String, Object>> decisores = new ArrayList<>();
+        if (qsaObj instanceof List<?> qsaList) {
+            List<Map<String, Object>> enrichedQsa = new ArrayList<>();
+            for (Object item : qsaList) {
+                if (item instanceof Map<?, ?> socioMap) {
+                    Map<String, Object> socio = new HashMap<>();
+                    socioMap.forEach((k, v) -> socio.put(String.valueOf(k), v));
+                    String nome = (String) socio.get("nome");
+                    String socioEmail = (String) socio.get("email");
+
+                    if ((socioEmail == null || socioEmail.isBlank()) && domain != null && !domain.isBlank() && nome != null) {
+                        String cleanName = nome.toLowerCase().trim();
+                        String[] parts = cleanName.split("\\s+");
+                        if (parts.length >= 2) {
+                            socio.put("email", parts[0] + "." + parts[parts.length - 1] + "@" + domain);
+                        } else if (parts.length == 1) {
+                            socio.put("email", parts[0] + "@" + domain);
+                        }
+                    }
+
+                    enrichedQsa.add(socio);
+
+                    // Sócios administradores também são decisores principais
+                    String qual = (String) socio.getOrDefault("qualificacao", "Sócio / Administrador");
+                    Map<String, Object> dec = new HashMap<>(socio);
+                    dec.put("cargo", qual);
+                    dec.put("cargoTipo", "SOCIO_ADMIN");
+                    decisores.add(dec);
+                }
+            }
+            map.put("qsa", enrichedQsa);
+        }
+
+        // Se houver decisores inferidos, adiciona na lista
+        if (!decisores.isEmpty()) {
+            map.putIfAbsent("decisores", decisores);
+        }
+
+        // 2. Enriquecimento via Apollo.io (se chave configurada)
+        try {
+            if (geminiProspectionService.hasApolloKey()) {
+                apolloEnrichmentService.enrichProspectsWithApollo(
+                        List.of(map), 
+                        geminiProspectionService.getCredentialsStatus().getOrDefault("apolloApiKey", "").toString()
+                );
+            }
+        } catch (Exception ex) {
+            log.debug("Enriquecimento Apollo ignorado: {}", ex.getMessage());
+        }
+    }
+
+    private String extractDomainFromWebsiteOrEmail(String website, String email) {
+        if (website != null && !website.isBlank()) {
+            String clean = website.trim().toLowerCase();
+            clean = clean.replace("http://", "").replace("https://", "");
+            if (clean.startsWith("www.")) clean = clean.substring(4);
+            int slash = clean.indexOf('/');
+            if (slash > 0) clean = clean.substring(0, slash);
+            if (clean.contains(".")) return clean;
+        }
+
+        if (email != null && !email.isBlank()) {
+            int at = email.indexOf('@');
+            if (at > 0 && at < email.length() - 1) {
+                String domain = email.substring(at + 1).toLowerCase().trim();
+                List<String> generic = List.of("gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "uol.com.br", "bol.com.br", "terra.com.br");
+                if (!generic.contains(domain) && domain.contains(".")) {
+                    return domain;
+                }
+            }
+        }
+        return null;
     }
 }
