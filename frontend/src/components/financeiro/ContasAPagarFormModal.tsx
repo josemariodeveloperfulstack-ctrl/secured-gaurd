@@ -437,8 +437,11 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
       // Carregar centros de custo
       contasAPagarService.getCostCenters()
         .then(data => {
-          const centrosArray = (Array.isArray(data) ? data : []).map(v => (v ?? '').toString().trim()).filter(v => v.length > 0);
-          setCostCenters(centrosArray);
+          const centrosArray = (Array.isArray(data) ? data : [])
+            .map(v => (v ?? '').toString().trim())
+            .filter(v => v.length > 0 && v.length <= 100);
+          const uniqueCentros = Array.from(new Set(centrosArray));
+          setCostCenters(uniqueCentros);
           if (editMode && initialData?.centroCusto) {
             setFormData(prev => ({ ...prev, centroCusto: initialData!.centroCusto }));
           }
@@ -758,11 +761,16 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
       
       onSuccess();
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar conta:', error);
+      const apiMessage = error?.response?.data?.message 
+        || (error?.response?.data?.fieldErrors ? Object.values(error.response.data.fieldErrors).join('; ') : null)
+        || error?.response?.data?.error
+        || error?.message
+        || "Erro ao salvar conta a pagar. Tente novamente.";
       toast({
-        title: "Erro",
-        description: "Erro ao salvar conta a pagar. Tente novamente.",
+        title: "Erro ao salvar conta",
+        description: apiMessage,
         variant: "destructive"
       });
     } finally {

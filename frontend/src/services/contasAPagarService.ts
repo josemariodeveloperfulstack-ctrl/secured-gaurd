@@ -455,22 +455,24 @@ export const contasAPagarService = {
 
     if (!unitId) {
       try {
-        const unitsResponse = await api.get('/api/units');
+        const unitsResponse = await api.get('/units');
         if (unitsResponse.data && unitsResponse.data.length > 0) {
           unitId = unitsResponse.data[0].id;
-        } else {
-          unitId = '11111111-1111-1111-1111-111111111111';
         }
       } catch (error) {
-        console.warn('Não foi possível buscar unidades, usando UUID padrão:', error);
-        unitId = '11111111-1111-1111-1111-111111111111';
+        console.warn('Não foi possível buscar unidades na API:', error);
       }
     }
+
+    // Truncar com segurança para caber nas colunas do banco
+    const rawCentroCusto = conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto;
+    const cleanCentroCusto = rawCentroCusto ? rawCentroCusto.substring(0, 100).trim() : undefined;
+    const cleanSigla = conta.companySigla ? conta.companySigla.substring(0, 10).trim() : undefined;
 
     const requestData: CreateContaAPagarRequest = {
       description: conta.descricao,
       supplierId: conta.fornecedorId || null,
-      unitId: unitId,
+      unitId: unitId || undefined,
       amount: Number(conta.valor) || 0,
       type: conta.tipo,
       status: mapFrontendStatusToBackend(conta.status) as any,
@@ -482,8 +484,8 @@ export const contasAPagarService = {
       subcategoriaId: conta.subcategoriaId || null,
       employeeId: conta.employeeId || null,
       notes: conta.observacoes,
-      centroCusto: conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto,
-      companySigla: conta.companySigla,
+      centroCusto: cleanCentroCusto,
+      companySigla: cleanSigla,
       workSector: conta.workSector || undefined
     };
 

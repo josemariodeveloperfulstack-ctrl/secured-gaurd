@@ -164,18 +164,27 @@ public class InvoiceService {
     }
     
     public Invoice save(Invoice invoice) {
-        // Garantir unidade válida: se não vier no DTO, usar a primeira unidade existente
-        if (invoice.getUnit() == null || invoice.getUnit().getId() == null) {
-            try {
-                org.springframework.data.domain.PageRequest pr = org.springframework.data.domain.PageRequest.of(0, 1);
-                Unit fallback = unitRepository.findAll(pr).stream().findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException("Nenhuma unidade cadastrada"));
-                invoice.setUnit(fallback);
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Unidade é obrigatória para faturas", e);
-            }
-        }
+        ensureDefaultUnit(invoice);
         return invoiceRepository.save(invoice);
+    }
+
+    public void ensureDefaultUnit(Invoice invoice) {
+        if (invoice.getUnit() != null && invoice.getUnit().getId() != null) {
+            return;
+        }
+        try {
+            org.springframework.data.domain.PageRequest pr = org.springframework.data.domain.PageRequest.of(0, 1);
+            Unit unit = unitRepository.findAll(pr).stream().findFirst().orElse(null);
+            if (unit == null) {
+                Unit newUnit = new Unit();
+                newUnit.setName("Matriz");
+                unit = unitRepository.save(newUnit);
+                log.info("Unidade padrão 'Matriz' criada com sucesso: {}", unit.getId());
+            }
+            invoice.setUnit(unit);
+        } catch (Exception e) {
+            log.warn("Falha ao associar unidade padrão: {}", e.getMessage());
+        }
     }
 
     public void assignCreatedByIfNew(Invoice invoice, UUID userId) {
@@ -522,11 +531,35 @@ public class InvoiceService {
             invoice.setDueDate(dto.getDueDate());
             invoice.setPaymentDate(dto.getPaymentDate());
             invoice.setCategory(dto.getCategory());
-            invoice.setCentroCusto(dto.getCentroCusto());
+            
+            // Normalizar e limitar Centro de Custo para no máximo 100 caracteres
+            String cc = dto.getCentroCusto();
+            if (cc != null && !cc.isBlank()) {
+                cc = cc.trim();
+                if (cc.length() > 100) {
+                    cc = cc.substring(0, 100);
+                }
+            } else {
+                cc = null;
+            }
+            invoice.setCentroCusto(cc);
+            
             invoice.setComprovanteUrl(dto.getComprovanteUrl());
             invoice.setBarcode(dto.getBarcode());
             invoice.setNotes(dto.getNotes());
-            invoice.setCompanySigla(dto.getCompanySigla());
+            
+            // Normalizar e limitar Sigla da Empresa para no máximo 10 caracteres (PostgreSQL VARCHAR(10))
+            String sigla = dto.getCompanySigla();
+            if (sigla != null && !sigla.isBlank()) {
+                sigla = sigla.trim();
+                if (sigla.length() > 10) {
+                    sigla = sigla.substring(0, 10);
+                }
+            } else {
+                sigla = "ADM";
+            }
+            invoice.setCompanySigla(sigla);
+            
             invoice.setWorkSector(dto.getWorkSector());
             
             log.debug("Campos básicos definidos");
@@ -555,45 +588,51 @@ public class InvoiceService {
 
             if (dto.getSupplierId() != null) {
                 log.debug("Processando fornecedor: {}", dto.getSupplierId());
-                Supplier supplier = supplierRepository.findById(dto.getSupplierId())
-                        .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado: " + dto.getSupplierId()));
-                invoice.setSupplier(supplier);
-                log.debug("Fornecedor definido: {}", supplier.getName());
+                Supplier supplier = supplierRepository.findById(dto.getSupplierId()).orElse(null);
+                if (supplier != null) {
+                    invoice.setSupplier(supplier);
+                    log.debug("Fornecedor definido: {}", supplier.getName());
+                } else {
+                    log.warn("Fornecedor {} não encontrado no banco de dados.", dto.getSupplierId());
+                }
             } else if (requiresEmployee) {
                 invoice.setSupplier(null);
             }
 
-            if (!requiresEmployee && dto.getSupplierId() == null && invoice.getSupplier() == null) {
-                throw new IllegalArgumentException("Fornecedor é obrigatório para contas que não são de Pessoal / RH.");
+            if (!requiresEmployee && invoice.getSupplier() == null) {
+                throw new IllegalArgumentException("Selecione um fornecedor cadastrado para a conta a pagar.");
             }
 
             if (dto.getClientId() != null) {
                 log.debug("Processando cliente: {}", dto.getClientId());
-                Client client = clientRepository.findById(dto.getClientId())
-                        .orElseThrow(() -> new RuntimeException("Cliente não encontrado: " + dto.getClientId()));
-                invoice.setClient(client);
-                log.debug("Cliente definido: {}", client.getName());
+                Client client = clientRepository.findById(dto.getClientId()).orElse(null);
+                if (client != null) {
+                    invoice.setClient(client);
+                    log.debug("Cliente definido: {}", client.getName());
+                }
             }
 
             if (dto.getContractId() != null) {
                 log.debug("Processando contrato: {}", dto.getContractId());
-                Contract contract = contractRepository.findById(dto.getContractId())
-                        .orElseThrow(() -> new RuntimeException("Contrato não encontrado: " + dto.getContractId()));
-                invoice.setContract(contract);
-                log.debug("Contrato definido: {}", contract.getContractNumber());
+                Contract contract = contractRepository.findById(dto.getContractId()).orElse(null);
+                if (contract != null) {
+                    invoice.setContract(contract);
+                    log.debug("Contrato definido: {}", contract.getContractNumber());
+                }
             }
 
             if (dto.getUnitId() != null) {
                 log.debug("Processando unidade: {}", dto.getUnitId());
-                try {
-                    Unit unit = unitRepository.findById(dto.getUnitId())
-                            .orElseThrow(() -> new RuntimeException("Unidade não encontrada: " + dto.getUnitId()));
+                Unit unit = unitRepository.findById(dto.getUnitId()).orElse(null);
+                if (unit != null) {
                     invoice.setUnit(unit);
                     log.debug("Unidade definida: {}", unit.getName());
-                } catch (Exception e) {
-                    log.error("Erro ao buscar unidade {}: {}", dto.getUnitId(), e.getMessage());
-                    throw new RuntimeException("Erro ao processar unidade: " + e.getMessage(), e);
+                } else {
+                    log.warn("Unidade informada {} não encontrada, associando unidade padrão/existente", dto.getUnitId());
+                    ensureDefaultUnit(invoice);
                 }
+            } else if (invoice.getUnit() == null) {
+                ensureDefaultUnit(invoice);
             }
 
             if (dto.getEmployeeId() != null) {

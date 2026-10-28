@@ -106,6 +106,22 @@ public class InvoiceDTO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    public void setCentroCusto(String centroCusto) {
+        if (centroCusto != null && centroCusto.length() > 100) {
+            this.centroCusto = centroCusto.substring(0, 100);
+        } else {
+            this.centroCusto = centroCusto;
+        }
+    }
+
+    public void setCompanySigla(String companySigla) {
+        if (companySigla != null && companySigla.length() > 10) {
+            this.companySigla = companySigla.substring(0, 10);
+        } else {
+            this.companySigla = companySigla;
+        }
+    }
+
     public java.util.UUID getId() {
         return id;
     }

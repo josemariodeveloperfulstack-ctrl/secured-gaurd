@@ -94,7 +94,49 @@ public class ProspectionController {
         log.info("Recebida requisição de prospecção com IA: cidade={}, uf={}, segmento={}", cidade, uf, segmento);
         List<Map<String, Object>> results = geminiProspectionService.searchProspectsWithAi(cidade, uf, segmento, quantidade);
 
-        // Gravar automaticamente os resultados no banco de dados
+        // Enriquecer automaticamente cada prospecto com CNPJ oficial, E-mail, Telefone, WhatsApp e QSA
+        for (Map<String, Object> item : results) {
+            String cnpj = (String) item.get("cnpj");
+            try {
+                Map<String, Object> enriched = null;
+                if (cnpj != null && !cnpj.isBlank()) {
+                    enriched = cnpjLookupService.lookupByCnpj(cnpj);
+                } else {
+                    String nome = (String) item.get("nomeFantasia");
+                    if (nome == null || nome.isBlank()) nome = (String) item.get("razaoSocial");
+                    if (nome != null && !nome.isBlank()) {
+                        enriched = cnpjLookupService.findCnpjByNameAndLocation(nome, cidade, uf);
+                    }
+                }
+
+                if (enriched != null && enriched.get("cnpj") != null && !enriched.get("cnpj").toString().isBlank()) {
+                    item.put("cnpj", enriched.get("cnpj"));
+                    if (enriched.get("razaoSocial") != null) item.put("razaoSocial", enriched.get("razaoSocial"));
+                    if (enriched.get("situacaoCadastral") != null) item.put("situacaoCadastral", enriched.get("situacaoCadastral"));
+                    if (enriched.get("porte") != null) item.put("porte", enriched.get("porte"));
+                    if (enriched.get("cnaePrincipal") != null) item.put("cnaePrincipal", enriched.get("cnaePrincipal"));
+                    if (enriched.get("qsa") != null && enriched.get("qsa") instanceof List && !((List<?>) enriched.get("qsa")).isEmpty()) {
+                        item.put("qsa", enriched.get("qsa"));
+                    }
+                    if (enriched.get("decisores") != null && enriched.get("decisores") instanceof List && !((List<?>) enriched.get("decisores")).isEmpty()) {
+                        item.put("decisores", enriched.get("decisores"));
+                    }
+                    if (enriched.get("email") != null && !enriched.get("email").toString().isBlank()) {
+                        item.put("email", enriched.get("email"));
+                    }
+                    if (enriched.get("emailCompras") != null && !enriched.get("emailCompras").toString().isBlank()) {
+                        item.put("emailCompras", enriched.get("emailCompras"));
+                    }
+                    if (enriched.get("telefone") != null && !enriched.get("telefone").toString().isBlank()) {
+                        item.put("telefone", enriched.get("telefone"));
+                    }
+                }
+            } catch (Exception ex) {
+                log.debug("Auto-enriquecimento ignorado para item: {}", ex.getMessage());
+            }
+        }
+
+        // Gravar automaticamente os resultados enriquecidos no banco de dados
         try {
             com.z7design.secured_guard.model.User user = resolveUser(userDetails);
             historyService.saveSearch("SEGMENTO", segmento, cidade, uf, segmento, results, user);

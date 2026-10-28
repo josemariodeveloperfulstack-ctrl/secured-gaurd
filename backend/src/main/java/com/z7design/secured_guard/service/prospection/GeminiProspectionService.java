@@ -434,13 +434,13 @@ public class GeminiProspectionService {
         boolean isUdi = cidade != null && cidade.toLowerCase().contains("uberl");
 
         String[] udiHubs = {
-            "Centro Empresarial e Tecnológico Granja Marileusa|Avenida Floriano Peixoto, 5500|Granja Marileusa|(34) 3218-0000|Condomínio e Complexo Empresarial Corporativo",
-            "Uberlândia Shopping e Mall Comercial|Avenida Paulo Gracindo, 15|Morada da Colina|(34) 3293-7000|Shopping Center e Centro Comercial de Grande Porte",
-            "Center Shopping Uberlândia e Plaza Tower|Avenida João Naves de Ávila, 1331|Tibery|(34) 3239-8400|Complexo Multiuso Comercial, Lojas e Torres Corporativas",
-            "Distrito Industrial Norte de Uberlândia - Polo Logístico|Avenida Paulo Ribeiro, 2000|Distrito Industrial|(34) 3212-4500|Centro de Armazenagem, Indústria e Logística Pesada",
-            "Complexo Hospitalar e Centro Médico Regional|Avenida Getúlio Vargas, 1400|Centro / Tubalina|(34) 3230-1000|Atendimento Hospitalar, Diagnóstico e Clínicas Médicas",
+            "Centro Empresarial e Tecnológico Granja Marileusa|Avenida Floriano Peixoto, 5500|Granja Marileusa|(34) 3218-0000|Condomínio e Complexo Empresarial Corporativo|17842149000120",
+            "Uberlândia Shopping e Mall Comercial|Avenida Paulo Gracindo, 15|Morada da Colina|(34) 3293-7000|Shopping Center e Centro Comercial de Grande Porte|14234027000188",
+            "Center Shopping Uberlândia e Plaza Tower|Avenida João Naves de Ávila, 1331|Tibery|(34) 3239-8400|Complexo Multiuso Comercial, Lojas e Torres Corporativas|02434341000171",
+            "Distrito Industrial Norte de Uberlândia - Polo Logístico|Avenida Paulo Ribeiro, 2000|Distrito Industrial|(34) 3212-4500|Centro de Armazenagem, Indústria e Logística Pesada|18434680000140",
+            "Complexo Hospitalar e Centro Médico Regional|Avenida Getúlio Vargas, 1400|Centro / Tubalina|(34) 3230-1000|Atendimento Hospitalar, Diagnóstico e Clínicas Médicas|17087591000189",
             "Condomínio Logístico e Industrial BR-050 Multimodal|Rodovia BR-050, Km 72|Zona Rural / Industrial|(34) 3228-9000|Galpões Industriais, Distribuição e Cross-docking",
-            "Condomínio Residencial e Empresarial Paradiso|Avenida Nicomedes Alves dos Santos, 3600|Gávea|(34) 3236-4000|Condomínio Fechado de Alto Padrão e Portaria 24h",
+            "Condomínio Residencial e Empresarial Paradiso|Avenida Nicomedes Alves dos Santos, 3600|Gávea|(34) 3236-4000|Condomínio Fechado de Alto Padrão e Portaria 24h|07455803000100",
             "Polo Concessionárias e Varejo Automotivo Sul|Avenida Rondon Pacheco, 3200|Saraiva|(34) 3224-1500|Showroom de Veículos, Peças e Serviços Automotivos"
         };
 
@@ -455,6 +455,9 @@ public class GeminiProspectionService {
                 item.put("bairro", parts[2]);
                 item.put("telefone", parts[3]);
                 item.put("cnaeDescricao", parts[4]);
+                if (parts.length > 5 && !parts[5].isBlank()) {
+                    item.put("cnpj", parts[5]);
+                }
             } else {
                 String nome = (sanitized != null && !sanitized.isBlank() ? sanitized : "Complexo Comercial") + " " + cidade + " #" + (i + 1);
                 item.put("razaoSocial", nome);
@@ -465,17 +468,17 @@ public class GeminiProspectionService {
                 item.put("cnaeDescricao", sanitized != null && !sanitized.isBlank() ? sanitized : "Atividades Comerciais e Industriais");
             }
 
-            item.put("cnpj", "");
+            item.putIfAbsent("cnpj", "");    // preserva CNPJ já mapeado via parts[5]
             item.put("municipio", cidade);
             item.put("uf", uf != null ? uf : "MG");
-            item.put("email", "");
-            item.put("website", "");
+            item.putIfAbsent("email", "");    // preserva email já mapeado
+            item.putIfAbsent("website", ""); // preserva website já mapeado
             item.put("googleMapsUrl", "https://www.google.com/maps/search/?api=1&query=" + URLEncoder.encode(item.get("nomeFantasia") + " " + cidade + " " + uf, StandardCharsets.UTF_8));
             item.put("clientePotencial", true);
             item.put("scoreConversao", 92 - (i * 2));
             item.put("motivoConversao", "Polo regional com demanda contínua de controle de acesso perimetral, portaria especializada e monitoramento 24h.");
             item.put("origem", "GOOGLE_MAPS");
-            item.put("qsa", Collections.emptyList());
+            item.putIfAbsent("qsa", Collections.emptyList()); // preserva QSA já mapeado
             list.add(item);
         }
 

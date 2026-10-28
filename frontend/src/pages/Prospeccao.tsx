@@ -1396,30 +1396,44 @@ const Prospeccao: React.FC = () => {
                 </p>
               </div>
 
-              {/* Setor de Compras / Suprimentos */}
-              {selectedCompany.emailCompras && (
-                <div className="bg-seguranca-black p-4 rounded-lg border border-amber-500/30 space-y-2">
-                  <h4 className="text-xs font-bold text-amber-300 uppercase flex items-center gap-1.5">
-                    <ShoppingCart className="h-4 w-4" />
-                    Setor de Compras / Suprimentos
+              {/* E-mail de Contato & Decisor */}
+              {(selectedCompany.email || selectedCompany.emailCompras) && (
+                <div className="bg-seguranca-black p-4 rounded-lg border border-blue-500/40 space-y-2">
+                  <h4 className="text-xs font-bold text-blue-300 uppercase flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Mail className="h-4 w-4" />
+                      E-mail Corporativo / Decisor
+                    </span>
+                    <Badge className="bg-blue-950 text-blue-300 border border-blue-800 text-[10px]">
+                      {selectedCompany.emailCompras ? 'Compras / Suprimentos' : 'Contato Verificado'}
+                    </Badge>
                   </h4>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
                     <div>
-                      <span className="text-gray-400 block text-[11px]">E-mail Corporativo de Compras:</span>
-                      <span className="text-white font-mono font-semibold">{selectedCompany.emailCompras}</span>
+                      <span className="text-gray-400 block text-[11px]">E-mail:</span>
+                      <span className="text-white font-mono font-semibold">{selectedCompany.emailCompras || selectedCompany.email}</span>
                       {selectedCompany.contatoComprasNome && (
                         <span className="text-gray-400 ml-2 font-sans">({selectedCompany.contatoComprasNome})</span>
                       )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleCopyEmail(selectedCompany.emailCompras!)}
-                      className="h-7 text-xs border-amber-500/50 text-amber-300 hover:bg-amber-500 hover:text-black"
-                    >
-                      {copiedEmail === selectedCompany.emailCompras ? <Check className="h-3.5 w-3.5 mr-1 text-green-400" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
-                      Copiar E-mail
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCopyEmail((selectedCompany.emailCompras || selectedCompany.email)!)}
+                        className="h-7 text-xs border-blue-500/50 text-blue-300 hover:bg-blue-500 hover:text-black"
+                      >
+                        {copiedEmail === (selectedCompany.emailCompras || selectedCompany.email) ? <Check className="h-3.5 w-3.5 mr-1 text-green-400" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+                        Copiar
+                      </Button>
+                      <a
+                        href={`mailto:${selectedCompany.emailCompras || selectedCompany.email}`}
+                        className="inline-flex items-center justify-center h-7 px-3 text-xs font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                      >
+                        <Mail className="h-3.5 w-3.5 mr-1" />
+                        Enviar E-mail
+                      </a>
+                    </div>
                   </div>
                 </div>
               )}

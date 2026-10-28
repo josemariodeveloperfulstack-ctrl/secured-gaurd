@@ -75,6 +75,32 @@ public class CnpjLookupService {
             log.warn("Falha ao consultar BrasilAPI para CNPJ {}: {}", cleanCnpj, ex.getMessage());
         }
 
+        // 2. Fallback: CNPJá (open.cnpja.com)
+        try {
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create("https://open.cnpja.com/office/" + cleanCnpj))
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SecuredGuard/1.0")
+                    .timeout(Duration.ofSeconds(8))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() == 200 && resp.body() != null) {
+                JsonNode root = objectMapper.readTree(resp.body());
+                Map<String, Object> mapped = mapCnpja(root);
+                try {
+                    enrichCorporateEmailsAndContacts(mapped);
+                } catch (Exception enrichEx) {
+                    log.warn("Enriquecimento adicional ignorado para CNPJ {}: {}", cleanCnpj, enrichEx.getMessage());
+                }
+                return mapped;
+            } else {
+                log.warn("CNPJá retornou status {} para CNPJ {}", resp.statusCode(), cleanCnpj);
+            }
+        } catch (Exception ex) {
+            log.warn("Falha ao consultar CNPJá para CNPJ {}: {}", cleanCnpj, ex.getMessage());
+        }
+
         // 2. Fallback: ReceitaWS
         try {
             HttpRequest req = HttpRequest.newBuilder()
@@ -142,13 +168,41 @@ public class CnpjLookupService {
 
         log.info("🔍 Localizando CNPJ oficial para: '{}' em {}/{}", cleanName, cleanCity, cleanUf);
 
-        // 1. Tentar descobrir o CNPJ usando IA Gemini especializada em cadastros públicos
-        String discoveredCnpj = geminiProspectionService.discoverCnpjWithGemini(cleanName, cleanCity, cleanUf);
+        // 1. Catálogo Estratégico Curado para Polos Regionais (Hospitais, Shoppings, Complexos Industriais)
+        String curatedCnpj = matchCuratedCnpj(cleanName, cleanCity);
+        if (curatedCnpj != null) {
+            log.info("🎯 CNPJ identificado via catálogo regional estratégico: {} para '{}'", curatedCnpj, cleanName);
+            try {
+                Map<String, Object> data = lookupByCnpj(curatedCnpj);
+                data.put("discoveredAutomatically", true);
+                return data;
+            } catch (Exception ex) {
+                log.warn("Erro ao buscar dados do CNPJ curado {}: {}", curatedCnpj, ex.getMessage());
+            }
+        }
 
+        // 2. Raspagem e Busca Web Pública em Tempo Real (DuckDuckGo / Registros Públicos)
+        String scrapedCnpj = scrapeCnpjFromWeb(cleanName, cleanCity, cleanUf);
+        if (scrapedCnpj != null) {
+            String digits = scrapedCnpj.replaceAll("\\D", "");
+            if (digits.length() == 14 && ValidationUtils.isValidCnpj(digits)) {
+                log.info("🎯 CNPJ {} localizado via busca e raspagem pública para '{}'. Consultando dados oficiais...", digits, cleanName);
+                try {
+                    Map<String, Object> officialData = lookupByCnpj(digits);
+                    officialData.put("discoveredAutomatically", true);
+                    return officialData;
+                } catch (Exception ex) {
+                    log.warn("CNPJ {} localizado, mas consulta oficial falhou: {}", digits, ex.getMessage());
+                }
+            }
+        }
+
+        // 3. Tentar descobrir o CNPJ usando IA Gemini especializada em cadastros públicos
+        String discoveredCnpj = geminiProspectionService.discoverCnpjWithGemini(cleanName, cleanCity, cleanUf);
         if (discoveredCnpj != null && !discoveredCnpj.isBlank()) {
             String digits = discoveredCnpj.replaceAll("\\D", "");
             if (digits.length() == 14 && ValidationUtils.isValidCnpj(digits)) {
-                log.info("🎯 CNPJ {} descoberto com sucesso para '{}'. Consultando dados na Receita Federal...", digits, cleanName);
+                log.info("🎯 CNPJ {} descoberto via Gemini IA para '{}'. Consultando dados na Receita Federal...", digits, cleanName);
                 try {
                     Map<String, Object> officialData = lookupByCnpj(digits);
                     officialData.put("discoveredAutomatically", true);
@@ -399,4 +453,149 @@ public class CnpjLookupService {
         }
         return null;
     }
+
+    private Map<String, Object> mapCnpja(JsonNode root) {
+        Map<String, Object> map = new HashMap<>();
+        String rawCnpj = root.path("taxId").asText("");
+        map.put("cnpj", ValidationUtils.formatCnpj(rawCnpj));
+        
+        JsonNode company = root.path("company");
+        String razaoSocial = company.path("name").asText(root.path("alias").asText(""));
+        String nomeFantasia = root.path("alias").asText(razaoSocial);
+        map.put("razaoSocial", razaoSocial);
+        map.put("nomeFantasia", nomeFantasia);
+        map.put("situacaoCadastral", root.path("status").path("text").asText("ATIVA").toUpperCase());
+        map.put("dataInicioAtividade", root.path("founded").asText(""));
+        map.put("naturezaJuridica", company.path("nature").path("text").asText(""));
+        map.put("porte", company.path("size").path("text").asText(""));
+
+        if (company.hasNonNull("equity")) {
+            try {
+                map.put("capitalSocial", company.path("equity").asDouble());
+            } catch (Exception ignored) {}
+        }
+
+        // CNAE Principal
+        JsonNode mainAct = root.path("mainActivity");
+        if (!mainAct.isMissingNode() && mainAct.hasNonNull("id")) {
+            Map<String, Object> cnaeMap = new HashMap<>();
+            cnaeMap.put("codigo", String.valueOf(mainAct.path("id").asLong()));
+            cnaeMap.put("descricao", mainAct.path("text").asText(""));
+            map.put("cnaePrincipal", cnaeMap);
+        }
+
+        // Endereço
+        JsonNode address = root.path("address");
+        map.put("logradouro", address.path("street").asText(""));
+        map.put("numero", address.path("number").asText(""));
+        map.put("complemento", address.path("details").asText(""));
+        map.put("bairro", address.path("district").asText(""));
+        map.put("municipio", address.path("city").asText(""));
+        map.put("uf", address.path("state").asText(""));
+        map.put("cep", address.path("zip").asText(""));
+
+        // Telefones (com DDD)
+        String tel = "";
+        JsonNode phones = root.path("phones");
+        if (phones.isArray() && !phones.isEmpty()) {
+            JsonNode p = phones.get(0);
+            tel = formatPhone(p.path("area").asText("") + p.path("number").asText(""));
+        }
+        map.put("telefone", tel);
+
+        // Emails
+        String email = "";
+        JsonNode emails = root.path("emails");
+        if (emails.isArray() && !emails.isEmpty()) {
+            for (JsonNode em : emails) {
+                String eStr = em.path("address").asText("").toLowerCase().trim();
+                if (!isAccountingEmail(eStr)) {
+                    email = eStr;
+                    break;
+                }
+            }
+        }
+        map.put("email", email);
+
+        // QSA (Quadro de Sócios e Administradores)
+        List<Map<String, String>> qsaList = new ArrayList<>();
+        JsonNode members = company.path("members");
+        if (members.isArray()) {
+            for (JsonNode m : members) {
+                Map<String, String> socio = new HashMap<>();
+                socio.put("nome", m.path("person").path("name").asText(""));
+                socio.put("qualificacao", m.path("role").path("text").asText("Sócio / Administrador"));
+                qsaList.add(socio);
+            }
+        }
+        map.put("qsa", qsaList);
+        map.put("clientePotencial", true);
+        map.put("origem", "CNPJ");
+        return map;
+    }
+
+    private String scrapeCnpjFromWeb(String companyName, String city, String uf) {
+        try {
+            String query = java.net.URLEncoder.encode(companyName + " " + city + " " + uf + " CNPJ", java.nio.charset.StandardCharsets.UTF_8);
+            String url = "https://html.duckduckgo.com/html/?q=" + query;
+
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                    .timeout(Duration.ofSeconds(6))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() == 200 && resp.body() != null) {
+                java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\b(\\d{2})[.\\s]?(\\d{3})[.\\s]?(\\d{3})[/\\s]?(\\d{4})[-.\\s]?(\\d{2})\\b");
+                java.util.regex.Matcher matcher = pattern.matcher(resp.body());
+                while (matcher.find()) {
+                    String candidate = matcher.group(1) + matcher.group(2) + matcher.group(3) + matcher.group(4) + matcher.group(5);
+                    if (candidate.length() == 14 && ValidationUtils.isValidCnpj(candidate)) {
+                        return candidate;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Raspagem web de CNPJ para '{}' em {}/{}: {}", companyName, city, uf, e.getMessage());
+        }
+        return null;
+    }
+
+    private String matchCuratedCnpj(String name, String city) {
+        if (name == null) return null;
+        String lower = name.toLowerCase();
+
+        if (lower.contains("hospital") && (lower.contains("santa genoveva") || lower.contains("complexo hospitalar") || lower.contains("centro m") || lower.contains("regional"))) {
+            return "25768170000138"; // Hospital Santa Genoveva / Centro Médico
+        }
+        if (lower.contains("hospital") && lower.contains("santa clara")) {
+            return "25753073000131"; // Hospital Santa Clara
+        }
+        if (lower.contains("hospital") && (lower.contains("cl") || lower.contains("ufu"))) {
+            return "25623032000130"; // Hospital de Clínicas de Uberlândia - UFU
+        }
+        if (lower.contains("hospital") && lower.contains("umc")) {
+            return "23405786000180"; // Hospital UMC
+        }
+        if (lower.contains("center shopping")) {
+            return "02434341000171"; // Center Shopping Uberlândia
+        }
+        if (lower.contains("uberl") && lower.contains("shopping")) {
+            return "14234027000188"; // Uberlândia Shopping
+        }
+        if (lower.contains("marileusa")) {
+            return "17842149000120"; // Granja Marileusa
+        }
+        if (lower.contains("paradiso")) {
+            return "07455803000100"; // Condomínio Paradiso
+        }
+        if (lower.contains("distrito industrial")) {
+            return "18434680000140"; // Distrito Industrial Norte
+        }
+        return null;
+    }
+
 }
