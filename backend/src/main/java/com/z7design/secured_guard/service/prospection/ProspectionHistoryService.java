@@ -252,8 +252,8 @@ public class ProspectionHistoryService {
                 }
             }
 
-            if (!qsaList.isEmpty()) map.put("qsa", qsaList);
-            if (!decisoresList.isEmpty()) map.put("decisores", decisoresList);
+            map.put("qsa", qsaList);
+            map.put("decisores", decisoresList);
 
             mappedCompanies.add(map);
         }
@@ -268,6 +268,7 @@ public class ProspectionHistoryService {
         response.put("totalEncontrados", search.getTotalEncontrados());
         response.put("createdAt", search.getCreatedAt());
         response.put("prospects", mappedCompanies);
+        response.put("companies", mappedCompanies);
 
         return response;
     }
