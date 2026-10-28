@@ -268,6 +268,28 @@ class EPIDeliveryPdfLineOrderTest {
         }
     }
 
+    @Test
+    void pdfCom27LinhasDevePreencherAteORodapeEmUmaPagina() throws Exception {
+        StandardReportLayoutService layoutService = newLayoutService();
+        pdfService = new EPIDeliveryStandardPdfService(
+                employeeRepository, companyRepository, epiDeliveryFormRepository,
+                stockItemRepository, layoutService,
+                new com.z7design.secured_guard.service.ExcelReportLayoutService(companyRepository),
+                documentDateResolver);
+
+        lenient().when(companyRepository.findById(company.getId())).thenReturn(Optional.of(company));
+
+        List<EPIDeliveryFormItem> items = new java.util.ArrayList<>();
+        for (int i = 1; i <= 27; i++) {
+            items.add(item("EPI " + i, i));
+        }
+        form.setItems(items);
+        byte[] pdf = pdfService.generateEPIDeliveryPdfFromForm(form);
+        try (PDDocument doc = PDDocument.load(new ByteArrayInputStream(pdf))) {
+            assertEquals(1, doc.getNumberOfPages(), "A ficha preenchendo até o rodapé com 27 linhas deve caber em 1 página");
+        }
+    }
+
     private String extractText(byte[] pdfBytes) throws Exception {
         try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdfBytes))) {
             return new PDFTextStripper().getText(document);
