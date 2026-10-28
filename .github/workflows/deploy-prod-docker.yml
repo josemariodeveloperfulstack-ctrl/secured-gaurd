@@ -256,6 +256,7 @@ jobs:
             echo "🔧 Flyway repair PROD..."
             docker exec -i secured-guard-db-prod psql -U postgres -d secured_guard_prod -c "
               DELETE FROM flyway_schema_history WHERE success = false;
+              DELETE FROM flyway_schema_history WHERE version = '1097';
               UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';
               UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';
               UPDATE flyway_schema_history SET checksum = -1673547286 WHERE version = '429';
