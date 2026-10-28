@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS prospection_searches (
     uf VARCHAR(10),
     segmento VARCHAR(100),
     total_encontrados INT DEFAULT 0,
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    user_id UUID,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS prospection_companies (
     website VARCHAR(255),
     origem VARCHAR(50),
     detalhes_json TEXT,
-    lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+    lead_id UUID,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
