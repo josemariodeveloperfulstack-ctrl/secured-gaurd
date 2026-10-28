@@ -35,8 +35,12 @@ public class ProspectionController {
         this.userRepository = userRepository;
     }
 
+    public static final String PROSPECTION_AUTHORITY = 
+            "hasAnyAuthority('LEADS_READ', 'LEADS_WRITE', 'LEADS_CREATE', 'SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'GESTOR', 'COMERCIAL', " +
+            "'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'ROLE_GESTOR', 'ROLE_COMERCIAL')";
+
     @GetMapping("/cnpj/{cnpj}")
-    @PreAuthorize("hasAnyAuthority('LEADS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Consulta dados oficiais completos de um CNPJ na Receita Federal")
     public ResponseEntity<Map<String, Object>> searchByCnpj(
             @PathVariable String cnpj,
@@ -56,7 +60,7 @@ public class ProspectionController {
     }
 
     @GetMapping("/find-cnpj")
-    @PreAuthorize("hasAnyAuthority('LEADS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Descobre e enriquece o CNPJ de uma empresa/condomínio a partir do nome e cidade")
     public ResponseEntity<Map<String, Object>> findCnpj(
             @RequestParam String nome,
@@ -79,7 +83,7 @@ public class ProspectionController {
     }
 
     @GetMapping("/ai-search")
-    @PreAuthorize("hasAnyAuthority('LEADS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Busca e qualificação de prospectos por cidade e segmento usando IA Gemini")
     public ResponseEntity<List<Map<String, Object>>> searchWithAi(
             @RequestParam(defaultValue = "Uberlândia") String cidade,
@@ -102,7 +106,7 @@ public class ProspectionController {
     }
 
     @GetMapping("/history")
-    @PreAuthorize("hasAnyAuthority('LEADS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Lista o histórico de pesquisas de prospecção gravadas no banco de dados")
     public ResponseEntity<org.springframework.data.domain.Page<com.z7design.secured_guard.model.prospection.ProspectionSearch>> listHistory(
             @RequestParam(defaultValue = "0") int page,
@@ -111,14 +115,14 @@ public class ProspectionController {
     }
 
     @GetMapping("/history/{id}")
-    @PreAuthorize("hasAnyAuthority('LEADS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Recupera os detalhes e prospectos salvos de uma pesquisa específica do histórico")
     public ResponseEntity<Map<String, Object>> getHistoryDetails(@PathVariable java.util.UUID id) {
         return ResponseEntity.ok(historyService.getSearchDetails(id));
     }
 
     @PostMapping("/history")
-    @PreAuthorize("hasAnyAuthority('LEADS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Salva manualmente uma pesquisa e sua lista de prospectos no banco")
     public ResponseEntity<Map<String, Object>> saveCustomSearch(
             @RequestBody Map<String, Object> payload,
@@ -143,20 +147,22 @@ public class ProspectionController {
 
     private com.z7design.secured_guard.model.User resolveUser(org.springframework.security.core.userdetails.UserDetails userDetails) {
         if (userDetails != null && userDetails.getUsername() != null) {
-            return userRepository.findByUsername(userDetails.getUsername()).orElse(null);
+            return userRepository.findByUsername(userDetails.getUsername())
+                    .or(() -> userRepository.findByEmailIgnoreCase(userDetails.getUsername()))
+                    .orElse(null);
         }
         return null;
     }
 
     @GetMapping("/credentials")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Retorna o status de configuração das chaves de IA e ferramentas de prospecção")
     public ResponseEntity<Map<String, Object>> getCredentialsStatus() {
         return ResponseEntity.ok(geminiProspectionService.getCredentialsStatus());
     }
 
     @PostMapping("/credentials")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Atualiza dinamicamente as chaves e modelos de IA e ferramentas de prospecção")
     public ResponseEntity<Map<String, Object>> updateCredentials(@RequestBody Map<String, String> payload) {
         String geminiKey = payload.get("geminiApiKey");

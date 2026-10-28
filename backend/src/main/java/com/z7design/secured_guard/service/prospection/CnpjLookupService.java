@@ -62,7 +62,11 @@ public class CnpjLookupService {
             if (resp.statusCode() == 200) {
                 JsonNode root = objectMapper.readTree(resp.body());
                 Map<String, Object> mapped = mapBrasilApi(root);
-                enrichCorporateEmailsAndContacts(mapped);
+                try {
+                    enrichCorporateEmailsAndContacts(mapped);
+                } catch (Exception enrichEx) {
+                    log.warn("Enriquecimento adicional ignorado para CNPJ {}: {}", cleanCnpj, enrichEx.getMessage());
+                }
                 return mapped;
             } else {
                 log.warn("BrasilAPI retornou status {} para CNPJ {}", resp.statusCode(), cleanCnpj);
@@ -75,7 +79,7 @@ public class CnpjLookupService {
         try {
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create("https://receitaws.com.br/v1/cnpj/" + cleanCnpj))
-                    .header("User-Agent", "SecuredGuard-Prospection/1.0")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                     .timeout(Duration.ofSeconds(8))
                     .GET()
                     .build();
@@ -85,7 +89,11 @@ public class CnpjLookupService {
                 JsonNode root = objectMapper.readTree(resp.body());
                 if (!"ERROR".equalsIgnoreCase(root.path("status").asText())) {
                     Map<String, Object> mapped = mapReceitaWs(root);
-                    enrichCorporateEmailsAndContacts(mapped);
+                    try {
+                        enrichCorporateEmailsAndContacts(mapped);
+                    } catch (Exception enrichEx) {
+                        log.warn("Enriquecimento adicional ignorado para CNPJ {}: {}", cleanCnpj, enrichEx.getMessage());
+                    }
                     return mapped;
                 }
             }
@@ -97,7 +105,7 @@ public class CnpjLookupService {
         try {
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create("https://minhareceita.org/" + cleanCnpj))
-                    .header("User-Agent", "SecuredGuard-Prospection/1.0")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                     .timeout(Duration.ofSeconds(8))
                     .GET()
                     .build();
@@ -106,7 +114,11 @@ public class CnpjLookupService {
             if (resp.statusCode() == 200) {
                 JsonNode root = objectMapper.readTree(resp.body());
                 Map<String, Object> mapped = mapBrasilApi(root);
-                enrichCorporateEmailsAndContacts(mapped);
+                try {
+                    enrichCorporateEmailsAndContacts(mapped);
+                } catch (Exception enrichEx) {
+                    log.warn("Enriquecimento adicional ignorado para CNPJ {}: {}", cleanCnpj, enrichEx.getMessage());
+                }
                 return mapped;
             }
         } catch (Exception ex) {
