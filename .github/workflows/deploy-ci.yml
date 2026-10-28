@@ -79,6 +79,7 @@ jobs:
             cd deploy
             echo "🐳 Build dos containers..."
             docker-compose -f docker-compose.env-ci.yml build --no-cache backend-ci frontend-ci
-            docker-compose -f docker-compose.env-ci.yml up -d --force-recreate
+            docker rm -f secured-guard-redis-ci secured-guard-postgres-ci whatsapp-service-ci 2>/dev/null || true
+            docker-compose -f docker-compose.env-ci.yml up -d --force-recreate --remove-orphans
 
             echo "✅ Deploy concluído com sucesso!"
