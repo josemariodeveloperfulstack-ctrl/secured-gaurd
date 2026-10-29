@@ -397,6 +397,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   ASSISTENCIA_RH: RH_DPE_ASSISTENCIA_ALLOWED_SET,
   COMERCIAL: new Set([
     'dashboard',
+    'prospeccao',
     'leads',
     'marketing',
     'empresas',
@@ -414,6 +415,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   ]),
   GESTOR_COMERCIAL: new Set([
     'dashboard',
+    'prospeccao',
     'leads',
     'marketing',
     'empresas',
@@ -431,6 +433,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   ]),
   ASSISTENTE_COMERCIAL: new Set([
     'dashboard',
+    'prospeccao',
     'leads',
     'marketing',
     'clientes',

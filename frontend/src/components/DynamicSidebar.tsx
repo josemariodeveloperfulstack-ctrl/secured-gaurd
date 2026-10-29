@@ -302,6 +302,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   COMERCIAL: new Set([
     'dashboard',
     'leads',
+    'prospeccao',
     'marketing',
     'empresas',
     'clientes',
@@ -319,6 +320,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   GESTOR_COMERCIAL: new Set([
     'dashboard',
     'leads',
+    'prospeccao',
     'marketing',
     'empresas',
     'clientes',
@@ -336,6 +338,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   ASSISTENTE_COMERCIAL: new Set([
     'dashboard',
     'leads',
+    'prospeccao',
     'marketing',
     'clientes',
     'propostas',
@@ -895,6 +898,12 @@ export function DynamicSidebar() {
 
       if (item.role && item.role !== user.role) return false;
 
+      // Papéis comerciais sempre têm acesso garantido aos itens do módulo comercial
+      const isCommercialRole = ['COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'GESTOR'].includes(normalizedRole);
+      if (isCommercialRole && ['prospeccao', 'leads', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm'].includes(item.id)) {
+        return true;
+      }
+
       if (item.requiredPermission) {
         return hasPermission(user.permissions, item.requiredPermission as keyof typeof user.permissions);
       }
@@ -946,7 +955,7 @@ export function DynamicSidebar() {
         ['empresas', 'filiais', 'clientes', 'fornecedores'].includes(item.id)
       ),
       comercial: filteredItems.filter(item =>
-        ['leads', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm'].includes(item.id)
+        ['prospeccao', 'leads', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm'].includes(item.id)
       ),
       compras: filteredItems.filter(item =>
         ['compras', 'compras-solicitacoes', 'compras-aprovacoes', 'compras-cotacoes', 'compras-relatorios'].includes(item.id)
