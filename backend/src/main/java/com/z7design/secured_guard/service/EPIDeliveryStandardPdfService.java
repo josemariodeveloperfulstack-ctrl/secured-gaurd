@@ -816,21 +816,9 @@ public class EPIDeliveryStandardPdfService {
                                 substitutionReason = item.getReplacementReason().trim();
                         }
 
-                        // Fallback pelo tipo da ficha (comportamento anterior)
-                        if (substitutionInfo.isEmpty() || substitutionReason.isEmpty()) {
-                                if (deliveryType == EPIDeliveryType.SUBSTITUICAO || deliveryType == EPIDeliveryType.TROCA || deliveryType == EPIDeliveryType.DEVOLUCAO) {
-                                        if (substitutionInfo.isEmpty()) {
-                                                substitutionInfo = formatDate(itemDeliveryDate);
-                                        }
-                                        if (substitutionReason.isEmpty() && deliveryType != null) {
-                                                substitutionReason = deliveryType.getDescription();
-                                        }
-                                }
-                        }
-
                         String sizeNum = resolveDisplaySizeNumber(item);
 
-                        rows.add(new EpiMovementRow(
+                        EpiMovementRow newRow = new EpiMovementRow(
                                         item.getEpiName(),
                                         sizeNum,
                                         item.getCa(),
@@ -838,7 +826,21 @@ public class EPIDeliveryStandardPdfService {
                                         itemDeliveryDate,
                                         substitutionInfo,
                                         substitutionReason,
-                                        item.getSignatureBase64()));
+                                        item.getSignatureBase64());
+
+                        boolean isDuplicate = rows.stream().anyMatch(existing ->
+                                equalsIgnoreCaseTrim(existing.epiName(), newRow.epiName()) &&
+                                equalsIgnoreCaseTrim(existing.sizeNumber(), newRow.sizeNumber()) &&
+                                equalsIgnoreCaseTrim(existing.ca(), newRow.ca()) &&
+                                existing.quantity() == newRow.quantity() &&
+                                java.util.Objects.equals(existing.deliveryDate(), newRow.deliveryDate()) &&
+                                equalsIgnoreCaseTrim(existing.substitutionInfo(), newRow.substitutionInfo()) &&
+                                equalsIgnoreCaseTrim(existing.substitutionReason(), newRow.substitutionReason())
+                        );
+
+                        if (!isDuplicate) {
+                                rows.add(newRow);
+                        }
                 }
         }
 
@@ -1150,5 +1152,11 @@ public class EPIDeliveryStandardPdfService {
                 secTable.addCell(barCell);
                 secTable.addCell(textCell);
                 document.add(secTable);
+        }
+
+        private static boolean equalsIgnoreCaseTrim(String a, String b) {
+                String s1 = a != null ? a.trim() : "";
+                String s2 = b != null ? b.trim() : "";
+                return s1.equalsIgnoreCase(s2);
         }
 }

@@ -739,8 +739,9 @@ public class EPIDeliveryFormService {
 
     @Transactional(readOnly = true)
     public EPIDeliveryFormDTO findById(UUID id) {
-        EPIDeliveryForm form = epiDeliveryFormRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByIdWithDetails(id)
+                .orElseGet(() -> epiDeliveryFormRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI nÃ£o encontrada com id: " + id)));
         return EPIDeliveryFormDTO.fromEntity(form);
     }
 

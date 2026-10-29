@@ -196,7 +196,46 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
             dataDevolucao: (item as any).returnedDate || '',
             motivoDevolucao: (item as any).returnReason || '',
           }));
-          setEpis([...savedEpis, emptyEpiRow()]);
+          // Carrega todo o histórico do funcionário para que a edição exiba a ficha completa de EPIs
+          let allCombinedItems = [...savedEpis];
+          if (ficha.employeeId) {
+            try {
+              const allEmployeeFichas = await epiDeliveryFormService.getByEmployeeId(ficha.employeeId);
+              for (const otherFicha of allEmployeeFichas) {
+                if (otherFicha.id === ficha.id) continue;
+                if (!otherFicha.items || otherFicha.items.length === 0) continue;
+                for (const otherItem of otherFicha.items) {
+                  const isDup = allCombinedItems.some(existing =>
+                    existing.nome?.trim().toLowerCase() === otherItem.epiName?.trim().toLowerCase() &&
+                    (existing.ca || '').trim() === (otherItem.ca || '').trim() &&
+                    existing.quantidade === String(otherItem.quantity)
+                  );
+                  if (!isDup) {
+                    allCombinedItems.push({
+                      id: otherItem.id || '',
+                      nome: otherItem.epiName,
+                      tamanho: otherItem.sizeNumber || '',
+                      quantidade: String(otherItem.quantity),
+                      ca: otherItem.ca || '',
+                      caName: otherItem.caName || '',
+                      validade: otherItem.validityDate || '',
+                      observacoes: otherItem.observations || '',
+                      uniformeTipo: otherItem.uniformType || '',
+                      uniformePeca: otherItem.uniformPiece || '',
+                      stockItemId: otherItem.stockItemId || '',
+                      dataSubstituicao: (otherItem as any).substitutedDate || '',
+                      motivoSubstituicao: (otherItem as any).replacementReason || '',
+                      dataDevolucao: (otherItem as any).returnedDate || '',
+                      motivoDevolucao: (otherItem as any).returnReason || '',
+                    });
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('Não foi possível carregar histórico completo de EPIs do funcionário:', err);
+            }
+          }
+          setEpis([...allCombinedItems, emptyEpiRow()]);
 
           // Estado gravado no backend: base para validar o saldo disponível no formulário.
           persistedStatusRef.current = ficha.status || 'DRAFT';
@@ -556,6 +595,66 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                 dataEntrega: prev.dataEntrega || defaults.dataEntrega,
                 tipoEntrega: defaults.tipoEntrega,
               }));
+
+              // Se o funcionário já possui fichas cadastradas, carrega os itens para edição
+              try {
+                const existingFichas = await epiDeliveryFormService.getByEmployeeId(mappedEmp.id);
+                if (existingFichas && existingFichas.length > 0) {
+                  const activeFicha = existingFichas.find(f => f.status === 'COMPLETED')
+                    || existingFichas.find(f => f.status === 'DRAFT')
+                    || existingFichas[0];
+
+                  if (activeFicha) {
+                    setCurrentFichaId(activeFicha.id);
+                    setForm(prev => ({
+                      ...prev,
+                      empresaId: activeFicha.companyId || prev.empresaId,
+                      dataEntrega: activeFicha.deliveryDate || prev.dataEntrega || defaults.dataEntrega,
+                      responsavelEntregaId: activeFicha.responsibleEmployeeId || prev.responsavelEntregaId,
+                      observacoes: activeFicha.observations || prev.observacoes,
+                      status: activeFicha.status || prev.status,
+                      tipoEntrega: activeFicha.deliveryType || prev.tipoEntrega,
+                      employeeWorkSector: activeFicha.employeeWorkSector || buildWorkSectorSnapshot(mappedEmp),
+                    }));
+
+                    const combined = [];
+                    for (const f of existingFichas) {
+                      if (!f.items) continue;
+                      for (const it of f.items) {
+                        const isDup = combined.some(existing =>
+                          existing.nome?.trim().toLowerCase() === it.epiName?.trim().toLowerCase() &&
+                          (existing.ca || '').trim() === (it.ca || '').trim() &&
+                          existing.quantidade === String(it.quantity)
+                        );
+                        if (!isDup) {
+                          combined.push({
+                            id: it.id || '',
+                            nome: it.epiName,
+                            tamanho: it.sizeNumber || '',
+                            quantidade: String(it.quantity),
+                            ca: it.ca || '',
+                            caName: it.caName || '',
+                            validade: it.validityDate || '',
+                            observacoes: it.observations || '',
+                            uniformeTipo: it.uniformType || '',
+                            uniformePeca: it.uniformPiece || '',
+                            stockItemId: it.stockItemId || '',
+                            dataSubstituicao: (it as any).substitutedDate || '',
+                            motivoSubstituicao: (it as any).replacementReason || '',
+                            dataDevolucao: (it as any).returnedDate || '',
+                            motivoDevolucao: (it as any).returnReason || '',
+                          });
+                        }
+                      }
+                    }
+                    if (combined.length > 0) {
+                      setEpis([...combined, emptyEpiRow()]);
+                    }
+                  }
+                }
+              } catch (err) {
+                console.warn('Erro ao carregar fichas existentes do funcionário:', err);
+              }
             } else {
               setForm(prev => ({ ...prev, employeeWorkSector: buildWorkSectorSnapshot(mappedEmp) }));
             }
@@ -573,7 +672,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
   }, []);
 
   useEffect(() => {
-    if (fichaId) return;
+    if (fichaId || currentFichaId) return;
+    if (epis.some(e => e.nome && e.nome.trim() !== '')) return;
 
     if (form.empresaId && companies.length > 0) {
       const selectedCompany = companies.find(c => c.id === form.empresaId);
