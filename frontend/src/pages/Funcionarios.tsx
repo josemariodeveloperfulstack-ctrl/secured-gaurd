@@ -207,7 +207,8 @@ const Funcionarios: React.FC = () => {
     { value: "INACTIVE", label: "⭕ Inativo" },
     { value: "VACATION", label: "🏖️ Férias" },
     { value: "MATERNITY_LEAVE", label: "👶 Licença Maternidade" },
-    { value: "MEDICAL_CERTIFICATE", label: "🏥 Atestado" },
+    { value: "MEDICAL_CERTIFICATE", label: "🩺 Atestado" },
+    { value: "INSS_LEAVE", label: "🏥 Afastamento INSS" },
     { value: "TERMINATED", label: "❌ Demitido" },
     { value: "SUSPENDED", label: "⏸️ Suspenso" },
     { value: "SUB_JUDICE", label: "⚖️ Sub Júdice / Judicial" },
@@ -1031,6 +1032,7 @@ Para excluir este funcionário:
       case 'VACATION': return 'bg-yellow-100 text-yellow-800';
       case 'MATERNITY_LEAVE': return 'bg-pink-100 text-pink-800';
       case 'MEDICAL_CERTIFICATE': return 'bg-blue-100 text-blue-800';
+      case 'INSS_LEAVE': return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'TERMINATED': return 'bg-gray-100 text-gray-800';
       case 'SUSPENDED': return 'bg-orange-100 text-orange-800';
       case 'SUB_JUDICE': return 'bg-amber-100 text-amber-800 border-amber-300';
@@ -1045,6 +1047,7 @@ Para excluir este funcionário:
       case 'VACATION': return 'Férias';
       case 'MATERNITY_LEAVE': return 'Licença Maternidade';
       case 'MEDICAL_CERTIFICATE': return 'Atestado';
+      case 'INSS_LEAVE': return 'Afastamento INSS';
       case 'TERMINATED': return 'Demitido';
       case 'SUSPENDED': return 'Suspenso';
       case 'SUB_JUDICE': return 'Sub Júdice / Judicial';
@@ -1138,7 +1141,7 @@ Para excluir este funcionário:
     total: (totalCount != null && !searchTerm?.trim()) ? totalCount : employees.length,
     active: employees.filter(e => e.status === 'ACTIVE').length,
     vacation: employees.filter(e => e.status === 'VACATION').length,
-    medicalCertificate: employees.filter(e => e.status === 'MEDICAL_CERTIFICATE').length,
+    medicalCertificate: employees.filter(e => e.status === 'MEDICAL_CERTIFICATE' || e.status === 'MATERNITY_LEAVE' || e.status === 'INSS_LEAVE').length,
     terminated: employees.filter(e => e.status === 'TERMINATED').length,
     suspended: employees.filter(e => e.status === 'SUSPENDED').length,
   };

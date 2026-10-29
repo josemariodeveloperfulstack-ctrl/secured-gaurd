@@ -203,8 +203,6 @@ public enum Permission {
     FINES_CREATE,
     FINES_DELETE,
 
-    FLEET_READ,
-    FLEET_WRITE,
     FLEET_MANAGE,
     
     // ===========================================

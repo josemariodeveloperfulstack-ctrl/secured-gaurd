@@ -24,6 +24,7 @@ const statusOptions = [
   { value: 'VACATION', label: 'Férias' },
   { value: 'MATERNITY_LEAVE', label: 'Licença Maternidade' },
   { value: 'MEDICAL_CERTIFICATE', label: 'Atestado' },
+  { value: 'INSS_LEAVE', label: 'Afastamento INSS' },
   { value: 'TERMINATED', label: 'Demitido' },
   { value: 'SUSPENDED', label: 'Suspenso' },
 ];

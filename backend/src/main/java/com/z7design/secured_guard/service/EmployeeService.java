@@ -1581,7 +1581,7 @@ public class EmployeeService {
                 "SELECT CAST(COUNT(*) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'ACTIVE' THEN 1 ELSE 0 END), 0) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'VACATION' THEN 1 ELSE 0 END), 0) AS bigint), "
-                        + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) IN ('MEDICAL_CERTIFICATE', 'MATERNITY_LEAVE') THEN 1 ELSE 0 END), 0) AS bigint), "
+                        + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) IN ('MEDICAL_CERTIFICATE', 'MATERNITY_LEAVE', 'INSS_LEAVE') THEN 1 ELSE 0 END), 0) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN (CAST(e.status AS text) = 'TERMINATED' OR EXISTS (SELECT 1 FROM employee_employment_periods per WHERE per.employee_id = e.id AND per.status = 'TERMINATED')) THEN 1 ELSE 0 END), 0) AS bigint), "
                         + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'SUSPENDED' THEN 1 ELSE 0 END), 0) AS bigint) "
                         + "FROM employees e "

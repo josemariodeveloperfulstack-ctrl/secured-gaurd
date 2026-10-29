@@ -269,6 +269,7 @@ export function RelatoriosModal({
             case 'VACATION': return 'Férias';
             case 'MATERNITY_LEAVE': return 'Licença Maternidade';
             case 'MEDICAL_CERTIFICATE': return 'Atestado';
+            case 'INSS_LEAVE': return 'Afastamento INSS';
             case 'TERMINATED': return 'Demitido';
             case 'SUSPENDED': return 'Suspenso';
             default: return status || 'Desconhecido';
@@ -862,6 +863,7 @@ export function RelatoriosModal({
                                             <SelectItem value="VACATION">Em Férias</SelectItem>
                                             <SelectItem value="MATERNITY_LEAVE">Licença Maternidade</SelectItem>
                                             <SelectItem value="MEDICAL_CERTIFICATE">Atestado Médico</SelectItem>
+                                            <SelectItem value="INSS_LEAVE">Afastamento INSS</SelectItem>
                                             <SelectItem value="TERMINATED">Demitidos</SelectItem>
                                             <SelectItem value="SUSPENDED">Suspensos</SelectItem>
                                         </SelectContent>
