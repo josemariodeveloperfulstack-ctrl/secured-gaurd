@@ -79,6 +79,9 @@ public class EmployeeService {
     @PersistenceContext
     private EntityManager entityManager;
 
+    @Autowired
+    private EmployeeHardDeleteService employeeHardDeleteService;
+
     private static final String BASIC_DATA_SELECT = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id, e.position_id, e.department_id, e.escala_trabalho, e.horario_trabalho, e.data_rescisao ";
 
     private static final String BASIC_DATA_JOINS = "FROM employees e "
@@ -879,7 +882,11 @@ public class EmployeeService {
                         "O funcionário " + employee.getName() + " não pode ser excluído pois não está demitido.");
             }
         }
-        employeeRepository.deleteAll(employees);
+        entityManager.flush();
+        entityManager.clear();
+        for (Employee employee : employees) {
+            employeeHardDeleteService.purgeAndDelete(employee.getId());
+        }
     }
 
     @Transactional
@@ -889,7 +896,10 @@ public class EmployeeService {
         if (employee.getStatus() != EmploymentStatus.TERMINATED) {
             throw new RuntimeException("Apenas funcionários demitidos podem ser excluídos");
         }
-        employeeRepository.delete(employee);
+        // Remove/desvincula registros dependentes (EPI, ponto, escalas...) antes de excluir: evita 409
+        entityManager.flush();
+        entityManager.clear();
+        employeeHardDeleteService.purgeAndDelete(id);
     }
 
     /**

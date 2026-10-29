@@ -115,7 +115,8 @@ public class EmployeeController {
     public ResponseEntity<EmployeeDTO> getMyEmployee(Authentication authentication) {
         return employeeService.findDtoForAuthenticatedUser(authentication)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                // 204: usuario sem cadastro de funcionario (ex.: Super Admin) nao e erro
+                .orElse(ResponseEntity.noContent().build());
     }
 
     @GetMapping("/status/test")
