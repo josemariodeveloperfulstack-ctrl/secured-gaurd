@@ -314,10 +314,20 @@ public class InvoiceController {
                 invoiceDTO.setSupplierId(existing.getSupplier().getId());
             }
             if (invoiceDTO.getSubcategoriaId() == null && existing.getSubcategoria() != null) {
-                invoiceDTO.setSubcategoriaId(existing.getSubcategoria().getId());
+                String cat = invoiceDTO.getCategory() != null ? invoiceDTO.getCategory() : existing.getCategory();
+                boolean isRh = cat != null && (cat.startsWith("01") || cat.toUpperCase().contains("RH") || cat.toUpperCase().contains("PESSOAL"));
+                if (isRh) {
+                    invoiceDTO.setSubcategoriaId(existing.getSubcategoria().getId());
+                }
             }
             if (invoiceDTO.getEmployeeId() == null && existing.getEmployee() != null) {
-                invoiceDTO.setEmployeeId(existing.getEmployee().getId());
+                String cat = invoiceDTO.getCategory() != null ? invoiceDTO.getCategory() : existing.getCategory();
+                boolean isRh = cat != null && (cat.startsWith("01") || cat.toUpperCase().contains("RH") || cat.toUpperCase().contains("PESSOAL"));
+                if (isRh) {
+                    invoiceDTO.setEmployeeId(existing.getEmployee().getId());
+                } else {
+                    invoiceDTO.setEmployeeId(null);
+                }
             }
             if (invoiceDTO.getCompanySigla() == null) {
                 invoiceDTO.setCompanySigla(existing.getCompanySigla());

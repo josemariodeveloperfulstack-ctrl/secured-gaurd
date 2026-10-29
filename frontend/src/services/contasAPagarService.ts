@@ -532,7 +532,15 @@ export const contasAPagarService = {
     if (fullConta.codigoBarras) requestData.barcode = fullConta.codigoBarras;
     if (fullConta.categoria !== undefined) requestData.category = fullConta.categoria === 'NENHUMA' ? undefined : fullConta.categoria;
     if (fullConta.subcategoriaId !== undefined) requestData.subcategoriaId = fullConta.subcategoriaId || null;
-    if (fullConta.employeeId !== undefined) requestData.employeeId = fullConta.employeeId || null;
+    if (fullConta.employeeId !== undefined) {
+      requestData.employeeId = fullConta.employeeId || null;
+    } else {
+      const cat = (fullConta.categoria || '').toUpperCase();
+      const isRh = cat.startsWith('01') || cat.includes('PESSOAL') || cat.includes('RH');
+      if (!isRh && cat.length > 0) {
+        requestData.employeeId = null;
+      }
+    }
     if (fullConta.observacoes) requestData.notes = fullConta.observacoes;
     if (fullConta.centroCusto !== undefined) requestData.centroCusto = fullConta.centroCusto === 'NENHUM' ? undefined : fullConta.centroCusto;
     if (fullConta.companySigla !== undefined) requestData.companySigla = fullConta.companySigla;

@@ -398,16 +398,7 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
               <Calendar size={18} />
               Listagem de Contas a Pagar
             </CardTitle>
-            <Button 
-              variant="outline"
-              size="sm"
-              onClick={onExportPeriodo}
-              disabled={!onExportPeriodo || exportLoading}
-              className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs h-8"
-            >
-              <Download size={14} className="mr-1.5" />
-              {exportLoading ? 'Exportando...' : 'Exportar'}
-            </Button>
+            
           </div>
         </CardHeader>
         <CardContent className="bg-gray-800 p-0">

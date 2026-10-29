@@ -36,7 +36,7 @@ public class CustomContasAPagarReportRequestDTO {
     /**
      * Tipo de agrupamento para exibição no PDF (ex: "UNIT_SECTOR", "STATUS", "SUPPLIER", "NONE")
      */
-    private String groupBy = "UNIT_SECTOR";
+    private String groupBy = "NONE";
 
     public CustomContasAPagarReportRequestDTO() {
     }

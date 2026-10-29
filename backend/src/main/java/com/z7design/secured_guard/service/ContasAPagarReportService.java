@@ -235,7 +235,7 @@ public class ContasAPagarReportService {
             req.setCompanySigla(companySigla);
             req.setStartDate(startDate);
             req.setEndDate(endDate);
-            req.setGroupBy("UNIT_SECTOR");
+            req.setGroupBy("NONE");
             req.setSelectedColumns(Arrays.asList("dueDate", "description", "supplier", "unit", "workSector", "category", "amount", "status"));
 
             return generateCustomPdfDocument(invoices, req);
@@ -308,19 +308,29 @@ public class ContasAPagarReportService {
                 }
                 return true;
             }).sorted((a, b) -> {
-                String uA = a.getUnit() != null && a.getUnit().getName() != null ? a.getUnit().getName() : "";
-                String uB = b.getUnit() != null && b.getUnit().getName() != null ? b.getUnit().getName() : "";
-                int cmpUnit = uA.compareToIgnoreCase(uB);
-                if (cmpUnit != 0) return cmpUnit;
+                LocalDate dA = a.getDueDate();
+                LocalDate dB = b.getDueDate();
+                if ("issueDate".equalsIgnoreCase(req.getDateField())) {
+                    dA = a.getIssueDate();
+                    dB = b.getIssueDate();
+                } else if ("paymentDate".equalsIgnoreCase(req.getDateField())) {
+                    dA = a.getPaymentDate();
+                    dB = b.getPaymentDate();
+                }
+                if (dA == null && dB == null) return 0;
+                if (dA == null) return 1;
+                if (dB == null) return -1;
+                int cmpDate = dA.compareTo(dB);
+                if (cmpDate != 0) return cmpDate;
 
-                String sA = a.getWorkSector() != null ? a.getWorkSector() : "";
-                String sB = b.getWorkSector() != null ? b.getWorkSector() : "";
-                int cmpSector = sA.compareToIgnoreCase(sB);
-                if (cmpSector != 0) return cmpSector;
+                String sA = getFornecedorOuFuncionario(a);
+                String sB = getFornecedorOuFuncionario(b);
+                int cmpSupp = sA.compareToIgnoreCase(sB);
+                if (cmpSupp != 0) return cmpSupp;
 
-                LocalDate dA = a.getDueDate() != null ? a.getDueDate() : LocalDate.MIN;
-                LocalDate dB = b.getDueDate() != null ? b.getDueDate() : LocalDate.MIN;
-                return dA.compareTo(dB);
+                String descA = a.getDescription() != null ? a.getDescription() : "";
+                String descB = b.getDescription() != null ? b.getDescription() : "";
+                return descA.compareToIgnoreCase(descB);
             }).collect(Collectors.toList());
 
             log.info("Contas filtradas para o relatório personalizado: {} de {}", filtered.size(), allInvoices.size());
@@ -419,6 +429,13 @@ public class ContasAPagarReportService {
                     for (Map.Entry<String, List<Invoice>> entry : grouped.entrySet()) {
                         String groupHeader = entry.getKey();
                         List<Invoice> groupInvoices = entry.getValue();
+                        groupInvoices.sort((a, b) -> {
+                            LocalDate dA = a.getDueDate() != null ? a.getDueDate() : LocalDate.MIN;
+                            LocalDate dB = b.getDueDate() != null ? b.getDueDate() : LocalDate.MIN;
+                            int cmp = dA.compareTo(dB);
+                            if (cmp != 0) return cmp;
+                            return getFornecedorOuFuncionario(a).compareToIgnoreCase(getFornecedorOuFuncionario(b));
+                        });
 
                         // Faixa de cabeçalho do grupo
                         Table groupBar = new Table(UnitValue.createPercentArray(new float[]{0.6f, 99.4f})).useAllAvailableWidth();
@@ -1227,6 +1244,11 @@ public class ContasAPagarReportService {
         }
 
         List<Map<String, Object>> contasData = invoices.stream()
+                .sorted((a, b) -> {
+                    LocalDate dA = a.getDueDate() != null ? a.getDueDate() : LocalDate.MIN;
+                    LocalDate dB = b.getDueDate() != null ? b.getDueDate() : LocalDate.MIN;
+                    return dA.compareTo(dB);
+                })
                 .map(this::mapInvoiceToReportData)
                 .collect(Collectors.toList());
 

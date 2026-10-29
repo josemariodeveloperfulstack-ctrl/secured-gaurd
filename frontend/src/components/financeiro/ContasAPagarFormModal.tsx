@@ -552,7 +552,11 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
           observacoes: initialData.observacoes || '',
           categoria: initialData.categoria || '',
           subcategoriaId: initialData.subcategoriaId || '',
-          employeeId: initialData.employeeId || '',
+          employeeId: (() => {
+            const catStr = (initialData.categoria || '').toUpperCase();
+            const isRh = catStr.startsWith('01') || catStr.includes('PESSOAL') || catStr.includes('RH');
+            return isRh ? (initialData.employeeId || '') : '';
+          })(),
           centroCusto: initialData.centroCusto || '',
           unitId: initialData.unitId ? String(initialData.unitId) : '',
           unitName: initialData.unitName || '',
@@ -689,7 +693,30 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
     return result.sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [setoresSugeridos, costCenters, formData.workSector]);
 
-  const requiresEmployee = Boolean(selectedSubcategoria?.requerVinculoFuncionario);
+  const selectedCategoriaPai = React.useMemo(() => {
+    return categoriasPai.find(c => c.id === selectedCategoriaPaiId);
+  }, [categoriasPai, selectedCategoriaPaiId]);
+
+  const isRhCategory = React.useMemo(() => {
+    if (selectedCategoriaPai) {
+      const cod = (selectedCategoriaPai.codigo || '').trim();
+      const nome = (selectedCategoriaPai.nome || '').toUpperCase();
+      return cod === '01' || cod.startsWith('01') || nome.includes('PESSOAL') || nome.includes('RH');
+    }
+    const catStr = (formData.categoria || '').toUpperCase();
+    return catStr.startsWith('01') || catStr.includes('PESSOAL') || catStr.includes('RH');
+  }, [selectedCategoriaPai, formData.categoria]);
+
+  const isRhSubcategoria = React.useMemo(() => {
+    if (!selectedSubcategoria) return false;
+    if (selectedSubcategoria.requerVinculoFuncionario) return true;
+    const cod = (selectedSubcategoria.codigo || '').trim();
+    const nome = (selectedSubcategoria.nome || '').toUpperCase();
+    return cod.startsWith('01') || nome.includes('PESSOAL') || nome.includes('RH');
+  }, [selectedSubcategoria]);
+
+  // SÓ deve solicitar o funcionário quando escolher a conta 01 - pessoal / RH ou suas subcategorias
+  const requiresEmployee = Boolean(isRhCategory || isRhSubcategoria);
   const requiresSupplier = !requiresEmployee;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -722,10 +749,10 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
       return;
     }
 
-    if (selectedSubcategoria?.requerVinculoFuncionario && !formData.employeeId) {
+    if (requiresEmployee && !formData.employeeId) {
       toast({
         title: "Erro",
-        description: "Esta conta do Plano de Contas exige informar o funcionário beneficiário",
+        description: "A conta 01 - Pessoal / RH exige selecionar o funcionário beneficiário",
         variant: "destructive"
       });
       return;
@@ -743,16 +770,23 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
     setLoading(true);
     try {
       if (editMode && initialData?.id) {
-        await contasAPagarService.updateContaAPagar(initialData.id, formData);
+        const payloadToSave = {
+          ...formData,
+          employeeId: requiresEmployee ? (formData.employeeId || undefined) : undefined,
+          fornecedorId: requiresSupplier ? (formData.fornecedorId || undefined) : formData.fornecedorId,
+        };
+        await contasAPagarService.updateContaAPagar(initialData.id, payloadToSave);
         toast({
           title: "Sucesso",
           description: "Conta a pagar atualizada com sucesso!"
         });
       } else {
-        await contasAPagarService.createContaAPagar({
+        const payloadToSave = {
           ...formData,
+          employeeId: requiresEmployee ? (formData.employeeId || undefined) : undefined,
           companySigla: formData.companySigla || siglas[0] || undefined
-        });
+        };
+        await contasAPagarService.createContaAPagar(payloadToSave);
         toast({
           title: "Sucesso",
           description: "Conta a pagar criada com sucesso!"
@@ -870,10 +904,18 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                   <Select
                     value={selectedCategoriaPaiId || 'none'}
                     onValueChange={(value) => {
-                      setSelectedCategoriaPaiId(value === 'none' ? '' : value);
+                      const nextId = value === 'none' ? '' : value;
+                      setSelectedCategoriaPaiId(nextId);
                       setSelectedSubcategoria(null);
                       handleInputChange('subcategoriaId', '');
                       handleInputChange('employeeId', '');
+
+                      const cat = categoriasPai.find(c => c.id === nextId);
+                      if (cat) {
+                        handleInputChange('categoria', `${cat.codigo} - ${cat.nome}`);
+                      } else {
+                        handleInputChange('categoria', '');
+                      }
                     }}
                   >
                     <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
@@ -950,7 +992,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 </div>
               </div>
 
-              {(requiresEmployee || formData.employeeId) && (
+              {requiresEmployee && (
                 <div className="mt-4 space-y-3 rounded-md border border-yellow-500/40 bg-yellow-500/5 p-3">
                   <label className="text-sm font-medium text-yellow-400 flex items-center gap-2">
                     <Users size={14} />

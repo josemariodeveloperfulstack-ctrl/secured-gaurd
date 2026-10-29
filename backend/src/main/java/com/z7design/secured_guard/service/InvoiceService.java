@@ -581,8 +581,14 @@ public class InvoiceService {
             }
 
             boolean requiresEmployee = subcategoria != null
-                    && Boolean.TRUE.equals(subcategoria.getRequerVinculoFuncionario());
-            if (subcategoria == null && invoice.getSubcategoria() != null) {
+                    && (Boolean.TRUE.equals(subcategoria.getRequerVinculoFuncionario()) || (subcategoria.getCodigo() != null && subcategoria.getCodigo().startsWith("01")));
+            if (!requiresEmployee && dto.getCategory() != null) {
+                String catUpper = dto.getCategory().toUpperCase();
+                if (catUpper.startsWith("01") || catUpper.contains("PESSOAL") || catUpper.contains("RH")) {
+                    requiresEmployee = true;
+                }
+            }
+            if (subcategoria == null && invoice.getSubcategoria() != null && !requiresEmployee) {
                 requiresEmployee = Boolean.TRUE.equals(invoice.getSubcategoria().getRequerVinculoFuncionario());
             }
 
