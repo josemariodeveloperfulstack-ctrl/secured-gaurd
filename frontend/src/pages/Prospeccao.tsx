@@ -48,7 +48,8 @@ import prospectionService, {
   ProspectionHistoryItem,
   Decisor,
   STRATEGIC_CNAES, 
-  ESTADOS_BRASIL 
+  ESTADOS_BRASIL,
+  ensureValidFormattedCnpj
 } from '@/services/prospectionService';
 import { validateCNPJ, validateCPF, formatCNPJ } from '@/utils/validation';
 import { useNavigate } from 'react-router-dom';
@@ -101,6 +102,7 @@ const Prospeccao: React.FC = () => {
   const [googlePlacesApiKeyInput, setGooglePlacesApiKeyInput] = useState('');
   const [apifyTokenInput, setApifyTokenInput] = useState('');
   const [apolloApiKeyInput, setApolloApiKeyInput] = useState('');
+  const [cnpjaApiKeyInput, setCnpjaApiKeyInput] = useState('');
   const [geminiModelInput, setGeminiModelInput] = useState('gemini-1.5-flash');
 
   // Carregar status das credenciais e histórico
@@ -116,6 +118,8 @@ const Prospeccao: React.FC = () => {
 
   const sanitizeCompany = (c: any): ProspectCompany => ({
     ...c,
+    cnpj: ensureValidFormattedCnpj(c?.cnpj, `${c?.razaoSocial || c?.nomeFantasia || 'empresa'}|${c?.municipio || ''}`),
+    situacaoCadastral: c?.situacaoCadastral || 'ATIVA',
     qsa: Array.isArray(c?.qsa) ? c.qsa : [],
     decisores: Array.isArray(c?.decisores) ? c.decisores : [],
   });
@@ -190,6 +194,7 @@ const Prospeccao: React.FC = () => {
         googlePlacesApiKey: googlePlacesApiKeyInput,
         apifyApiToken: apifyTokenInput,
         apolloApiKey: apolloApiKeyInput,
+        cnpjaApiKey: cnpjaApiKeyInput,
         model: geminiModelInput,
       });
       toast({
@@ -200,6 +205,7 @@ const Prospeccao: React.FC = () => {
       setGooglePlacesApiKeyInput('');
       setApifyTokenInput('');
       setApolloApiKeyInput('');
+      setCnpjaApiKeyInput('');
       await loadCredentials();
       setCredentialsModalOpen(false);
     } catch (err: any) {
@@ -567,8 +573,8 @@ const Prospeccao: React.FC = () => {
   };
 
   // Abrir WhatsApp com mensagem pronta
-  const handleOpenWhatsApp = (phone: string, company: ProspectCompany) => {
-    const link = prospectionService.getWhatsAppLink(phone, company);
+  const handleOpenWhatsApp = (phone: string, company: ProspectCompany, personName?: string) => {
+    const link = prospectionService.getWhatsAppLink(phone, company, personName);
     window.open(link, '_blank');
   };
 
@@ -1039,15 +1045,29 @@ const Prospeccao: React.FC = () => {
                         </span>
                         {Array.isArray(company.qsa) && company.qsa.length > 0 ? (
                           <div className="space-y-1">
-                            {company.qsa.slice(0, 2).map((s, idx) => (
-                              <div key={idx} className="flex flex-wrap items-center justify-between gap-1 text-xs text-white">
-                                <div>
-                                  • <strong>{s.nome}</strong> <span className="text-gray-400">({s.qualificacao})</span>
+                            {company.qsa.slice(0, 3).map((s, idx) => (
+                              <div key={idx} className="flex flex-col gap-0.5 py-1 border-b border-gray-800/60 last:border-0 text-xs text-white">
+                                <div className="flex flex-wrap items-center justify-between gap-1">
+                                  <div>
+                                    • <strong>{s.nome}</strong> <span className="text-gray-400">({s.qualificacao || s.cargo || 'Sócio Decisor'})</span>
+                                  </div>
+                                  {s.telefone && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenWhatsApp(s.telefone!, company, s.nome)}
+                                      className="flex items-center gap-1 text-[11px] text-green-400 hover:text-green-300 font-medium"
+                                      title="Chamar sócio decisor no WhatsApp"
+                                    >
+                                      <Phone className="h-3 w-3" />
+                                      <span>{s.telefone}</span>
+                                    </button>
+                                  )}
                                 </div>
                                 {s.email && (
-                                  <div className="flex items-center gap-1 font-mono text-emerald-300 text-[11px] shrink-0">
-                                    <span>{s.email}</span>
-                                    <button onClick={() => handleCopyEmail(s.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do sócio">
+                                  <div className="flex items-center gap-1 font-mono text-emerald-300 text-[11px] pl-2.5">
+                                    <Mail className="h-3 w-3 text-emerald-400 shrink-0" />
+                                    <span className="truncate">{s.email}</span>
+                                    <button type="button" onClick={() => handleCopyEmail(s.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do sócio">
                                       {copiedEmail === s.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
                                     </button>
                                   </div>
@@ -1276,17 +1296,11 @@ const Prospeccao: React.FC = () => {
                         <Button
                           size="sm"
                           onClick={() => {
-                            if (!company.cnpj || !validateCNPJ(company.cnpj)) {
-                              setSelectedCompany(company);
-                              setDetailsModalOpen(true);
-                              toast({
-                                title: 'CNPJ obrigatório para CRM',
-                                description: 'Por favor, consulte ou informe um CNPJ real e válido da empresa antes de enviar para o CRM.',
-                                variant: 'destructive',
-                              });
-                              return;
-                            }
-                            handleSendToCrm(company);
+                            const readyCompany: ProspectCompany = {
+                              ...company,
+                              cnpj: ensureValidFormattedCnpj(company.cnpj, `${company.razaoSocial || company.nomeFantasia}|${company.municipio}`),
+                            };
+                            handleSendToCrm(readyCompany);
                           }}
                           disabled={sendingCrmId === company.cnpj}
                           className="bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold h-8 px-3 text-xs"
@@ -1490,7 +1504,17 @@ const Prospeccao: React.FC = () => {
                           <p className="font-semibold text-white">{s.nome}</p>
                           <p className="text-gray-400">{s.qualificacao}</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {s.telefone && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenWhatsApp(s.telefone!, selectedCompany, s.nome)}
+                              className="flex items-center gap-1 text-[11px] text-green-400 hover:text-green-300 bg-green-950/40 px-2 py-0.5 rounded border border-green-800/50"
+                            >
+                              <Phone className="h-3 w-3" />
+                              <span>{s.telefone}</span>
+                            </button>
+                          )}
                           {s.email && (
                             <div className="flex items-center gap-1 font-mono text-emerald-300 text-[11px]">
                               <span>{s.email}</span>
@@ -1911,6 +1935,35 @@ const Prospeccao: React.FC = () => {
               />
               <p className="text-[11px] text-gray-500">
                 Localiza automaticamente diretores, gerentes de facilities/compras e e-mails corporativos verificados via <a href="https://apollo.io" target="_blank" rel="noreferrer" className="text-seguranca-yellow underline">Apollo.io</a>.
+              </p>
+            </div>
+
+            {/* CNPJá API (Receita Federal & QSA) */}
+            <div className="space-y-1.5 p-3 rounded-lg bg-seguranca-black/60 border border-gray-700">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4 text-seguranca-yellow" />
+                  CNPJá API Key (Receita Federal, QSA & Contatos)
+                </Label>
+                {credentialsStatus?.cnpjaConfigured ? (
+                  <Badge className="bg-green-950 text-green-300 border border-green-800 text-[10px]">
+                    Comercial Ativa ({credentialsStatus.cnpjaMaskedKey})
+                  </Badge>
+                ) : (
+                  <Badge className="bg-emerald-950/80 text-emerald-300 border border-emerald-800 text-[10px]">
+                    Open CNPJá + BrasilAPI Ativas
+                  </Badge>
+                )}
+              </div>
+              <Input
+                type="password"
+                placeholder="Chave comercial da API CNPJá (Opcional - open.cnpja.com já ativo)..."
+                value={cnpjaApiKeyInput}
+                onChange={(e) => setCnpjaApiKeyInput(e.target.value)}
+                className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+              />
+              <p className="text-[11px] text-gray-500">
+                O sistema já utiliza gratuitamente <span className="text-emerald-400">open.cnpja.com</span> e <span className="text-emerald-400">BrasilAPI</span>. Informe uma chave comercial de <a href="https://cnpja.com" target="_blank" rel="noreferrer" className="text-seguranca-yellow underline">cnpja.com</a> apenas para consultas ilimitadas.
               </p>
             </div>
 

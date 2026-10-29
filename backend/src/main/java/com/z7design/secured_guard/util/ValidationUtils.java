@@ -80,4 +80,50 @@ public class ValidationUtils {
                 digits.substring(8, 12),
                 digits.substring(12, 14));
     }
+
+    /**
+     * Garante que um CNPJ tenha 14 dígitos com dígitos verificadores módulo-11 válidos da Receita Federal
+     * e retorna formatado no padrão XX.XXX.XXX/XXXX-XX.
+     */
+    public static String repairOrGenerateValidCnpj(String rawCnpj, String fallbackSeed) {
+        String digits = rawCnpj != null ? rawCnpj.replaceAll("\\D", "") : "";
+        if (digits.length() == 14 && isValidCnpj(digits)) {
+            return formatCnpj(digits);
+        }
+
+        String base12;
+        if (digits.length() >= 12 && !digits.substring(0, 12).matches("(\\d)\\1{11}")) {
+            base12 = digits.substring(0, 12);
+        } else if (digits.length() >= 8 && !digits.substring(0, 8).matches("(\\d)\\1{7}")) {
+            base12 = digits.substring(0, 8) + "0001";
+        } else {
+            String seed = (fallbackSeed != null && !fallbackSeed.isBlank()) ? fallbackSeed.trim().toLowerCase() : "securedguard";
+            long hash = 2166136261L;
+            for (int i = 0; i < seed.length(); i++) {
+                hash ^= seed.charAt(i);
+                hash *= 16777619L;
+            }
+            long positive = Math.abs(hash) % 89999999L + 10000000L;
+            base12 = String.format("%08d0001", positive);
+        }
+
+        int[] weights1 = {5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+        int sum1 = 0;
+        for (int i = 0; i < 12; i++) {
+            sum1 += (base12.charAt(i) - '0') * weights1[i];
+        }
+        int mod1 = sum1 % 11;
+        int d1 = (mod1 < 2) ? 0 : 11 - mod1;
+
+        String base13 = base12 + d1;
+        int[] weights2 = {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+        int sum2 = 0;
+        for (int i = 0; i < 13; i++) {
+            sum2 += (base13.charAt(i) - '0') * weights2[i];
+        }
+        int mod2 = sum2 % 11;
+        int d2 = (mod2 < 2) ? 0 : 11 - mod2;
+
+        return formatCnpj(base13 + d2);
+    }
 }

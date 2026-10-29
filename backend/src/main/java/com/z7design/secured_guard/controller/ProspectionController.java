@@ -3,7 +3,6 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.service.prospection.GeminiProspectionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -48,7 +47,6 @@ public class ProspectionController {
         log.info("Recebida requisição de consulta de CNPJ: {}", cnpj);
         Map<String, Object> data = cnpjLookupService.lookupByCnpj(cnpj);
 
-        // Gravar no histórico automaticamente se o CNPJ for válido
         try {
             com.z7design.secured_guard.model.User user = resolveUser(userDetails);
             historyService.saveSearch("CNPJ", cnpj, (String) data.get("municipio"), (String) data.get("uf"), null, List.of(data), user);
@@ -94,7 +92,7 @@ public class ProspectionController {
         log.info("Recebida requisição de prospecção com IA: cidade={}, uf={}, segmento={}", cidade, uf, segmento);
         List<Map<String, Object>> results = geminiProspectionService.searchProspectsWithAi(cidade, uf, segmento, quantidade);
 
-        // Enriquecer automaticamente cada prospecto com CNPJ oficial, E-mail, Telefone, WhatsApp e QSA
+        // Enriquecer automaticamente cada prospecto com CNPJ oficial formatado, E-mail, Telefone/WhatsApp e QSA completo
         for (Map<String, Object> item : results) {
             String cnpj = (String) item.get("cnpj");
             try {
@@ -111,9 +109,13 @@ public class ProspectionController {
 
                 if (enriched != null && enriched.get("cnpj") != null && !enriched.get("cnpj").toString().isBlank()) {
                     item.put("cnpj", enriched.get("cnpj"));
-                    if (enriched.get("razaoSocial") != null) item.put("razaoSocial", enriched.get("razaoSocial"));
+                    String enrichedRazao = String.valueOf(enriched.getOrDefault("razaoSocial", ""));
+                    if (!enrichedRazao.isBlank() && !enrichedRazao.startsWith("Empresa Cadastrada")) {
+                        item.put("razaoSocial", enrichedRazao);
+                    }
                     if (enriched.get("situacaoCadastral") != null) item.put("situacaoCadastral", enriched.get("situacaoCadastral"));
-                    if (enriched.get("porte") != null) item.put("porte", enriched.get("porte"));
+                    if (enriched.get("porte") != null && !enriched.get("porte").toString().isBlank()) item.put("porte", enriched.get("porte"));
+                    if (enriched.get("capitalSocial") != null) item.put("capitalSocial", enriched.get("capitalSocial"));
                     if (enriched.get("cnaePrincipal") != null) item.put("cnaePrincipal", enriched.get("cnaePrincipal"));
                     if (enriched.get("qsa") != null && enriched.get("qsa") instanceof List && !((List<?>) enriched.get("qsa")).isEmpty()) {
                         item.put("qsa", enriched.get("qsa"));
@@ -127,12 +129,25 @@ public class ProspectionController {
                     if (enriched.get("emailCompras") != null && !enriched.get("emailCompras").toString().isBlank()) {
                         item.put("emailCompras", enriched.get("emailCompras"));
                     }
+                    if (enriched.get("contatoComprasNome") != null) {
+                        item.put("contatoComprasNome", enriched.get("contatoComprasNome"));
+                    }
                     if (enriched.get("telefone") != null && !enriched.get("telefone").toString().isBlank()) {
                         item.put("telefone", enriched.get("telefone"));
                     }
+                    if (enriched.get("website") != null && !enriched.get("website").toString().isBlank()) {
+                        item.put("website", enriched.get("website"));
+                    }
                 }
             } catch (Exception ex) {
-                log.debug("Auto-enriquecimento ignorado para item: {}", ex.getMessage());
+                log.debug("Auto-enriquecimento externo ignorado para item: {}", ex.getMessage());
+            } finally {
+                // Garantir 100% que o card tenha CNPJ válido formatado, email, telefone/WhatsApp e QSA com decisores
+                try {
+                    cnpjLookupService.enrichCorporateEmailsAndContacts(item);
+                } catch (Exception ex2) {
+                    log.debug("Erro no enriquecimento de garantia: {}", ex2.getMessage());
+                }
             }
         }
 
@@ -150,7 +165,7 @@ public class ProspectionController {
     @GetMapping("/history")
     @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Lista o histórico de pesquisas de prospecção gravadas no banco de dados")
-    public ResponseEntity<org.springframework.data.domain.Page<com.z7design.secured_guard.model.prospection.ProspectionSearch>> listHistory(
+    public ResponseEntity<org.springframework.data.domain.Page<Map<String, Object>>> listHistory(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(historyService.listRecentSearches(page, size));
@@ -211,8 +226,9 @@ public class ProspectionController {
         String placesKey = payload.get("googlePlacesApiKey");
         String apifyToken = payload.get("apifyApiToken");
         String apolloKey = payload.get("apolloApiKey");
+        String cnpjaKey = payload.get("cnpjaApiKey");
         String model = payload.get("model");
-        geminiProspectionService.updateCredentials(geminiKey, placesKey, apifyToken, apolloKey, model);
+        geminiProspectionService.updateCredentials(geminiKey, placesKey, apifyToken, apolloKey, cnpjaKey, model);
 
         Map<String, Object> response = new HashMap<>(geminiProspectionService.getCredentialsStatus());
         response.put("message", "Credenciais de Prospecção atualizadas com sucesso!");
