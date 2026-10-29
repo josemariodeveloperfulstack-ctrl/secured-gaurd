@@ -133,24 +133,42 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
         // Or map the backend list to include our translations.
 
         let enhancedPerms: PermissionDTO[] = [];
-
-        if (!perms || perms.length === 0) {
-          // Fallback: Generate from local keys
-          enhancedPerms = Object.keys(PERMISSION_TRANSLATIONS).map(key => ({
-            id: key,
-            name: key,
-            description: PERMISSION_TRANSLATIONS[key as keyof UserPermissions]
-          }));
-        } else {
-          // Translate existing
-          enhancedPerms = perms.map(p => ({
-            ...p,
-            description: PERMISSION_TRANSLATIONS[p.name as keyof UserPermissions] || p.description || p.name
-          }));
+        const backendMap = new Map<string, PermissionDTO>();
+        if (perms && perms.length > 0) {
+          perms.forEach(p => {
+            backendMap.set(p.name, p);
+          });
         }
 
-        // Sort alphabetically
-        enhancedPerms.sort((a, b) => a.description.localeCompare(b.description));
+        // Garante que todas as funcionalidades do sistema (locais e novas) sejam listadas
+        Object.keys(PERMISSION_TRANSLATIONS).forEach(key => {
+          const existing = backendMap.get(key);
+          const desc = PERMISSION_TRANSLATIONS[key as keyof UserPermissions];
+          if (existing) {
+            enhancedPerms.push({
+              ...existing,
+              description: desc || existing.description || key
+            });
+            backendMap.delete(key);
+          } else {
+            enhancedPerms.push({
+              id: key,
+              name: key,
+              description: desc || key
+            });
+          }
+        });
+
+        // Inclui quaisquer outras permissões vindas do backend
+        backendMap.forEach(p => {
+          enhancedPerms.push({
+            ...p,
+            description: p.description || p.name
+          });
+        });
+
+        // Ordenação alfabética pela descrição amigável
+        enhancedPerms.sort((a, b) => (a.description || a.name).localeCompare(b.description || b.name));
 
         setAllPermissions(enhancedPerms);
       })

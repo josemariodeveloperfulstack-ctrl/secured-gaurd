@@ -202,6 +202,10 @@ public enum Permission {
     FINES_WRITE,
     FINES_CREATE,
     FINES_DELETE,
+
+    FLEET_READ,
+    FLEET_WRITE,
+    FLEET_MANAGE,
     
     // ===========================================
     // ESTOQUE E EQUIPAMENTOS
@@ -232,6 +236,10 @@ public enum Permission {
     PURCHASE_REQUESTS_READ,
     PURCHASE_REQUESTS_WRITE,
     PURCHASE_REQUESTS_CREATE,
+
+    PURCHASES_READ,
+    PURCHASES_WRITE,
+    PURCHASES_MANAGE,
     
     // ===========================================
     // CRM E VENDAS
@@ -240,6 +248,18 @@ public enum Permission {
     LEADS_WRITE,
     LEADS_DELETE,
     LEADS_CREATE,
+
+    PROSPECTION_READ,
+    PROSPECTION_WRITE,
+    PROSPECTION_MANAGE,
+
+    MARKETING_READ,
+    MARKETING_WRITE,
+    MARKETING_MANAGE,
+
+    CRM_READ,
+    CRM_WRITE,
+    CRM_MANAGE,
     
     OPPORTUNITIES_READ,
     OPPORTUNITIES_WRITE,
@@ -314,6 +334,10 @@ public enum Permission {
     SUPERVISORS_WRITE,
     SUPERVISORS_CREATE,
     SUPERVISORS_DELETE,
+
+    SUPERVISAO_READ,
+    SUPERVISAO_WRITE,
+    SUPERVISAO_MANAGE,
     
     SPECIFIC_ACTIVITIES_READ,
     SPECIFIC_ACTIVITIES_WRITE,

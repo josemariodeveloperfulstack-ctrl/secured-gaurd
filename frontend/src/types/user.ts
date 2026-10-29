@@ -88,6 +88,41 @@ export interface UserPermissions {
   LEADS_DELETE: boolean;
   LEADS_CREATE: boolean;
 
+  // Prospecção Comercial
+  PROSPECTION_READ?: boolean;
+  PROSPECTION_WRITE?: boolean;
+  PROSPECTION_MANAGE?: boolean;
+
+  // Marketing Comercial
+  MARKETING_READ?: boolean;
+  MARKETING_WRITE?: boolean;
+  MARKETING_MANAGE?: boolean;
+
+  // CRM Comercial
+  CRM_READ?: boolean;
+  CRM_WRITE?: boolean;
+  CRM_MANAGE?: boolean;
+
+  // Supervisão Operacional
+  SUPERVISAO_READ?: boolean;
+  SUPERVISAO_WRITE?: boolean;
+  SUPERVISAO_MANAGE?: boolean;
+
+  // Compras e Cotações
+  PURCHASES_READ?: boolean;
+  PURCHASES_WRITE?: boolean;
+  PURCHASES_MANAGE?: boolean;
+
+  // Frota de Veículos
+  FLEET_READ?: boolean;
+  FLEET_WRITE?: boolean;
+  FLEET_MANAGE?: boolean;
+
+  // Chat Interno
+  CHAT_READ?: boolean;
+  CHAT_WRITE?: boolean;
+  CHAT_MANAGE?: boolean;
+
   PROPOSALS_READ: boolean;
   PROPOSALS_WRITE: boolean;
   PROPOSALS_DELETE: boolean;

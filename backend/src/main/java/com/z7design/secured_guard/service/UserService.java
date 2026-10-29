@@ -193,6 +193,13 @@ public class UserService {
 
         System.out.println("💾 Salvando usuário no banco...");
         User savedUser = userRepository.save(user);
+        if (request.getPermissions() != null && !request.getPermissions().isEmpty()) {
+            try {
+                addUserPermissionsByIdentifiers(savedUser.getId(), request.getPermissions());
+            } catch (Exception permEx) {
+                log.warn("Erro ao atribuir permissões na criação do usuário: {}", permEx.getMessage());
+            }
+        }
         System.out.println("✅ Usuário salvo com ID: " + savedUser.getId());
 
         return savedUser;
@@ -651,7 +658,17 @@ public class UserService {
             permissionsToAdd.addAll(permissionRepository.findAllById(uuids));
         }
         if (!names.isEmpty()) {
-            permissionsToAdd.addAll(permissionRepository.findByNames(names));
+            for (String name : names) {
+                var foundList = permissionRepository.findAllByName(name);
+                if (!foundList.isEmpty()) {
+                    permissionsToAdd.add(foundList.get(0));
+                } else {
+                    Permission newPerm = new Permission();
+                    newPerm.setName(name);
+                    newPerm.setDescription(name);
+                    permissionsToAdd.add(permissionRepository.save(newPerm));
+                }
+            }
         }
 
         if (permissionsToAdd.isEmpty()) {
