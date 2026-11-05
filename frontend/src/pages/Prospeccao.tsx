@@ -596,7 +596,7 @@ const Prospeccao: React.FC = () => {
             Prospecção Comercial de Leads
           </h1>
           <p className="text-sm text-gray-400 mt-1">
-            Descubra empresas, qualifique tomadores de decisão (sócios/compras) e converta em oportunidades no CRM com 1 clique.
+            Descubra empresas, qualifique tomadores de decisão com inteligência B2B estilo Econodata (Faturamento Presumido, Porte e Pessoas por Departamento) e converta em oportunidades no CRM.
           </p>
         </div>
         <div className="flex gap-2">
@@ -754,10 +754,14 @@ const Prospeccao: React.FC = () => {
                   </Button>
                 </div>
 
-                <div className="md:col-span-4 flex items-center justify-between pt-1 border-t border-gray-800 text-xs">
+                <div className="md:col-span-4 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-800 text-xs">
                   <span className="text-amber-400/90 flex items-center gap-1.5">
                     <Bot className="h-4 w-4 text-amber-400" />
                     Higienização automática ativa: ignora e-mails de escritórios contábeis e prioriza contatos diretos e decisores reais.
+                  </span>
+                  <span className="text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-1 rounded text-[11px] font-medium flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-cyan-400" />
+                    Motor Econodata Ativo: Faturamento Presumido, Porte e Pessoas por Departamento
                   </span>
                 </div>
               </form>
@@ -915,12 +919,47 @@ const Prospeccao: React.FC = () => {
         </div>
 
         {(!Array.isArray(prospects) || prospects.length === 0) ? (
-          <div className="bg-seguranca-graphite/40 border border-dashed border-gray-700 rounded-lg p-12 text-center space-y-3">
-            <Building2 className="h-12 w-12 text-gray-600 mx-auto" />
-            <h3 className="text-base font-semibold text-gray-300">Nenhum prospecto carregado no momento</h3>
-            <p className="text-sm text-gray-500 max-w-md mx-auto">
-              Utilize o campo de busca acima para digitar um CNPJ ou buscar por segmento e região. Os resultados serão enriquecidos com sócios e canais de contato.
-            </p>
+          <div className="bg-seguranca-graphite/40 border border-dashed border-gray-700 rounded-lg p-8 sm:p-12 text-center space-y-6">
+            <div className="space-y-2">
+              <Building2 className="h-12 w-12 text-gray-500 mx-auto" />
+              <h3 className="text-base font-semibold text-gray-200">Nenhum prospecto carregado no momento</h3>
+              <p className="text-sm text-gray-400 max-w-lg mx-auto">
+                Utilize o campo de busca acima por nicho e região, consulte um CNPJ direto ou carregue uma pesquisa do histórico para visualizar as empresas com inteligência B2B Econodata.
+              </p>
+            </div>
+
+            {/* Destaque das Capacidades Econodata */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-3xl mx-auto text-left pt-2">
+              <div className="p-3.5 rounded-lg bg-seguranca-black/70 border border-emerald-900/60 shadow-sm">
+                <div className="flex items-center gap-2 text-emerald-300 font-semibold text-xs mb-1">
+                  <DollarSign className="h-4 w-4 text-emerald-400" />
+                  Faturamento & Porte Presumido
+                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  Estimativa de receita anual e faixa de colaboradores baseada no capital social, filiais e CNAE conforme o modelo estatístico.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-seguranca-black/70 border border-cyan-900/60 shadow-sm">
+                <div className="flex items-center gap-2 text-cyan-300 font-semibold text-xs mb-1">
+                  <Layers className="h-4 w-4 text-cyan-400" />
+                  Pessoas por Departamentos
+                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  Decisores categorizados em Diretoria, Compras, Facilities/Segurança, RH e Finanças com e-mail corporativo e WhatsApp direto.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-seguranca-black/70 border border-amber-900/60 shadow-sm">
+                <div className="flex items-center gap-2 text-amber-300 font-semibold text-xs mb-1">
+                  <Award className="h-4 w-4 text-amber-400" />
+                  Lead Score & Cache L1 Redis
+                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  Pontuação de 0 a 100 de fit com terceirização/segurança patrimonial e busca instantânea com cache L1 no Redis.
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

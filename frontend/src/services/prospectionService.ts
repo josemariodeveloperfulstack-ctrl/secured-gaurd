@@ -485,6 +485,18 @@ class ProspectionService {
             qsa: Array.isArray(item.qsa) ? item.qsa : [],
             decisores: Array.isArray(item.decisores) ? item.decisores : [],
             origem: item.origem || 'GEMINI_AI',
+            faturamentoEstimadoMin: item.faturamentoEstimadoMin,
+            faturamentoEstimadoMax: item.faturamentoEstimadoMax,
+            faturamentoEstimadoFaixa: item.faturamentoEstimadoFaixa || item.faixaFaturamento,
+            faixaFaturamento: item.faixaFaturamento || item.faturamentoEstimadoFaixa,
+            porteEstimado: item.porteEstimado,
+            faixaFuncionarios: item.faixaFuncionarios,
+            leadScore: item.leadScore,
+            leadTier: item.leadTier,
+            motivoQualificacao: item.motivoQualificacao,
+            contatosEconodata: Array.isArray(item.contatosEconodata) ? item.contatosEconodata : [],
+            contatosPorDepartamento: (item.contatosPorDepartamento && typeof item.contatosPorDepartamento === 'object') ? item.contatosPorDepartamento : {},
+            totalContatosChave: item.totalContatosChave || (Array.isArray(item.contatosEconodata) ? item.contatosEconodata.length : 0),
           };
         });
       }
