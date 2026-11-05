@@ -41,7 +41,7 @@ public class ProspectionContactEnricherService {
         List<Map<String, Object>> consolidatedContacts = new ArrayList<>();
         Set<String> seenNames = new HashSet<>();
 
-        // 1. Processar Sócios do QSA (Receita Federal)
+        // 1. Processar Sócios do QSA (Receita Federal) - Manter apenas dados verídicos
         Object qsaObj = companyMap.get("qsa");
         if (qsaObj instanceof List) {
             List<?> qsaList = (List<?>) qsaObj;
@@ -52,13 +52,9 @@ public class ProspectionContactEnricherService {
                     if (nome != null && !nome.isBlank() && seenNames.add(normalizeKey(nome))) {
                         String qual = (String) socio.getOrDefault("qualificacao", "Sócio-Administrador");
                         String email = (String) socio.get("email");
-                        if (email == null || email.isBlank()) {
-                            email = buildCorporateEmail(nome, domain);
-                        }
+                        if (email != null && email.isBlank()) email = null;
                         String tel = (String) socio.get("telefone");
-                        if (tel == null || tel.isBlank()) {
-                            tel = phoneCompany != null ? phoneCompany : ("(" + ddd + ") 3200-" + (1000 + Math.abs(nome.hashCode() % 8999)));
-                        }
+                        if (tel != null && tel.isBlank()) tel = null;
 
                         Map<String, Object> contact = buildContactMap(
                                 nome,
@@ -66,8 +62,8 @@ public class ProspectionContactEnricherService {
                                 DEP_DIRETORIA,
                                 "Diretoria & Sócios",
                                 "SOCIO",
-                                email,
-                                tel,
+                                email != null ? email : "",
+                                tel != null ? tel : "",
                                 "RECEITA_FEDERAL_QSA",
                                 domain
                         );
@@ -77,7 +73,7 @@ public class ProspectionContactEnricherService {
             }
         }
 
-        // 2. Processar Decisores já identificados (Apollo ou heurística existente)
+        // 2. Processar Decisores Reais identificados via Apollo.io
         Object decObj = companyMap.get("decisores");
         if (decObj instanceof List) {
             List<?> decList = (List<?>) decObj;
@@ -93,13 +89,9 @@ public class ProspectionContactEnricherService {
                         String depLabel = resolveDepartmentLabel(dep);
                         String nivel = classifyHierarchy(cargo);
                         String email = (String) decisor.get("email");
-                        if (email == null || email.isBlank()) {
-                            email = buildCorporateEmail(nome, domain);
-                        }
+                        if (email != null && email.isBlank()) email = null;
                         String tel = (String) decisor.get("telefone");
-                        if (tel == null || tel.isBlank()) {
-                            tel = phoneCompany != null ? phoneCompany : ("(" + ddd + ") 3200-" + (1000 + Math.abs(nome.hashCode() % 8999)));
-                        }
+                        if (tel != null && tel.isBlank()) tel = null;
 
                         Map<String, Object> contact = buildContactMap(
                                 nome,
@@ -107,8 +99,8 @@ public class ProspectionContactEnricherService {
                                 dep,
                                 depLabel,
                                 nivel,
-                                email,
-                                tel,
+                                email != null ? email : "",
+                                tel != null ? tel : "",
                                 "APOLLO_IO",
                                 domain
                         );
@@ -121,11 +113,7 @@ public class ProspectionContactEnricherService {
             }
         }
 
-        // 3. Garantir que empresas B2B tenham contatos departamentais essenciais
-        // (Compras, Facilities/Segurança, Diretoria, RH)
-        ensureDepartmentalCoverage(consolidatedContacts, seenNames, companyName, domain, ddd, phoneCompany);
-
-        // 4. Organizar em sumário por departamentos para exibição rápida estilo Econodata
+        // 3. Organizar em sumário por departamentos para exibição rápida estilo Econodata (apenas pessoas reais)
         Map<String, List<Map<String, Object>>> byDepartment = new LinkedHashMap<>();
         byDepartment.put(DEP_DIRETORIA, new ArrayList<>());
         byDepartment.put(DEP_COMPRAS, new ArrayList<>());
@@ -143,82 +131,14 @@ public class ProspectionContactEnricherService {
         companyMap.put("contatosPorDepartamento", byDepartment);
         companyMap.put("totalContatosChave", consolidatedContacts.size());
 
-        // Preencher emailCompras e contatoComprasNome se houver comprador identificado
+        // Preencher emailCompras e contatoComprasNome SOMENTE se houver comprador real identificado com e-mail
         List<Map<String, Object>> comprasList = byDepartment.get(DEP_COMPRAS);
         if (comprasList != null && !comprasList.isEmpty()) {
             Map<String, Object> comprador = comprasList.get(0);
-            companyMap.put("emailCompras", comprador.get("email"));
-            companyMap.put("contatoComprasNome", comprador.get("nome") + " - " + comprador.get("cargo"));
-        }
-    }
-
-    private void ensureDepartmentalCoverage(
-            List<Map<String, Object>> contacts,
-            Set<String> seenNames,
-            String companyName,
-            String domain,
-            String ddd,
-            String basePhone) {
-
-        boolean hasCompras = contacts.stream().anyMatch(c -> DEP_COMPRAS.equals(c.get("departamento")));
-        boolean hasFacilities = contacts.stream().anyMatch(c -> DEP_FACILITIES.equals(c.get("departamento")));
-        boolean hasDiretoria = contacts.stream().anyMatch(c -> DEP_DIRETORIA.equals(c.get("departamento")));
-
-        String[][] templateCompras = {
-                {"Mariana Costa Silveira", "Coordenadora de Compras & Suprimentos"},
-                {"Lucas Ferreira Duarte", "Gerente de Procurement & Contratos"},
-                {"Juliana Prado Meireles", "Supervisora de Compras e Terceirizados"},
-                {"Thiago Borges Alcantara", "Comprador Sênior B2B"}
-        };
-
-        String[][] templateFacilities = {
-                {"Ricardo Augusto Viana", "Gerente de Facilities & Infraestrutura"},
-                {"Alexandre Ramos Peixoto", "Coordenador de Segurança Patrimonial & Acesso"},
-                {"Renata Vasconcelos", "Gestora Predial & Operações"},
-                {"Marcos Vinicius Lopes", "Supervisor de Manutenção e Serviços Gerais"}
-        };
-
-        String[][] templateDiretoria = {
-                {"Carlos Eduardo Monteiro", "Diretor Executivo / Operações"},
-                {"Fernando Nogueira Maia", "Sócio-Diretor Geral"},
-                {"Beatriz Santos Guimarães", "Diretora de Gestão e Governança"}
-        };
-
-        int hash = Math.abs((companyName != null ? companyName : "Empresa").hashCode());
-
-        if (!hasCompras) {
-            String[] p = templateCompras[hash % templateCompras.length];
-            if (seenNames.add(normalizeKey(p[0]))) {
-                contacts.add(buildContactMap(
-                        p[0], p[1], DEP_COMPRAS, "Compras & Suprimentos", "GERENTE",
-                        buildCorporateEmail(p[0], domain),
-                        resolveDirectPhone(basePhone, ddd, 11),
-                        "REDE_EXECUTIVA", domain
-                ));
-            }
-        }
-
-        if (!hasFacilities) {
-            String[] p = templateFacilities[(hash + 1) % templateFacilities.length];
-            if (seenNames.add(normalizeKey(p[0]))) {
-                contacts.add(buildContactMap(
-                        p[0], p[1], DEP_FACILITIES, "Facilities & Segurança", "GERENTE",
-                        buildCorporateEmail(p[0], domain),
-                        resolveDirectPhone(basePhone, ddd, 22),
-                        "REDE_EXECUTIVA", domain
-                ));
-            }
-        }
-
-        if (!hasDiretoria) {
-            String[] p = templateDiretoria[(hash + 2) % templateDiretoria.length];
-            if (seenNames.add(normalizeKey(p[0]))) {
-                contacts.add(buildContactMap(
-                        p[0], p[1], DEP_DIRETORIA, "Diretoria & Sócios", "DIRETOR",
-                        buildCorporateEmail(p[0], domain),
-                        resolveDirectPhone(basePhone, ddd, 33),
-                        "REDE_EXECUTIVA", domain
-                ));
+            String compEmail = (String) comprador.get("email");
+            if (compEmail != null && !compEmail.isBlank()) {
+                companyMap.put("emailCompras", compEmail);
+                companyMap.put("contatoComprasNome", comprador.get("nome") + " - " + comprador.get("cargo"));
             }
         }
     }
@@ -234,9 +154,9 @@ public class ProspectionContactEnricherService {
         m.put("departamento", dep);
         m.put("departamentoLabel", depLabel);
         m.put("nivelHierarquico", nivel);
-        m.put("email", email);
-        m.put("emailVerificado", true);
-        m.put("telefone", tel);
+        m.put("email", email != null ? email : "");
+        m.put("emailVerificado", email != null && !email.isBlank());
+        m.put("telefone", tel != null ? tel : "");
 
         String cleanPhone = tel != null ? tel.replaceAll("\\D", "") : "";
         if (cleanPhone.length() >= 10) {
@@ -248,8 +168,6 @@ public class ProspectionContactEnricherService {
             m.put("whatsappUrl", null);
         }
 
-        String searchName = nome.replace(" ", "+");
-        m.put("linkedinUrl", "https://www.linkedin.com/search/results/all/?keywords=" + searchName);
         m.put("origem", origem);
         return m;
     }

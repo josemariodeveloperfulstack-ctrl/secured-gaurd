@@ -122,47 +122,14 @@ export const isAccountingContact = (email?: string, razaoSocial?: string): boole
 /**
  * Garante que o CNPJ possua 14 dígitos com dígitos verificadores módulo-11 válidos da Receita Federal
  * e esteja formatado no padrão XX.XXX.XXX/XXXX-XX.
+ * NUNCA gera CNPJs sintéticos ou fictícios: se ausente ou inválido, retorna string vazia.
  */
-export const ensureValidFormattedCnpj = (rawCnpj?: string, fallbackSeed?: string): string => {
+export const ensureValidFormattedCnpj = (rawCnpj?: string, _fallbackSeed?: string): string => {
   const digits = (rawCnpj || '').replace(/\D/g, '');
   if (digits.length === 14 && validateCNPJ(digits)) {
     return formatCNPJ(digits);
   }
-
-  let base12 = '';
-  if (digits.length >= 12 && !/^(\d)\1{11}$/.test(digits.slice(0, 12))) {
-    base12 = digits.slice(0, 12);
-  } else if (digits.length >= 8 && !/^(\d)\1{7}$/.test(digits.slice(0, 8))) {
-    base12 = digits.slice(0, 8) + '0001';
-  } else {
-    const seed = (fallbackSeed || 'securedguard').trim().toLowerCase();
-    let hash = 2166136261;
-    for (let i = 0; i < seed.length; i++) {
-      hash ^= seed.charCodeAt(i);
-      hash = Math.imul(hash, 16777619);
-    }
-    const positive = (Math.abs(hash) % 89999999) + 10000000;
-    base12 = String(positive).padStart(8, '0') + '0001';
-  }
-
-  const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-  let sum1 = 0;
-  for (let i = 0; i < 12; i++) {
-    sum1 += Number(base12[i]) * weights1[i];
-  }
-  const mod1 = sum1 % 11;
-  const d1 = mod1 < 2 ? 0 : 11 - mod1;
-
-  const base13 = base12 + String(d1);
-  const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-  let sum2 = 0;
-  for (let i = 0; i < 13; i++) {
-    sum2 += Number(base13[i]) * weights2[i];
-  }
-  const mod2 = sum2 % 11;
-  const d2 = mod2 < 2 ? 0 : 11 - mod2;
-
-  return formatCNPJ(base13 + String(d2));
+  return '';
 };
 
 export interface ProspectionFilters {

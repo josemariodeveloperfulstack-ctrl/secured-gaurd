@@ -254,20 +254,16 @@ public class CnpjLookupService {
             }
         }
 
-        // 4. Garantia de Qualificação Completa: gera/valida CNPJ estruturado e enriquece contatos e QSA
-        Map<String, Object> result = new HashMap<>();
-        String validCnpj = ValidationUtils.repairOrGenerateValidCnpj(null, cleanName + "|" + cleanCity);
-        result.put("found", true);
-        result.put("discoveredAutomatically", true);
-        result.put("cnpj", validCnpj);
-        result.put("razaoSocial", cleanName);
-        result.put("nomeFantasia", cleanName);
-        result.put("situacaoCadastral", "ATIVA");
-        result.put("municipio", cleanCity);
-        result.put("uf", cleanUf);
-        result.put("clientePotencial", true);
-        enrichCorporateEmailsAndContacts(result);
-        return result;
+        // 4. Se não localizado nas bases oficiais, retorna indicador claro de não encontrado (sem inventar dados)
+        Map<String, Object> notFound = new HashMap<>();
+        notFound.put("found", false);
+        notFound.put("discoveredAutomatically", false);
+        notFound.put("cnpj", "");
+        notFound.put("razaoSocial", cleanName);
+        notFound.put("nomeFantasia", cleanName);
+        notFound.put("municipio", cleanCity);
+        notFound.put("uf", cleanUf);
+        return notFound;
     }
 
     private Map<String, Object> mapBrasilApi(JsonNode root) {
@@ -399,64 +395,40 @@ public class CnpjLookupService {
     }
 
     /**
-     * Garante que TODOS os campos do card (CNPJ válido formatado, E-mail corporativo, E-mail de Compras,
-     * Telefone/WhatsApp e QSA com Nome, Cargo, E-mail e Telefone dos sócios decisores) estejam preenchidos e prontos para o CRM.
+     * Enriquece com dados cadastrais oficiais e executa esteira de enriquecimento (Apollo, Estimativas e Contatos Reais).
+     * NUNCA gera contatos, telefones, e-mails ou sócios falsos/sintéticos: campos não existentes permanecem vazios.
      */
     public void enrichCorporateEmailsAndContacts(Map<String, Object> map) {
         if (map == null) return;
 
-        String razao = String.valueOf(map.getOrDefault("razaoSocial", "")).trim();
-        String fantasia = String.valueOf(map.getOrDefault("nomeFantasia", "")).trim();
-        String baseName = !fantasia.isBlank() ? fantasia : (!razao.isBlank() ? razao : "Empresa Comercial");
-        String municipio = String.valueOf(map.getOrDefault("municipio", "Uberlândia")).trim();
-        String uf = String.valueOf(map.getOrDefault("uf", "MG")).trim();
-
-        // 1. Garantir CNPJ válido (14 dígitos com módulo-11 oficial) e formatado XX.XXX.XXX/XXXX-XX
+        // 1. Garantir CNPJ real formatado XX.XXX.XXX/XXXX-XX (apenas se for válido de fato)
         String rawCnpj = map.get("cnpj") != null ? map.get("cnpj").toString() : "";
-        String validFormattedCnpj = ValidationUtils.repairOrGenerateValidCnpj(rawCnpj, baseName + "|" + municipio);
-        map.put("cnpj", validFormattedCnpj);
-        map.put("situacaoCadastral", "ATIVA");
+        String cleanCnpj = rawCnpj.replaceAll("\\D", "");
+        if (cleanCnpj.length() == 14 && ValidationUtils.isValidCnpj(cleanCnpj)) {
+            map.put("cnpj", ValidationUtils.formatCnpj(cleanCnpj));
+        } else {
+            map.put("cnpj", "");
+        }
 
-        // 2. Garantir Domínio Corporativo, Website, E-mail Geral e E-mail de Compras
+        // 2. Sanitização de E-mail, Website e Domínio Corporativo Real
         String website = map.get("website") != null ? map.get("website").toString().trim() : "";
         String email = map.get("email") != null ? map.get("email").toString().trim().toLowerCase() : "";
         if (isAccountingEmail(email)) {
             email = "";
             map.put("emailContabilidadeDescartado", true);
         }
+        map.put("email", email);
 
         String domain = extractDomainFromWebsiteOrEmail(website, email);
-        if (domain == null || domain.isBlank()) {
-            domain = inferDomainFromCompanyName(baseName);
+        if (domain != null && !domain.isBlank()) {
+            map.put("domain", domain);
         }
 
-        map.put("domain", domain);
-        if (website.isBlank()) {
-            map.put("website", "https://www." + domain);
-        }
-        if (email.isBlank()) {
-            email = "contato@" + domain;
-            map.put("email", email);
-        } else {
-            map.put("email", email);
-        }
-
-        String emailCompras = map.get("emailCompras") != null ? map.get("emailCompras").toString().trim() : "";
-        if (emailCompras.isBlank()) {
-            map.put("emailCompras", "compras@" + domain);
-            map.put("contatoComprasNome", "Setor de Compras / Suprimentos");
-        }
-
-        // 3. Garantir Telefone / WhatsApp Comercial Válido
-        String ddd = resolveDdd(municipio, uf);
+        // 3. Telefone: manter apenas o que foi obtido oficialmente (sem gerar números falsos)
         String telefone = map.get("telefone") != null ? map.get("telefone").toString().trim() : "";
-        if (telefone.isBlank()) {
-            int suffix = Math.abs(baseName.hashCode()) % 8000 + 1000;
-            telefone = String.format("(%s) 998%02d-%04d", ddd, (suffix % 89) + 10, suffix);
-            map.put("telefone", telefone);
-        }
+        map.put("telefone", telefone);
 
-        // 4. Garantir Quadro de Sócios e Decisores (QSA) com Nome, Cargo, E-mail e Telefone/WhatsApp
+        // 4. Sócios do QSA (manter apenas sócios reais da base da Receita Federal ou enriquecidos de fato)
         Object qsaObj = map.get("qsa");
         List<Map<String, Object>> currentQsa = new ArrayList<>();
         if (qsaObj instanceof List<?> qsaList) {
@@ -472,45 +444,28 @@ public class CnpjLookupService {
             }
         }
 
-        if (currentQsa.isEmpty()) {
-            currentQsa.addAll(buildDefaultDecisionMakersForCompany(baseName));
-        }
-
-        List<Map<String, Object>> enrichedQsa = new ArrayList<>();
+        List<Map<String, Object>> verifiedQsa = new ArrayList<>();
         List<Map<String, Object>> decisores = new ArrayList<>();
-        int idx = 0;
         for (Map<String, Object> socio : currentQsa) {
-            idx++;
-            String nome = String.valueOf(socio.getOrDefault("nome", "Diretor Executivo")).trim();
-            String qual = String.valueOf(socio.getOrDefault("qualificacao", socio.getOrDefault("cargo", "Sócio-Administrador"))).trim();
-            if (qual.isBlank()) qual = "Sócio-Administrador";
-
+            String nome = String.valueOf(socio.getOrDefault("nome", "")).trim();
+            if (nome.isBlank()) continue;
+            String qual = String.valueOf(socio.getOrDefault("qualificacao", socio.getOrDefault("cargo", "Sócio / Administrador"))).trim();
             String socioEmail = socio.get("email") != null ? socio.get("email").toString().trim().toLowerCase() : "";
-            if (socioEmail.isBlank()) {
-                socioEmail = buildPersonCorporateEmail(nome, domain);
-            }
-
+            if (isAccountingEmail(socioEmail)) socioEmail = "";
             String socioTel = socio.get("telefone") != null ? socio.get("telefone").toString().trim() : "";
-            if (socioTel.isBlank()) {
-                int numSeed = Math.abs((nome + baseName).hashCode()) % 8999 + 1000;
-                socioTel = String.format("(%s) 99%d-%04d", ddd, 700 + (idx * 17 % 290), numSeed);
-            }
 
             socio.put("nome", nome);
             socio.put("qualificacao", qual);
             socio.put("cargo", qual);
             socio.put("email", socioEmail);
             socio.put("telefone", socioTel);
-            enrichedQsa.add(socio);
-
-            Map<String, Object> dec = new HashMap<>(socio);
-            dec.put("cargo", qual);
-            dec.put("cargoTipo", "SOCIO_ADMIN");
-            decisores.add(dec);
+            verifiedQsa.add(socio);
         }
 
-        map.put("qsa", enrichedQsa);
-        map.put("decisores", decisores);
+        map.put("qsa", verifiedQsa);
+        if (!map.containsKey("decisores") || !(map.get("decisores") instanceof List<?> l && !l.isEmpty())) {
+            map.put("decisores", Collections.emptyList());
+        }
 
         // 5. Enriquecimento adicional via Apollo.io (se chave configurada)
         try {
@@ -550,60 +505,6 @@ public class CnpjLookupService {
         } catch (Exception ex) {
             log.debug("Falha ao salvar no cache: {}", ex.getMessage());
         }
-    }
-
-    private List<Map<String, Object>> buildDefaultDecisionMakersForCompany(String companyName) {
-        String lower = companyName != null ? companyName.toLowerCase() : "";
-        List<Map<String, Object>> list = new ArrayList<>();
-
-        if (lower.contains("marileusa")) {
-            list.add(new HashMap<>(Map.of("nome", "Ricardo Augusto Pereira", "qualificacao", "Diretor Superintendente / Operações")));
-            list.add(new HashMap<>(Map.of("nome", "Fernanda Oliveira Costa", "qualificacao", "Gerente de Facilities e Segurança")));
-        } else if (lower.contains("uberl") && lower.contains("shopping")) {
-            list.add(new HashMap<>(Map.of("nome", "Carlos Eduardo Mendes", "qualificacao", "Superintendente Geral")));
-            list.add(new HashMap<>(Map.of("nome", "Juliana Ribeiro Martins", "qualificacao", "Gerente de Operações e Segurança")));
-        } else if (lower.contains("center shopping")) {
-            list.add(new HashMap<>(Map.of("nome", "Marcelo Henrique Ferreira", "qualificacao", "Diretor de Operações / Administração")));
-            list.add(new HashMap<>(Map.of("nome", "Patrícia Almeida Souza", "qualificacao", "Coordenação de Suprimentos e Facilities")));
-        } else if (lower.contains("martins")) {
-            list.add(new HashMap<>(Map.of("nome", "Alair Martins do Nascimento", "qualificacao", "Conselheiro / Diretor Presidente")));
-            list.add(new HashMap<>(Map.of("nome", "Roberto Carlos Nogueira", "qualificacao", "Diretor de Logística e Segurança Patrimonial")));
-        } else if (lower.contains("algar")) {
-            list.add(new HashMap<>(Map.of("nome", "Luiz Alexandre Garcia", "qualificacao", "Presidente do Conselho / Diretor")));
-            list.add(new HashMap<>(Map.of("nome", "Marcos Vinícius Andrade", "qualificacao", "Gestor de Facilities e Suprimentos")));
-        } else if (lower.contains("santa genoveva") || lower.contains("mater dei")) {
-            list.add(new HashMap<>(Map.of("nome", "Henrique Moraes Salvador Silva", "qualificacao", "Diretor Presidente")));
-            list.add(new HashMap<>(Map.of("nome", "Luciana Teixeira Barros", "qualificacao", "Gerente Administrativa e Suprimentos")));
-        } else if (lower.contains("santa clara")) {
-            list.add(new HashMap<>(Map.of("nome", "Eduardo Crosara", "qualificacao", "Diretor Clínico e Administrativo")));
-            list.add(new HashMap<>(Map.of("nome", "Renata Cristina Borges", "qualificacao", "Gestora de Compras e Hotelaria Hospitalar")));
-        } else {
-            String[][] pool = {
-                {"Carlos Alberto Silveira", "Diretor Administrativo / Sócio-Administrador", "Mariana Gomes Castro", "Gerente de Compras e Facilities"},
-                {"Roberto Mendes Oliveira", "Sócio-Diretor de Operações", "Camila Ferreira Lopes", "Coordenadora de Suprimentos e Contratos"},
-                {"Fernando Henrique Ribeiro", "Diretor Executivo (CEO)", "Beatriz Santos Rezende", "Gerente de Infraestrutura e Segurança"},
-                {"Gustavo Pereira Machado", "Sócio-Administrador", "Vanessa Martins Cardoso", "Gestora Administrativa e Financeira"}
-            };
-            int pick = Math.abs((companyName != null ? companyName : "").hashCode()) % pool.length;
-            list.add(new HashMap<>(Map.of("nome", pool[pick][0], "qualificacao", pool[pick][1])));
-            list.add(new HashMap<>(Map.of("nome", pool[pick][2], "qualificacao", pool[pick][3])));
-        }
-        return list;
-    }
-
-    private String buildPersonCorporateEmail(String fullName, String domain) {
-        if (fullName == null || fullName.isBlank()) return "diretoria@" + domain;
-        String normalized = Normalizer.normalize(fullName.toLowerCase().trim(), Normalizer.Form.NFD)
-                .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
-                .replaceAll("[^a-z\\s]", " ")
-                .trim();
-        String[] parts = normalized.split("\\s+");
-        if (parts.length >= 2) {
-            return parts[0] + "." + parts[parts.length - 1] + "@" + domain;
-        } else if (parts.length == 1 && !parts[0].isBlank()) {
-            return parts[0] + "@" + domain;
-        }
-        return "diretoria@" + domain;
     }
 
     private String inferDomainFromCompanyName(String name) {

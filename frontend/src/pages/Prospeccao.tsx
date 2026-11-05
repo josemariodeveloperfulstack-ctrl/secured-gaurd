@@ -1008,7 +1008,7 @@ const Prospeccao: React.FC = () => {
                         variant="outline" 
                         onClick={() => !company.cnpj && handleSearchCnpjForCompany(company)}
                         className={
-                          company.situacaoCadastral === 'ATIVA' 
+                          company.cnpj && company.situacaoCadastral === 'ATIVA' 
                             ? 'border-green-500 text-green-400 shrink-0' 
                             : 'border-amber-500 text-amber-400 shrink-0 cursor-pointer hover:bg-amber-500/10 transition-colors'
                         }
@@ -1019,7 +1019,7 @@ const Prospeccao: React.FC = () => {
                             <Loader2 className="h-3 w-3 animate-spin" /> Verificando...
                           </span>
                         ) : (
-                          company.situacaoCadastral
+                          company.cnpj ? (company.situacaoCadastral || 'ATIVA') : 'Localizar CNPJ'
                         )}
                       </Badge>
                     </div>
@@ -1164,36 +1164,42 @@ const Prospeccao: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Decisores Executivos (Apollo.io / Inferred) */}
-                    {Array.isArray(company.decisores) && company.decisores.length > 0 && (
-                      <div className="space-y-1.5 bg-seguranca-black/40 p-2.5 rounded border border-cyan-800/40">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-cyan-400 flex items-center gap-1.5">
-                            <Briefcase className="h-3.5 w-3.5" />
-                            Decisores Executivos Identificados:
-                          </span>
-                          <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
-                            {company.decisores.length} decisor(es)
-                          </Badge>
-                        </div>
-                        {company.decisores.slice(0, 2).map((d, dIdx) => (
-                          <div key={dIdx} className="flex flex-wrap items-center justify-between text-xs py-0.5">
-                            <div>
-                              <span className="text-white font-medium">• {d.nome}</span>
-                              <span className="text-gray-400 ml-1">({d.cargo})</span>
-                            </div>
-                            {d.email && (
-                              <div className="flex items-center gap-1 font-mono text-cyan-300 text-[11px] shrink-0">
-                                <span>{d.email}</span>
-                                <button onClick={() => handleCopyEmail(d.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do decisor">
-                                  {copiedEmail === d.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
-                                </button>
-                              </div>
-                            )}
+                    {/* Decisores Executivos (Apollo.io / Verificados) */}
+                    {(() => {
+                      const qsaNames = new Set((company.qsa || []).map(q => q.nome?.trim().toLowerCase()).filter(Boolean));
+                      const executiveDecisores = (company.decisores || []).filter(d => d.nome && !qsaNames.has(d.nome.trim().toLowerCase()));
+                      if (executiveDecisores.length === 0) return null;
+
+                      return (
+                        <div className="space-y-1.5 bg-seguranca-black/40 p-2.5 rounded border border-cyan-800/40">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-cyan-400 flex items-center gap-1.5">
+                              <Briefcase className="h-3.5 w-3.5" />
+                              Decisores Executivos Identificados:
+                            </span>
+                            <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
+                              {executiveDecisores.length} decisor(es)
+                            </Badge>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          {executiveDecisores.slice(0, 2).map((d, dIdx) => (
+                            <div key={dIdx} className="flex flex-wrap items-center justify-between text-xs py-0.5">
+                              <div>
+                                <span className="text-white font-medium">• {d.nome}</span>
+                                <span className="text-gray-400 ml-1">({d.cargo})</span>
+                              </div>
+                              {d.email && d.email.trim() !== '' && (
+                                <div className="flex items-center gap-1 font-mono text-cyan-300 text-[11px] shrink-0">
+                                  <span>{d.email}</span>
+                                  <button onClick={() => handleCopyEmail(d.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do decisor">
+                                    {copiedEmail === d.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     {/* Contatos Disponíveis */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">

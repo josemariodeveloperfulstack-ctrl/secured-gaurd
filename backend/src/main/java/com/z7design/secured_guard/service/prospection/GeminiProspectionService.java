@@ -361,7 +361,7 @@ public class GeminiProspectionService {
     private String buildProspectionPrompt(String cidade, String uf, String segmento, int limit) {
         String sanitizedSegmento = querySanitizer.cleanSegmentTerm(segmento);
         return """
-            Você é um agente sênior de inteligência comercial B2B e enriquecimento de dados cadastrais (Receita Federal / Google Meu Negócio / CNPJá) para prospecção de clientes reais para:
+            Você é um agente sênior de inteligência cadastral B2B e prospecção de estabelecimentos reais para:
             - Segurança Patrimonial Armada e Desarmada
             - Portaria, Recepção e Controle de Acesso
             - Facilities, Zeladoria e Limpeza Predial / Industrial
@@ -370,42 +370,36 @@ public class GeminiProspectionService {
             Segmento ou Palavra-Chave Alvo: %s
 
             Objetivo:
-            Gere uma lista de até %d ESTABELECIMENTOS, EMPRESAS E CONDOMÍNIOS REAIS E EXISTENTES nesta cidade e estado que possuam demanda contínua desses serviços.
+            Identifique até %d ESTABELECIMENTOS, EMPRESAS, CONDOMÍNIOS, HOSPITAIS OU POLOS INDUSTRIAIS REAIS E EXISTENTES que operam nesta cidade.
 
-            REGRAS OBRIGATÓRIAS PARA DEIXAR O CARD 100%% PRONTO PARA ENVIO AO CRM:
-            1. CNPJ VÁLIDO E FORMATADO: Sempre preencha o campo "cnpj" no formato "XX.XXX.XXX/XXXX-XX" com o CNPJ real de 14 dígitos e dígitos verificadores módulo-11 válidos da Receita Federal.
-            2. TELEFONE / WHATSAPP VÁLIDO: Sempre preencha o campo "telefone" com DDD no formato "(XX) 9XXXX-XXXX" ou "(XX) XXXX-XXXX".
-            3. E-MAIL CORPORATIVO E COMPRAS VÁLIDOS: Sempre preencha "email" (ex: contato@dominio.com.br) e "emailCompras" (ex: compras@dominio.com.br). NUNCA traga e-mails de escritórios de contabilidade.
-            4. SÓCIOS E TOMADORES DE DECISÃO (QSA): Sempre preencha a lista "qsa" com pelo menos 2 sócios, diretores ou gestores decisores contendo "nome", "qualificacao" (ex: Sócio-Administrador, Diretor Operacional, Gerente de Facilities), "email" corporativo válido e "telefone" (WhatsApp/contato direto com DDD).
-            5. Inclua o link de busca no Google Maps ("googleMapsUrl") e o "website" corporativo.
+            DIRETRIZES MANDATÓRIAS DE VERACIDADE (PROIBIDO DADOS FICTÍCIOS / MOCKS):
+            1. APENAS EMPRESAS REAIS: Nunca invente nomes genéricos ou nomes de fantasia inexistentes.
+            2. CNPJ REAL OU VAZIO: Se você tiver certeza absoluta do CNPJ oficial de 14 dígitos da empresa, informe-o. Se não souber com certeza, deixe o campo "cnpj": "". NUNCA invente números de CNPJ.
+            3. TELEFONE REAL OU VAZIO: Informe o telefone comercial/fixo público real do estabelecimento. Se não souber, deixe "telefone": "". NUNCA invente números ou use DDDs genéricos.
+            4. E-MAILS REAIS OU VAZIO: Informe apenas e-mails corporativos reais oficiais que sejam de conhecimento público. Se não souber, deixe "email": "" e "emailCompras": "". NUNCA gere e-mails falsos como contato@empresa.com.br ou @estabelecimento.com.br.
+            5. SÓCIOS E DECISORES (QSA): Preencha "qsa" APENAS se souber os nomes reais dos sócios ou administradores registrados na Receita Federal. Caso não tenha certeza, deixe "qsa": []. NUNCA invente nomes de pessoas.
+            6. Inclua o "website" oficial se existir e o link de busca no Google Maps ("googleMapsUrl").
 
-            IMPORTANTE: Retorne ESTRITAMENTE um array JSON válido sem markdown ou texto explicativo:
+            IMPORTANTE: Retorne ESTRITAMENTE um array JSON válido sem blocos markdown ou texto explicativo:
             [
               {
                 "cnpj": "XX.XXX.XXX/0001-XX",
-                "razaoSocial": "Razão Social Oficial Completa",
-                "nomeFantasia": "Nome Comercial / Fantasia",
+                "razaoSocial": "Razão Social Oficial Real",
+                "nomeFantasia": "Nome Comercial Real",
                 "municipio": "%s",
                 "uf": "%s",
                 "bairro": "Bairro real",
-                "logradouro": "Endereço real com número",
-                "telefone": "(XX) 9XXXX-XXXX",
-                "email": "contato@empresa.com.br",
-                "emailCompras": "compras@empresa.com.br",
-                "website": "https://www.empresa.com.br",
+                "logradouro": "Endereço real",
+                "telefone": "(XX) XXXX-XXXX",
+                "email": "",
+                "emailCompras": "",
+                "website": "https://...",
                 "googleMapsUrl": "https://www.google.com/maps/search/...",
                 "cnaeDescricao": "Ramo real da atividade",
                 "clientePotencial": true,
-                "scoreConversao": 92,
-                "motivoConversao": "Justificativa comercial para segurança patrimonial, portaria e facilities",
-                "qsa": [
-                  {
-                    "nome": "Nome Completo do Sócio ou Diretor",
-                    "qualificacao": "Sócio-Administrador / Diretor",
-                    "email": "nome.sobrenome@empresa.com.br",
-                    "telefone": "(XX) 9XXXX-XXXX"
-                  }
-                ]
+                "scoreConversao": 90,
+                "motivoConversao": "Demanda contínua de controle de acesso perimetral e portaria especializada",
+                "qsa": []
               }
             ]
             """.formatted(cidade, uf, (sanitizedSegmento != null && !sanitizedSegmento.isBlank() ? sanitizedSegmento : "Condomínios, Indústrias, Hospitais e Centros Comerciais"), limit, cidade, uf);
@@ -522,8 +516,13 @@ public class GeminiProspectionService {
      */
     private List<Map<String, Object>> generateRegionalDirectoryFallback(String cidade, String uf, String segmento, int limit) {
         List<Map<String, Object>> list = new ArrayList<>();
-        String sanitized = querySanitizer.cleanSegmentTerm(segmento);
         boolean isUdi = cidade == null || cidade.isBlank() || cidade.toLowerCase().contains("uberl");
+
+        if (!isUdi) {
+            // Para outras cidades onde nenhuma API externa retornou dados, NUNCA inventar empresas sintéticas
+            log.info("Nenhum estabelecimento verificado localizado no catálogo fixo para a cidade '{}'. Retornando vazio para preservar veracidade.", cidade);
+            return list;
+        }
 
         // Formato: NomeFantasia|RazaoSocial|Logradouro|Bairro|Telefone|CNAEDescricao|CNPJRealValidado|Website|Email
         String[] udiHubs = {
@@ -540,40 +539,25 @@ public class GeminiProspectionService {
         int count = Math.min(limit, udiHubs.length);
         for (int i = 0; i < count; i++) {
             Map<String, Object> item = new HashMap<>();
-            if (isUdi) {
-                String[] parts = udiHubs[i].split("\\|");
-                item.put("nomeFantasia", parts[0]);
-                item.put("razaoSocial", parts[1]);
-                item.put("logradouro", parts[2]);
-                item.put("bairro", parts[3]);
-                item.put("telefone", parts[4]);
-                item.put("cnaeDescricao", parts[5]);
-                item.put("cnpj", parts[6]);
-                item.put("website", parts[7]);
-                item.put("email", parts[8]);
-            } else {
-                String nome = (sanitized != null && !sanitized.isBlank() ? sanitized : "Complexo Empresarial") + " " + cidade + " #" + (i + 1);
-                String validCnpj = ValidationUtils.repairOrGenerateValidCnpj(null, nome + "|" + cidade);
-                item.put("razaoSocial", nome + " S/A");
-                item.put("nomeFantasia", nome);
-                item.put("logradouro", "Avenida Empresarial Principal, " + ((i + 1) * 250));
-                item.put("bairro", "Distrito Empresarial");
-                item.put("telefone", "");
-                item.put("cnaeDescricao", sanitized != null && !sanitized.isBlank() ? sanitized : "Atividades Comerciais e Industriais");
-                item.put("cnpj", validCnpj);
-            }
+            String[] parts = udiHubs[i].split("\\|");
+            item.put("nomeFantasia", parts[0]);
+            item.put("razaoSocial", parts[1]);
+            item.put("logradouro", parts[2]);
+            item.put("bairro", parts[3]);
+            item.put("telefone", parts[4]);
+            item.put("cnaeDescricao", parts[5]);
+            item.put("cnpj", parts[6]);
+            item.put("website", parts[7]);
+            item.put("email", parts[8]);
 
-            item.putIfAbsent("cnpj", "");
-            item.put("municipio", cidade != null && !cidade.isBlank() ? cidade : "Uberlândia");
-            item.put("uf", uf != null && !uf.isBlank() ? uf : "MG");
-            item.putIfAbsent("email", "");
-            item.putIfAbsent("website", "");
-            item.put("googleMapsUrl", "https://www.google.com/maps/search/?api=1&query=" + URLEncoder.encode(item.get("nomeFantasia") + " " + cidade + " " + uf, StandardCharsets.UTF_8));
+            item.put("municipio", "Uberlândia");
+            item.put("uf", "MG");
+            item.put("googleMapsUrl", "https://www.google.com/maps/search/?api=1&query=" + URLEncoder.encode(item.get("nomeFantasia") + " Uberlândia MG", StandardCharsets.UTF_8));
             item.put("clientePotencial", true);
             item.put("scoreConversao", 94 - (i * 2));
             item.put("motivoConversao", "Polo regional com demanda contínua de controle de acesso perimetral, portaria especializada e monitoramento 24h.");
             item.put("origem", "GOOGLE_MAPS");
-            item.putIfAbsent("qsa", Collections.emptyList());
+            item.put("qsa", Collections.emptyList());
             list.add(item);
         }
 
