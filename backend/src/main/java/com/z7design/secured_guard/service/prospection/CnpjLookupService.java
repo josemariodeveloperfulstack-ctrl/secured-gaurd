@@ -21,13 +21,22 @@ public class CnpjLookupService {
     private final ObjectMapper objectMapper;
     private final GeminiProspectionService geminiProspectionService;
     private final ApolloEnrichmentService apolloEnrichmentService;
+    private final CompanyRevenueEstimatorService revenueEstimatorService;
+    private final ProspectionContactEnricherService contactEnricherService;
+    private final ProspectionCacheService prospectionCacheService;
     private final HttpClient httpClient;
 
     public CnpjLookupService(
             GeminiProspectionService geminiProspectionService,
-            ApolloEnrichmentService apolloEnrichmentService) {
+            ApolloEnrichmentService apolloEnrichmentService,
+            CompanyRevenueEstimatorService revenueEstimatorService,
+            ProspectionContactEnricherService contactEnricherService,
+            ProspectionCacheService prospectionCacheService) {
         this.geminiProspectionService = geminiProspectionService;
         this.apolloEnrichmentService = apolloEnrichmentService;
+        this.revenueEstimatorService = revenueEstimatorService;
+        this.contactEnricherService = contactEnricherService;
+        this.prospectionCacheService = prospectionCacheService;
         this.objectMapper = new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
@@ -46,6 +55,13 @@ public class CnpjLookupService {
         if (cleanCnpj.length() != 14 || !ValidationUtils.isValidCnpj(cleanCnpj)) {
             String repairedFormatted = ValidationUtils.repairOrGenerateValidCnpj(cleanCnpj, rawCnpj);
             cleanCnpj = repairedFormatted.replaceAll("\\D", "");
+        }
+
+        // 0. Checar Cache L1 (Redis com TTL de 15 dias / Fallback em Memória)
+        Optional<Map<String, Object>> cached = prospectionCacheService.getCachedCompany(cleanCnpj);
+        if (cached.isPresent()) {
+            log.info("⚡ Retornando CNPJ {} direto do Cache L1 (Redis/Memória)", cleanCnpj);
+            return new HashMap<>(cached.get());
         }
 
         // 0. Tentar CNPJá Comercial API (se chave configurada)
@@ -506,6 +522,33 @@ public class CnpjLookupService {
             }
         } catch (Exception ex) {
             log.debug("Enriquecimento Apollo ignorado: {}", ex.getMessage());
+        }
+
+        // 6. Estimativa de Faturamento Presumido, Porte e Faixa de Colaboradores (Modelo Matemático SDD)
+        try {
+            revenueEstimatorService.applyToCompanyMap(map);
+        } catch (Exception ex) {
+            log.debug("Estimativa de faturamento presumido ignorada: {}", ex.getMessage());
+        }
+
+        // 7. Estruturação Econodata de Pessoas por Departamentos (Diretoria, Compras, Facilities, RH, Financeiro)
+        try {
+            contactEnricherService.enrichCompanyContacts(map);
+        } catch (Exception ex) {
+            log.debug("Enriquecimento de contatos departamentais ignorado: {}", ex.getMessage());
+        }
+
+        // 8. Salvar no Cache L1 (Redis / Memória com TTL de 15 dias) se possuir CNPJ
+        try {
+            Object cnpjVal = map.get("cnpj");
+            if (cnpjVal != null) {
+                String clean = cnpjVal.toString().replaceAll("\\D", "");
+                if (clean.length() == 14) {
+                    prospectionCacheService.putCompany(clean, map);
+                }
+            }
+        } catch (Exception ex) {
+            log.debug("Falha ao salvar no cache: {}", ex.getMessage());
         }
     }
 

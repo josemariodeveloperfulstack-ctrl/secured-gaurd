@@ -108,15 +108,44 @@ public class ProspectionHistoryService {
 
     private void saveContactsForCompany(ProspectionCompany comp, Map<String, Object> data) {
         List<ProspectionContact> contactsToSave = new ArrayList<>();
+        Set<String> seenNames = new HashSet<>();
 
-        // 1. Sócios do QSA
+        // 0. Contatos Estruturados estilo Econodata (Diretoria, Compras, Facilities, RH, Financeiro)
+        Object econodataObj = data.get("contatosEconodata");
+        if (econodataObj instanceof List<?> econoList) {
+            for (Object item : econoList) {
+                if (item instanceof Map<?, ?> cMap) {
+                    Object nomeObj = cMap.get("nome");
+                    String nome = nomeObj != null ? nomeObj.toString().trim() : null;
+                    if (nome != null && !nome.isBlank() && seenNames.add(nome.toLowerCase())) {
+                        String cargo = cMap.get("cargo") != null ? cMap.get("cargo").toString() : "Gestor / Decisor";
+                        String dep = cMap.get("departamento") != null ? cMap.get("departamento").toString() : "DECISOR";
+                        String email = cMap.get("email") != null ? cMap.get("email").toString() : null;
+                        String tel = cMap.get("telefone") != null ? cMap.get("telefone").toString() : null;
+                        String linkedin = cMap.get("linkedinUrl") != null ? cMap.get("linkedinUrl").toString() : null;
+
+                        contactsToSave.add(ProspectionContact.builder()
+                                .company(comp)
+                                .nome(truncate(nome, 250))
+                                .cargoTipo(truncate(dep, 50))
+                                .cargoDescricao(truncate(cargo, 250))
+                                .email(truncate(email, 250))
+                                .telefone(truncate(tel, 48))
+                                .linkedinUrl(truncate(linkedin, 250))
+                                .build());
+                    }
+                }
+            }
+        }
+
+        // 1. Sócios do QSA (se ainda não salvos via econodata)
         Object qsaObj = data.get("qsa");
         if (qsaObj instanceof List<?> qsaList) {
             for (Object item : qsaList) {
                 if (item instanceof Map<?, ?> socioMap) {
                     Object nomeObj = socioMap.get("nome");
-                    String nome = nomeObj != null ? nomeObj.toString() : null;
-                    if (nome != null && !nome.isBlank()) {
+                    String nome = nomeObj != null ? nomeObj.toString().trim() : null;
+                    if (nome != null && !nome.isBlank() && seenNames.add(nome.toLowerCase())) {
                         Object qualObj = socioMap.get("qualificacao");
                         String qual = qualObj != null ? qualObj.toString() : "Sócio / Administrador";
                         Object emailObj = socioMap.get("email");
@@ -146,8 +175,8 @@ public class ProspectionHistoryService {
             for (Object item : decList) {
                 if (item instanceof Map<?, ?> decMap) {
                     Object nomeObj = decMap.get("nome");
-                    String nome = nomeObj != null ? nomeObj.toString() : null;
-                    if (nome != null && !nome.isBlank()) {
+                    String nome = nomeObj != null ? nomeObj.toString().trim() : null;
+                    if (nome != null && !nome.isBlank() && seenNames.add(nome.toLowerCase())) {
                         Object cargoObj = decMap.get("cargo");
                         String cargo = cargoObj != null ? cargoObj.toString() : "Tomador de Decisão";
                         Object emailObj = decMap.get("email");
@@ -174,7 +203,7 @@ public class ProspectionHistoryService {
         // 3. Setor de Compras / Suprimentos
         String emailCompras = (String) data.get("emailCompras");
         String comprasNome = (String) data.getOrDefault("contatoComprasNome", "Setor de Compras / Suprimentos");
-        if (emailCompras != null && !emailCompras.isBlank()) {
+        if (emailCompras != null && !emailCompras.isBlank() && seenNames.add(comprasNome.toLowerCase())) {
             contactsToSave.add(ProspectionContact.builder()
                     .company(comp)
                     .nome(truncate(comprasNome, 250))

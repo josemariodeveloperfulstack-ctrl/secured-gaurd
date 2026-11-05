@@ -828,17 +828,48 @@ public class EPIDeliveryStandardPdfService {
                                         substitutionReason,
                                         item.getSignatureBase64());
 
-                        boolean isDuplicate = rows.stream().anyMatch(existing ->
-                                equalsIgnoreCaseTrim(existing.epiName(), newRow.epiName()) &&
-                                equalsIgnoreCaseTrim(existing.sizeNumber(), newRow.sizeNumber()) &&
-                                equalsIgnoreCaseTrim(existing.ca(), newRow.ca()) &&
-                                existing.quantity() == newRow.quantity() &&
-                                java.util.Objects.equals(existing.deliveryDate(), newRow.deliveryDate()) &&
-                                equalsIgnoreCaseTrim(existing.substitutionInfo(), newRow.substitutionInfo()) &&
-                                equalsIgnoreCaseTrim(existing.substitutionReason(), newRow.substitutionReason())
-                        );
+                        // Se a data de substituição for idêntica à data de entrega e o motivo for apenas "Substituição" genérico
+                        // (resquício de preenchimento automático anterior), desconsidera essa informação espúria de substituição
+                        if (!substitutionInfo.isEmpty() && substitutionInfo.equals(formatDate(itemDeliveryDate))) {
+                                if ("Substituição".equalsIgnoreCase(substitutionReason) || "Troca".equalsIgnoreCase(substitutionReason)) {
+                                        substitutionInfo = "";
+                                        substitutionReason = "";
+                                }
+                        }
 
-                        if (!isDuplicate) {
+                        // Verifica se já existe linha deste mesmo equipamento entregue na mesma data
+                        int existingIdx = -1;
+                        for (int i = 0; i < rows.size(); i++) {
+                                EpiMovementRow r = rows.get(i);
+                                if (equalsIgnoreCaseTrim(r.epiName(), newRow.epiName()) &&
+                                    equalsIgnoreCaseTrim(r.sizeNumber(), newRow.sizeNumber()) &&
+                                    equalsIgnoreCaseTrim(r.ca(), newRow.ca()) &&
+                                    java.util.Objects.equals(r.deliveryDate(), newRow.deliveryDate())) {
+                                        existingIdx = i;
+                                        break;
+                                }
+                        }
+
+                        if (existingIdx >= 0) {
+                                // Já existe uma linha desse equipamento nesta mesma data de entrega.
+                                // Se a nova linha trouxer dados reais de substituição/devolução (e a existente não tiver),
+                                // atualiza a linha existente em vez de criar uma segunda linha duplicada
+                                EpiMovementRow existing = rows.get(existingIdx);
+                                if ((existing.substitutionInfo() == null || existing.substitutionInfo().isBlank()) &&
+                                    (!substitutionInfo.isBlank() || !substitutionReason.isBlank())) {
+                                        rows.set(existingIdx, new EpiMovementRow(
+                                                existing.epiName(),
+                                                existing.sizeNumber(),
+                                                existing.ca(),
+                                                existing.quantity(),
+                                                existing.deliveryDate(),
+                                                substitutionInfo,
+                                                substitutionReason,
+                                                existing.signatureBase64() != null ? existing.signatureBase64() : newRow.signatureBase64()
+                                        ));
+                                }
+                                // Não adiciona linha duplicada na mesma data
+                        } else {
                                 rows.add(newRow);
                         }
                 }

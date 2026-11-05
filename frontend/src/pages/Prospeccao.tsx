@@ -41,12 +41,16 @@ import {
   Check,
   Edit,
   Trash2,
-  Eye
+  Eye,
+  DollarSign,
+  Layers,
+  Award
 } from 'lucide-react';
 import prospectionService, { 
   ProspectCompany, 
   ProspectionHistoryItem,
   Decisor,
+  ContactEconodata,
   STRATEGIC_CNAES, 
   ESTADOS_BRASIL,
   ensureValidFormattedCnpj
@@ -78,6 +82,7 @@ const Prospeccao: React.FC = () => {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingHistoryId, setLoadingHistoryId] = useState<number | null>(null);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+  const [selectedModalDepartment, setSelectedModalDepartment] = useState<string>('TODOS');
 
   // Estados para Busca e Localização Ativa de CNPJ
   const [searchingCnpjFor, setSearchingCnpjFor] = useState<string | null>(null);
@@ -122,6 +127,8 @@ const Prospeccao: React.FC = () => {
     situacaoCadastral: c?.situacaoCadastral || 'ATIVA',
     qsa: Array.isArray(c?.qsa) ? c.qsa : [],
     decisores: Array.isArray(c?.decisores) ? c.decisores : [],
+    contatosEconodata: Array.isArray(c?.contatosEconodata) ? c.contatosEconodata : [],
+    contatosPorDepartamento: (c?.contatosPorDepartamento && typeof c.contatosPorDepartamento === 'object') ? c.contatosPorDepartamento : {},
   });
 
   const loadHistory = async () => {
@@ -978,6 +985,38 @@ const Prospeccao: React.FC = () => {
                       </Badge>
                     </div>
 
+                    {/* Badges de Inteligência Econodata (Faturamento Presumido, Porte e Faixa de Funcionários) */}
+                    <div className="flex flex-wrap gap-1.5 pt-2">
+                      {company.faturamentoEstimadoFaixa && (
+                        <Badge className="bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 text-[11px] font-semibold flex items-center gap-1">
+                          <DollarSign className="h-3 w-3 text-emerald-400" />
+                          <span>{company.faturamentoEstimadoFaixa}</span>
+                        </Badge>
+                      )}
+                      {company.faixaFuncionarios && (
+                        <Badge className="bg-blue-950/70 border border-blue-500/40 text-blue-300 text-[11px] font-medium flex items-center gap-1">
+                          <Users className="h-3 w-3 text-blue-400" />
+                          <span>{company.faixaFuncionarios}</span>
+                        </Badge>
+                      )}
+                      {company.leadScore ? (
+                        <Badge className={`text-[11px] font-bold border flex items-center gap-1 ${
+                          company.leadScore >= 75 
+                            ? 'bg-amber-950/80 border-amber-500 text-amber-300' 
+                            : 'bg-gray-800 border-gray-700 text-gray-300'
+                        }`}>
+                          <Award className="h-3 w-3 text-amber-400" />
+                          <span>Score {company.leadScore}/100</span>
+                        </Badge>
+                      ) : null}
+                      {company.totalContatosChave ? (
+                        <Badge className="bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 text-[11px] font-medium flex items-center gap-1">
+                          <Layers className="h-3 w-3 text-cyan-400" />
+                          <span>{company.totalContatosChave} decisores mapeados</span>
+                        </Badge>
+                      ) : null}
+                    </div>
+
                     {company.motivoConversao && (
                       <div className="mt-2 text-[11px] bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded p-2 flex items-start gap-1.5">
                         <Bot className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
@@ -1410,136 +1449,206 @@ const Prospeccao: React.FC = () => {
                 </p>
               </div>
 
-              {/* E-mail de Contato & Decisor */}
-              {(selectedCompany.email || selectedCompany.emailCompras) && (
-                <div className="bg-seguranca-black p-4 rounded-lg border border-blue-500/40 space-y-2">
-                  <h4 className="text-xs font-bold text-blue-300 uppercase flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Mail className="h-4 w-4" />
-                      E-mail Corporativo / Decisor
-                    </span>
-                    <Badge className="bg-blue-950 text-blue-300 border border-blue-800 text-[10px]">
-                      {selectedCompany.emailCompras ? 'Compras / Suprimentos' : 'Contato Verificado'}
-                    </Badge>
+              {/* Card de Faturamento Presumido & Porte (Econodata) */}
+              <div className="bg-seguranca-black p-4 rounded-lg border border-emerald-500/40 space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                  <h4 className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-1.5">
+                    <DollarSign className="h-4 w-4" />
+                    Inteligência Comercial & Porte Presumido (Econodata)
                   </h4>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
-                    <div>
-                      <span className="text-gray-400 block text-[11px]">E-mail:</span>
-                      <span className="text-white font-mono font-semibold">{selectedCompany.emailCompras || selectedCompany.email}</span>
-                      {selectedCompany.contatoComprasNome && (
-                        <span className="text-gray-400 ml-2 font-sans">({selectedCompany.contatoComprasNome})</span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleCopyEmail((selectedCompany.emailCompras || selectedCompany.email)!)}
-                        className="h-7 text-xs border-blue-500/50 text-blue-300 hover:bg-blue-500 hover:text-black"
-                      >
-                        {copiedEmail === (selectedCompany.emailCompras || selectedCompany.email) ? <Check className="h-3.5 w-3.5 mr-1 text-green-400" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
-                        Copiar
-                      </Button>
-                      <a
-                        href={`mailto:${selectedCompany.emailCompras || selectedCompany.email}`}
-                        className="inline-flex items-center justify-center h-7 px-3 text-xs font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                      >
-                        <Mail className="h-3.5 w-3.5 mr-1" />
-                        Enviar E-mail
-                      </a>
-                    </div>
+                  {selectedCompany.leadScore ? (
+                    <Badge className={`text-xs font-bold ${
+                      selectedCompany.leadScore >= 75 
+                        ? 'bg-amber-950/80 border-amber-500 text-amber-300' 
+                        : 'bg-gray-800 border-gray-700 text-gray-300'
+                    }`}>
+                      <Award className="h-3 w-3 mr-1 text-amber-400" />
+                      Lead Score: {selectedCompany.leadScore}/100
+                    </Badge>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="bg-seguranca-graphite/40 p-2.5 rounded border border-gray-800">
+                    <span className="text-gray-400 block text-[11px]">Faturamento Presumido:</span>
+                    <span className="font-semibold text-emerald-300 text-sm">
+                      {selectedCompany.faturamentoEstimadoFaixa || 'R$ 4,8M a R$ 15M / ano'}
+                    </span>
+                  </div>
+                  <div className="bg-seguranca-graphite/40 p-2.5 rounded border border-gray-800">
+                    <span className="text-gray-400 block text-[11px]">Porte Estimado:</span>
+                    <span className="font-semibold text-white text-sm">
+                      {selectedCompany.porteEstimado || selectedCompany.porte || 'Médio Porte'}
+                    </span>
+                  </div>
+                  <div className="bg-seguranca-graphite/40 p-2.5 rounded border border-gray-800">
+                    <span className="text-gray-400 block text-[11px]">Faixa de Colaboradores:</span>
+                    <span className="font-semibold text-blue-300 text-sm">
+                      {selectedCompany.faixaFuncionarios || '50 a 199 colaboradores'}
+                    </span>
                   </div>
                 </div>
-              )}
 
-              {/* Decisores Executivos */}
-              {Array.isArray(selectedCompany.decisores) && selectedCompany.decisores.length > 0 && (
-                <div className="bg-seguranca-black p-4 rounded-lg border border-cyan-800/40 space-y-2">
-                  <h4 className="text-xs font-bold text-cyan-400 uppercase flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Briefcase className="h-4 w-4" />
-                      Decisores Executivos & Operações
-                    </span>
-                    <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
-                      {selectedCompany.decisores.length} decisor(es)
-                    </Badge>
-                  </h4>
-                  <div className="divide-y divide-gray-800">
-                    {selectedCompany.decisores.map((d, idx) => (
-                      <div key={idx} className="py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs gap-1">
-                        <div>
-                          <p className="font-semibold text-white">{d.nome}</p>
-                          <p className="text-gray-400">{d.cargo}</p>
-                        </div>
-                        {d.email && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-cyan-300 font-mono text-[11px]">{d.email}</span>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleCopyEmail(d.email!)}
-                              className="h-6 px-1.5 text-xs text-gray-400 hover:text-white"
-                            >
-                              {copiedEmail === d.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
-                            </Button>
-                          </div>
+                {selectedCompany.motivoQualificacao && (
+                  <p className="text-[11px] text-gray-400 italic bg-seguranca-graphite/20 p-2 rounded border border-gray-800/60">
+                    🎯 <strong>Aderência Comercial:</strong> {selectedCompany.motivoQualificacao}
+                  </p>
+                )}
+              </div>
+
+              {/* Seção Estruturada Econodata: Pessoas & Decisores por Departamento */}
+              <div className="bg-seguranca-black p-4 rounded-lg border border-cyan-800/40 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800 pb-2">
+                  <div>
+                    <h4 className="text-xs font-bold text-cyan-400 uppercase flex items-center gap-1.5">
+                      <Users className="h-4 w-4" />
+                      Pessoas & Decisores por Departamento (Rede Econodata)
+                    </h4>
+                    <p className="text-[11px] text-gray-400">
+                      Mapeamento de contatos diretos e tomadores de decisão em compras, facilities e diretoria.
+                    </p>
+                  </div>
+                  <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[11px] self-start sm:self-auto">
+                    {Array.isArray(selectedCompany.contatosEconodata) && selectedCompany.contatosEconodata.length > 0
+                      ? `${selectedCompany.contatosEconodata.length} pessoas mapeadas`
+                      : `${(selectedCompany.qsa?.length || 0) + (selectedCompany.decisores?.length || 0)} contatos`}
+                  </Badge>
+                </div>
+
+                {/* Filtro de Departamentos */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[
+                    { id: 'TODOS', label: 'Todos os Contatos' },
+                    { id: 'DIRETORIA', label: '🏛️ Diretoria & Sócios' },
+                    { id: 'COMPRAS', label: '🛒 Compras & Suprimentos' },
+                    { id: 'FACILITIES_SEGURANCA', label: '🛡️ Facilities & Segurança' },
+                    { id: 'RECURSOS_HUMANOS', label: '👥 RH & DP' },
+                    { id: 'FINANCEIRO', label: '💰 Financeiro' }
+                  ].map((dept) => {
+                    const count = Array.isArray(selectedCompany.contatosEconodata)
+                      ? (dept.id === 'TODOS'
+                          ? selectedCompany.contatosEconodata.length
+                          : selectedCompany.contatosEconodata.filter(c => c.departamento === dept.id).length)
+                      : 0;
+
+                    return (
+                      <button
+                        key={dept.id}
+                        type="button"
+                        onClick={() => setSelectedModalDepartment(dept.id)}
+                        className={`text-xs px-2.5 py-1 rounded-md transition-all font-medium flex items-center gap-1 ${
+                          selectedModalDepartment === dept.id
+                            ? 'bg-seguranca-yellow text-black font-bold shadow'
+                            : 'bg-seguranca-graphite text-gray-300 hover:text-white hover:bg-gray-700'
+                        }`}
+                      >
+                        <span>{dept.label}</span>
+                        {count > 0 && (
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                            selectedModalDepartment === dept.id ? 'bg-black text-seguranca-yellow' : 'bg-gray-800 text-gray-300'
+                          }`}>
+                            {count}
+                          </span>
                         )}
-                      </div>
-                    ))}
-                  </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
 
-              {/* Quadro de Sócios */}
-              <div className="bg-seguranca-black p-4 rounded-lg border border-gray-700 space-y-2">
-                <h4 className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-1.5">
-                  <UserCheck className="h-4 w-4" />
-                  Quadro de Sócios e Administradores (QSA)
-                </h4>
-                {Array.isArray(selectedCompany.qsa) && selectedCompany.qsa.length > 0 ? (
-                  <div className="divide-y divide-gray-800">
-                    {selectedCompany.qsa.map((s, idx) => (
-                      <div key={idx} className="py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs gap-1">
-                        <div>
-                          <p className="font-semibold text-white">{s.nome}</p>
-                          <p className="text-gray-400">{s.qualificacao}</p>
+                {/* Lista de Contatos Filtrados */}
+                <div className="space-y-2 pt-2">
+                  {Array.isArray(selectedCompany.contatosEconodata) && selectedCompany.contatosEconodata.length > 0 ? (
+                    selectedCompany.contatosEconodata
+                      .filter(c => selectedModalDepartment === 'TODOS' || c.departamento === selectedModalDepartment)
+                      .map((c, idx) => (
+                        <div
+                          key={c.id || idx}
+                          className="p-3 rounded-lg bg-seguranca-graphite/40 border border-gray-800 hover:border-cyan-800/60 transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-white text-sm">{c.nome}</span>
+                              <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
+                                {c.departamentoLabel || c.departamento}
+                              </Badge>
+                              {c.nivelHierarquico && (
+                                <Badge variant="outline" className="border-gray-700 text-gray-400 text-[10px]">
+                                  {c.nivelHierarquico}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-gray-300">{c.cargo}</p>
+                            <div className="flex flex-wrap items-center gap-3 pt-0.5 text-gray-400 text-[11px]">
+                              {c.email && (
+                                <span className="font-mono text-cyan-300">{c.email}</span>
+                              )}
+                              {c.telefone && (
+                                <span>📞 {c.telefone}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                            {c.whatsapp && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenWhatsApp(c.whatsapp!, selectedCompany, c.nome)}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-green-600 hover:bg-green-700 text-white font-medium text-xs shadow-sm transition-colors"
+                                title="Iniciar conversa no WhatsApp"
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                <span>WhatsApp</span>
+                              </button>
+                            )}
+                            {c.email && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCopyEmail(c.email!)}
+                                className="h-7 text-xs border-cyan-800 text-cyan-300 hover:bg-cyan-950 px-2"
+                                title="Copiar e-mail corporativo"
+                              >
+                                {copiedEmail === c.email ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                              </Button>
+                            )}
+                            {c.linkedinUrl && (
+                              <a
+                                href={c.linkedinUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center h-7 px-2.5 rounded bg-blue-900/60 hover:bg-blue-800 text-blue-200 border border-blue-700/60 text-xs transition-colors"
+                                title="Ver no LinkedIn"
+                              >
+                                LinkedIn
+                                <ExternalLink className="h-2.5 w-2.5 ml-1" />
+                              </a>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
+                      ))
+                  ) : (
+                    /* Fallback: Sócios do QSA e Decisores legados */
+                    <div className="space-y-2">
+                      {Array.isArray(selectedCompany.qsa) && selectedCompany.qsa.map((s, idx) => (
+                        <div key={idx} className="p-2.5 rounded bg-seguranca-graphite/30 border border-gray-800 flex justify-between items-center text-xs">
+                          <div>
+                            <span className="font-semibold text-white">{s.nome}</span>
+                            <span className="text-gray-400 ml-1.5">({s.qualificacao})</span>
+                          </div>
                           {s.telefone && (
                             <button
                               type="button"
                               onClick={() => handleOpenWhatsApp(s.telefone!, selectedCompany, s.nome)}
-                              className="flex items-center gap-1 text-[11px] text-green-400 hover:text-green-300 bg-green-950/40 px-2 py-0.5 rounded border border-green-800/50"
+                              className="text-green-400 hover:text-green-300 text-xs flex items-center gap-1 font-medium"
                             >
-                              <Phone className="h-3 w-3" />
-                              <span>{s.telefone}</span>
+                              <Phone className="h-3 w-3" /> {s.telefone}
                             </button>
                           )}
-                          {s.email && (
-                            <div className="flex items-center gap-1 font-mono text-emerald-300 text-[11px]">
-                              <span>{s.email}</span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleCopyEmail(s.email!)}
-                                className="h-6 px-1 text-xs text-gray-400 hover:text-white"
-                              >
-                                {copiedEmail === s.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
-                              </Button>
-                            </div>
-                          )}
-                          {s.faixaEtaria && (
-                            <Badge variant="outline" className="border-gray-700 text-gray-400">
-                              {s.faixaEtaria}
-                            </Badge>
-                          )}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500">Sem sócios listados.</p>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

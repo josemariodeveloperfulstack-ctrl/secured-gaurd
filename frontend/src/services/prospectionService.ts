@@ -30,6 +30,22 @@ export interface CnaeInfo {
   descricao: string;
 }
 
+export interface ContactEconodata {
+  id?: string;
+  nome: string;
+  cargo: string;
+  departamento: 'DIRETORIA' | 'COMPRAS' | 'FACILITIES_SEGURANCA' | 'RECURSOS_HUMANOS' | 'FINANCEIRO' | 'OUTROS';
+  departamentoLabel?: string;
+  nivelHierarquico?: 'SOCIO' | 'C_LEVEL' | 'DIRETOR' | 'GERENTE' | 'COORDENADOR' | 'ESPECIALISTA';
+  email?: string;
+  emailVerificado?: boolean;
+  telefone?: string;
+  whatsapp?: string;
+  whatsappUrl?: string;
+  linkedinUrl?: string;
+  origem?: string;
+}
+
 export interface ProspectCompany {
   cnpj: string;
   razaoSocial: string;
@@ -41,6 +57,18 @@ export interface ProspectCompany {
   naturezaJuridica?: string;
   porte?: string;
   capitalSocial?: number;
+  faturamentoEstimadoMin?: number;
+  faturamentoEstimadoMax?: number;
+  faturamentoEstimadoFaixa?: string;
+  faixaFaturamento?: 'MICRO' | 'PEQUENO' | 'MEDIO' | 'GRANDE' | 'CORPORATE';
+  porteEstimado?: string;
+  faixaFuncionarios?: string;
+  leadScore?: number;
+  leadTier?: string;
+  motivoQualificacao?: string;
+  contatosEconodata?: ContactEconodata[];
+  contatosPorDepartamento?: Record<string, ContactEconodata[]>;
+  totalContatosChave?: number;
   logradouro?: string;
   numero?: string;
   complemento?: string;

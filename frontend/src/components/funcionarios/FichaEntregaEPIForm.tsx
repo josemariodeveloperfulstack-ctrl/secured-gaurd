@@ -179,23 +179,29 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
           setItemConfirmations(ficha.items || []);
           // Itens já cadastrados aparecem primeiro (ordem da ficha) e a linha
           // vazia para o próximo item fica na linha de baixo, após os salvos.
-          const savedEpis = ficha.items.map(item => ({
-            id: item.id || '',
-            nome: item.epiName,
-            tamanho: item.sizeNumber || '',
-            quantidade: String(item.quantity),
-            ca: item.ca || '',
-            caName: item.caName || '',
-            validade: item.validityDate || '',
-            observacoes: item.observations || '',
-            uniformeTipo: item.uniformType || '',
-            uniformePeca: item.uniformPiece || '',
-            stockItemId: item.stockItemId || '',
-            dataSubstituicao: (item as any).substitutedDate || '',
-            motivoSubstituicao: (item as any).replacementReason || '',
-            dataDevolucao: (item as any).returnedDate || '',
-            motivoDevolucao: (item as any).returnReason || '',
-          }));
+          const savedEpis = ficha.items.map(item => {
+            const rawSubDate = (item as any).substitutedDate || '';
+            const rawReason = (item as any).replacementReason || '';
+            const isFakeSub = rawSubDate && rawSubDate === ficha.deliveryDate &&
+              (rawReason === 'Substituição' || rawReason === 'Troca');
+            return {
+              id: item.id || '',
+              nome: item.epiName,
+              tamanho: item.sizeNumber || '',
+              quantidade: String(item.quantity),
+              ca: item.ca || '',
+              caName: item.caName || '',
+              validade: item.validityDate || '',
+              observacoes: item.observations || '',
+              uniformeTipo: item.uniformType || '',
+              uniformePeca: item.uniformPiece || '',
+              stockItemId: item.stockItemId || '',
+              dataSubstituicao: isFakeSub ? '' : rawSubDate,
+              motivoSubstituicao: isFakeSub ? '' : rawReason,
+              dataDevolucao: (item as any).returnedDate || '',
+              motivoDevolucao: (item as any).returnReason || '',
+            };
+          });
           // Carrega todo o histórico do funcionário para que a edição exiba a ficha completa de EPIs
           let allCombinedItems = [...savedEpis];
           if (ficha.employeeId) {
@@ -208,9 +214,13 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                   const isDup = allCombinedItems.some(existing =>
                     existing.nome?.trim().toLowerCase() === otherItem.epiName?.trim().toLowerCase() &&
                     (existing.ca || '').trim() === (otherItem.ca || '').trim() &&
-                    existing.quantidade === String(otherItem.quantity)
+                    (existing.tamanho || '').trim() === (otherItem.sizeNumber || '').trim()
                   );
                   if (!isDup) {
+                    const rawOtherSub = (otherItem as any).substitutedDate || '';
+                    const rawOtherReason = (otherItem as any).replacementReason || '';
+                    const isFakeOtherSub = rawOtherSub && rawOtherSub === otherFicha.deliveryDate &&
+                      (rawOtherReason === 'Substituição' || rawOtherReason === 'Troca');
                     allCombinedItems.push({
                       id: otherItem.id || '',
                       nome: otherItem.epiName,
@@ -223,8 +233,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                       uniformeTipo: otherItem.uniformType || '',
                       uniformePeca: otherItem.uniformPiece || '',
                       stockItemId: otherItem.stockItemId || '',
-                      dataSubstituicao: (otherItem as any).substitutedDate || '',
-                      motivoSubstituicao: (otherItem as any).replacementReason || '',
+                      dataSubstituicao: isFakeOtherSub ? '' : rawOtherSub,
+                      motivoSubstituicao: isFakeOtherSub ? '' : rawOtherReason,
                       dataDevolucao: (otherItem as any).returnedDate || '',
                       motivoDevolucao: (otherItem as any).returnReason || '',
                     });
@@ -624,9 +634,13 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                         const isDup = combined.some(existing =>
                           existing.nome?.trim().toLowerCase() === it.epiName?.trim().toLowerCase() &&
                           (existing.ca || '').trim() === (it.ca || '').trim() &&
-                          existing.quantidade === String(it.quantity)
+                          (existing.tamanho || '').trim() === (it.sizeNumber || '').trim()
                         );
                         if (!isDup) {
+                          const rawSub = (it as any).substitutedDate || '';
+                          const rawReason = (it as any).replacementReason || '';
+                          const isFakeSub = rawSub && rawSub === f.deliveryDate &&
+                            (rawReason === 'Substituição' || rawReason === 'Troca');
                           combined.push({
                             id: it.id || '',
                             nome: it.epiName,
@@ -639,8 +653,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({
                             uniformeTipo: it.uniformType || '',
                             uniformePeca: it.uniformPiece || '',
                             stockItemId: it.stockItemId || '',
-                            dataSubstituicao: (it as any).substitutedDate || '',
-                            motivoSubstituicao: (it as any).replacementReason || '',
+                            dataSubstituicao: isFakeSub ? '' : rawSub,
+                            motivoSubstituicao: isFakeSub ? '' : rawReason,
                             dataDevolucao: (it as any).returnedDate || '',
                             motivoDevolucao: (it as any).returnReason || '',
                           });
