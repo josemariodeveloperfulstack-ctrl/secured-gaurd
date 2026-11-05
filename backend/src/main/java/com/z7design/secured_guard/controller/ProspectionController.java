@@ -65,9 +65,12 @@ public class ProspectionController {
             @RequestParam String nome,
             @RequestParam(required = false, defaultValue = "Uberlândia") String cidade,
             @RequestParam(required = false, defaultValue = "MG") String uf,
+            @RequestParam(required = false) String logradouro,
+            @RequestParam(required = false) String telefone,
             @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
-        log.info("Recebida requisição para localizar CNPJ: nome='{}', cidade='{}', uf='{}'", nome, cidade, uf);
-        Map<String, Object> data = cnpjLookupService.findCnpjByNameAndLocation(nome, cidade, uf);
+        log.info("Recebida requisição para localizar CNPJ: nome='{}', cidade='{}', uf='{}', logradouro='{}', telefone='{}'",
+                nome, cidade, uf, logradouro, telefone);
+        Map<String, Object> data = cnpjLookupService.findCnpjByNameAndLocation(nome, cidade, uf, logradouro, telefone);
 
         if (Boolean.TRUE.equals(data.get("discoveredAutomatically"))) {
             try {
@@ -103,8 +106,10 @@ public class ProspectionController {
                 } else {
                     String nome = (String) item.get("nomeFantasia");
                     if (nome == null || nome.isBlank()) nome = (String) item.get("razaoSocial");
+                    String logradouro = (String) item.get("logradouro");
+                    String telefone = (String) item.get("telefone");
                     if (nome != null && !nome.isBlank()) {
-                        enriched = cnpjLookupService.findCnpjByNameAndLocation(nome, cidade, uf);
+                        enriched = cnpjLookupService.findCnpjByNameAndLocation(nome, cidade, uf, logradouro, telefone);
                     }
                 }
 

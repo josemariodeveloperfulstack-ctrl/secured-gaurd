@@ -278,13 +278,15 @@ class ProspectionService {
   }
 
   /**
-   * Tenta localizar e enriquecer o CNPJ de uma empresa ou condomínio a partir do nome/fantasia e localidade
+   * Tenta localizar e enriquecer o CNPJ de uma empresa ou condomínio a partir do nome/fantasia, localidade, endereço e telefone
    */
-  async findCnpjByName(nome: string, cidade?: string, uf?: string): Promise<any> {
+  async findCnpjByName(nome: string, cidade?: string, uf?: string, logradouro?: string, telefone?: string): Promise<any> {
     const params = new URLSearchParams();
     params.append('nome', nome);
     if (cidade) params.append('cidade', cidade);
     if (uf) params.append('uf', uf);
+    if (logradouro) params.append('logradouro', logradouro);
+    if (telefone) params.append('telefone', telefone);
 
     const { data } = await api.get(`/prospection/find-cnpj?${params.toString()}`);
     if (data && data.cnpj) {

@@ -568,24 +568,36 @@ public class GeminiProspectionService {
      * Tenta identificar o CNPJ oficial e os decisores de uma empresa ou condomínio usando a IA Gemini.
      */
     public String discoverCnpjWithGemini(String companyName, String city, String uf) {
+        return discoverCnpjWithGemini(companyName, city, uf, null, null);
+    }
+
+    /**
+     * Identifica o CNPJ oficial através de IA Gemini com contexto detalhado de localização e telefone.
+     */
+    public String discoverCnpjWithGemini(String companyName, String city, String uf, String address, String phone) {
         if (!isConfigured()) {
             return null;
         }
         try {
-            String prompt = String.format(
-                    "Você é um especialista em registros cadastrais públicos do Brasil (Receita Federal / CNPJ).\n" +
-                    "Descubra o CNPJ oficial (14 dígitos numéricos válidos) da seguinte empresa ou condomínio:\n" +
-                    "Nome / Fantasia: \"%s\"\n" +
-                    "Cidade / UF: \"%s - %s\"\n\n" +
-                    "Responda estritamente em formato JSON:\n" +
-                    "{\"cnpj\": \"XXXXXXXXXXXXXX\"}",
-                    companyName, city, uf);
+            StringBuilder promptBuilder = new StringBuilder();
+            promptBuilder.append("Você é um especialista em registros cadastrais públicos do Brasil (Receita Federal / CNPJ).\n");
+            promptBuilder.append("Descubra o CNPJ oficial (14 dígitos numéricos válidos) da seguinte empresa ou estabelecimento comercial:\n");
+            promptBuilder.append(String.format("Nome / Fantasia: \"%s\"\n", companyName));
+            promptBuilder.append(String.format("Cidade / UF: \"%s - %s\"\n", city, uf));
+            if (address != null && !address.isBlank()) {
+                promptBuilder.append(String.format("Endereço / Logradouro: \"%s\"\n", address));
+            }
+            if (phone != null && !phone.isBlank()) {
+                promptBuilder.append(String.format("Telefone oficial: \"%s\"\n", phone));
+            }
+            promptBuilder.append("\nResponda estritamente em formato JSON com o CNPJ oficial de 14 dígitos (apenas dígitos numéricos):\n");
+            promptBuilder.append("{\"cnpj\": \"XXXXXXXXXXXXXX\"}");
 
+            String prompt = promptBuilder.toString();
             Map<String, Object> body = new HashMap<>();
             Map<String, Object> content = new HashMap<>();
             content.put("parts", List.of(Map.of("text", prompt)));
             body.put("contents", List.of(content));
-            String bodyJson = objectMapper.writeValueAsString(body);
 
             List<String> modelsToTry = new ArrayList<>();
             String preferred = (model != null && !model.isBlank()) ? model.trim() : "gemini-1.5-flash";
@@ -601,35 +613,50 @@ public class GeminiProspectionService {
             for (String tryModel : modelsToTry) {
                 String cleanModel = tryModel.replace("models/", "");
                 String endpoint = apiUrl + "/models/" + cleanModel + ":generateContent?key=" + apiKey;
-                try {
-                    HttpRequest req = HttpRequest.newBuilder()
-                            .uri(URI.create(endpoint))
-                            .header("Content-Type", "application/json")
-                            .timeout(Duration.ofSeconds(12))
-                            .POST(HttpRequest.BodyPublishers.ofString(bodyJson, StandardCharsets.UTF_8))
-                            .build();
 
-                    HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-                    if (resp.statusCode() == 200) {
-                        JsonNode response = objectMapper.readTree(resp.body());
-                        if (response.has("candidates")) {
-                            JsonNode textNode = response.path("candidates").get(0)
-                                    .path("content").path("parts").get(0).path("text");
-                            if (!textNode.isMissingNode()) {
-                                String clean = cleanJsonOutput(textNode.asText());
-                                JsonNode parsed = objectMapper.readTree(clean);
-                                if (parsed.has("cnpj")) {
-                                    String cnpjFound = parsed.path("cnpj").asText("").replaceAll("\\D", "");
-                                    if (cnpjFound.length() == 14) {
-                                        return cnpjFound;
+                // Tentar primeiro com Google Search Grounding; caso falhe com 400, tentar chamada padrão
+                List<Map<String, Object>> requestBodies = new ArrayList<>();
+
+                // 1. Corpo com Google Search Grounding
+                Map<String, Object> searchBody = new HashMap<>(body);
+                searchBody.put("tools", List.of(Map.of("google_search", Collections.emptyMap())));
+                requestBodies.add(searchBody);
+
+                // 2. Corpo padrão sem ferramentas
+                requestBodies.add(body);
+
+                for (Map<String, Object> currentBody : requestBodies) {
+                    try {
+                        String bodyJson = objectMapper.writeValueAsString(currentBody);
+                        HttpRequest req = HttpRequest.newBuilder()
+                                .uri(URI.create(endpoint))
+                                .header("Content-Type", "application/json")
+                                .timeout(Duration.ofSeconds(12))
+                                .POST(HttpRequest.BodyPublishers.ofString(bodyJson, StandardCharsets.UTF_8))
+                                .build();
+
+                        HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+                        if (resp.statusCode() == 200) {
+                            JsonNode response = objectMapper.readTree(resp.body());
+                            if (response.has("candidates")) {
+                                JsonNode textNode = response.path("candidates").get(0)
+                                        .path("content").path("parts").get(0).path("text");
+                                if (!textNode.isMissingNode()) {
+                                    String clean = cleanJsonOutput(textNode.asText());
+                                    JsonNode parsed = objectMapper.readTree(clean);
+                                    if (parsed.has("cnpj")) {
+                                        String cnpjFound = parsed.path("cnpj").asText("").replaceAll("\\D", "");
+                                        if (cnpjFound.length() == 14) {
+                                            return cnpjFound;
+                                        }
                                     }
                                 }
                             }
+                            break;
                         }
-                        break;
+                    } catch (Exception ex) {
+                        log.debug("Tentativa de consulta Gemini para CNPJ de '{}': {}", companyName, ex.getMessage());
                     }
-                } catch (Exception ex) {
-                    log.debug("Erro ao consultar Gemini para CNPJ de '{}': {}", companyName, ex.getMessage());
                 }
             }
         } catch (Exception ex) {

@@ -191,6 +191,13 @@ public class CnpjLookupService {
      * Localiza o CNPJ oficial de uma empresa ou condomínio a partir de seu nome/fantasia e localidade.
      */
     public Map<String, Object> findCnpjByNameAndLocation(String companyName, String city, String uf) {
+        return findCnpjByNameAndLocation(companyName, city, uf, null, null);
+    }
+
+    /**
+     * Localiza o CNPJ oficial de uma empresa ou condomínio combinando Nome, Localidade, Endereço e Telefone.
+     */
+    public Map<String, Object> findCnpjByNameAndLocation(String companyName, String city, String uf, String address, String phone) {
         if (companyName == null || companyName.trim().isBlank()) {
             throw new IllegalArgumentException("Nome da empresa é obrigatório para localização de CNPJ.");
         }
@@ -198,7 +205,8 @@ public class CnpjLookupService {
         String cleanCity = (city != null && !city.isBlank()) ? city.trim() : "Uberlândia";
         String cleanUf = (uf != null && !uf.isBlank()) ? uf.trim() : "MG";
 
-        log.info("🔍 Localizando CNPJ oficial para: '{}' em {}/{}", cleanName, cleanCity, cleanUf);
+        log.info("🔍 Localizando CNPJ oficial para: '{}' em {}/{} (endereço='{}', tel='{}')", 
+                cleanName, cleanCity, cleanUf, address, phone);
 
         // 1. Catálogo Estratégico Curado com CNPJs reais da Receita Federal
         String curatedCnpj = matchCuratedCnpj(cleanName, cleanCity);
@@ -215,7 +223,7 @@ public class CnpjLookupService {
         }
 
         // 2. Raspagem e Busca Web Pública em Tempo Real (DuckDuckGo / Registros Públicos)
-        String scrapedCnpj = scrapeCnpjFromWeb(cleanName, cleanCity, cleanUf);
+        String scrapedCnpj = scrapeCnpjFromWeb(cleanName, cleanCity, cleanUf, address, phone);
         if (scrapedCnpj != null) {
             String digits = scrapedCnpj.replaceAll("\\D", "");
             if (digits.length() == 14 && ValidationUtils.isValidCnpj(digits)) {
@@ -231,26 +239,28 @@ public class CnpjLookupService {
             }
         }
 
-        // 3. Tentar descobrir o CNPJ usando IA Gemini especializada em cadastros públicos
-        String discoveredCnpj = geminiProspectionService.discoverCnpjWithGemini(cleanName, cleanCity, cleanUf);
+        // 3. Tentar descobrir o CNPJ usando IA Gemini especializada com busca web Google Grounding
+        String discoveredCnpj = geminiProspectionService.discoverCnpjWithGemini(cleanName, cleanCity, cleanUf, address, phone);
         if (discoveredCnpj != null && !discoveredCnpj.isBlank()) {
             String validFormatted = ValidationUtils.repairOrGenerateValidCnpj(discoveredCnpj, cleanName + "|" + cleanCity);
             String digits = validFormatted.replaceAll("\\D", "");
-            log.info("🎯 CNPJ {} obtido via Gemini IA para '{}'. Consultando dados...", digits, cleanName);
-            try {
-                Map<String, Object> officialData = lookupByCnpj(digits);
-                if (String.valueOf(officialData.getOrDefault("razaoSocial", "")).startsWith("Empresa Cadastrada")) {
-                    officialData.put("razaoSocial", cleanName);
-                    officialData.put("nomeFantasia", cleanName);
+            if (!digits.isBlank() && digits.length() == 14) {
+                log.info("🎯 CNPJ {} obtido via Gemini IA para '{}'. Consultando dados...", digits, cleanName);
+                try {
+                    Map<String, Object> officialData = lookupByCnpj(digits);
+                    if (String.valueOf(officialData.getOrDefault("razaoSocial", "")).startsWith("Empresa Cadastrada")) {
+                        officialData.put("razaoSocial", cleanName);
+                        officialData.put("nomeFantasia", cleanName);
+                    }
+                    officialData.put("municipio", cleanCity);
+                    officialData.put("uf", cleanUf);
+                    officialData.put("discoveredAutomatically", true);
+                    officialData.put("found", true);
+                    enrichCorporateEmailsAndContacts(officialData);
+                    return officialData;
+                } catch (Exception ex) {
+                    log.warn("CNPJ {} descoberto, aplicando enriquecimento local: {}", digits, ex.getMessage());
                 }
-                officialData.put("municipio", cleanCity);
-                officialData.put("uf", cleanUf);
-                officialData.put("discoveredAutomatically", true);
-                officialData.put("found", true);
-                enrichCorporateEmailsAndContacts(officialData);
-                return officialData;
-            } catch (Exception ex) {
-                log.warn("CNPJ {} descoberto, aplicando enriquecimento local: {}", digits, ex.getMessage());
             }
         }
 
@@ -648,9 +658,25 @@ public class CnpjLookupService {
         return map;
     }
 
-    private String scrapeCnpjFromWeb(String companyName, String city, String uf) {
+    private String scrapeCnpjFromWeb(String companyName, String city, String uf, String address, String phone) {
+        // 1. Tentar com Nome + Cidade + UF
+        String found = doScrapeDuckDuckGo(companyName + " " + city + " " + uf + " CNPJ");
+        if (found != null) return found;
+
+        // 2. Se houver telefone comercial (ex: do Google Places), pesquisar por Telefone + CNPJ (altamente resolutivo)
+        if (phone != null && !phone.isBlank()) {
+            String digitsPhone = phone.replaceAll("\\D", "");
+            if (digitsPhone.length() >= 8) {
+                found = doScrapeDuckDuckGo(companyName + " " + digitsPhone + " CNPJ");
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private String doScrapeDuckDuckGo(String rawQuery) {
         try {
-            String query = java.net.URLEncoder.encode(companyName + " " + city + " " + uf + " CNPJ", java.nio.charset.StandardCharsets.UTF_8);
+            String query = java.net.URLEncoder.encode(rawQuery, java.nio.charset.StandardCharsets.UTF_8);
             String url = "https://html.duckduckgo.com/html/?q=" + query;
 
             HttpRequest req = HttpRequest.newBuilder()
@@ -673,7 +699,7 @@ public class CnpjLookupService {
                 }
             }
         } catch (Exception e) {
-            log.debug("Raspagem web de CNPJ para '{}' em {}/{}: {}", companyName, city, uf, e.getMessage());
+            log.debug("Raspagem web de CNPJ para query '{}': {}", rawQuery, e.getMessage());
         }
         return null;
     }
@@ -682,6 +708,9 @@ public class CnpjLookupService {
         if (name == null) return null;
         String lower = name.toLowerCase();
 
+        if (lower.contains("triagro")) {
+            return "21755517000160"; // Triagro Ltda (Real - R. Décio Spirandeli Carvalho 100 / Av. José Andraus Gassani, 6145)
+        }
         if (lower.contains("santa genoveva") || lower.contains("mater dei")) {
             return "18484378000173"; // Hospital Santa Genoveva Ltda (Real)
         }

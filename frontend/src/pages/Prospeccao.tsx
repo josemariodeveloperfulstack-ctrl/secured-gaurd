@@ -384,7 +384,13 @@ const Prospeccao: React.FC = () => {
 
     try {
       setSearchingCnpjFor(companyName);
-      const result = await prospectionService.findCnpjByName(companyName, company.municipio, company.uf);
+      const result = await prospectionService.findCnpjByName(
+        companyName, 
+        company.municipio, 
+        company.uf,
+        company.logradouro,
+        company.telefone
+      );
 
       if (result && result.cnpj && result.cnpj !== '00.000.000/0001-00' && result.found !== false) {
         // Encontrou e validou dados oficiais!
