@@ -296,12 +296,30 @@ class ProspectionService {
   }
 
   private mapBrasilApiToProspect(data: any): ProspectCompany {
+    const formatTel = (ddd?: string, tel?: string) => {
+      if (!tel) return '';
+      const num = tel.replace(/\D/g, '');
+      const d = ddd ? ddd.replace(/\D/g, '') : '';
+      if (!num) return '';
+      return d ? `(${d}) ${num}` : num;
+    };
+
+    const telefone = formatTel(data.ddd_telefone_1?.split('/')[0], data.ddd_telefone_1);
+    const telefoneSecundario = formatTel(data.ddd_telefone_2?.split('/')[0], data.ddd_telefone_2);
+
+    const rawEmail = data.email?.toLowerCase() || '';
+    const isContabil = isAccountingContact(rawEmail, data.razao_social);
+    const sanitizedEmail = isContabil ? '' : rawEmail;
+    const chosenPhone = telefoneSecundario || telefone || '';
+
     const qsa: Socio[] = Array.isArray(data.qsa)
       ? data.qsa.map((s: any) => ({
           nome: s.nome_socio || s.nome_socio_razao_social || '',
           qualificacao: s.qualificacao_socio || s.qualificacao_representante_legal || 'Sócio / Administrador',
           paisOrigem: s.pais,
           faixaEtaria: s.faixa_etaria,
+          email: sanitizedEmail || undefined,
+          telefone: chosenPhone || undefined,
         }))
       : [];
 
@@ -319,20 +337,26 @@ class ProspectionService {
         }))
       : [];
 
-    const formatTel = (ddd?: string, tel?: string) => {
-      if (!tel) return '';
-      const num = tel.replace(/\D/g, '');
-      const d = ddd ? ddd.replace(/\D/g, '') : '';
-      if (!num) return '';
-      return d ? `(${d}) ${num}` : num;
-    };
+    // Estimativas Econodata Inteligentes com base no Capital Social e Porte
+    const capital = data.capital_social ? Number(data.capital_social) : 0;
+    const porteStr = String(data.porte || data.descricao_porte || '').toUpperCase();
+    let faturamentoEstimadoFaixa = 'R$ 4,8M a R$ 15,0M / ano';
+    let faixaFuncionarios = '50 a 99 colaboradores';
+    let leadScore = 55;
 
-    const telefone = formatTel(data.ddd_telefone_1?.split('/')[0], data.ddd_telefone_1);
-    const telefoneSecundario = formatTel(data.ddd_telefone_2?.split('/')[0], data.ddd_telefone_2);
-
-    const rawEmail = data.email?.toLowerCase() || '';
-    const isContabil = isAccountingContact(rawEmail, data.razao_social);
-    const sanitizedEmail = isContabil ? '' : rawEmail;
+    if (porteStr.includes('ME') || porteStr.includes('MICRO') || (capital > 0 && capital < 360000)) {
+      faturamentoEstimadoFaixa = 'R$ 360K a R$ 1,2M / ano';
+      faixaFuncionarios = '10 a 29 colaboradores';
+      leadScore = 45;
+    } else if (porteStr.includes('EPP') || (capital >= 360000 && capital < 4800000)) {
+      faturamentoEstimadoFaixa = 'R$ 1,2M a R$ 4,8M / ano';
+      faixaFuncionarios = '30 a 49 colaboradores';
+      leadScore = 50;
+    } else if (capital >= 10000000) {
+      faturamentoEstimadoFaixa = 'Acima de R$ 50M / ano';
+      faixaFuncionarios = 'Acima de 200 colaboradores';
+      leadScore = 80;
+    }
 
     return {
       cnpj: ensureValidFormattedCnpj(data.cnpj, data.razao_social),
@@ -344,7 +368,8 @@ class ProspectionService {
       cnaesSecundarios,
       naturezaJuridica: data.natureza_juridica,
       porte: data.porte || data.descricao_porte,
-      capitalSocial: data.capital_social ? Number(data.capital_social) : undefined,
+      porteEstimado: porteStr || 'Médio Porte',
+      capitalSocial: capital > 0 ? capital : undefined,
       logradouro: data.logradouro,
       numero: data.numero,
       complemento: data.complemento,
@@ -355,19 +380,32 @@ class ProspectionService {
       telefone: telefone || data.ddd_telefone_1 || '',
       telefoneSecundario: telefoneSecundario || data.ddd_telefone_2 || '',
       email: sanitizedEmail,
+      emailCompras: sanitizedEmail || undefined,
+      contatoComprasNome: sanitizedEmail ? 'Setor de Suprimentos / Contato Oficial' : undefined,
       emailContabilidadeDescartado: isContabil,
       clientePotencial: true,
+      faturamentoEstimadoFaixa,
+      faixaFuncionarios,
+      leadScore,
+      totalContatosChave: qsa.length,
       qsa,
       origem: 'CNPJ',
     };
   }
 
   private mapMinhaReceitaToProspect(data: any): ProspectCompany {
+    const rawEmail = data.email?.toLowerCase() || '';
+    const isContabil = isAccountingContact(rawEmail, data.razao_social);
+    const sanitizedEmail = isContabil ? '' : rawEmail;
+    const phone = data.ddd_telefone_1 || '';
+
     const qsa: Socio[] = Array.isArray(data.qsa)
       ? data.qsa.map((s: any) => ({
           nome: s.nome_socio || '',
           qualificacao: s.qualificacao_socio || 'Sócio / Administrador',
           faixaEtaria: s.faixa_etaria,
+          email: sanitizedEmail || undefined,
+          telefone: phone || undefined,
         }))
       : [];
 
@@ -383,6 +421,7 @@ class ProspectionService {
       },
       naturezaJuridica: data.natureza_juridica,
       porte: data.porte,
+      porteEstimado: data.porte || 'Médio Porte',
       capitalSocial: data.capital_social ? Number(data.capital_social) : undefined,
       logradouro: data.logradouro,
       numero: data.numero,
@@ -391,8 +430,14 @@ class ProspectionService {
       municipio: data.municipio,
       uf: data.uf,
       cep: data.cep,
-      telefone: data.ddd_telefone_1 || '',
-      email: data.email?.toLowerCase() || '',
+      telefone: phone,
+      email: sanitizedEmail,
+      emailCompras: sanitizedEmail || undefined,
+      contatoComprasNome: sanitizedEmail ? 'Setor de Suprimentos / Contato Oficial' : undefined,
+      faturamentoEstimadoFaixa: 'R$ 4,8M a R$ 15,0M / ano',
+      faixaFuncionarios: '50 a 99 colaboradores',
+      leadScore: 55,
+      totalContatosChave: qsa.length,
       qsa,
       origem: 'CNPJ',
     };

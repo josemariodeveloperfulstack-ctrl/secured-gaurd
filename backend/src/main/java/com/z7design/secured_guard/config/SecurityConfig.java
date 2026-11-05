@@ -415,12 +415,13 @@ public class SecurityConfig {
                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ANALISTA_SUPRIMENTOS",
                                                                 "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de propostas e leads - requerem permissões comerciais
-                                                .requestMatchers("/api/leads/**")
+                                                .requestMatchers("/api/leads/**", "/api/prospection/**", "/api/mcp/prospection/**")
                                                 .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
                                                                 "LEADS_DELETE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_GESTOR",
                                                                 "ROLE_COMERCIAL",
-                                                                "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
+                                                                "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
+                                                                "SUPER_ADMIN", "ADMIN", "ADMINISTRADOR", "GESTOR", "COMERCIAL")
                                                 .requestMatchers("/api/whatsapp/agent/conversations/**")
                                                 .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
                                                                 "LEADS_DELETE",
