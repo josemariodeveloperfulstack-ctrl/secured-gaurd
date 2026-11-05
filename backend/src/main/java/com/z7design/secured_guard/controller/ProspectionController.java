@@ -114,35 +114,14 @@ public class ProspectionController {
                 }
 
                 if (enriched != null && enriched.get("cnpj") != null && !enriched.get("cnpj").toString().isBlank()) {
-                    item.put("cnpj", enriched.get("cnpj"));
-                    String enrichedRazao = String.valueOf(enriched.getOrDefault("razaoSocial", ""));
-                    if (!enrichedRazao.isBlank() && !enrichedRazao.startsWith("Empresa Cadastrada")) {
-                        item.put("razaoSocial", enrichedRazao);
-                    }
-                    if (enriched.get("situacaoCadastral") != null) item.put("situacaoCadastral", enriched.get("situacaoCadastral"));
-                    if (enriched.get("porte") != null && !enriched.get("porte").toString().isBlank()) item.put("porte", enriched.get("porte"));
-                    if (enriched.get("capitalSocial") != null) item.put("capitalSocial", enriched.get("capitalSocial"));
-                    if (enriched.get("cnaePrincipal") != null) item.put("cnaePrincipal", enriched.get("cnaePrincipal"));
-                    if (enriched.get("qsa") != null && enriched.get("qsa") instanceof List && !((List<?>) enriched.get("qsa")).isEmpty()) {
-                        item.put("qsa", enriched.get("qsa"));
-                    }
-                    if (enriched.get("decisores") != null && enriched.get("decisores") instanceof List && !((List<?>) enriched.get("decisores")).isEmpty()) {
-                        item.put("decisores", enriched.get("decisores"));
-                    }
-                    if (enriched.get("email") != null && !enriched.get("email").toString().isBlank()) {
-                        item.put("email", enriched.get("email"));
-                    }
-                    if (enriched.get("emailCompras") != null && !enriched.get("emailCompras").toString().isBlank()) {
-                        item.put("emailCompras", enriched.get("emailCompras"));
-                    }
-                    if (enriched.get("contatoComprasNome") != null) {
-                        item.put("contatoComprasNome", enriched.get("contatoComprasNome"));
-                    }
-                    if (enriched.get("telefone") != null && !enriched.get("telefone").toString().isBlank()) {
-                        item.put("telefone", enriched.get("telefone"));
-                    }
-                    if (enriched.get("website") != null && !enriched.get("website").toString().isBlank()) {
-                        item.put("website", enriched.get("website"));
+                    for (Map.Entry<String, Object> entry : enriched.entrySet()) {
+                        if (entry.getValue() != null && !(entry.getValue() instanceof String s && s.isBlank())) {
+                            // Preserva dados de mapa do Google Places se já preenchidos
+                            if ("googleMapsUrl".equals(entry.getKey()) && item.get("googleMapsUrl") != null) continue;
+                            if ("rating".equals(entry.getKey()) && item.get("rating") != null) continue;
+                            if ("userRatingsTotal".equals(entry.getKey()) && item.get("userRatingsTotal") != null) continue;
+                            item.put(entry.getKey(), entry.getValue());
+                        }
                     }
                 }
             } catch (Exception ex) {

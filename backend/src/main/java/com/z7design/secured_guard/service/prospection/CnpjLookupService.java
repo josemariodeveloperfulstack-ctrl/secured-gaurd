@@ -462,7 +462,19 @@ public class CnpjLookupService {
             String qual = String.valueOf(socio.getOrDefault("qualificacao", socio.getOrDefault("cargo", "Sócio / Administrador"))).trim();
             String socioEmail = socio.get("email") != null ? socio.get("email").toString().trim().toLowerCase() : "";
             if (isAccountingEmail(socioEmail)) socioEmail = "";
+            if (socioEmail.isBlank() && !email.isBlank()) {
+                socioEmail = email; // Herda o e-mail oficial registrado na base oficial
+            }
+
             String socioTel = socio.get("telefone") != null ? socio.get("telefone").toString().trim() : "";
+            if (socioTel.isBlank()) {
+                String telSec = map.get("telefoneSecundario") != null ? map.get("telefoneSecundario").toString().trim() : "";
+                if (!telSec.isBlank()) {
+                    socioTel = telSec;
+                } else if (!telefone.isBlank()) {
+                    socioTel = telefone;
+                }
+            }
 
             socio.put("nome", nome);
             socio.put("qualificacao", qual);
@@ -475,6 +487,13 @@ public class CnpjLookupService {
         map.put("qsa", verifiedQsa);
         if (!map.containsKey("decisores") || !(map.get("decisores") instanceof List<?> l && !l.isEmpty())) {
             map.put("decisores", Collections.emptyList());
+        }
+
+        // Setor de Compras / Suprimentos: se não houver comprador específico, direciona para o canal corporativo oficial
+        String emailCompras = map.get("emailCompras") != null ? map.get("emailCompras").toString().trim() : "";
+        if (emailCompras.isBlank() && !email.isBlank()) {
+            map.put("emailCompras", email);
+            map.put("contatoComprasNome", "Setor de Suprimentos / Contato Oficial");
         }
 
         // 5. Enriquecimento adicional via Apollo.io (se chave configurada)

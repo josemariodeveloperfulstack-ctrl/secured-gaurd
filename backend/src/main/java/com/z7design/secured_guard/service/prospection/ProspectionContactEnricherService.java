@@ -140,6 +140,25 @@ public class ProspectionContactEnricherService {
                 companyMap.put("emailCompras", compEmail);
                 companyMap.put("contatoComprasNome", comprador.get("nome") + " - " + comprador.get("cargo"));
             }
+        } else {
+            String existingEmailCompras = (String) companyMap.get("emailCompras");
+            if (existingEmailCompras != null && !existingEmailCompras.isBlank()) {
+                String contatoNome = (String) companyMap.getOrDefault("contatoComprasNome", "Setor de Suprimentos / Contato Oficial");
+                Map<String, Object> contact = buildContactMap(
+                        contatoNome,
+                        "Suprimentos & Contratos",
+                        DEP_COMPRAS,
+                        "Compras & Suprimentos",
+                        "ANALISTA",
+                        existingEmailCompras,
+                        phoneCompany != null ? phoneCompany : "",
+                        "CANAL_OFICIAL_EMPRESA",
+                        domain
+                );
+                byDepartment.get(DEP_COMPRAS).add(contact);
+                consolidatedContacts.add(contact);
+                companyMap.put("totalContatosChave", consolidatedContacts.size());
+            }
         }
     }
 
