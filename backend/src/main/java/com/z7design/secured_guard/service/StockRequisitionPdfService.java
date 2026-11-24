@@ -26,7 +26,7 @@ import com.z7design.secured_guard.model.StockItem;
 import com.z7design.secured_guard.model.StockMovement;
 import com.z7design.secured_guard.model.StockRequisition;
 import com.z7design.secured_guard.model.StockRequisitionLine;
-import com.z7design.secured_guard.model.enums.CompanyStatus;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus;
 import com.z7design.secured_guard.model.enums.MovementReason;
 import com.z7design.secured_guard.repository.CompanyRepository;
