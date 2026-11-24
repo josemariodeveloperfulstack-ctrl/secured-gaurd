@@ -674,7 +674,7 @@ public class EPIDeliveryFormService {
             i.setEpiName(si.getFullName());
             i.setQuantity(line.getQuantity());
             i.setStockItemId(si.getId());
-            i.setCa(si.getCa());
+            i.setCa(si.getCaNumber());
             i.setSizeNumber(si.getSizeVariation());
             return i;
         }).collect(Collectors.toList());
@@ -734,7 +734,7 @@ public class EPIDeliveryFormService {
             return false;
         }
         if (item.getCategory() == null) {
-            if (item.getCa() != null && !item.getCa().isBlank()) {
+            if (item.getCaNumber() != null && !item.getCaNumber().isBlank()) {
                 return true;
             }
             String name = item.getName() != null ? item.getName().toLowerCase() : "";

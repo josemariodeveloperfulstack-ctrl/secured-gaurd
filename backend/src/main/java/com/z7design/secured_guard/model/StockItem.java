@@ -138,4 +138,12 @@ public class StockItem {
     public void setRequiresCa(Boolean requiresCa) {
         this.requiresCa = requiresCa;
     }
+
+    public String getCa() {
+        return caNumber;
+    }
+
+    public void setCa(String ca) {
+        this.caNumber = ca;
+    }
 }
