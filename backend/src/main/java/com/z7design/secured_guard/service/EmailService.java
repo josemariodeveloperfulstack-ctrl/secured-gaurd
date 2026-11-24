@@ -61,6 +61,35 @@ public class EmailService {
     }
 
     /**
+     * Envia email HTML com Reply-To personalizado (e-mail informado pelo usuário).
+     * O remetente SMTP continua sendo a conta configurada no servidor; o usuário
+     * que responde é sempre o e-mail informado na interface.
+     */
+    public boolean sendEmailWithReplyTo(String toEmail, String replyTo, String subject, String htmlBody) {
+        if (mockEmail) {
+            log.info("📧 [MOCK] Simulação de envio para {} (Reply-To: {}) — {}", toEmail, replyTo, subject);
+            return true;
+        }
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            if (replyTo != null && !replyTo.isBlank()) {
+                helper.setReplyTo(replyTo.trim());
+            }
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+            mailSender.send(message);
+            log.info("✅ Email enviado para {} com Reply-To {}", toEmail, replyTo);
+            return true;
+        } catch (Exception e) {
+            log.error("💥 Erro ao enviar email para {}: {}", toEmail, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Envia documento unificado por email
      */
     public boolean sendUnifiedDocument(String toEmail, String employeeName, String month, String year,

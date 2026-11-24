@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   Building,
   Gavel,
-  ShieldAlert
+  ShieldAlert,
+  Package
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
 import { Occurrence } from '@/services/occurrenceService';
@@ -187,6 +188,21 @@ export const EmployeeUnifiedTimeline: React.FC<EmployeeUnifiedTimelineProps> = (
     historyItems.forEach((hist, idx) => {
       if (!hist.changedAt) return;
       const isoDate = hist.changedAt.slice(0, 10);
+      const isRequisicao = hist.fieldName?.includes('REQUISICAO_ESTOQUE');
+      if (isRequisicao) {
+        list.push({
+          id: `hist-${hist.id || idx}`,
+          type: 'ALTERACAO_CADASTRAL',
+          date: isoDate,
+          title: hist.fieldLabel || 'Requisição de Estoque / EPI',
+          description: `${hist.newValue || 'Requisição registrada'}${hist.reason ? ` — Obs: ${hist.reason}` : ''}${hist.changedByName ? ` (Por: ${hist.changedByName})` : ''}.`,
+          badgeLabel: 'Estoque / EPI',
+          badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+          icon: Package,
+          iconColor: 'text-amber-400 bg-amber-500/10'
+        });
+        return;
+      }
       list.push({
         id: `hist-${hist.id || idx}`,
         type: 'ALTERACAO_CADASTRAL',

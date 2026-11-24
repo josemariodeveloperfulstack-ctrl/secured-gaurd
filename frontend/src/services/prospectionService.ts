@@ -132,6 +132,39 @@ export const ensureValidFormattedCnpj = (rawCnpj?: string, _fallbackSeed?: strin
   return '';
 };
 
+/** Resumo da gravação automática feita pelo backend ao prospectar (header X-Prospection-AutoSave). */
+export interface ProspectionAutoSaveSummary {
+  total: number;
+  qualified: number;
+  leadsCreated: number;
+  leadsUpdated: number;
+  marketingAdded: number;
+  withWhatsapp: number;
+  skippedNoName: number;
+  skippedInvalidEmail: number;
+  skippedAccountingEmail: number;
+  skippedUnsubscribed: number;
+  skippedRejected: number;
+  skippedDuplicates: number;
+}
+
+/**
+ * Valida e normaliza o WhatsApp antes de qualquer envio.
+ * Aceita apenas celular brasileiro com DDD (11-99) e 9 dígitos iniciados em 9.
+ */
+export const qualifyWhatsapp = (raw?: string | null): string | undefined => {
+  if (!raw) return undefined;
+  let digits = raw.replace(/\D/g, '');
+  if (digits.length > 13) return undefined;
+  if (digits.length >= 12 && digits.startsWith('55')) digits = digits.substring(2);
+  if (digits.length !== 11) return undefined;
+  const ddd = Number(digits.substring(0, 2));
+  if (!Number.isInteger(ddd) || ddd < 11 || ddd > 99) return undefined;
+  const number = digits.substring(2);
+  if (!number.startsWith('9')) return undefined;
+  return `(${digits.substring(0, 2)}) ${number.substring(0, 5)}-${number.substring(5)}`;
+};
+
 export interface ProspectionFilters {
   tipoBusca: 'CNPJ' | 'CNAE' | 'MAPS';
   cnpj?: string;
@@ -233,6 +266,13 @@ export const ESTADOS_BRASIL = [
 ];
 
 class ProspectionService {
+  private lastAutoSaveSummary: ProspectionAutoSaveSummary | null = null;
+
+  /** Resumo da última gravação automática ocorrida durante a busca com IA. */
+  getLastAutoSaveSummary(): ProspectionAutoSaveSummary | null {
+    return this.lastAutoSaveSummary;
+  }
+
   /**
    * Consulta dados completos de um CNPJ com prioridade no backend seguro (sem CORS)
    */
@@ -451,7 +491,16 @@ class ProspectionService {
       if (segmento) params.append('segmento', segmento);
       params.append('quantidade', String(quantidade));
 
-      const { data } = await api.get<any[]>(`/prospection/ai-search?${params.toString()}`);
+      const { data, headers } = await api.get<any[]>(`/prospection/ai-search?${params.toString()}`);
+
+      // O backend grava automaticamente os contatos qualificados e devolve o resumo no header.
+      try {
+        const raw = headers?.['x-prospection-autosave'] ?? headers?.['X-Prospection-AutoSave'];
+        this.lastAutoSaveSummary = raw ? JSON.parse(raw) as ProspectionAutoSaveSummary : null;
+      } catch {
+        this.lastAutoSaveSummary = null;
+      }
+
       if (Array.isArray(data)) {
         return data.map((item: any) => {
           const compName = item.nomeFantasia || item.razaoSocial || 'Empresa';
@@ -541,6 +590,12 @@ class ProspectionService {
     const contactPosition = decisor?.qualificacao || decisor?.cargo || 'Diretoria / Compras';
     const contactPhone = decisor?.telefone || company.telefone || company.telefoneSecundario || '';
     const contactEmail = decisor?.email || company.email || company.emailCompras || '';
+    const contactWhatsapp = qualifyWhatsapp(
+      company.contatosEconodata?.find(c => c.whatsapp)?.whatsapp
+        || decisor?.telefone
+        || company.telefoneSecundario
+        || company.telefone
+    );
 
     // Montar descrição rica com dados de inteligência cadastral e contatos dos sócios decisores
     const sociosDesc = Array.isArray(company.qsa) && company.qsa.length > 0
@@ -566,10 +621,11 @@ class ProspectionService {
       company: company.razaoSocial || company.nomeFantasia || '',
       position: contactPosition,
       phone: contactPhone,
+      whatsapp: contactWhatsapp,
       email: contactEmail,
-      source: 'OTHER',
+      source: 'PROSPECTION',
       status: 'NEW',
-      description: `[PROSPECÇÃO ATIVA IA]\nCNPJ: ${validCnpj}\nNome Fantasia: ${company.nomeFantasia || '-'}\nE-mail Corporativo: ${company.email || '-'}${comprasDesc}\nTelefone Comercial: ${company.telefone || '-'}\nCNAE: ${company.cnaePrincipal?.codigo || ''} - ${company.cnaePrincipal?.descricao || ''}\nPorte: ${company.porte || '-'}\nSituação: ${company.situacaoCadastral || 'ATIVA'}\nEndereço: ${enderecoDesc}${sociosDesc}`,
+      description: `[PROSPECÇÃO ATIVA IA]\nCNPJ: ${validCnpj}\nNome Fantasia: ${company.nomeFantasia || '-'}\nE-mail Corporativo: ${company.email || '-'}${comprasDesc}\nTelefone Comercial: ${company.telefone || '-'}\nWhatsApp qualificado: ${contactWhatsapp || '-'}\nCNAE: ${company.cnaePrincipal?.codigo || ''} - ${company.cnaePrincipal?.descricao || ''}\nPorte: ${company.porte || '-'}\nSituação: ${company.situacaoCadastral || 'ATIVA'}\nEndereço: ${enderecoDesc}${sociosDesc}`,
       assignedToId: assignedUserId,
     };
 
@@ -623,10 +679,11 @@ class ProspectionService {
     const recipient = {
       email: targetEmail,
       name: company.qsa?.[0]?.nome || company.nomeFantasia || company.razaoSocial,
-      sourceType: 'IMPORT' as const,
+      sourceType: 'PROSPECTION' as const,
       metadata: {
         empresa: company.razaoSocial,
         cnpj: company.cnpj,
+        whatsapp: qualifyWhatsapp(company.contatosEconodata?.find(c => c.whatsapp)?.whatsapp || company.telefoneSecundario || company.telefone) || null,
         municipio: company.municipio,
         uf: company.uf,
         cnae: company.cnaePrincipal?.descricao,
@@ -734,6 +791,53 @@ class ProspectionService {
     prospects: ProspectCompany[];
   }> {
     const { data } = await api.get(`/prospection/history/${id}`);
+    return data;
+  }
+
+  /** Status do WhatsApp conectado no dispositivo do usuário e do e-mail de envio. */
+  async getCommunicationStatus(): Promise<{
+    whatsappConnected: boolean;
+    connectionState: string;
+    serviceAvailable: boolean;
+    providers: Array<{ type: string; connected: boolean; connectionState?: string; lastError?: string }>;
+    senderEmail: string;
+  }> {
+    const { data } = await api.get('/prospection/communications/status');
+    return data;
+  }
+
+  async getSenderEmail(): Promise<string> {
+    const { data } = await api.get<{ senderEmail: string }>('/prospection/communications/sender-email');
+    return data.senderEmail || '';
+  }
+
+  /** Salva o e-mail informado pelo usuário (usado como Reply-To e assinatura). */
+  async saveSenderEmail(email: string): Promise<string> {
+    const { data } = await api.put<{ senderEmail: string }>('/prospection/communications/sender-email', { email });
+    return data.senderEmail;
+  }
+
+  /** Envia a mensagem pelo WhatsApp conectado (Baileys/Evolution no dispositivo do usuário). */
+  async sendWhatsApp(payload: {
+    to: string;
+    name?: string;
+    company?: string;
+    message?: string;
+  }): Promise<{ success: boolean; to: string; provider?: string; error?: string }> {
+    const { data } = await api.post('/prospection/communications/whatsapp', payload);
+    return data;
+  }
+
+  /** Envia o e-mail de apresentação da empresa. */
+  async sendPresentationEmail(payload: {
+    to: string;
+    name?: string;
+    company?: string;
+    senderEmail?: string;
+    subject?: string;
+    message?: string;
+  }): Promise<{ success: boolean; to: string; replyTo?: string; error?: string }> {
+    const { data } = await api.post('/prospection/communications/email', payload);
     return data;
   }
 }

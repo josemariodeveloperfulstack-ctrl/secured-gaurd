@@ -861,7 +861,8 @@ public class SecurityConfig {
                 // Configurar exposição de headers para imagens
                 configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With",
                                 "Accept",
-                                "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
+                                "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers",
+                                "X-Prospection-AutoSave"));
                 configuration.setMaxAge(3600L);
 
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

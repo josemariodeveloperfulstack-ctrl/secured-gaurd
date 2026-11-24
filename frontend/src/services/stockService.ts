@@ -829,6 +829,13 @@ export const stockService = {
     this.handleFileDownload(response.data, name);
   },
 
+  async previewStockRequisitionPdf(id: string): Promise<void> {
+    const response = await api.get(`/api/stock/requisitions/${id}/pdf`, { responseType: 'blob' });
+    const file = new Blob([response.data], { type: 'application/pdf' });
+    const fileURL = URL.createObjectURL(file);
+    window.open(fileURL, '_blank');
+  },
+
   async sendRequisition(movementId: string, type: RequisitionSentType, destination?: string): Promise<void> {
     try {
       const params = new URLSearchParams();

@@ -664,6 +664,14 @@ public class EPIDeliveryStandardPdfService {
                 if (signatureBase64 == null || signatureBase64.isBlank()) {
                         return createEpiDataCell("");
                 }
+                String sigTrim = signatureBase64.trim();
+                if (sigTrim.contains("manual") || sigTrim.contains("Manual")
+                                || sigTrim.contains("impressa") || sigTrim.contains("Impressa")
+                                || sigTrim.equalsIgnoreCase("PHYSICAL") || sigTrim.contains("Física")
+                                || sigTrim.contains("FISICA")) {
+                        return new Cell().add(new Paragraph("Ficha Manual Impressa").setFontSize(6.5f).setItalic())
+                                        .setPadding(1f).setHeight(15f);
+                }
                 try {
                         String base64Data = signatureBase64;
                         if (base64Data.contains(",")) {
@@ -677,6 +685,10 @@ public class EPIDeliveryStandardPdfService {
                         return new Cell().add(img).setPadding(1f).setHeight(15f);
                 } catch (Exception e) {
                         log.warn("Erro ao renderizar assinatura do item no PDF: {}", e.getMessage());
+                        if (signatureBase64.length() < 100) {
+                                return new Cell().add(new Paragraph(signatureBase64).setFontSize(6.5f).setItalic())
+                                                .setPadding(1f).setHeight(15f);
+                        }
                         return createEpiDataCell("");
                 }
         }

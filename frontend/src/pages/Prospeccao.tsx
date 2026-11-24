@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,7 +53,8 @@ import prospectionService, {
   ContactEconodata,
   STRATEGIC_CNAES, 
   ESTADOS_BRASIL,
-  ensureValidFormattedCnpj
+  ensureValidFormattedCnpj,
+  qualifyWhatsapp
 } from '@/services/prospectionService';
 import { validateCNPJ, validateCPF, formatCNPJ } from '@/utils/validation';
 import { useNavigate } from 'react-router-dom';
@@ -94,6 +95,11 @@ const Prospeccao: React.FC = () => {
   // Estados de ações
   const [sendingCrmId, setSendingCrmId] = useState<string | null>(null);
   const [sendingMarketingId, setSendingMarketingId] = useState<string | null>(null);
+  const [sendingCommunicationId, setSendingCommunicationId] = useState<string | null>(null);
+
+  // Canais de envio do usuário: WhatsApp conectado no dispositivo e e-mail informado
+  const [senderEmail, setSenderEmail] = useState('');
+  const [whatsappConnected, setWhatsappConnected] = useState(false);
 
   // Estados de Edição e Exclusão de Prospectos
   const [editingProspect, setEditingProspect] = useState<ProspectCompany | null>(null);
@@ -187,9 +193,34 @@ const Prospeccao: React.FC = () => {
     });
   };
 
+  const loadCommunicationStatus = async () => {
+    try {
+      const status = await prospectionService.getCommunicationStatus();
+      setWhatsappConnected(Boolean(status.whatsappConnected));
+      setSenderEmail(status.senderEmail || '');
+    } catch {
+      // O status é informativo; a prospecção continua disponível sem ele.
+    }
+  };
+
+  const handleSaveSenderEmail = async () => {
+    try {
+      const saved = await prospectionService.saveSenderEmail(senderEmail);
+      setSenderEmail(saved);
+      toast({ title: 'E-mail de envio salvo!', description: `Seus envios usarão ${saved} como resposta.` });
+    } catch (err: any) {
+      toast({
+        title: 'E-mail inválido',
+        description: err?.response?.data?.message || 'Informe um e-mail válido.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   React.useEffect(() => {
     loadCredentials();
     loadHistory();
+    loadCommunicationStatus();
   }, []);
 
   const handleSaveCredentials = async (e: React.FormEvent) => {
@@ -275,6 +306,14 @@ const Prospeccao: React.FC = () => {
           title: 'Nenhum prospecto retornado',
           description: 'Tente alterar a palavra-chave, setor ou cidade.',
           variant: 'destructive',
+        });
+      }
+
+      const autoSave = prospectionService.getLastAutoSaveSummary();
+      if (autoSave && autoSave.qualified > 0) {
+        toast({
+          title: `✅ ${autoSave.qualified} contatos qualificados e salvos`,
+          description: `${autoSave.leadsCreated} novos leads no CRM • ${autoSave.marketingAdded} e-mails na lista de apresentação • ${autoSave.withWhatsapp} WhatsApp válidos.`,
         });
       }
     } catch (err: any) {
@@ -591,6 +630,85 @@ const Prospeccao: React.FC = () => {
     window.open(link, '_blank');
   };
 
+  // Enviar pelo WhatsApp conectado no dispositivo do usuário
+  const handleSendConnectedWhatsApp = async (company: ProspectCompany) => {
+    const phone = qualifyWhatsapp(company.telefoneSecundario || company.telefone);
+    if (!phone) {
+      toast({
+        title: 'Sem WhatsApp válido',
+        description: 'Este prospecto não possui um celular com DDD qualificado para envio.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      setSendingCommunicationId(company.cnpj);
+      const result = await prospectionService.sendWhatsApp({
+        to: phone,
+        name: company.qsa?.[0]?.nome || company.nomeFantasia,
+        company: company.razaoSocial || company.nomeFantasia,
+      });
+      toast({
+        title: result.success ? 'Mensagem enviada no WhatsApp!' : 'Não foi possível enviar',
+        description: result.success
+          ? `Mensagem enviada para ${phone}${result.provider ? ` via ${result.provider}` : ''}.`
+          : result.error || 'Conecte seu WhatsApp e tente novamente.',
+        variant: result.success ? 'default' : 'destructive',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Erro no envio',
+        description: err?.response?.data?.message || err.message || 'Falha ao enviar mensagem.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingCommunicationId(null);
+    }
+  };
+
+  // Enviar e-mail de apresentação da empresa
+  const handleSendPresentationEmail = async (company: ProspectCompany) => {
+    const to = company.email || company.emailCompras || company.qsa?.[0]?.email;
+    if (!to) {
+      toast({
+        title: 'Sem e-mail',
+        description: 'Este prospecto não possui e-mail qualificado para envio.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!senderEmail) {
+      toast({
+        title: 'Informe seu e-mail',
+        description: 'Digite seu e-mail no topo da página para enviar a apresentação.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      setSendingCommunicationId(company.cnpj);
+      const result = await prospectionService.sendPresentationEmail({
+        to,
+        name: company.qsa?.[0]?.nome || company.nomeFantasia,
+        company: company.razaoSocial || company.nomeFantasia,
+        senderEmail,
+      });
+      toast({
+        title: result.success ? 'E-mail de apresentação enviado!' : 'Não foi possível enviar',
+        description: result.success ? `Enviado para ${to}.` : result.error || 'Falha no envio.',
+        variant: result.success ? 'default' : 'destructive',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Erro no envio de e-mail',
+        description: err?.response?.data?.message || err.message || 'Falha ao enviar e-mail.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingCommunicationId(null);
+    }
+  };
+
   return (
     <StandardLayout>
       <div className="space-y-6 p-4 sm:p-6 bg-seguranca-black min-h-screen text-seguranca-lightgray">
@@ -636,6 +754,51 @@ const Prospeccao: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Canais de envio: WhatsApp do dispositivo + e-mail informado pelo usuário */}
+      <Card className="bg-seguranca-graphite/60 border-gray-700">
+        <CardContent className="p-3 sm:p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <MessageSquare className={`h-4 w-4 ${whatsappConnected ? 'text-green-400' : 'text-gray-500'}`} />
+            <span className="text-xs text-gray-300">
+              WhatsApp {whatsappConnected ? 'conectado no seu dispositivo' : 'desconectado'}
+            </span>
+            <Badge className={whatsappConnected
+              ? 'bg-green-900/60 text-green-300 border-green-700'
+              : 'bg-red-900/50 text-red-300 border-red-800'}>
+              {whatsappConnected ? 'Online' : 'Offline'}
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/whatsapp-connection')}
+              className="h-7 px-2 text-xs text-seguranca-yellow hover:text-white"
+              title="Conectar seu WhatsApp lendo o QR Code com seu dispositivo"
+            >
+              Conectar
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor="sender-email" className="text-xs text-gray-300">Seu e-mail de envio</Label>
+            <Input
+              id="sender-email"
+              type="email"
+              value={senderEmail}
+              onChange={(e) => setSenderEmail(e.target.value)}
+              placeholder="voce@empresa.com.br"
+              className="h-8 w-56 bg-seguranca-black border-gray-600 text-xs"
+            />
+            <Button
+              size="sm"
+              onClick={handleSaveSenderEmail}
+              className="h-8 bg-seguranca-yellow text-black hover:bg-yellow-400 text-xs font-semibold"
+            >
+              <Save className="h-3.5 w-3.5 mr-1" />
+              Salvar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Painel de Busca e Filtros */}
       <Card className="bg-seguranca-graphite border-gray-700 shadow-xl">
@@ -1290,6 +1453,37 @@ const Prospeccao: React.FC = () => {
                         </Button>
                       )}
 
+                      {qualifyWhatsapp(company.telefoneSecundario || company.telefone) && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleSendConnectedWhatsApp(company)}
+                          disabled={sendingCommunicationId === company.cnpj}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 text-xs font-semibold"
+                          title="Enviar apresentação pelo WhatsApp conectado no seu dispositivo"
+                        >
+                          {sendingCommunicationId === company.cnpj ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5 mr-1" />
+                          )}
+                          Enviar ZAP
+                        </Button>
+                      )}
+
+                      {(company.email || company.emailCompras) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSendPresentationEmail(company)}
+                          disabled={sendingCommunicationId === company.cnpj || !senderEmail}
+                          className="border-emerald-700 text-emerald-300 hover:text-white h-8 px-2.5 text-xs"
+                          title="Enviar e-mail de apresentação da empresa"
+                        >
+                          <Mail className="h-3.5 w-3.5 mr-1" />
+                          Apresentação
+                        </Button>
+                      )}
+
                       {company.email && (
                         <Button
                           size="sm"
@@ -1711,6 +1905,33 @@ const Prospeccao: React.FC = () => {
                 >
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Conversar no WhatsApp
+                </Button>
+              )}
+              {qualifyWhatsapp(selectedCompany.telefoneSecundario || selectedCompany.telefone) && (
+                <Button
+                  onClick={() => handleSendConnectedWhatsApp(selectedCompany)}
+                  disabled={sendingCommunicationId === selectedCompany.cnpj}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                  title="Enviar pelo WhatsApp conectado no seu dispositivo"
+                >
+                  {sendingCommunicationId === selectedCompany.cnpj ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Enviar ZAP conectado
+                </Button>
+              )}
+              {(selectedCompany.email || selectedCompany.emailCompras) && (
+                <Button
+                  variant="outline"
+                  onClick={() => handleSendPresentationEmail(selectedCompany)}
+                  disabled={sendingCommunicationId === selectedCompany.cnpj || !senderEmail}
+                  className="border-emerald-700 text-emerald-300 hover:text-white font-semibold"
+                  title="Enviar e-mail de apresentação da empresa"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  E-mail de Apresentação
                 </Button>
               )}
               {selectedCompany.leadImported ? (

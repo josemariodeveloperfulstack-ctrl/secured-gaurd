@@ -22,16 +22,19 @@ public class ProspectionController {
     private final com.z7design.secured_guard.service.prospection.CnpjLookupService cnpjLookupService;
     private final com.z7design.secured_guard.service.prospection.ProspectionHistoryService historyService;
     private final com.z7design.secured_guard.repository.UserRepository userRepository;
+    private final com.z7design.secured_guard.service.prospection.ProspectionLeadPersistenceService leadPersistenceService;
 
     public ProspectionController(
             GeminiProspectionService geminiProspectionService,
             com.z7design.secured_guard.service.prospection.CnpjLookupService cnpjLookupService,
             com.z7design.secured_guard.service.prospection.ProspectionHistoryService historyService,
-            com.z7design.secured_guard.repository.UserRepository userRepository) {
+            com.z7design.secured_guard.repository.UserRepository userRepository,
+            com.z7design.secured_guard.service.prospection.ProspectionLeadPersistenceService leadPersistenceService) {
         this.geminiProspectionService = geminiProspectionService;
         this.cnpjLookupService = cnpjLookupService;
         this.historyService = historyService;
         this.userRepository = userRepository;
+        this.leadPersistenceService = leadPersistenceService;
     }
 
     public static final String PROSPECTION_AUTHORITY = 
@@ -136,15 +139,30 @@ public class ProspectionController {
             }
         }
 
-        // Gravar automaticamente os resultados enriquecidos no banco de dados
+        com.z7design.secured_guard.model.User user = resolveUser(userDetails);
+
+        // Gravar automaticamente os prospectos qualificados no CRM e na lista de e-mail marketing.
+        // Nenhum disparo é feito aqui: apenas Nome, E-mail, WhatsApp e Empresa são preparados.
+        String autoSaveHeader = null;
         try {
-            com.z7design.secured_guard.model.User user = resolveUser(userDetails);
+            autoSaveHeader = leadPersistenceService.saveAll(results, user).toJson();
+        } catch (Exception ex) {
+            log.warn("Falha ao gravar automaticamente os leads prospectados: {}", ex.getMessage());
+        }
+
+        // Gravar automaticamente os resultados enriquecidos no histórico de pesquisas
+        try {
             historyService.saveSearch("SEGMENTO", segmento, cidade, uf, segmento, results, user);
         } catch (Exception ex) {
             log.warn("Falha ao gravar pesquisa com IA no histórico: {}", ex.getMessage());
         }
 
-        return ResponseEntity.ok(results);
+        if (autoSaveHeader == null) {
+            return ResponseEntity.ok(results);
+        }
+        return ResponseEntity.ok()
+                .header("X-Prospection-AutoSave", autoSaveHeader)
+                .body(results);
     }
 
     @GetMapping("/history")

@@ -289,9 +289,6 @@ public class StockRequisitionService {
     @Transactional(readOnly = true)
     public byte[] generatePdf(UUID id) {
         StockRequisition r = loadFetched(id);
-        if (r.getStatus() == StockRequisitionStatus.PENDING) {
-            throw new IllegalArgumentException("Aprove a requisição antes de gerar o PDF para assinatura.");
-        }
         return stockRequisitionPdfService.generateMultiLineRequisitionPdf(r);
     }
 

@@ -708,6 +708,7 @@ export const FichasEntregaEPIContent: React.FC = () => {
                           <TableHead>Quantidade</TableHead>
                           <TableHead>CA</TableHead>
                           <TableHead>Validade</TableHead>
+                          <TableHead>Assinatura</TableHead>
                           <TableHead>Observações</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -722,6 +723,21 @@ export const FichasEntregaEPIContent: React.FC = () => {
                               {item.validityDate
                                 ? formatAdmissionDateBr(item.validityDate)
                                 : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {item.signatureBase64?.includes('manual') ||
+                              item.signatureBase64?.includes('impressa') ||
+                              selectedFicha.signatureType === 'PHYSICAL' ? (
+                                <Badge variant="outline" className="text-xs bg-emerald-100 text-emerald-800 border-emerald-300">
+                                  Ficha Manual Impressa
+                                </Badge>
+                              ) : item.signatureBase64 ? (
+                                <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                                  Digital
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
                             </TableCell>
                             <TableCell>{item.observations || '-'}</TableCell>
                           </TableRow>
