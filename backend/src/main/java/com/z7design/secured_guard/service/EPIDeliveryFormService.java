@@ -627,11 +627,8 @@ public class EPIDeliveryFormService {
      */
     @Transactional
     public void ensureDraftEpiFormFromApprovedStockRequisition(StockRequisition r, UUID actingUserId) {
-        boolean isEpiReason = r.getMovementReason() == MovementReason.ENTREGA_INICIAL
-                || r.getMovementReason() == MovementReason.REPOSICAO
-                || r.getMovementReason() == MovementReason.TROCA;
         List<StockRequisitionLine> eligibleLines = r.getLines().stream()
-                .filter(line -> line.getStockItem() != null && (isStockItemEligibleForEpiFicha(line.getStockItem()) || isEpiReason))
+                .filter(line -> line.getStockItem() != null && isStockItemEligibleForEpiFicha(line.getStockItem()))
                 .collect(Collectors.toList());
 
         Optional<EPIDeliveryForm> existingOpt = epiDeliveryFormRepository.findFirstByStockRequisitionIdOrderByCreatedAtDesc(r.getId());
@@ -729,26 +726,25 @@ public class EPIDeliveryFormService {
         log.info("Ficha EPI {} concluída após entrega da requisição {}", form.getId(), r.getRequisitionNumber());
     }
 
-    private static boolean isStockItemEligibleForEpiFicha(StockItem item) {
+    public static boolean isStockItemEligibleForEpiFicha(StockItem item) {
         if (item == null) {
             return false;
         }
-        if (item.getCategory() == null) {
-            if (item.getCaNumber() != null && !item.getCaNumber().isBlank()) {
-                return true;
-            }
-            String name = item.getName() != null ? item.getName().toLowerCase() : "";
-            return name.contains("epi") || name.contains("bota") || name.contains("luva")
-                    || name.contains("oculos") || name.contains("óculos") || name.contains("capacete")
-                    || name.contains("uniforme") || name.contains("colete") || name.contains("protetor")
-                    || name.contains("mascara") || name.contains("máscara") || name.contains("calçado")
-                    || name.contains("calcado");
-        }
-        StockCategory c = item.getCategory();
-        if (c == StockCategory.EPI || c == StockCategory.CALCADOS) {
+        if (Boolean.TRUE.equals(item.getRequiresCa()) || (item.getCaNumber() != null && !item.getCaNumber().isBlank())) {
             return true;
         }
-        return c.name().startsWith("UNIFORME");
+        if (item.getCategory() != null) {
+            StockCategory c = item.getCategory();
+            if (c == StockCategory.EPI || c == StockCategory.CALCADOS || c.name().startsWith("UNIFORME")) {
+                return true;
+            }
+        }
+        String name = item.getName() != null ? item.getName().toLowerCase() : "";
+        return name.contains("epi") || name.contains("bota") || name.contains("luva")
+                || name.contains("oculos") || name.contains("óculos") || name.contains("capacete")
+                || name.contains("uniforme") || name.contains("colete") || name.contains("protetor")
+                || name.contains("mascara") || name.contains("máscara") || name.contains("calçado")
+                || name.contains("calcado");
     }
 
     private static EPIDeliveryType mapMovementReasonToEpiDeliveryType(MovementReason reason) {

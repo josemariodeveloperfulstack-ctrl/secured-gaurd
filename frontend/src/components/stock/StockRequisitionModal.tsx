@@ -168,6 +168,7 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
   const [selectedStockItemId, setSelectedStockItemId] = useState('');
   const [selectedItemQuantity, setSelectedItemQuantity] = useState(1);
   const [lines, setLines] = useState<LineRow[]>([]);
+  const selectedStockItem = useMemo(() => items.find((it) => it.id === selectedStockItemId), [items, selectedStockItemId]);
 
   // Motivo e opções
   const [movementReason, setMovementReason] = useState<MovementReason>(MovementReason.ENTREGA_INICIAL);
@@ -1002,6 +1003,31 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
                     </Button>
                   </div>
                 </div>
+
+                {/* Prévia ao vivo do saldo antes de adicionar */}
+                {selectedStockItem && (
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900/80 border border-zinc-700/60 text-xs">
+                    <span className="text-zinc-400 font-medium">Previsão de Estoque:</span>
+                    <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                      Saldo Atual: <strong className="text-white font-mono">{selectedStockItem.currentQuantity}</strong>
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-800/50">
+                      Saída: <strong className="font-mono">-{selectedItemQuantity}</strong>
+                    </span>
+                    <span className={`px-2 py-0.5 rounded border font-medium ${
+                      (selectedStockItem.currentQuantity - selectedItemQuantity) >= 0
+                        ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50'
+                        : 'bg-red-950/50 text-red-300 border-red-800/60 font-bold'
+                    }`}>
+                      Saldo Restante: <strong className="font-mono">{selectedStockItem.currentQuantity - selectedItemQuantity}</strong>
+                    </span>
+                    {(selectedStockItem.currentQuantity - selectedItemQuantity) < 0 && (
+                      <Badge className="bg-red-500/20 text-red-300 border-red-500/40 text-[10px] py-0 font-bold">
+                        ⚠️ Saldo Insuficiente
+                      </Badge>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Lista dos Itens Selecionados */}
@@ -1027,7 +1053,10 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
                   <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                     {lines.map((row, idx) => {
                       const itemData = row.itemData || items.find((it) => it.id === row.stockItemId);
-                      const isLowStock = itemData && itemData.currentQuantity < row.quantity;
+                      const currentQty = itemData?.currentQuantity ?? 0;
+                      const requestedQty = row.quantity;
+                      const balanceAfter = currentQty - requestedQty;
+                      const isLowStock = itemData && balanceAfter < 0;
 
                       return (
                         <div
@@ -1043,19 +1072,32 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
                                 {itemData?.fullName || 'Item de Estoque'}
                               </span>
                             </div>
-                            <div className="flex flex-wrap gap-2 text-xs text-zinc-400 mt-1">
-                              {itemData?.ca && <span>CA: {itemData.ca}</span>}
+                            <div className="flex flex-wrap items-center gap-2 text-xs mt-1.5">
+                              {itemData?.ca && (
+                                <Badge variant="outline" className="border-zinc-700 text-zinc-400 text-[11px] py-0">
+                                  CA: {itemData.ca}
+                                </Badge>
+                              )}
                               {itemData && (
-                                <span>
-                                  Saldo Almoxarifado:{' '}
-                                  <strong className={itemData.currentQuantity >= row.quantity ? 'text-emerald-400' : 'text-red-400'}>
-                                    {itemData.currentQuantity}
-                                  </strong>
-                                </span>
+                                <>
+                                  <span className="px-2 py-0.5 rounded bg-zinc-800/90 text-zinc-300 border border-zinc-700 text-[11px]">
+                                    Saldo em Estoque: <strong className="text-white font-mono">{currentQty}</strong>
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-800/50 text-[11px]">
+                                    Saída: <strong className="font-mono">-{requestedQty}</strong>
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded border text-[11px] font-medium ${
+                                    balanceAfter >= 0
+                                      ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50'
+                                      : 'bg-red-950/50 text-red-300 border-red-800/60 font-bold'
+                                  }`}>
+                                    Saldo Pós-Saída: <strong className="font-mono">{balanceAfter}</strong>
+                                  </span>
+                                </>
                               )}
                               {isLowStock && (
-                                <Badge className="bg-red-500/20 text-red-300 border-red-500/30 text-[10px] py-0">
-                                  Saldo insuficiente
+                                <Badge className="bg-red-500/20 text-red-300 border-red-500/40 text-[10px] py-0 font-bold">
+                                  ⚠️ Saldo Insuficiente
                                 </Badge>
                               )}
                             </div>
