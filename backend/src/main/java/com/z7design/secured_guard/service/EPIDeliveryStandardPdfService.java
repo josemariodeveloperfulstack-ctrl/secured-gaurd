@@ -664,6 +664,14 @@ public class EPIDeliveryStandardPdfService {
                 if (signatureBase64 == null || signatureBase64.isBlank()) {
                         return createEpiDataCell("");
                 }
+                String sigTrim = signatureBase64.trim();
+                if (sigTrim.contains("manual") || sigTrim.contains("Manual")
+                                || sigTrim.contains("impressa") || sigTrim.contains("Impressa")
+                                || sigTrim.equalsIgnoreCase("PHYSICAL") || sigTrim.contains("Física")
+                                || sigTrim.contains("FISICA")) {
+                        return new Cell().add(new Paragraph("Ficha Manual Impressa").setFontSize(6.5f).setItalic())
+                                        .setPadding(1f).setHeight(15f);
+                }
                 try {
                         String base64Data = signatureBase64;
                         if (base64Data.contains(",")) {
@@ -677,6 +685,10 @@ public class EPIDeliveryStandardPdfService {
                         return new Cell().add(img).setPadding(1f).setHeight(15f);
                 } catch (Exception e) {
                         log.warn("Erro ao renderizar assinatura do item no PDF: {}", e.getMessage());
+                        if (signatureBase64.length() < 100) {
+                                return new Cell().add(new Paragraph(signatureBase64).setFontSize(6.5f).setItalic())
+                                                .setPadding(1f).setHeight(15f);
+                        }
                         return createEpiDataCell("");
                 }
         }
@@ -816,21 +828,9 @@ public class EPIDeliveryStandardPdfService {
                                 substitutionReason = item.getReplacementReason().trim();
                         }
 
-                        // Fallback pelo tipo da ficha (comportamento anterior)
-                        if (substitutionInfo.isEmpty() || substitutionReason.isEmpty()) {
-                                if (deliveryType == EPIDeliveryType.SUBSTITUICAO || deliveryType == EPIDeliveryType.TROCA || deliveryType == EPIDeliveryType.DEVOLUCAO) {
-                                        if (substitutionInfo.isEmpty()) {
-                                                substitutionInfo = formatDate(itemDeliveryDate);
-                                        }
-                                        if (substitutionReason.isEmpty() && deliveryType != null) {
-                                                substitutionReason = deliveryType.getDescription();
-                                        }
-                                }
-                        }
-
                         String sizeNum = resolveDisplaySizeNumber(item);
 
-                        rows.add(new EpiMovementRow(
+                        EpiMovementRow newRow = new EpiMovementRow(
                                         item.getEpiName(),
                                         sizeNum,
                                         item.getCa(),
@@ -838,7 +838,52 @@ public class EPIDeliveryStandardPdfService {
                                         itemDeliveryDate,
                                         substitutionInfo,
                                         substitutionReason,
-                                        item.getSignatureBase64()));
+                                        item.getSignatureBase64());
+
+                        // Se a data de substituição for idêntica à data de entrega e o motivo for apenas "Substituição" genérico
+                        // (resquício de preenchimento automático anterior), desconsidera essa informação espúria de substituição
+                        if (!substitutionInfo.isEmpty() && substitutionInfo.equals(formatDate(itemDeliveryDate))) {
+                                if ("Substituição".equalsIgnoreCase(substitutionReason) || "Troca".equalsIgnoreCase(substitutionReason)) {
+                                        substitutionInfo = "";
+                                        substitutionReason = "";
+                                }
+                        }
+
+                        // Verifica se já existe linha deste mesmo equipamento entregue na mesma data
+                        int existingIdx = -1;
+                        for (int i = 0; i < rows.size(); i++) {
+                                EpiMovementRow r = rows.get(i);
+                                if (equalsIgnoreCaseTrim(r.epiName(), newRow.epiName()) &&
+                                    equalsIgnoreCaseTrim(r.sizeNumber(), newRow.sizeNumber()) &&
+                                    equalsIgnoreCaseTrim(r.ca(), newRow.ca()) &&
+                                    java.util.Objects.equals(r.deliveryDate(), newRow.deliveryDate())) {
+                                        existingIdx = i;
+                                        break;
+                                }
+                        }
+
+                        if (existingIdx >= 0) {
+                                // Já existe uma linha desse equipamento nesta mesma data de entrega.
+                                // Se a nova linha trouxer dados reais de substituição/devolução (e a existente não tiver),
+                                // atualiza a linha existente em vez de criar uma segunda linha duplicada
+                                EpiMovementRow existing = rows.get(existingIdx);
+                                if ((existing.substitutionInfo() == null || existing.substitutionInfo().isBlank()) &&
+                                    (!substitutionInfo.isBlank() || !substitutionReason.isBlank())) {
+                                        rows.set(existingIdx, new EpiMovementRow(
+                                                existing.epiName(),
+                                                existing.sizeNumber(),
+                                                existing.ca(),
+                                                existing.quantity(),
+                                                existing.deliveryDate(),
+                                                substitutionInfo,
+                                                substitutionReason,
+                                                existing.signatureBase64() != null ? existing.signatureBase64() : newRow.signatureBase64()
+                                        ));
+                                }
+                                // Não adiciona linha duplicada na mesma data
+                        } else {
+                                rows.add(newRow);
+                        }
                 }
         }
 
@@ -1150,5 +1195,11 @@ public class EPIDeliveryStandardPdfService {
                 secTable.addCell(barCell);
                 secTable.addCell(textCell);
                 document.add(secTable);
+        }
+
+        private static boolean equalsIgnoreCaseTrim(String a, String b) {
+                String s1 = a != null ? a.trim() : "";
+                String s2 = b != null ? b.trim() : "";
+                return s1.equalsIgnoreCase(s2);
         }
 }

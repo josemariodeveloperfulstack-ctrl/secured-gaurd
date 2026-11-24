@@ -12,6 +12,7 @@ public enum MedicalDocumentType {
     LICENCA_GALA_MATRIMONIAL,           // Licença Gala ou Matrimonial
     TESTEMUNHA_JUDICIAL,                // Afastamento como Testemunha Judicial
     PROCESSO_TRABALHISTA,               // Processo Trabalhista
+    ATESTADO_OBITO,                     // Atestado de Óbito
     DECLARACAO_MEDICA,                  // Declaração Médica (legado/compatibilidade)
     CAT,                                // CAT (legado/compatibilidade)
     AFASTAMENTO;                        // Afastamento (legado/compatibilidade)

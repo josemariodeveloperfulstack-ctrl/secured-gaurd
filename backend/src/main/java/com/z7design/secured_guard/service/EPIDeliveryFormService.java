@@ -627,8 +627,11 @@ public class EPIDeliveryFormService {
      */
     @Transactional
     public void ensureDraftEpiFormFromApprovedStockRequisition(StockRequisition r, UUID actingUserId) {
+        boolean isEpiReason = r.getMovementReason() == MovementReason.ENTREGA_INICIAL
+                || r.getMovementReason() == MovementReason.REPOSICAO
+                || r.getMovementReason() == MovementReason.TROCA;
         List<StockRequisitionLine> eligibleLines = r.getLines().stream()
-                .filter(line -> line.getStockItem() != null && isStockItemEligibleForEpiFicha(line.getStockItem()))
+                .filter(line -> line.getStockItem() != null && (isStockItemEligibleForEpiFicha(line.getStockItem()) || isEpiReason))
                 .collect(Collectors.toList());
 
         Optional<EPIDeliveryForm> existingOpt = epiDeliveryFormRepository.findFirstByStockRequisitionIdOrderByCreatedAtDesc(r.getId());
@@ -671,6 +674,8 @@ public class EPIDeliveryFormService {
             i.setEpiName(si.getFullName());
             i.setQuantity(line.getQuantity());
             i.setStockItemId(si.getId());
+            i.setCa(si.getCaNumber());
+            i.setSizeNumber(si.getSizeVariation());
             return i;
         }).collect(Collectors.toList());
         dto.setItems(items);
@@ -698,6 +703,11 @@ public class EPIDeliveryFormService {
         if (req.getSignatureType() == StockMovement.SignatureType.DIGITAL) {
             form.setSignatureBase64(req.getDigitalSignature());
             form.setSignatureType("ON_SCREEN");
+            if (form.getItems() != null) {
+                for (EPIDeliveryFormItem item : form.getItems()) {
+                    item.setSignatureBase64(req.getDigitalSignature());
+                }
+            }
         } else {
             form.setSignatureBase64(null);
             form.setSignatureType("PHYSICAL");
@@ -705,6 +715,11 @@ public class EPIDeliveryFormService {
             if (ack != null && !ack.isBlank()) {
                 String obs = form.getObservations() != null ? form.getObservations() : "";
                 form.setObservations(obs + (obs.isBlank() ? "" : "\n") + "Recebimento físico: " + ack);
+            }
+            if (form.getItems() != null) {
+                for (EPIDeliveryFormItem item : form.getItems()) {
+                    item.setSignatureBase64("Assinado na ficha manual impressa");
+                }
             }
         }
 
@@ -715,8 +730,19 @@ public class EPIDeliveryFormService {
     }
 
     private static boolean isStockItemEligibleForEpiFicha(StockItem item) {
-        if (item.getCategory() == null) {
+        if (item == null) {
             return false;
+        }
+        if (item.getCategory() == null) {
+            if (item.getCaNumber() != null && !item.getCaNumber().isBlank()) {
+                return true;
+            }
+            String name = item.getName() != null ? item.getName().toLowerCase() : "";
+            return name.contains("epi") || name.contains("bota") || name.contains("luva")
+                    || name.contains("oculos") || name.contains("óculos") || name.contains("capacete")
+                    || name.contains("uniforme") || name.contains("colete") || name.contains("protetor")
+                    || name.contains("mascara") || name.contains("máscara") || name.contains("calçado")
+                    || name.contains("calcado");
         }
         StockCategory c = item.getCategory();
         if (c == StockCategory.EPI || c == StockCategory.CALCADOS) {
@@ -739,8 +765,9 @@ public class EPIDeliveryFormService {
 
     @Transactional(readOnly = true)
     public EPIDeliveryFormDTO findById(UUID id) {
-        EPIDeliveryForm form = epiDeliveryFormRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
+        EPIDeliveryForm form = epiDeliveryFormRepository.findByIdWithDetails(id)
+                .orElseGet(() -> epiDeliveryFormRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI nÃ£o encontrada com id: " + id)));
         return EPIDeliveryFormDTO.fromEntity(form);
     }
 

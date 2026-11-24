@@ -26,6 +26,7 @@ export interface Lead {
   email: string;
   phone: string;
   mobile?: string;
+  whatsapp?: string;
   company: string;
   position: string;
   source: string;
@@ -51,6 +52,7 @@ export interface CreateLeadRequest {
   name: string;
   email?: string;
   phone?: string;
+  whatsapp?: string;
   company?: string;
   position?: string;
   source: string;

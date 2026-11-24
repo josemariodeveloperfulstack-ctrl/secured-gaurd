@@ -669,6 +669,7 @@ export const employeeService = {
   async getMyEmployee(): Promise<Employee | null> {
     try {
       const response = await api.get('/api/employees/me');
+      if (response.status === 204 || !response.data) return null;
       return this.normalizeEmployee(response.data);
     } catch (error: any) {
       if (error?.response?.status === 404) return null;

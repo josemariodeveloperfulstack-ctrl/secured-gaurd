@@ -104,7 +104,7 @@ public class PayslipService {
                 throw new IllegalArgumentException("O arquivo está vazio após carregamento");
             }
 
-            try (PDDocument document = PDDocument.load(new java.io.ByteArrayInputStream(fileBytes))) {
+            try (PDDocument document = PDDocument.load(new java.io.ByteArrayInputStream(fileBytes), org.apache.pdfbox.io.MemoryUsageSetting.setupMixed(50 * 1024 * 1024))) {
                 if (document.isEncrypted()) {
                     throw new IllegalArgumentException("O PDF está criptografado");
                 }
@@ -2186,7 +2186,7 @@ public class PayslipService {
 
         // Salvar PDF individual
         try (PDDocument newDoc = new PDDocument()) {
-            newDoc.addPage(document.getPage(pageNumber - 1));
+            newDoc.importPage(document.getPage(pageNumber - 1));
             newDoc.save(caminhoCompleto.toString());
             log.info("📄 PDF salvo conforme PRD: {} (versão {})", caminhoCompleto, proximaVersao);
         }
@@ -3225,7 +3225,7 @@ public class PayslipService {
 
         try {
             // Carregar o documento para verificar páginas
-            PDDocument document = PDDocument.load(new java.io.ByteArrayInputStream(fileBytes));
+            PDDocument document = PDDocument.load(new java.io.ByteArrayInputStream(fileBytes), org.apache.pdfbox.io.MemoryUsageSetting.setupMixed(50 * 1024 * 1024));
             int pageCount = document.getNumberOfPages();
 
             log.info("🔍 Verificando se arquivo '{}' já foi processado ({} página(s))...", originalFilename, pageCount);
@@ -3525,7 +3525,7 @@ public class PayslipService {
             // Criar um novo documento com apenas a página desejada
             try (PDDocument singlePageDoc = new PDDocument()) {
                 PDPage page = document.getPage(pageNumber - 1);
-                singlePageDoc.addPage(page);
+                singlePageDoc.importPage(page);
 
                 // Salvar em um ByteArrayOutputStream para obter os bytes
                 java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();

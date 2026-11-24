@@ -484,9 +484,9 @@ public class CustomFinancialReportService {
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
         int numCols = cols.size();
-        float headerFontSize = numCols >= 10 ? 5.2f : (numCols >= 8 ? 5.8f : 6.5f);
-        float dataFontSize = numCols >= 10 ? 5.0f : (numCols >= 8 ? 5.5f : 6.5f);
-        float cellPadding = numCols >= 10 ? 1.0f : (numCols >= 8 ? 1.5f : 2.0f);
+        float headerFontSize = numCols >= 10 ? 6.8f : (numCols >= 8 ? 7.4f : 8.2f);
+        float dataFontSize = numCols >= 10 ? 6.8f : (numCols >= 8 ? 7.2f : 8.0f);
+        float cellPadding = numCols >= 10 ? 1.2f : (numCols >= 8 ? 1.8f : 2.2f);
 
         // Header
         for (String col : cols) {
@@ -515,20 +515,20 @@ public class CustomFinancialReportService {
     private float getReceivableColumnProportionalWidth(String colKey, int totalCols) {
         boolean compact = totalCols >= 8;
         return switch (colKey) {
-            case "dueDate", "vencimento", "issueDate", "dataEmissao", "paymentDate", "dataPagamento" -> compact ? 4.8f : 5.8f;
-            case "invoiceNumber", "numeroFatura", "fatura" -> compact ? 5.0f : 6.0f;
+            case "dueDate", "vencimento", "issueDate", "dataEmissao", "paymentDate", "dataPagamento" -> compact ? 3.2f : 4.2f;
+            case "invoiceNumber", "numeroFatura", "fatura" -> compact ? 3.5f : 4.5f;
             case "description", "descricao" -> compact ? 12.0f : 16.0f;
             case "client", "cliente" -> compact ? 12.0f : 15.0f;
-            case "unit", "unidade" -> compact ? 6.5f : 8.0f;
-            case "workPost", "posto" -> compact ? 6.0f : 7.5f;
-            case "category", "categoria", "conta", "subcategoria" -> compact ? 6.2f : 7.5f;
-            case "paymentMethod", "formaPagamento" -> compact ? 5.0f : 6.0f;
-            case "amount", "valor" -> compact ? 5.8f : 6.5f;
-            case "amountPaid", "valorPago" -> compact ? 5.8f : 6.5f;
-            case "status" -> compact ? 5.2f : 6.0f;
-            case "measurementNumber", "medicao" -> compact ? 5.0f : 6.0f;
-            case "barcode", "codigoBarras" -> compact ? 5.5f : 6.5f;
-            default -> compact ? 5.0f : 6.0f;
+            case "unit", "unidade" -> compact ? 5.0f : 6.5f;
+            case "workPost", "posto" -> compact ? 5.0f : 6.5f;
+            case "category", "categoria", "conta", "subcategoria" -> compact ? 5.5f : 7.0f;
+            case "paymentMethod", "formaPagamento" -> compact ? 3.2f : 4.2f;
+            case "amount", "valor" -> compact ? 3.8f : 4.8f;
+            case "amountPaid", "valorPago" -> compact ? 3.8f : 4.8f;
+            case "status" -> compact ? 2.8f : 3.5f;
+            case "measurementNumber", "medicao" -> compact ? 3.8f : 4.8f;
+            case "barcode", "codigoBarras" -> compact ? 5.0f : 6.0f;
+            default -> compact ? 4.5f : 5.5f;
         };
     }
 
@@ -924,8 +924,8 @@ public class CustomFinancialReportService {
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
         int numCols = cols.size();
-        float headerFontSize = numCols >= 8 ? 5.8f : 6.5f;
-        float dataFontSize = numCols >= 8 ? 5.5f : 6.5f;
+        float headerFontSize = numCols >= 8 ? 7.2f : 8.0f;
+        float dataFontSize = numCols >= 8 ? 7.0f : 8.0f;
         float cellPadding = numCols >= 8 ? 1.5f : 2.0f;
 
         // Header
@@ -955,17 +955,17 @@ public class CustomFinancialReportService {
     private float getScheduledPaymentColumnProportionalWidth(String colKey, int totalCols) {
         boolean compact = totalCols >= 8;
         return switch (colKey) {
-            case "scheduledDate", "dataAgendamento" -> compact ? 5.0f : 6.0f;
-            case "executionDate", "dataExecucao" -> compact ? 5.0f : 6.0f;
-            case "invoiceNumber", "numeroFatura", "fatura" -> compact ? 5.5f : 6.5f;
+            case "scheduledDate", "dataAgendamento" -> compact ? 3.5f : 4.5f;
+            case "executionDate", "dataExecucao" -> compact ? 3.5f : 4.5f;
+            case "invoiceNumber", "numeroFatura", "fatura" -> compact ? 4.0f : 5.0f;
             case "description", "descricao" -> compact ? 14.0f : 18.0f;
             case "client", "cliente" -> compact ? 12.0f : 15.0f;
-            case "paymentMethod", "formaPagamento" -> compact ? 5.5f : 6.5f;
-            case "category", "subcategoria" -> compact ? 6.5f : 8.0f;
-            case "amount", "valor" -> compact ? 6.0f : 7.0f;
-            case "status" -> compact ? 5.2f : 6.0f;
-            case "notes", "observacoes" -> compact ? 6.5f : 8.0f;
-            default -> compact ? 5.0f : 6.0f;
+            case "paymentMethod", "formaPagamento" -> compact ? 3.5f : 4.5f;
+            case "category", "subcategoria" -> compact ? 6.0f : 7.5f;
+            case "amount", "valor" -> compact ? 4.0f : 5.0f;
+            case "status" -> compact ? 2.8f : 3.5f;
+            case "notes", "observacoes" -> compact ? 6.0f : 7.5f;
+            default -> compact ? 4.5f : 5.5f;
         };
     }
 

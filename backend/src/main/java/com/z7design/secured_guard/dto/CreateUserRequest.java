@@ -35,7 +35,9 @@ public class CreateUserRequest {
     @Pattern(regexp = "^\\d{9,20}$|^$", message = "WhatsApp deve conter apenas dígitos e ter entre 9 e 20 caracteres")
     private String whatsapp;
     
-    private List<String> roles;  // Array de Strings com nomes dos roles
+    private List<String> roles;
+    
+    private List<String> permissions;  // Array de Strings com nomes dos roles
     
     private Boolean active = true;
 
@@ -55,6 +57,9 @@ public class CreateUserRequest {
 
     public String getWhatsapp() { return whatsapp; }
     public void setWhatsapp(String whatsapp) { this.whatsapp = whatsapp; }
+
+    public List<String> getPermissions() { return permissions; }
+    public void setPermissions(List<String> permissions) { this.permissions = permissions; }
 
     public List<String> getRoles() { return roles; }
     public void setRoles(List<String> roles) { this.roles = roles; }

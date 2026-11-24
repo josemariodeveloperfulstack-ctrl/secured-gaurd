@@ -266,15 +266,40 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
 
   const loadClients = async () => {
     try {
-      const clientsData = await clientService.getClients({ page: 0, size: 1000 });
-      let clientes = [];
-      if (Array.isArray(clientsData)) {
-        clientes = clientsData;
-      } else if (clientsData && typeof clientsData === 'object') {
-        if (Array.isArray(clientsData.content)) {
-          clientes = clientsData.content;
+      let clientes: any[] = [];
+      // 1. Tentar buscar a lista completa (não paginada)
+      try {
+        const allClients = await clientService.getAllClients();
+        if (Array.isArray(allClients) && allClients.length > 0) {
+          clientes = allClients;
+        }
+      } catch (err) {
+        console.warn('⚠️ Fallback /api/clients/all falhou, tentando próxima opção...', err);
+      }
+
+      // 2. Fallback para clientes de seleção
+      if (clientes.length === 0) {
+        try {
+          const selectClients = await clientService.getClientsForSelect();
+          if (Array.isArray(selectClients) && selectClients.length > 0) {
+            clientes = selectClients;
+          }
+        } catch (err) {
+          console.warn('⚠️ Fallback /api/clients/select falhou, tentando próxima opção...', err);
         }
       }
+
+      // 3. Fallback para getClients paginado
+      if (clientes.length === 0) {
+        const clientsData = await clientService.getClients({ page: 0, size: 1000 });
+        if (Array.isArray(clientsData)) {
+          clientes = clientsData;
+        } else if (clientsData && typeof clientsData === 'object' && Array.isArray((clientsData as any).content)) {
+          clientes = (clientsData as any).content;
+        }
+      }
+
+      console.log('✅ Clientes carregados no modal de novo contrato:', clientes.length);
       setClients(clientes);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);

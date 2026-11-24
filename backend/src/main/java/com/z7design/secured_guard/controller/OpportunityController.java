@@ -64,9 +64,15 @@ public class OpportunityController {
 
     @GetMapping
     public List<OpportunityResponse> getAll() {
-        return opportunityService.findAllActive().stream()
-                .map(OpportunityResponse::fromEntity)
-                .collect(Collectors.toList());
+        try {
+            return opportunityService.findAllActive().stream()
+                    .map(OpportunityResponse::fromEntity)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Erro ao listar oportunidades ativas no CRM", e);
+            return new ArrayList<>();
+        }
     }
 
     @GetMapping("/{id}")

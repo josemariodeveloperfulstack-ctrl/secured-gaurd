@@ -26,21 +26,40 @@ export const clientService = {
     if (params.sortBy) query.append('sortBy', params.sortBy);
     if (params.sortDir) query.append('sortDir', params.sortDir);
 
-    const response = await api.get(`/api/clients?${query.toString()}`);
-    const data = response.data;
-    // Normalizar resposta (Page do backend ou array)
-    if (Array.isArray(data)) {
-      return {
-        content: data,
-        totalElements: data.length,
-        totalPages: 1,
-        size: data.length,
-        number: 0,
-        first: true,
-        last: true,
-      } as ClientPage;
+    try {
+      const response = await api.get(`/api/clients?${query.toString()}`);
+      const data = response.data;
+      // Normalizar resposta (Page do backend ou array)
+      if (Array.isArray(data)) {
+        return {
+          content: data,
+          totalElements: data.length,
+          totalPages: 1,
+          size: data.length,
+          number: 0,
+          first: true,
+          last: true,
+        } as ClientPage;
+      }
+      return data as ClientPage;
+    } catch (error) {
+      console.warn('⚠️ Erro ao chamar /api/clients, tentando fallback para /api/clients/all...', error);
+      try {
+        const fallbackRes = await api.get('/api/clients/all');
+        const fallbackData = Array.isArray(fallbackRes.data) ? fallbackRes.data : [];
+        return {
+          content: fallbackData,
+          totalElements: fallbackData.length,
+          totalPages: 1,
+          size: fallbackData.length,
+          number: 0,
+          first: true,
+          last: true,
+        } as ClientPage;
+      } catch (fallbackError) {
+        throw error;
+      }
     }
-    return data as ClientPage;
   },
   // Buscar todos os clientes
   async getAllClients(): Promise<Client[]> {

@@ -425,11 +425,19 @@ const ContasAPagar: React.FC = () => {
 
       console.log('🔍 DEBUG: Contas filtradas:', contasFiltradas.length, contasFiltradas);
 
-      // Se não há dados reais, criar dados de teste para demonstração
-      let contasParaRelatorio = contasFiltradas;
-      if (contasFiltradas.length === 0 && contas.length > 0 && reportFilters.empresa === 'TODAS') {
+      // Ordena rigorosamente por data de vencimento crescente (01/11 a 30/11)
+      let contasParaRelatorio = [...contasFiltradas].sort((a, b) => {
+        const dateA = a.vencimento ? new Date(a.vencimento).getTime() : 0;
+        const dateB = b.vencimento ? new Date(b.vencimento).getTime() : 0;
+        return dateA - dateB;
+      });
+      if (contasParaRelatorio.length === 0 && contas.length > 0 && reportFilters.empresa === 'TODAS') {
         console.log('🔍 DEBUG: Nenhuma conta passou nos filtros, usando todas as contas para demonstração');
-        contasParaRelatorio = contas.slice(0, 5); // Usar apenas as primeiras 5 para demonstração
+        contasParaRelatorio = [...contas].slice(0, 5).sort((a, b) => {
+          const dateA = a.vencimento ? new Date(a.vencimento).getTime() : 0;
+          const dateB = b.vencimento ? new Date(b.vencimento).getTime() : 0;
+          return dateA - dateB;
+        });
       }
 
       let reportData = {
@@ -472,10 +480,16 @@ const ContasAPagar: React.FC = () => {
           };
           break;
         case 'periodo':
+          contasParaRelatorio.sort((a, b) => {
+            const dateA = a.vencimento ? new Date(a.vencimento).getTime() : 0;
+            const dateB = b.vencimento ? new Date(b.vencimento).getTime() : 0;
+            return dateA - dateB;
+          });
           reportData = {
             ...reportData,
             title: 'Relatório por Período - Contas a Pagar',
-            subtitle: 'Detalhamento das contas por período de vencimento',
+            subtitle: 'Detalhamento das contas por período de vencimento (ordem cronológica)',
+            data: [...contasParaRelatorio],
             summary: {
               totalContas: contasParaRelatorio.length,
               valorTotal: contasParaRelatorio.reduce((sum, c) => sum + c.valor, 0)

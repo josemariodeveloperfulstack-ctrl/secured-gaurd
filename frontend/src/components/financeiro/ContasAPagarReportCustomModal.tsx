@@ -71,7 +71,7 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
   const [workSector, setWorkSector] = useState<string>('TODOS');
   const [companySigla, setCompanySigla] = useState<string>('TODAS');
   const [supplierId, setSupplierId] = useState<string>('TODOS');
-  const [groupBy, setGroupBy] = useState<'UNIT_SECTOR' | 'NONE'>('UNIT_SECTOR');
+  const [groupBy, setGroupBy] = useState<string>('NONE');
 
   // Seleção de colunas
   const [selectedColumns, setSelectedColumns] = useState<string[]>(
@@ -479,6 +479,9 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
+                  <SelectItem value="NONE" className="hover:bg-slate-800">
+                    📄 Listagem Simples (Cronológica por Vencimento)
+                  </SelectItem>
                   <SelectItem value="UNIT_SECTOR" className="hover:bg-slate-800">
                     🏢 Agrupar por Unidade e Setor
                   </SelectItem>
@@ -496,9 +499,6 @@ export const ContasAPagarReportCustomModal: React.FC<ContasAPagarReportCustomMod
                   </SelectItem>
                   <SelectItem value="STATUS" className="hover:bg-slate-800">
                     📊 Agrupar por Status (Pendente/Paga)
-                  </SelectItem>
-                  <SelectItem value="NONE" className="hover:bg-slate-800">
-                    📄 Listagem Simples (Sem Agrupamento)
                   </SelectItem>
                 </SelectContent>
               </Select>

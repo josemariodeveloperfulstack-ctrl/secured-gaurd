@@ -21,7 +21,7 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     
     @Query("""
         SELECT new com.z7design.secured_guard.dto.LeadDTO(
-            l.id, l.name, l.email, l.phone, l.mobile, l.company, l.position,
+            l.id, l.name, l.email, l.phone, l.mobile, l.whatsapp, l.company, l.position,
             l.status, l.source, l.estimatedValue, l.notes,
             at.id,
             CASE WHEN at.name IS NOT NULL THEN at.name ELSE at.username END,

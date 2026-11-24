@@ -88,6 +88,10 @@ interface StockReport {
   itemCode?: string;
   /** Movimentações: funcionário */
   employeeName?: string;
+  /** Movimentações: usuário responsável */
+  userName?: string;
+  /** Movimentações: número da requisição vinculada */
+  requisitionNumber?: string;
   /** Movimentações / requisições: motivo */
   movementReasonText?: string;
   /** Requisições: quem solicitou */
@@ -347,7 +351,9 @@ const StockReportsContent: React.FC = () => {
             totalValue: Number(m.totalCost ?? 0),
             status: 'NORMAL' as const,
             itemCode: String(m.itemCode ?? ''),
-            employeeName: String(m.employeeName ?? m.userName ?? ''),
+            employeeName: String(m.employeeName ?? ''),
+            userName: String(m.userName ?? ''),
+            requisitionNumber: String(m.requisitionNumber ?? ''),
             movementReasonText: movementReasonLabel(m.reason)
           }));
           break;
@@ -1095,15 +1101,15 @@ const StockReportsContent: React.FC = () => {
               <Table>
                 <TableHeader>
                   <TableRow className="border-gray-600">
-                    <TableHead className="text-seguranca-lightgray">Data</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Tipo</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Motivo</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Item</TableHead>
+                    <TableHead className="text-seguranca-lightgray">Data/Hora</TableHead>
+                    <TableHead className="text-seguranca-lightgray">Tipo / Motivo</TableHead>
+                    <TableHead className="text-seguranca-lightgray">Item / EPI</TableHead>
                     <TableHead className="text-seguranca-lightgray">Código</TableHead>
                     <TableHead className="text-seguranca-lightgray">Qtd</TableHead>
                     <TableHead className="text-seguranca-lightgray">Antes</TableHead>
                     <TableHead className="text-seguranca-lightgray">Depois</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Valor</TableHead>
+                    <TableHead className="text-seguranca-lightgray">Destinatário / Colaborador</TableHead>
+                    <TableHead className="text-seguranca-lightgray">Nº Requisição</TableHead>
                     <TableHead className="text-seguranca-lightgray">Responsável</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1117,18 +1123,39 @@ const StockReportsContent: React.FC = () => {
                   ) : (
                     reports.map((report) => (
                       <TableRow key={report.id} className="border-gray-600">
-                        <TableCell className="text-gray-300 whitespace-nowrap">
+                        <TableCell className="text-gray-300 whitespace-nowrap text-xs">
                           {formatDateTime(report.lastMovementDate)}
                         </TableCell>
-                        <TableCell className="text-seguranca-lightgray">{report.category}</TableCell>
-                        <TableCell className="text-gray-300">{report.movementReasonText || '—'}</TableCell>
-                        <TableCell className="text-seguranca-lightgray font-medium">{report.productName}</TableCell>
-                        <TableCell className="text-gray-300">{report.itemCode || '—'}</TableCell>
-                        <TableCell className="text-gray-300">{formatNumber(report.currentStock)}</TableCell>
-                        <TableCell className="text-gray-300">{formatNumber(report.minimumStock)}</TableCell>
-                        <TableCell className="text-gray-300">{formatNumber(report.maximumStock)}</TableCell>
-                        <TableCell className="text-gray-300">{formatCurrency(report.totalValue)}</TableCell>
-                        <TableCell className="text-gray-300">{report.employeeName || '—'}</TableCell>
+                        <TableCell className="text-seguranca-lightgray text-xs">
+                          <span className="font-semibold block">{report.category}</span>
+                          {report.movementReasonText && (
+                            <span className="text-[11px] text-zinc-400">{report.movementReasonText}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-seguranca-lightgray font-medium text-xs">
+                          {report.productName}
+                        </TableCell>
+                        <TableCell className="text-gray-300 font-mono text-xs">{report.itemCode || '—'}</TableCell>
+                        <TableCell className="text-emerald-400 font-bold text-xs">{formatNumber(report.currentStock)}</TableCell>
+                        <TableCell className="text-gray-400 text-xs">{formatNumber(report.minimumStock)}</TableCell>
+                        <TableCell className="text-gray-400 text-xs">{formatNumber(report.maximumStock)}</TableCell>
+                        <TableCell className="text-gray-200 text-xs">
+                          {report.employeeName ? (
+                            <span className="font-medium">{report.employeeName}</span>
+                          ) : (
+                            <span className="text-zinc-500 italic">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-gray-300 font-mono text-xs">
+                          {report.requisitionNumber ? (
+                            <Badge variant="outline" className="border-seguranca-yellow/40 text-seguranca-yellow text-[10px] whitespace-nowrap">
+                              {report.requisitionNumber}
+                            </Badge>
+                          ) : (
+                            <span className="text-zinc-500">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-gray-400 text-xs">{report.userName || '—'}</TableCell>
                       </TableRow>
                     ))
                   )}

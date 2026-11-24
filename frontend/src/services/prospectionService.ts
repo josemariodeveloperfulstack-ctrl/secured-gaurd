@@ -2,11 +2,12 @@ import api from '@/lib/axios';
 import leadService, { CreateLeadRequest, Lead } from './leadService';
 import { createOpportunity, fetchKanbanStatuses } from './crmService';
 import emailCampaignService from './emailCampaignService';
-import { validateCNPJ } from '@/utils/validation';
+import { validateCNPJ, formatCNPJ } from '@/utils/validation';
 
 export interface Socio {
   nome: string;
   qualificacao: string;
+  cargo?: string;
   paisOrigem?: string;
   nomeRepresentanteLegal?: string;
   qualificacaoRepresentanteLegal?: string;
@@ -29,6 +30,22 @@ export interface CnaeInfo {
   descricao: string;
 }
 
+export interface ContactEconodata {
+  id?: string;
+  nome: string;
+  cargo: string;
+  departamento: 'DIRETORIA' | 'COMPRAS' | 'FACILITIES_SEGURANCA' | 'RECURSOS_HUMANOS' | 'FINANCEIRO' | 'OUTROS';
+  departamentoLabel?: string;
+  nivelHierarquico?: 'SOCIO' | 'C_LEVEL' | 'DIRETOR' | 'GERENTE' | 'COORDENADOR' | 'ESPECIALISTA';
+  email?: string;
+  emailVerificado?: boolean;
+  telefone?: string;
+  whatsapp?: string;
+  whatsappUrl?: string;
+  linkedinUrl?: string;
+  origem?: string;
+}
+
 export interface ProspectCompany {
   cnpj: string;
   razaoSocial: string;
@@ -40,6 +57,18 @@ export interface ProspectCompany {
   naturezaJuridica?: string;
   porte?: string;
   capitalSocial?: number;
+  faturamentoEstimadoMin?: number;
+  faturamentoEstimadoMax?: number;
+  faturamentoEstimadoFaixa?: string;
+  faixaFaturamento?: 'MICRO' | 'PEQUENO' | 'MEDIO' | 'GRANDE' | 'CORPORATE';
+  porteEstimado?: string;
+  faixaFuncionarios?: string;
+  leadScore?: number;
+  leadTier?: string;
+  motivoQualificacao?: string;
+  contatosEconodata?: ContactEconodata[];
+  contatosPorDepartamento?: Record<string, ContactEconodata[]>;
+  totalContatosChave?: number;
   logradouro?: string;
   numero?: string;
   complemento?: string;
@@ -54,13 +83,14 @@ export interface ProspectCompany {
   contatoComprasNome?: string;
   decisores?: Decisor[];
   qsa: Socio[];
-  origem: 'CNPJ' | 'CNAE' | 'GOOGLE_MAPS' | 'GEMINI_AI';
+  origem: 'CNPJ' | 'CNAE' | 'GOOGLE_MAPS' | 'GEMINI_AI' | 'RECEITA_FEDERAL';
   googleMapsUrl?: string;
   website?: string;
   socialMediaUrl?: string;
   rating?: number;
   userRatingsTotal?: number;
   leadImported?: boolean;
+  importedLeadId?: string | number;
   scoreConversao?: number;
   motivoConversao?: string;
   clientePotencial?: boolean;
@@ -70,6 +100,7 @@ export interface ProspectCompany {
 export interface ProspectionHistoryItem {
   id: string;
   tipoBusca: string;
+  tipoPesquisa?: string;
   termoPesquisa?: string;
   cidade?: string;
   uf?: string;
@@ -82,10 +113,56 @@ export const isAccountingContact = (email?: string, razaoSocial?: string): boole
   if (!email) return false;
   const lowerEmail = email.toLowerCase();
   const forbiddenTerms = [
-    'contab', 'contabil', 'contabilidade', 'fiscal', 'assessoria', 
+    'contab', 'contabil', 'contabilidade', 'fiscal', 'assessoria',
     'escritorio', 'audit', 'tax', 'contador', 'balanco', 'escrituracao'
   ];
   return forbiddenTerms.some(term => lowerEmail.includes(term));
+};
+
+/**
+ * Garante que o CNPJ possua 14 dígitos com dígitos verificadores módulo-11 válidos da Receita Federal
+ * e esteja formatado no padrão XX.XXX.XXX/XXXX-XX.
+ * NUNCA gera CNPJs sintéticos ou fictícios: se ausente ou inválido, retorna string vazia.
+ */
+export const ensureValidFormattedCnpj = (rawCnpj?: string, _fallbackSeed?: string): string => {
+  const digits = (rawCnpj || '').replace(/\D/g, '');
+  if (digits.length === 14 && validateCNPJ(digits)) {
+    return formatCNPJ(digits);
+  }
+  return '';
+};
+
+/** Resumo da gravação automática feita pelo backend ao prospectar (header X-Prospection-AutoSave). */
+export interface ProspectionAutoSaveSummary {
+  total: number;
+  qualified: number;
+  leadsCreated: number;
+  leadsUpdated: number;
+  marketingAdded: number;
+  withWhatsapp: number;
+  skippedNoName: number;
+  skippedInvalidEmail: number;
+  skippedAccountingEmail: number;
+  skippedUnsubscribed: number;
+  skippedRejected: number;
+  skippedDuplicates: number;
+}
+
+/**
+ * Valida e normaliza o WhatsApp antes de qualquer envio.
+ * Aceita apenas celular brasileiro com DDD (11-99) e 9 dígitos iniciados em 9.
+ */
+export const qualifyWhatsapp = (raw?: string | null): string | undefined => {
+  if (!raw) return undefined;
+  let digits = raw.replace(/\D/g, '');
+  if (digits.length > 13) return undefined;
+  if (digits.length >= 12 && digits.startsWith('55')) digits = digits.substring(2);
+  if (digits.length !== 11) return undefined;
+  const ddd = Number(digits.substring(0, 2));
+  if (!Number.isInteger(ddd) || ddd < 11 || ddd > 99) return undefined;
+  const number = digits.substring(2);
+  if (!number.startsWith('9')) return undefined;
+  return `(${digits.substring(0, 2)}) ${number.substring(0, 5)}-${number.substring(5)}`;
 };
 
 export interface ProspectionFilters {
@@ -98,7 +175,6 @@ export interface ProspectionFilters {
   raioKm?: number;
 }
 
-// Lista curada de CNAEs estratégicos organizada por Setores (Indústria, Comercial, Agro, Condomínios, Saúde, etc.)
 export interface StrategicCnae {
   codigo: string;
   label: string;
@@ -106,7 +182,6 @@ export interface StrategicCnae {
 }
 
 export const STRATEGIC_CNAES: StrategicCnae[] = [
-  // Geral
   { codigo: 'TODOS', label: 'Todos os Segmentos Estratégicos', setor: 'TODOS' },
 
   // AGRONEGÓCIO & AGROINDÚSTRIA
@@ -191,6 +266,13 @@ export const ESTADOS_BRASIL = [
 ];
 
 class ProspectionService {
+  private lastAutoSaveSummary: ProspectionAutoSaveSummary | null = null;
+
+  /** Resumo da última gravação automática ocorrida durante a busca com IA. */
+  getLastAutoSaveSummary(): ProspectionAutoSaveSummary | null {
+    return this.lastAutoSaveSummary;
+  }
+
   /**
    * Consulta dados completos de um CNPJ com prioridade no backend seguro (sem CORS)
    */
@@ -200,17 +282,18 @@ class ProspectionService {
       throw new Error('CNPJ deve conter 14 dígitos numéricos.');
     }
 
-    // 1. Prioridade máxima: Proxy Seguro do Backend (sem erros de CORS ou bloqueios no browser)
     try {
       const { data } = await api.get<ProspectCompany>(`/prospection/cnpj/${cleanCnpj}`);
       if (data && data.cnpj) {
-        return data;
+        return {
+          ...data,
+          cnpj: ensureValidFormattedCnpj(data.cnpj, data.razaoSocial || data.nomeFantasia),
+        };
       }
     } catch (err: any) {
       console.warn('Backend proxy CNPJ retornou erro, tentando fallbacks públicos...', err?.message);
     }
 
-    // 2. Fallback direto caso o backend esteja oscilando
     try {
       const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
       if (res.ok) {
@@ -235,45 +318,24 @@ class ProspectionService {
   }
 
   /**
-   * Tenta localizar e enriquecer o CNPJ de uma empresa ou condomínio a partir do nome/fantasia e localidade
+   * Tenta localizar e enriquecer o CNPJ de uma empresa ou condomínio a partir do nome/fantasia, localidade, endereço e telefone
    */
-  async findCnpjByName(nome: string, cidade?: string, uf?: string): Promise<any> {
+  async findCnpjByName(nome: string, cidade?: string, uf?: string, logradouro?: string, telefone?: string): Promise<any> {
     const params = new URLSearchParams();
     params.append('nome', nome);
     if (cidade) params.append('cidade', cidade);
     if (uf) params.append('uf', uf);
+    if (logradouro) params.append('logradouro', logradouro);
+    if (telefone) params.append('telefone', telefone);
 
     const { data } = await api.get(`/prospection/find-cnpj?${params.toString()}`);
+    if (data && data.cnpj) {
+      data.cnpj = ensureValidFormattedCnpj(data.cnpj, nome);
+    }
     return data;
   }
 
-  /**
-   * Mapeamento de resposta da BrasilAPI
-   */
   private mapBrasilApiToProspect(data: any): ProspectCompany {
-    const qsa: Socio[] = Array.isArray(data.qsa)
-      ? data.qsa.map((s: any) => ({
-          nome: s.nome_socio || s.nome_socio_razao_social || '',
-          qualificacao: s.qualificacao_socio || s.qualificacao_representante_legal || 'Sócio / Administrador',
-          paisOrigem: s.pais,
-          faixaEtaria: s.faixa_etaria,
-        }))
-      : [];
-
-    const cnaePrincipal: CnaeInfo | undefined = data.cnae_fiscal
-      ? {
-          codigo: data.cnae_fiscal,
-          descricao: data.cnae_fiscal_descricao || '',
-        }
-      : undefined;
-
-    const cnaesSecundarios: CnaeInfo[] = Array.isArray(data.cnaes_secundarios)
-      ? data.cnaes_secundarios.map((c: any) => ({
-          codigo: c.codigo,
-          descricao: c.descricao,
-        }))
-      : [];
-
     const formatTel = (ddd?: string, tel?: string) => {
       if (!tel) return '';
       const num = tel.replace(/\D/g, '');
@@ -288,9 +350,56 @@ class ProspectionService {
     const rawEmail = data.email?.toLowerCase() || '';
     const isContabil = isAccountingContact(rawEmail, data.razao_social);
     const sanitizedEmail = isContabil ? '' : rawEmail;
+    const chosenPhone = telefoneSecundario || telefone || '';
+
+    const qsa: Socio[] = Array.isArray(data.qsa)
+      ? data.qsa.map((s: any) => ({
+        nome: s.nome_socio || s.nome_socio_razao_social || '',
+        qualificacao: s.qualificacao_socio || s.qualificacao_representante_legal || 'Sócio / Administrador',
+        paisOrigem: s.pais,
+        faixaEtaria: s.faixa_etaria,
+        email: sanitizedEmail || undefined,
+        telefone: chosenPhone || undefined,
+      }))
+      : [];
+
+    const cnaePrincipal: CnaeInfo | undefined = data.cnae_fiscal
+      ? {
+        codigo: data.cnae_fiscal,
+        descricao: data.cnae_fiscal_descricao || '',
+      }
+      : undefined;
+
+    const cnaesSecundarios: CnaeInfo[] = Array.isArray(data.cnaes_secundarios)
+      ? data.cnaes_secundarios.map((c: any) => ({
+        codigo: c.codigo,
+        descricao: c.descricao,
+      }))
+      : [];
+
+    // Estimativas Econodata Inteligentes com base no Capital Social e Porte
+    const capital = data.capital_social ? Number(data.capital_social) : 0;
+    const porteStr = String(data.porte || data.descricao_porte || '').toUpperCase();
+    let faturamentoEstimadoFaixa = 'R$ 4,8M a R$ 15,0M / ano';
+    let faixaFuncionarios = '50 a 99 colaboradores';
+    let leadScore = 55;
+
+    if (porteStr.includes('ME') || porteStr.includes('MICRO') || (capital > 0 && capital < 360000)) {
+      faturamentoEstimadoFaixa = 'R$ 360K a R$ 1,2M / ano';
+      faixaFuncionarios = '10 a 29 colaboradores';
+      leadScore = 45;
+    } else if (porteStr.includes('EPP') || (capital >= 360000 && capital < 4800000)) {
+      faturamentoEstimadoFaixa = 'R$ 1,2M a R$ 4,8M / ano';
+      faixaFuncionarios = '30 a 49 colaboradores';
+      leadScore = 50;
+    } else if (capital >= 10000000) {
+      faturamentoEstimadoFaixa = 'Acima de R$ 50M / ano';
+      faixaFuncionarios = 'Acima de 200 colaboradores';
+      leadScore = 80;
+    }
 
     return {
-      cnpj: data.cnpj,
+      cnpj: ensureValidFormattedCnpj(data.cnpj, data.razao_social),
       razaoSocial: data.razao_social,
       nomeFantasia: data.nome_fantasia || data.razao_social,
       situacaoCadastral: data.descricao_situacao_cadastral || 'ATIVA',
@@ -299,7 +408,8 @@ class ProspectionService {
       cnaesSecundarios,
       naturezaJuridica: data.natureza_juridica,
       porte: data.porte || data.descricao_porte,
-      capitalSocial: data.capital_social ? Number(data.capital_social) : undefined,
+      porteEstimado: porteStr || 'Médio Porte',
+      capitalSocial: capital > 0 ? capital : undefined,
       logradouro: data.logradouro,
       numero: data.numero,
       complemento: data.complemento,
@@ -310,27 +420,37 @@ class ProspectionService {
       telefone: telefone || data.ddd_telefone_1 || '',
       telefoneSecundario: telefoneSecundario || data.ddd_telefone_2 || '',
       email: sanitizedEmail,
+      emailCompras: sanitizedEmail || undefined,
+      contatoComprasNome: sanitizedEmail ? 'Setor de Suprimentos / Contato Oficial' : undefined,
       emailContabilidadeDescartado: isContabil,
       clientePotencial: true,
+      faturamentoEstimadoFaixa,
+      faixaFuncionarios,
+      leadScore,
+      totalContatosChave: qsa.length,
       qsa,
       origem: 'CNPJ',
     };
   }
 
-  /**
-   * Mapeamento de resposta do MinhaReceita
-   */
   private mapMinhaReceitaToProspect(data: any): ProspectCompany {
+    const rawEmail = data.email?.toLowerCase() || '';
+    const isContabil = isAccountingContact(rawEmail, data.razao_social);
+    const sanitizedEmail = isContabil ? '' : rawEmail;
+    const phone = data.ddd_telefone_1 || '';
+
     const qsa: Socio[] = Array.isArray(data.qsa)
       ? data.qsa.map((s: any) => ({
-          nome: s.nome_socio || '',
-          qualificacao: s.qualificacao_socio || 'Sócio / Administrador',
-          faixaEtaria: s.faixa_etaria,
-        }))
+        nome: s.nome_socio || '',
+        qualificacao: s.qualificacao_socio || 'Sócio / Administrador',
+        faixaEtaria: s.faixa_etaria,
+        email: sanitizedEmail || undefined,
+        telefone: phone || undefined,
+      }))
       : [];
 
     return {
-      cnpj: data.cnpj,
+      cnpj: ensureValidFormattedCnpj(data.cnpj, data.razao_social),
       razaoSocial: data.razao_social,
       nomeFantasia: data.nome_fantasia || data.razao_social,
       situacaoCadastral: data.descricao_situacao_cadastral || 'ATIVA',
@@ -341,6 +461,7 @@ class ProspectionService {
       },
       naturezaJuridica: data.natureza_juridica,
       porte: data.porte,
+      porteEstimado: data.porte || 'Médio Porte',
       capitalSocial: data.capital_social ? Number(data.capital_social) : undefined,
       logradouro: data.logradouro,
       numero: data.numero,
@@ -349,8 +470,14 @@ class ProspectionService {
       municipio: data.municipio,
       uf: data.uf,
       cep: data.cep,
-      telefone: data.ddd_telefone_1 || '',
-      email: data.email?.toLowerCase() || '',
+      telefone: phone,
+      email: sanitizedEmail,
+      emailCompras: sanitizedEmail || undefined,
+      contatoComprasNome: sanitizedEmail ? 'Setor de Suprimentos / Contato Oficial' : undefined,
+      faturamentoEstimadoFaixa: 'R$ 4,8M a R$ 15,0M / ano',
+      faixaFuncionarios: '50 a 99 colaboradores',
+      leadScore: 55,
+      totalContatosChave: qsa.length,
       qsa,
       origem: 'CNPJ',
     };
@@ -364,42 +491,104 @@ class ProspectionService {
       if (segmento) params.append('segmento', segmento);
       params.append('quantidade', String(quantidade));
 
-      const { data } = await api.get<any[]>(`/prospection/ai-search?${params.toString()}`);
+      const { data, headers } = await api.get<any[]>(`/prospection/ai-search?${params.toString()}`);
+
+      // O backend grava automaticamente os contatos qualificados e devolve o resumo no header.
+      try {
+        const raw = headers?.['x-prospection-autosave'] ?? headers?.['X-Prospection-AutoSave'];
+        this.lastAutoSaveSummary = raw ? JSON.parse(raw) as ProspectionAutoSaveSummary : null;
+      } catch {
+        this.lastAutoSaveSummary = null;
+      }
+
       if (Array.isArray(data)) {
         return data.map((item: any) => {
+          const compName = item.nomeFantasia || item.razaoSocial || 'Empresa';
           const rawEmail = (item.email || '').toLowerCase().trim();
-          const isContabil = isAccountingContact(rawEmail, item.razaoSocial || item.nomeFantasia);
+          const isContabil = isAccountingContact(rawEmail, compName);
           const sanitizedEmail = isContabil ? '' : rawEmail;
 
-          // Se tiver CNPJ válido, formata; se for string vazia ou inválida, não coloca CNPJ mockado
-          const rawCnpj = (item.cnpj || '').replace(/\D/g, '');
-          const cleanCnpj = rawCnpj.length === 14 ? item.cnpj : '';
+          // Garantir que o CNPJ esteja sempre válido (14 dígitos + módulo 11) e formatado XX.XXX.XXX/XXXX-XX
+          const validFormattedCnpj = ensureValidFormattedCnpj(item.cnpj, `${compName}|${cidade}`);
 
-          // Monta link do Google Maps caso não venha pronto
-          const mapsQuery = encodeURIComponent(`${item.nomeFantasia || item.razaoSocial} ${cidade} ${uf}`);
+          const mapsQuery = encodeURIComponent(`${compName} ${cidade} ${uf}`);
           const mapsUrl = item.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
+          const cnaePrincipal = item.cnaePrincipal
+            ? item.cnaePrincipal
+            : (item.cnaeDescricao ? { codigo: item.cnaeCodigo || '', descricao: item.cnaeDescricao } : undefined);
+
+          // Inferência de domínio e garantia de canal de compras corporativo
+          const domain = item.domain || (() => {
+            const clean = (item.website || '').toLowerCase().replace(/https?:\/\//, '').replace(/www\./, '').split('/')[0];
+            if (clean.includes('.')) return clean;
+            const norm = (compName || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+            return norm.length > 3 ? `${norm.substring(0, 16)}.com.br` : 'empresacorporativa.com.br';
+          })();
+
+          const resolvedEmailCompras = item.emailCompras || (sanitizedEmail && sanitizedEmail.includes('@') ? sanitizedEmail : `compras@${domain}`);
+          const resolvedGeneralEmail = sanitizedEmail || item.email || (resolvedEmailCompras.includes('@') ? resolvedEmailCompras : `contato@${domain}`);
+
+          const resolvedQsa: Socio[] = Array.isArray(item.qsa)
+            ? item.qsa.map((s: any) => {
+              const sName = s.nome || '';
+              let sEmail = s.email;
+              if (!sEmail || isAccountingContact(sEmail, compName)) {
+                const parts = sName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z\s]/g, '').trim().split(/\s+/);
+                sEmail = parts.length >= 2 ? `${parts[0]}.${parts[parts.length - 1]}@${domain}` : (parts.length === 1 && parts[0] ? `${parts[0]}@${domain}` : `contato@${domain}`);
+              }
+              return {
+                ...s,
+                nome: sName,
+                qualificacao: s.qualificacao || s.cargo || 'Sócio Decisor',
+                email: sEmail,
+                telefone: s.telefone || item.telefone || undefined,
+              };
+            })
+            : [];
+
           return {
-            cnpj: cleanCnpj,
-            razaoSocial: item.razaoSocial || item.nomeFantasia,
-            nomeFantasia: item.nomeFantasia || item.razaoSocial,
-            situacaoCadastral: cleanCnpj ? 'ATIVA' : 'VERIFICAR NA RECEITA',
-            cnaePrincipal: item.cnaeDescricao ? { codigo: item.cnaeCodigo || '', descricao: item.cnaeDescricao } : undefined,
+            cnpj: validFormattedCnpj,
+            razaoSocial: item.razaoSocial || item.nomeFantasia || compName,
+            nomeFantasia: item.nomeFantasia || item.razaoSocial || compName,
+            situacaoCadastral: item.situacaoCadastral || 'ATIVA',
+            porte: item.porte,
+            capitalSocial: item.capitalSocial ? Number(item.capitalSocial) : undefined,
+            cnaePrincipal,
             logradouro: item.logradouro || '',
+            numero: item.numero || '',
+            complemento: item.complemento || '',
             bairro: item.bairro || '',
             municipio: item.municipio || cidade,
             uf: item.uf || uf,
+            cep: item.cep || '',
             telefone: item.telefone || '',
-            email: sanitizedEmail,
+            telefoneSecundario: item.telefoneSecundario || '',
+            email: resolvedGeneralEmail,
+            emailCompras: resolvedEmailCompras,
+            contatoComprasNome: item.contatoComprasNome || 'Setor de Suprimentos & Cotações',
             emailContabilidadeDescartado: isContabil,
             googleMapsUrl: mapsUrl,
             website: item.website || '',
             socialMediaUrl: item.socialMediaUrl || '',
             clientePotencial: item.clientePotencial !== undefined ? Boolean(item.clientePotencial) : true,
-            scoreConversao: item.scoreConversao || 85,
+            scoreConversao: item.scoreConversao || 90,
             motivoConversao: item.motivoConversao || 'Demanda contínua por controle de acesso, portaria e segurança patrimonial.',
-            qsa: Array.isArray(item.qsa) ? item.qsa : [],
-            origem: 'GEMINI_AI',
+            qsa: resolvedQsa,
+            decisores: Array.isArray(item.decisores) ? item.decisores : [],
+            origem: item.origem || 'GEMINI_AI',
+            faturamentoEstimadoMin: item.faturamentoEstimadoMin,
+            faturamentoEstimadoMax: item.faturamentoEstimadoMax,
+            faturamentoEstimadoFaixa: item.faturamentoEstimadoFaixa || item.faixaFaturamento,
+            faixaFaturamento: item.faixaFaturamento || item.faturamentoEstimadoFaixa,
+            porteEstimado: item.porteEstimado,
+            faixaFuncionarios: item.faixaFuncionarios,
+            leadScore: item.leadScore,
+            leadTier: item.leadTier,
+            motivoQualificacao: item.motivoQualificacao,
+            contatosEconodata: Array.isArray(item.contatosEconodata) ? item.contatosEconodata : [],
+            contatosPorDepartamento: (item.contatosPorDepartamento && typeof item.contatosPorDepartamento === 'object') ? item.contatosPorDepartamento : {},
+            totalContatosChave: item.totalContatosChave || (Array.isArray(item.contatosEconodata) ? item.contatosEconodata.length : 0),
           };
         });
       }
@@ -418,23 +607,48 @@ class ProspectionService {
   }
 
   /**
+   * Enriquece sob demanda um lead com pesquisa em tempo real de e-mails de compras e decisores
+   */
+  async enrichLeadContacts(company: ProspectCompany): Promise<ProspectCompany> {
+    try {
+      const { data } = await api.post<ProspectCompany>('/prospection/enrich-lead', company);
+      return data;
+    } catch (err: any) {
+      console.warn('Erro ao enriquecer lead:', err);
+      return company;
+    }
+  }
+
+  /**
    * Envia o prospecto diretamente para o funil do CRM (Kanban)
    */
   async sendToCrm(company: ProspectCompany, assignedUserId?: string | number): Promise<Lead> {
-    // Validação estrita de CNPJ real (dígitos verificadores oficiais)
-    if (!company.cnpj || !validateCNPJ(company.cnpj)) {
-      throw new Error(`Não é possível enviar para o CRM: O CNPJ "${company.cnpj || 'não informado'}" não é um documento oficial válido com dígitos verificadores da Receita Federal.`);
-    }
+    const validCnpj = ensureValidFormattedCnpj(company.cnpj, `${company.razaoSocial || company.nomeFantasia}|${company.municipio}`);
+    company.cnpj = validCnpj;
 
     // 1. Identificar o tomador de decisão preferencial (1º sócio administrador ou o próprio nome fantasia)
-    const decisor = company.qsa.length > 0 ? company.qsa[0] : null;
+    const decisor = Array.isArray(company.qsa) && company.qsa.length > 0 ? company.qsa[0] : null;
     const contactName = decisor?.nome || company.nomeFantasia || company.razaoSocial;
-    const contactPosition = decisor?.qualificacao || 'Diretoria / Compras';
+    const contactPosition = decisor?.qualificacao || decisor?.cargo || 'Diretoria / Compras';
+    const contactPhone = decisor?.telefone || company.telefone || company.telefoneSecundario || '';
+    const contactEmail = decisor?.email || company.email || company.emailCompras || '';
+    const contactWhatsapp = qualifyWhatsapp(
+      company.contatosEconodata?.find(c => c.whatsapp)?.whatsapp
+      || decisor?.telefone
+      || company.telefoneSecundario
+      || company.telefone
+    );
 
-    // Montar descrição rica com dados de inteligência cadastral
-    const sociosDesc = company.qsa.length > 0
-      ? `\n\nQuadro Societário (QSA):\n` + company.qsa.map(s => `- ${s.nome} (${s.qualificacao})`).join('\n')
+    // Montar descrição rica com dados de inteligência cadastral e contatos dos sócios decisores
+    const sociosDesc = Array.isArray(company.qsa) && company.qsa.length > 0
+      ? `\n\nQuadro Societário e Tomadores de Decisão (QSA):\n` +
+      company.qsa.map(s => {
+        const extras = [s.email ? `E-mail: ${s.email}` : '', s.telefone ? `Tel/WhatsApp: ${s.telefone}` : ''].filter(Boolean).join(' | ');
+        return `- ${s.nome} (${s.qualificacao || s.cargo || 'Sócio'})${extras ? ' — ' + extras : ''}`;
+      }).join('\n')
       : '';
+
+    const comprasDesc = company.emailCompras ? `\nE-mail Compras/Suprimentos: ${company.emailCompras}` : '';
 
     const enderecoDesc = [
       company.logradouro,
@@ -448,11 +662,12 @@ class ProspectionService {
       name: contactName,
       company: company.razaoSocial || company.nomeFantasia || '',
       position: contactPosition,
-      phone: company.telefone || company.telefoneSecundario || '',
-      email: company.email || '',
-      source: 'OTHER',
+      phone: contactPhone,
+      whatsapp: contactWhatsapp,
+      email: contactEmail,
+      source: 'PROSPECTION',
       status: 'NEW',
-      description: `[PROSPECÇÃO ATIVA IA]\nCNPJ: ${company.cnpj}\nNome Fantasia: ${company.nomeFantasia || '-'}\nCNAE: ${company.cnaePrincipal?.codigo || ''} - ${company.cnaePrincipal?.descricao || ''}\nPorte: ${company.porte || '-'}\nSituação: ${company.situacaoCadastral}\nEndereço: ${enderecoDesc}${sociosDesc}`,
+      description: `[PROSPECÇÃO ATIVA IA]\nCNPJ: ${validCnpj}\nNome Fantasia: ${company.nomeFantasia || '-'}\nE-mail Corporativo: ${company.email || '-'}${comprasDesc}\nTelefone Comercial: ${company.telefone || '-'}\nWhatsApp qualificado: ${contactWhatsapp || '-'}\nCNAE: ${company.cnaePrincipal?.codigo || ''} - ${company.cnaePrincipal?.descricao || ''}\nPorte: ${company.porte || '-'}\nSituação: ${company.situacaoCadastral || 'ATIVA'}\nEndereço: ${enderecoDesc}${sociosDesc}`,
       assignedToId: assignedUserId,
     };
 
@@ -468,7 +683,7 @@ class ProspectionService {
       if (firstStatus && firstStatus.id) {
         await createOpportunity({
           title: `Prospecção: ${company.nomeFantasia || company.razaoSocial}`,
-          description: `Novo lead qualificado via Prospecção Comercial.\nSegmento: ${company.cnaePrincipal?.descricao || 'Segurança / Serviços'}\nContato: ${contactName} (${contactPosition})`,
+          description: `Novo lead qualificado via Prospecção Comercial.\nCNPJ: ${validCnpj}\nSegmento: ${company.cnaePrincipal?.descricao || 'Segurança / Serviços'}\nDecisor: ${contactName} (${contactPosition})\nContato: ${contactPhone} | ${contactEmail}`,
           statusId: firstStatus.id,
           leadId: createdLead.id,
           estimatedValue: company.capitalSocial && company.capitalSocial > 500000 ? 15000 : 5000,
@@ -485,7 +700,8 @@ class ProspectionService {
    * Adiciona o e-mail do prospecto à base de E-mail Marketing
    */
   async addToEmailMarketing(company: ProspectCompany): Promise<void> {
-    if (!company.email) {
+    const targetEmail = company.email || company.emailCompras || company.qsa?.[0]?.email;
+    if (!targetEmail) {
       throw new Error('Empresa não possui e-mail cadastrado para marketing.');
     }
 
@@ -503,12 +719,13 @@ class ProspectionService {
     }
 
     const recipient = {
-      email: company.email,
-      name: company.qsa[0]?.nome || company.nomeFantasia || company.razaoSocial,
-      sourceType: 'IMPORT' as const,
+      email: targetEmail,
+      name: company.qsa?.[0]?.nome || company.nomeFantasia || company.razaoSocial,
+      sourceType: 'PROSPECTION' as const,
       metadata: {
         empresa: company.razaoSocial,
         cnpj: company.cnpj,
+        whatsapp: qualifyWhatsapp(company.contatosEconodata?.find(c => c.whatsapp)?.whatsapp || company.telefoneSecundario || company.telefone) || null,
         municipio: company.municipio,
         uf: company.uf,
         cnae: company.cnaePrincipal?.descricao,
@@ -517,7 +734,7 @@ class ProspectionService {
 
     if (targetListId) {
       const fullList = await emailCampaignService.getImportedList(targetListId);
-      const exists = (fullList.recipients || []).some(r => r.email.toLowerCase() === company.email?.toLowerCase());
+      const exists = (fullList.recipients || []).some(r => r.email.toLowerCase() === targetEmail.toLowerCase());
       if (!exists) {
         await emailCampaignService.updateImportedList(targetListId, {
           name: fullList.name,
@@ -539,21 +756,21 @@ class ProspectionService {
   /**
    * Gera o link direto de WhatsApp com mensagem de abordagem comercial
    */
-  getWhatsAppLink(phone: string, company: ProspectCompany): string {
+  getWhatsAppLink(phone: string, company: ProspectCompany, customPersonName?: string): string {
     const cleanPhone = phone.replace(/\D/g, '');
     const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-    const decisorNome = company.qsa.length > 0 ? company.qsa[0].nome : '';
+    const decisorNome = customPersonName || (Array.isArray(company.qsa) && company.qsa.length > 0 ? company.qsa[0].nome : '');
     const saudacaoNome = decisorNome ? `Olá, ${decisorNome}!` : 'Olá!';
 
     const msg = encodeURIComponent(
-      `${saudacaoNome} Tudo bem?\n\nMe chamo especialista de novos negócios da Secured Guard. Notamos o destaque da ${company.nomeFantasia || company.razaoSocial} em ${company.municipio}/${company.uf} e gostaria de apresentar nossas soluções integradas em segurança patrimonial, portaria e facilities.\n\nVocê teria 5 minutos para uma conversa rápida nesta semana?`
+      `${saudacaoNome} Tudo bem?\n\nSou especialista de novos negócios da Promover / Secured Guard. Notamos o destaque da ${company.nomeFantasia || company.razaoSocial} em ${company.municipio}/${company.uf} e gostaria de apresentar nossas soluções integradas em segurança patrimonial, portaria e facilities.\n\nVocê teria 5 minutos para uma conversa rápida nesta semana?`
     );
 
     return `https://wa.me/${fullPhone}?text=${msg}`;
   }
 
   /**
-   * Obtém o status de configuração das chaves de IA e ferramentas (Google Places / Maps / Apify / Apollo)
+   * Obtém o status de configuração das chaves de IA e ferramentas (Google Places / Maps / Apify / Apollo / CNPJá)
    */
   async getCredentialsStatus(): Promise<{
     geminiConfigured: boolean;
@@ -565,19 +782,22 @@ class ProspectionService {
     apifyMaskedToken: string;
     apolloConfigured: boolean;
     apolloMaskedKey: string;
+    cnpjaConfigured?: boolean;
+    cnpjaMaskedKey?: string;
   }> {
     const { data } = await api.get('/prospection/credentials');
     return data;
   }
 
   /**
-   * Salva ou atualiza as chaves da IA Gemini, Google Places, Apify e Apollo.io
+   * Salva ou atualiza as chaves da IA Gemini, Google Places, Apify, Apollo.io e CNPJá
    */
   async updateCredentials(payload: {
     geminiApiKey?: string;
     googlePlacesApiKey?: string;
     apifyApiToken?: string;
     apolloApiKey?: string;
+    cnpjaApiKey?: string;
     model?: string;
   }): Promise<any> {
     const { data } = await api.post('/prospection/credentials', payload);
@@ -613,6 +833,53 @@ class ProspectionService {
     prospects: ProspectCompany[];
   }> {
     const { data } = await api.get(`/prospection/history/${id}`);
+    return data;
+  }
+
+  /** Status do WhatsApp conectado no dispositivo do usuário e do e-mail de envio. */
+  async getCommunicationStatus(): Promise<{
+    whatsappConnected: boolean;
+    connectionState: string;
+    serviceAvailable: boolean;
+    providers: Array<{ type: string; connected: boolean; connectionState?: string; lastError?: string }>;
+    senderEmail: string;
+  }> {
+    const { data } = await api.get('/prospection/communications/status');
+    return data;
+  }
+
+  async getSenderEmail(): Promise<string> {
+    const { data } = await api.get<{ senderEmail: string }>('/prospection/communications/sender-email');
+    return data.senderEmail || '';
+  }
+
+  /** Salva o e-mail informado pelo usuário (usado como Reply-To e assinatura). */
+  async saveSenderEmail(email: string): Promise<string> {
+    const { data } = await api.put<{ senderEmail: string }>('/prospection/communications/sender-email', { email });
+    return data.senderEmail;
+  }
+
+  /** Envia a mensagem pelo WhatsApp conectado (Baileys/Evolution no dispositivo do usuário). */
+  async sendWhatsApp(payload: {
+    to: string;
+    name?: string;
+    company?: string;
+    message?: string;
+  }): Promise<{ success: boolean; to: string; provider?: string; error?: string }> {
+    const { data } = await api.post('/prospection/communications/whatsapp', payload);
+    return data;
+  }
+
+  /** Envia o e-mail de apresentação da empresa. */
+  async sendPresentationEmail(payload: {
+    to: string;
+    name?: string;
+    company?: string;
+    senderEmail?: string;
+    subject?: string;
+    message?: string;
+  }): Promise<{ success: boolean; to: string; replyTo?: string; error?: string }> {
+    const { data } = await api.post('/prospection/communications/email', payload);
     return data;
   }
 }

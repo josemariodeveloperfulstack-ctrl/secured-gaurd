@@ -46,6 +46,11 @@ public class Lead {
     @Size(max = 20, message = "Celular deve ter no máximo 20 caracteres")
     @Column(name = "mobile")
     private String mobile;
+
+    /** WhatsApp qualificado na prospecção (formato (DD) 9XXXX-XXXX). */
+    @Size(max = 20, message = "WhatsApp deve ter no máximo 20 caracteres")
+    @Column(name = "whatsapp")
+    private String whatsapp;
     
     @Size(max = 255, message = "Empresa deve ter no máximo 255 caracteres")
     @Column(name = "company")
@@ -143,6 +148,14 @@ public class Lead {
     
     public void setMobile(String mobile) {
         this.mobile = mobile;
+    }
+
+    public String getWhatsapp() {
+        return whatsapp;
+    }
+
+    public void setWhatsapp(String whatsapp) {
+        this.whatsapp = whatsapp;
     }
     
     public String getCompany() {

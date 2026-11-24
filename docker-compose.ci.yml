@@ -101,7 +101,8 @@ services:
       ZAPI_INSTANCE_ID: ${ZAPI_INSTANCE_ID:-}
       ZAPI_INSTANCE_TOKEN: ${ZAPI_INSTANCE_TOKEN:-}
       ZAPI_CLIENT_TOKEN: ${ZAPI_CLIENT_TOKEN:-}
-      EVOLUTION_API_ENABLED: ${EVOLUTION_API_ENABLED:-false}
+      # Evolution habilitado por padrao no CI - fallback automatico para Baileys se container nao estiver rodando
+      EVOLUTION_API_ENABLED: ${EVOLUTION_API_ENABLED:-true}
       EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution-api-ci:8080}
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-B6D711FCDE4D4FD5936544120E713976}
       EVOLUTION_API_INSTANCE: ${EVOLUTION_API_INSTANCE:-securedguard}

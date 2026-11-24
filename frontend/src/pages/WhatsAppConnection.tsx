@@ -36,6 +36,8 @@ interface ProviderStatus {
   available: boolean;
   connected: boolean;
   connectionState?: string;
+  serviceUrl?: string;
+  lastError?: string;
 }
 
 const WhatsAppConnection: React.FC = () => {

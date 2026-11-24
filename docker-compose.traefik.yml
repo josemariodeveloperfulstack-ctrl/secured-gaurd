@@ -22,9 +22,9 @@ services:
       - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300"
       - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300"
       - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=300"
-      # Usar staging para testar estabilidade (Traefik crashava ~60s após "Testing certificate renew")
-      # Remover esta linha após confirmar que estabilizou - staging não é confiável no browser
-      - "--certificatesresolvers.letsencryptresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      # PRODUÇÃO: usar o ACME de produção do Let's Encrypt.
+      # O ACME de staging gera certificados NÃO confiáveis (NET::ERR_CERT_AUTHORITY_INVALID).
+      # Se precisar testar o ACME temporariamente, use uma cópia deste arquivo e restaure depois.
       - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.letsencryptresolver.acme.email=z7designcode@gmail.com"

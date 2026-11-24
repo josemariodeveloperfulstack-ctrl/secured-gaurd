@@ -231,7 +231,7 @@ public class InvoiceController {
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<InvoiceDTO> create(@Valid @RequestBody InvoiceDTO invoiceDTO, Authentication authentication) {
+    public ResponseEntity<?> create(@Valid @RequestBody InvoiceDTO invoiceDTO, Authentication authentication) {
         try {
             log.info("POST /api/invoices - Criando nova fatura");
             log.info("Dados recebidos: {}", invoiceDTO);
@@ -247,9 +247,20 @@ public class InvoiceController {
             log.info("✅ Fatura criada com sucesso - ID: {}", saved.getId());
             return ResponseEntity.ok(InvoiceDTO.fromEntity(saved));
             
+        } catch (IllegalArgumentException e) {
+            log.error("❌ Erro de validação ao criar fatura: {}", e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", 400);
+            error.put("error", "BAD_REQUEST");
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         } catch (Exception e) {
             log.error("❌ Erro ao criar fatura: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", 400);
+            error.put("error", "BAD_REQUEST");
+            error.put("message", e.getMessage() != null ? e.getMessage() : "Erro interno ao processar a fatura.");
+            return ResponseEntity.badRequest().body(error);
         }
     }
     
@@ -261,7 +272,7 @@ public class InvoiceController {
             @ApiResponse(responseCode = "404", description = "Fatura não encontrada"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<InvoiceDTO> update(@PathVariable String id, @RequestBody InvoiceDTO invoiceDTO, Authentication authentication) {
+    public ResponseEntity<?> update(@PathVariable String id, @RequestBody InvoiceDTO invoiceDTO, Authentication authentication) {
         try {
             log.info("PUT /api/invoices/{} - Atualizando fatura", id);
             log.info("Dados recebidos: {}", invoiceDTO);
@@ -303,10 +314,20 @@ public class InvoiceController {
                 invoiceDTO.setSupplierId(existing.getSupplier().getId());
             }
             if (invoiceDTO.getSubcategoriaId() == null && existing.getSubcategoria() != null) {
-                invoiceDTO.setSubcategoriaId(existing.getSubcategoria().getId());
+                String cat = invoiceDTO.getCategory() != null ? invoiceDTO.getCategory() : existing.getCategory();
+                boolean isRh = cat != null && (cat.startsWith("01") || cat.toUpperCase().contains("RH") || cat.toUpperCase().contains("PESSOAL"));
+                if (isRh) {
+                    invoiceDTO.setSubcategoriaId(existing.getSubcategoria().getId());
+                }
             }
             if (invoiceDTO.getEmployeeId() == null && existing.getEmployee() != null) {
-                invoiceDTO.setEmployeeId(existing.getEmployee().getId());
+                String cat = invoiceDTO.getCategory() != null ? invoiceDTO.getCategory() : existing.getCategory();
+                boolean isRh = cat != null && (cat.startsWith("01") || cat.toUpperCase().contains("RH") || cat.toUpperCase().contains("PESSOAL"));
+                if (isRh) {
+                    invoiceDTO.setEmployeeId(existing.getEmployee().getId());
+                } else {
+                    invoiceDTO.setEmployeeId(null);
+                }
             }
             if (invoiceDTO.getCompanySigla() == null) {
                 invoiceDTO.setCompanySigla(existing.getCompanySigla());
@@ -323,9 +344,20 @@ public class InvoiceController {
             log.info("✅ Fatura atualizada com sucesso - ID: {}", updated.getId());
             return ResponseEntity.ok(InvoiceDTO.fromEntity(updated));
             
+        } catch (IllegalArgumentException e) {
+            log.error("❌ Erro de validação ao atualizar fatura: {}", e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", 400);
+            error.put("error", "BAD_REQUEST");
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         } catch (Exception e) {
             log.error("❌ Erro ao atualizar fatura: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", 400);
+            error.put("error", "BAD_REQUEST");
+            error.put("message", e.getMessage() != null ? e.getMessage() : "Erro interno ao atualizar a fatura.");
+            return ResponseEntity.badRequest().body(error);
         }
     }
     

@@ -13,7 +13,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Mail, Shield, Save, X, Eye, EyeOff } from 'lucide-react';
+import { User, Mail, Shield, Save, X, Eye, EyeOff, Check, Users } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+import { permissionService } from '@/services/permissionService';
+import { PermissionDTO, UserPermissions } from '@/types/user';
+import { PERMISSION_TRANSLATIONS } from '@/utils/permissions';
 import { UserRole } from '@/types/user';
 import { getRoleDisplayName, getRoleColor, USER_ROLE_LIST } from '@/utils/permissions';
 import { userService } from '@/services/userService';
@@ -33,6 +38,9 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [allPermissions, setAllPermissions] = useState<PermissionDTO[]>([]);
+  const [selectedPermissionIds, setSelectedPermissionIds] = useState<string[]>([]);
+  const [isComboboxOpen, setIsComboboxOpen] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -42,6 +50,57 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     roles: [] as string[],
     whatsapp: '',
   });
+
+  React.useEffect(() => {
+    if (isOpen) {
+      permissionService.getAllPermissions().then((perms) => {
+        let enhancedPerms: PermissionDTO[] = [];
+        const backendMap = new Map<string, PermissionDTO>();
+        if (perms && perms.length > 0) {
+          perms.forEach(p => {
+            backendMap.set(p.name, p);
+          });
+        }
+
+        Object.keys(PERMISSION_TRANSLATIONS).forEach(key => {
+          const existing = backendMap.get(key);
+          const desc = PERMISSION_TRANSLATIONS[key as keyof UserPermissions];
+          if (existing) {
+            enhancedPerms.push({
+              ...existing,
+              description: desc || existing.description || key
+            });
+            backendMap.delete(key);
+          } else {
+            enhancedPerms.push({
+              id: key,
+              name: key,
+              description: desc || key
+            });
+          }
+        });
+
+        backendMap.forEach(p => {
+          enhancedPerms.push({
+            ...p,
+            description: p.description || p.name
+          });
+        });
+
+        enhancedPerms.sort((a, b) => (a.description || a.name).localeCompare(b.description || b.name));
+        setAllPermissions(enhancedPerms);
+      }).catch(err => {
+        console.error("Failed to load permissions", err);
+        const fallback = Object.keys(PERMISSION_TRANSLATIONS).map(key => ({
+          id: key,
+          name: key,
+          description: PERMISSION_TRANSLATIONS[key as keyof UserPermissions]
+        }));
+        fallback.sort((a, b) => a.description.localeCompare(b.description));
+        setAllPermissions(fallback);
+      });
+    }
+  }, [isOpen]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -306,6 +365,118 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
                     maxLength={20}
                   />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+                    {/* Funcionalidades e Permissões Individuais */}
+          <Card className="bg-seguranca-graphite border-gray-600">
+            <CardHeader>
+              <CardTitle className="text-seguranca-lightgray flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-seguranca-yellow" />
+                  <span>Funcionalidades & Permissões Individuais</span>
+                </div>
+                <Badge variant="outline" className="text-xs text-gray-400">
+                  {selectedPermissionIds.length} selecionada(s)
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2 mb-2 min-h-[38px] p-2 bg-seguranca-black border border-gray-600 rounded-md">
+                {selectedPermissionIds.length === 0 ? (
+                  <span className="text-gray-400 text-sm">Nenhuma funcionalidade individual selecionada (herda padrão da função).</span>
+                ) : (
+                  selectedPermissionIds.map((permId) => {
+                    const perm = allPermissions.find(p => p.id === permId || p.name === permId);
+                    const desc = perm?.description || (PERMISSION_TRANSLATIONS as Record<string, string>)[permId] || permId;
+                    return (
+                      <Badge key={permId} variant="outline" className="flex items-center gap-1 bg-gray-900 border-gray-600 text-seguranca-lightgray">
+                        {desc}
+                        <button
+                          type="button"
+                          className="ml-1 text-red-400 hover:text-red-300"
+                          onClick={() => setSelectedPermissionIds(prev => prev.filter(id => id !== permId))}
+                          title="Remover funcionalidade"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {!isComboboxOpen ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsComboboxOpen(true)}
+                    className="w-full justify-between bg-seguranca-black border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black/80 hover:text-white"
+                  >
+                    Selecionar Funcionalidades / Permissões Individuais...
+                    <Users className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                ) : (
+                  <div className="border border-gray-600 rounded-md p-2 bg-seguranca-black">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs text-gray-400">Marque as funcionalidades para adicionar ao usuário:</span>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setIsComboboxOpen(false)} className="h-6 text-gray-400 hover:text-white">
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <Command className="bg-seguranca-black text-seguranca-lightgray border border-gray-700 rounded-md">
+                      <CommandInput placeholder="Buscar por módulo ou funcionalidade (ex: Prospecção, Leads, Financeiro)..." className="h-9" />
+                      <CommandList className="max-h-[220px] overflow-y-auto">
+                        <CommandEmpty>Nenhuma funcionalidade encontrada.</CommandEmpty>
+                        <CommandGroup>
+                          {allPermissions.map((perm) => {
+                            const translatedDesc = (PERMISSION_TRANSLATIONS as Record<string, string>)[perm.name] || perm.description || perm.name;
+                            const searchTerms = `${perm.name} ${translatedDesc}`.toLowerCase();
+                            const isSelected = selectedPermissionIds.includes(perm.id) || selectedPermissionIds.includes(perm.name);
+                            return (
+                              <CommandItem
+                                key={perm.id}
+                                value={searchTerms}
+                                onSelect={() => {
+                                  setSelectedPermissionIds(prev =>
+                                    prev.includes(perm.id) || prev.includes(perm.name)
+                                      ? prev.filter(id => id !== perm.id && id !== perm.name)
+                                      : [...prev, perm.id]
+                                  );
+                                }}
+                                className="cursor-pointer hover:bg-gray-800 aria-selected:bg-gray-800 flex items-center gap-2 p-2"
+                              >
+                                <div className={cn(
+                                  "flex h-4 w-4 items-center justify-center rounded-sm border border-primary shrink-0",
+                                  isSelected ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible"
+                                )}>
+                                  <Check className={cn("h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium">{translatedDesc}</span>
+                                  <span className="text-[10px] text-gray-400">{perm.name}</span>
+                                </div>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                    <div className="mt-2 flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsComboboxOpen(false)}
+                        className="border-gray-600 text-gray-300"
+                      >
+                        Concluir Seleção ({selectedPermissionIds.length})
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -139,6 +139,41 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     LEADS_DELETE: false,
     LEADS_CREATE: false,
 
+    // Prospecção Comercial
+    PROSPECTION_READ: false,
+    PROSPECTION_WRITE: false,
+    PROSPECTION_MANAGE: false,
+
+    // Marketing Comercial
+    MARKETING_READ: false,
+    MARKETING_WRITE: false,
+    MARKETING_MANAGE: false,
+
+    // CRM Comercial
+    CRM_READ: false,
+    CRM_WRITE: false,
+    CRM_MANAGE: false,
+
+    // Supervisão Operacional
+    SUPERVISAO_READ: false,
+    SUPERVISAO_WRITE: false,
+    SUPERVISAO_MANAGE: false,
+
+    // Compras
+    PURCHASES_READ: false,
+    PURCHASES_WRITE: false,
+    PURCHASES_MANAGE: false,
+
+    // Frota
+    FLEET_READ: false,
+    FLEET_WRITE: false,
+    FLEET_MANAGE: false,
+
+    // Chat Interno
+    CHAT_READ: false,
+    CHAT_WRITE: false,
+    CHAT_MANAGE: false,
+
     PROPOSALS_READ: false,
     PROPOSALS_WRITE: false,
     PROPOSALS_DELETE: false,
@@ -1125,6 +1160,41 @@ export const PERMISSION_TRANSLATIONS: Record<keyof UserPermissions, string> = {
   LEADS_WRITE: 'Editar Leads',
   LEADS_DELETE: 'Excluir Leads',
   LEADS_CREATE: 'Cadastrar Leads',
+
+  // Prospecção Comercial
+  PROSPECTION_READ: 'Visualizar Prospecção de Leads',
+  PROSPECTION_WRITE: 'Executar e Salvar Prospecção de Leads',
+  PROSPECTION_MANAGE: 'Gerenciar Prospecção e Chaves de IA',
+
+  // Marketing Comercial
+  MARKETING_READ: 'Visualizar Campanhas de Marketing',
+  MARKETING_WRITE: 'Criar e Disparar Campanhas de Marketing',
+  MARKETING_MANAGE: 'Gerenciar Marketing e Modelos de E-mail',
+
+  // CRM Comercial
+  CRM_READ: 'Visualizar CRM e Funil Kanban',
+  CRM_WRITE: 'Criar e Editar Oportunidades no CRM',
+  CRM_MANAGE: 'Gerenciar Funil e Estágios do CRM',
+
+  // Supervisão Operacional
+  SUPERVISAO_READ: 'Visualizar Supervisão e Rotas',
+  SUPERVISAO_WRITE: 'Registrar Visitas e Relatórios de Supervisão',
+  SUPERVISAO_MANAGE: 'Gerenciar Supervisão Operacional',
+
+  // Gestão de Compras
+  PURCHASES_READ: 'Visualizar Compras e Cotações',
+  PURCHASES_WRITE: 'Criar Solicitações e Cotações de Compras',
+  PURCHASES_MANAGE: 'Aprovar e Gerenciar Compras',
+
+  // Frota
+  FLEET_READ: 'Visualizar Veículos e Frota',
+  FLEET_WRITE: 'Registrar Manutenções e Abastecimentos',
+  FLEET_MANAGE: 'Gerenciar Frota e Condutores',
+
+  // Chat Interno
+  CHAT_READ: 'Visualizar Chat Interno',
+  CHAT_WRITE: 'Enviar Mensagens no Chat Interno',
+  CHAT_MANAGE: 'Gerenciar Salas e Histórico do Chat',
 
   // Comercial (Propostas)
   PROPOSALS_READ: 'Visualizar Propostas',

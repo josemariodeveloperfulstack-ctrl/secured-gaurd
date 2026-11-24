@@ -30,5 +30,8 @@ public class MovementSummaryDTO {
     private String documentNumber;
     private String itemName;
     private String itemCode;
+    private String requisitionNumber;
+    private String category;
+    private String ca;
 }
 

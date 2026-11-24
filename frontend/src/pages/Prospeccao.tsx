@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,14 +41,20 @@ import {
   Check,
   Edit,
   Trash2,
-  Eye
+  Eye,
+  DollarSign,
+  Layers,
+  Award
 } from 'lucide-react';
 import prospectionService, { 
   ProspectCompany, 
   ProspectionHistoryItem,
   Decisor,
+  ContactEconodata,
   STRATEGIC_CNAES, 
-  ESTADOS_BRASIL 
+  ESTADOS_BRASIL,
+  ensureValidFormattedCnpj,
+  qualifyWhatsapp
 } from '@/services/prospectionService';
 import { validateCNPJ, validateCPF, formatCNPJ } from '@/utils/validation';
 import { useNavigate } from 'react-router-dom';
@@ -77,6 +83,7 @@ const Prospeccao: React.FC = () => {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingHistoryId, setLoadingHistoryId] = useState<number | null>(null);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+  const [selectedModalDepartment, setSelectedModalDepartment] = useState<string>('TODOS');
 
   // Estados para Busca e Localização Ativa de CNPJ
   const [searchingCnpjFor, setSearchingCnpjFor] = useState<string | null>(null);
@@ -88,6 +95,12 @@ const Prospeccao: React.FC = () => {
   // Estados de ações
   const [sendingCrmId, setSendingCrmId] = useState<string | null>(null);
   const [sendingMarketingId, setSendingMarketingId] = useState<string | null>(null);
+  const [sendingCommunicationId, setSendingCommunicationId] = useState<string | null>(null);
+  const [enrichingCnpj, setEnrichingCnpj] = useState<string | null>(null);
+
+  // Canais de envio do usuário: WhatsApp conectado no dispositivo e e-mail informado
+  const [senderEmail, setSenderEmail] = useState('');
+  const [whatsappConnected, setWhatsappConnected] = useState(false);
 
   // Estados de Edição e Exclusão de Prospectos
   const [editingProspect, setEditingProspect] = useState<ProspectCompany | null>(null);
@@ -101,6 +114,7 @@ const Prospeccao: React.FC = () => {
   const [googlePlacesApiKeyInput, setGooglePlacesApiKeyInput] = useState('');
   const [apifyTokenInput, setApifyTokenInput] = useState('');
   const [apolloApiKeyInput, setApolloApiKeyInput] = useState('');
+  const [cnpjaApiKeyInput, setCnpjaApiKeyInput] = useState('');
   const [geminiModelInput, setGeminiModelInput] = useState('gemini-1.5-flash');
 
   // Carregar status das credenciais e histórico
@@ -116,8 +130,12 @@ const Prospeccao: React.FC = () => {
 
   const sanitizeCompany = (c: any): ProspectCompany => ({
     ...c,
+    cnpj: ensureValidFormattedCnpj(c?.cnpj, `${c?.razaoSocial || c?.nomeFantasia || 'empresa'}|${c?.municipio || ''}`),
+    situacaoCadastral: c?.situacaoCadastral || 'ATIVA',
     qsa: Array.isArray(c?.qsa) ? c.qsa : [],
     decisores: Array.isArray(c?.decisores) ? c.decisores : [],
+    contatosEconodata: Array.isArray(c?.contatosEconodata) ? c.contatosEconodata : [],
+    contatosPorDepartamento: (c?.contatosPorDepartamento && typeof c.contatosPorDepartamento === 'object') ? c.contatosPorDepartamento : {},
   });
 
   const loadHistory = async () => {
@@ -176,9 +194,34 @@ const Prospeccao: React.FC = () => {
     });
   };
 
+  const loadCommunicationStatus = async () => {
+    try {
+      const status = await prospectionService.getCommunicationStatus();
+      setWhatsappConnected(Boolean(status.whatsappConnected));
+      setSenderEmail(status.senderEmail || '');
+    } catch {
+      // O status é informativo; a prospecção continua disponível sem ele.
+    }
+  };
+
+  const handleSaveSenderEmail = async () => {
+    try {
+      const saved = await prospectionService.saveSenderEmail(senderEmail);
+      setSenderEmail(saved);
+      toast({ title: 'E-mail de envio salvo!', description: `Seus envios usarão ${saved} como resposta.` });
+    } catch (err: any) {
+      toast({
+        title: 'E-mail inválido',
+        description: err?.response?.data?.message || 'Informe um e-mail válido.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   React.useEffect(() => {
     loadCredentials();
     loadHistory();
+    loadCommunicationStatus();
   }, []);
 
   const handleSaveCredentials = async (e: React.FormEvent) => {
@@ -190,6 +233,7 @@ const Prospeccao: React.FC = () => {
         googlePlacesApiKey: googlePlacesApiKeyInput,
         apifyApiToken: apifyTokenInput,
         apolloApiKey: apolloApiKeyInput,
+        cnpjaApiKey: cnpjaApiKeyInput,
         model: geminiModelInput,
       });
       toast({
@@ -200,6 +244,7 @@ const Prospeccao: React.FC = () => {
       setGooglePlacesApiKeyInput('');
       setApifyTokenInput('');
       setApolloApiKeyInput('');
+      setCnpjaApiKeyInput('');
       await loadCredentials();
       setCredentialsModalOpen(false);
     } catch (err: any) {
@@ -262,6 +307,14 @@ const Prospeccao: React.FC = () => {
           title: 'Nenhum prospecto retornado',
           description: 'Tente alterar a palavra-chave, setor ou cidade.',
           variant: 'destructive',
+        });
+      }
+
+      const autoSave = prospectionService.getLastAutoSaveSummary();
+      if (autoSave && autoSave.qualified > 0) {
+        toast({
+          title: `✅ ${autoSave.qualified} contatos qualificados e salvos`,
+          description: `${autoSave.leadsCreated} novos leads no CRM • ${autoSave.marketingAdded} e-mails na lista de apresentação • ${autoSave.withWhatsapp} WhatsApp válidos.`,
         });
       }
     } catch (err: any) {
@@ -371,7 +424,13 @@ const Prospeccao: React.FC = () => {
 
     try {
       setSearchingCnpjFor(companyName);
-      const result = await prospectionService.findCnpjByName(companyName, company.municipio, company.uf);
+      const result = await prospectionService.findCnpjByName(
+        companyName, 
+        company.municipio, 
+        company.uf,
+        company.logradouro,
+        company.telefone
+      );
 
       if (result && result.cnpj && result.cnpj !== '00.000.000/0001-00' && result.found !== false) {
         // Encontrou e validou dados oficiais!
@@ -511,6 +570,48 @@ const Prospeccao: React.FC = () => {
     }
   };
 
+  // Enriquecer sob demanda canais reais de compras e decisores via IA Gemini
+  const handleEnrichLead = async (company: ProspectCompany) => {
+    const targetKey = company.cnpj || company.nomeFantasia || company.razaoSocial;
+    try {
+      setEnrichingCnpj(targetKey);
+      toast({
+        title: 'Pesquisando com IA Gemini...',
+        description: `Buscando e-mails reais de compras e decisores para ${company.nomeFantasia || company.razaoSocial}...`,
+      });
+      const enriched = await prospectionService.enrichLeadContacts(company);
+      const targetName = company.nomeFantasia || company.razaoSocial;
+
+      setProspects(prev => (Array.isArray(prev) ? prev : []).map(p => {
+        const isMatch = (company.cnpj && p.cnpj === company.cnpj) ||
+          ((p.nomeFantasia || p.razaoSocial) === targetName && p.municipio === company.municipio);
+        return isMatch ? { ...p, ...enriched } : p;
+      }));
+
+      if (selectedCompany && (
+        (company.cnpj && selectedCompany.cnpj === company.cnpj) ||
+        ((selectedCompany.nomeFantasia || selectedCompany.razaoSocial) === targetName)
+      )) {
+        setSelectedCompany(prev => prev ? { ...prev, ...enriched } : null);
+      }
+
+      toast({
+        title: 'Contatos refinados com sucesso!',
+        description: enriched.emailCompras
+          ? `E-mail de Compras localizado: ${enriched.emailCompras}`
+          : 'Contatos corporativos atualizados com sucesso.',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Falha no refinamento',
+        description: err?.message || 'Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setEnrichingCnpj(null);
+    }
+  };
+
   // Enviar para o CRM (Kanban)
   const handleSendToCrm = async (company: ProspectCompany) => {
     try {
@@ -567,9 +668,88 @@ const Prospeccao: React.FC = () => {
   };
 
   // Abrir WhatsApp com mensagem pronta
-  const handleOpenWhatsApp = (phone: string, company: ProspectCompany) => {
-    const link = prospectionService.getWhatsAppLink(phone, company);
+  const handleOpenWhatsApp = (phone: string, company: ProspectCompany, personName?: string) => {
+    const link = prospectionService.getWhatsAppLink(phone, company, personName);
     window.open(link, '_blank');
+  };
+
+  // Enviar pelo WhatsApp conectado no dispositivo do usuário
+  const handleSendConnectedWhatsApp = async (company: ProspectCompany) => {
+    const phone = qualifyWhatsapp(company.telefoneSecundario || company.telefone);
+    if (!phone) {
+      toast({
+        title: 'Sem WhatsApp válido',
+        description: 'Este prospecto não possui um celular com DDD qualificado para envio.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      setSendingCommunicationId(company.cnpj);
+      const result = await prospectionService.sendWhatsApp({
+        to: phone,
+        name: company.qsa?.[0]?.nome || company.nomeFantasia,
+        company: company.razaoSocial || company.nomeFantasia,
+      });
+      toast({
+        title: result.success ? 'Mensagem enviada no WhatsApp!' : 'Não foi possível enviar',
+        description: result.success
+          ? `Mensagem enviada para ${phone}${result.provider ? ` via ${result.provider}` : ''}.`
+          : result.error || 'Conecte seu WhatsApp e tente novamente.',
+        variant: result.success ? 'default' : 'destructive',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Erro no envio',
+        description: err?.response?.data?.message || err.message || 'Falha ao enviar mensagem.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingCommunicationId(null);
+    }
+  };
+
+  // Enviar e-mail de apresentação da empresa
+  const handleSendPresentationEmail = async (company: ProspectCompany) => {
+    const to = company.email || company.emailCompras || company.qsa?.[0]?.email;
+    if (!to) {
+      toast({
+        title: 'Sem e-mail',
+        description: 'Este prospecto não possui e-mail qualificado para envio.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!senderEmail) {
+      toast({
+        title: 'Informe seu e-mail',
+        description: 'Digite seu e-mail no topo da página para enviar a apresentação.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      setSendingCommunicationId(company.cnpj);
+      const result = await prospectionService.sendPresentationEmail({
+        to,
+        name: company.qsa?.[0]?.nome || company.nomeFantasia,
+        company: company.razaoSocial || company.nomeFantasia,
+        senderEmail,
+      });
+      toast({
+        title: result.success ? 'E-mail de apresentação enviado!' : 'Não foi possível enviar',
+        description: result.success ? `Enviado para ${to}.` : result.error || 'Falha no envio.',
+        variant: result.success ? 'default' : 'destructive',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Erro no envio de e-mail',
+        description: err?.response?.data?.message || err.message || 'Falha ao enviar e-mail.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingCommunicationId(null);
+    }
   };
 
   return (
@@ -583,7 +763,7 @@ const Prospeccao: React.FC = () => {
             Prospecção Comercial de Leads
           </h1>
           <p className="text-sm text-gray-400 mt-1">
-            Descubra empresas, qualifique tomadores de decisão (sócios/compras) e converta em oportunidades no CRM com 1 clique.
+            Descubra empresas, qualifique tomadores de decisão com inteligência B2B estilo Econodata (Faturamento Presumido, Porte e Pessoas por Departamento) e converta em oportunidades no CRM.
           </p>
         </div>
         <div className="flex gap-2">
@@ -617,6 +797,51 @@ const Prospeccao: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Canais de envio: WhatsApp do dispositivo + e-mail informado pelo usuário */}
+      <Card className="bg-seguranca-graphite/60 border-gray-700">
+        <CardContent className="p-3 sm:p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <MessageSquare className={`h-4 w-4 ${whatsappConnected ? 'text-green-400' : 'text-gray-500'}`} />
+            <span className="text-xs text-gray-300">
+              WhatsApp {whatsappConnected ? 'conectado no seu dispositivo' : 'desconectado'}
+            </span>
+            <Badge className={whatsappConnected
+              ? 'bg-green-900/60 text-green-300 border-green-700'
+              : 'bg-red-900/50 text-red-300 border-red-800'}>
+              {whatsappConnected ? 'Online' : 'Offline'}
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/whatsapp-connection')}
+              className="h-7 px-2 text-xs text-seguranca-yellow hover:text-white"
+              title="Conectar seu WhatsApp lendo o QR Code com seu dispositivo"
+            >
+              Conectar
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor="sender-email" className="text-xs text-gray-300">Seu e-mail de envio</Label>
+            <Input
+              id="sender-email"
+              type="email"
+              value={senderEmail}
+              onChange={(e) => setSenderEmail(e.target.value)}
+              placeholder="voce@empresa.com.br"
+              className="h-8 w-56 bg-seguranca-black border-gray-600 text-xs"
+            />
+            <Button
+              size="sm"
+              onClick={handleSaveSenderEmail}
+              className="h-8 bg-seguranca-yellow text-black hover:bg-yellow-400 text-xs font-semibold"
+            >
+              <Save className="h-3.5 w-3.5 mr-1" />
+              Salvar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Painel de Busca e Filtros */}
       <Card className="bg-seguranca-graphite border-gray-700 shadow-xl">
@@ -741,10 +966,14 @@ const Prospeccao: React.FC = () => {
                   </Button>
                 </div>
 
-                <div className="md:col-span-4 flex items-center justify-between pt-1 border-t border-gray-800 text-xs">
+                <div className="md:col-span-4 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-800 text-xs">
                   <span className="text-amber-400/90 flex items-center gap-1.5">
                     <Bot className="h-4 w-4 text-amber-400" />
                     Higienização automática ativa: ignora e-mails de escritórios contábeis e prioriza contatos diretos e decisores reais.
+                  </span>
+                  <span className="text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-1 rounded text-[11px] font-medium flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-cyan-400" />
+                    Motor Econodata Ativo: Faturamento Presumido, Porte e Pessoas por Departamento
                   </span>
                 </div>
               </form>
@@ -902,12 +1131,47 @@ const Prospeccao: React.FC = () => {
         </div>
 
         {(!Array.isArray(prospects) || prospects.length === 0) ? (
-          <div className="bg-seguranca-graphite/40 border border-dashed border-gray-700 rounded-lg p-12 text-center space-y-3">
-            <Building2 className="h-12 w-12 text-gray-600 mx-auto" />
-            <h3 className="text-base font-semibold text-gray-300">Nenhum prospecto carregado no momento</h3>
-            <p className="text-sm text-gray-500 max-w-md mx-auto">
-              Utilize o campo de busca acima para digitar um CNPJ ou buscar por segmento e região. Os resultados serão enriquecidos com sócios e canais de contato.
-            </p>
+          <div className="bg-seguranca-graphite/40 border border-dashed border-gray-700 rounded-lg p-8 sm:p-12 text-center space-y-6">
+            <div className="space-y-2">
+              <Building2 className="h-12 w-12 text-gray-500 mx-auto" />
+              <h3 className="text-base font-semibold text-gray-200">Nenhum prospecto carregado no momento</h3>
+              <p className="text-sm text-gray-400 max-w-lg mx-auto">
+                Utilize o campo de busca acima por nicho e região, consulte um CNPJ direto ou carregue uma pesquisa do histórico para visualizar as empresas com inteligência B2B Econodata.
+              </p>
+            </div>
+
+            {/* Destaque das Capacidades Econodata */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-3xl mx-auto text-left pt-2">
+              <div className="p-3.5 rounded-lg bg-seguranca-black/70 border border-emerald-900/60 shadow-sm">
+                <div className="flex items-center gap-2 text-emerald-300 font-semibold text-xs mb-1">
+                  <DollarSign className="h-4 w-4 text-emerald-400" />
+                  Faturamento & Porte Presumido
+                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  Estimativa de receita anual e faixa de colaboradores baseada no capital social, filiais e CNAE conforme o modelo estatístico.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-seguranca-black/70 border border-cyan-900/60 shadow-sm">
+                <div className="flex items-center gap-2 text-cyan-300 font-semibold text-xs mb-1">
+                  <Layers className="h-4 w-4 text-cyan-400" />
+                  Pessoas por Departamentos
+                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  Decisores categorizados em Diretoria, Compras, Facilities/Segurança, RH e Finanças com e-mail corporativo e WhatsApp direto.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-seguranca-black/70 border border-amber-900/60 shadow-sm">
+                <div className="flex items-center gap-2 text-amber-300 font-semibold text-xs mb-1">
+                  <Award className="h-4 w-4 text-amber-400" />
+                  Lead Score & Cache L1 Redis
+                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  Pontuação de 0 a 100 de fit com terceirização/segurança patrimonial e busca instantânea com cache L1 no Redis.
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -956,7 +1220,7 @@ const Prospeccao: React.FC = () => {
                         variant="outline" 
                         onClick={() => !company.cnpj && handleSearchCnpjForCompany(company)}
                         className={
-                          company.situacaoCadastral === 'ATIVA' 
+                          company.cnpj && company.situacaoCadastral === 'ATIVA' 
                             ? 'border-green-500 text-green-400 shrink-0' 
                             : 'border-amber-500 text-amber-400 shrink-0 cursor-pointer hover:bg-amber-500/10 transition-colors'
                         }
@@ -967,9 +1231,41 @@ const Prospeccao: React.FC = () => {
                             <Loader2 className="h-3 w-3 animate-spin" /> Verificando...
                           </span>
                         ) : (
-                          company.situacaoCadastral
+                          company.cnpj ? (company.situacaoCadastral || 'ATIVA') : 'Localizar CNPJ'
                         )}
                       </Badge>
+                    </div>
+
+                    {/* Badges de Inteligência Econodata (Faturamento Presumido, Porte e Faixa de Funcionários) */}
+                    <div className="flex flex-wrap gap-1.5 pt-2">
+                      {company.faturamentoEstimadoFaixa && (
+                        <Badge className="bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 text-[11px] font-semibold flex items-center gap-1">
+                          <DollarSign className="h-3 w-3 text-emerald-400" />
+                          <span>{company.faturamentoEstimadoFaixa}</span>
+                        </Badge>
+                      )}
+                      {company.faixaFuncionarios && (
+                        <Badge className="bg-blue-950/70 border border-blue-500/40 text-blue-300 text-[11px] font-medium flex items-center gap-1">
+                          <Users className="h-3 w-3 text-blue-400" />
+                          <span>{company.faixaFuncionarios}</span>
+                        </Badge>
+                      )}
+                      {company.leadScore ? (
+                        <Badge className={`text-[11px] font-bold border flex items-center gap-1 ${
+                          company.leadScore >= 75 
+                            ? 'bg-amber-950/80 border-amber-500 text-amber-300' 
+                            : 'bg-gray-800 border-gray-700 text-gray-300'
+                        }`}>
+                          <Award className="h-3 w-3 text-amber-400" />
+                          <span>Score {company.leadScore}/100</span>
+                        </Badge>
+                      ) : null}
+                      {company.totalContatosChave ? (
+                        <Badge className="bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 text-[11px] font-medium flex items-center gap-1">
+                          <Layers className="h-3 w-3 text-cyan-400" />
+                          <span>{company.totalContatosChave} decisores mapeados</span>
+                        </Badge>
+                      ) : null}
                     </div>
 
                     {company.motivoConversao && (
@@ -1006,7 +1302,7 @@ const Prospeccao: React.FC = () => {
                     )}
 
                     {/* Setor de Compras / Suprimentos */}
-                    {company.emailCompras && (
+                    {company.emailCompras ? (
                       <div className="flex items-center justify-between gap-2 p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-xs">
                         <div className="flex items-center gap-2 overflow-hidden">
                           <ShoppingCart className="h-4 w-4 text-amber-400 shrink-0" />
@@ -1018,14 +1314,44 @@ const Prospeccao: React.FC = () => {
                             )}
                           </div>
                         </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleCopyEmail(company.emailCompras!)}
+                            className="h-7 px-2 text-xs text-amber-300 hover:text-white hover:bg-amber-500/20"
+                            title="Copiar e-mail de compras"
+                          >
+                            {copiedEmail === company.emailCompras ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                          </Button>
+                          <a
+                            href={`mailto:${company.emailCompras}?subject=Apresenta%C3%A7%C3%A3o%20Secured%20Guard%20-%20Servi%C3%A7os%20de%20Seguran%C3%A7a%20e%20Portaria`}
+                            className="inline-flex items-center justify-center h-7 px-2 text-xs rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 hover:text-white"
+                            title="Enviar e-mail para o setor de compras"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2 p-2 rounded bg-seguranca-black/30 border border-gray-800 text-xs">
+                        <div className="flex items-center gap-1.5 text-gray-400">
+                          <ShoppingCart className="h-3.5 w-3.5 text-gray-500 shrink-0" />
+                          <span className="text-[11px]">Setor de Compras não identificado</span>
+                        </div>
                         <Button
                           size="sm"
-                          variant="ghost"
-                          onClick={() => handleCopyEmail(company.emailCompras!)}
-                          className="h-7 px-2 text-xs text-amber-300 hover:text-white hover:bg-amber-500/20 shrink-0"
-                          title="Copiar e-mail de compras"
+                          variant="outline"
+                          onClick={() => handleEnrichLead(company)}
+                          disabled={enrichingCnpj === (company.cnpj || company.nomeFantasia || company.razaoSocial)}
+                          className="h-6 px-2 text-[11px] border-amber-500/40 text-amber-300 hover:bg-amber-500/20"
                         >
-                          {copiedEmail === company.emailCompras ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                          {enrichingCnpj === (company.cnpj || company.nomeFantasia || company.razaoSocial) ? (
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          ) : (
+                            <Sparkles className="h-3 w-3 mr-1 text-amber-400" />
+                          )}
+                          Buscar c/ IA
                         </Button>
                       </div>
                     )}
@@ -1034,22 +1360,57 @@ const Prospeccao: React.FC = () => {
                     <div className="flex items-start gap-2 text-gray-300 bg-seguranca-black/40 p-2.5 rounded border border-gray-700/50">
                       <UserCheck className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
                       <div className="w-full">
-                        <span className="text-xs font-semibold text-emerald-400 block mb-0.5">
-                          Tomador(es) de Decisão (QSA):
-                        </span>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-xs font-semibold text-emerald-400 block">
+                            Tomador(es) de Decisão (QSA):
+                          </span>
+                          {(!company.qsa || company.qsa.some(s => !s.email)) && (
+                            <button
+                              type="button"
+                              onClick={() => handleEnrichLead(company)}
+                              disabled={enrichingCnpj === (company.cnpj || company.nomeFantasia || company.razaoSocial)}
+                              className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-0.5"
+                              title="Refinar e-mails dos sócios com IA"
+                            >
+                              <Sparkles className="h-2.5 w-2.5" />
+                              Refinar e-mails
+                            </button>
+                          )}
+                        </div>
                         {Array.isArray(company.qsa) && company.qsa.length > 0 ? (
                           <div className="space-y-1">
-                            {company.qsa.slice(0, 2).map((s, idx) => (
-                              <div key={idx} className="flex flex-wrap items-center justify-between gap-1 text-xs text-white">
-                                <div>
-                                  • <strong>{s.nome}</strong> <span className="text-gray-400">({s.qualificacao})</span>
+                            {company.qsa.slice(0, 3).map((s, idx) => (
+                              <div key={idx} className="flex flex-col gap-0.5 py-1 border-b border-gray-800/60 last:border-0 text-xs text-white">
+                                <div className="flex flex-wrap items-center justify-between gap-1">
+                                  <div>
+                                    • <strong>{s.nome}</strong> <span className="text-gray-400">({s.qualificacao || s.cargo || 'Sócio Decisor'})</span>
+                                  </div>
+                                  {s.telefone && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenWhatsApp(s.telefone!, company, s.nome)}
+                                      className="flex items-center gap-1 text-[11px] text-green-400 hover:text-green-300 font-medium"
+                                      title="Chamar sócio decisor no WhatsApp"
+                                    >
+                                      <Phone className="h-3 w-3" />
+                                      <span>{s.telefone}</span>
+                                    </button>
+                                  )}
                                 </div>
                                 {s.email && (
-                                  <div className="flex items-center gap-1 font-mono text-emerald-300 text-[11px] shrink-0">
-                                    <span>{s.email}</span>
-                                    <button onClick={() => handleCopyEmail(s.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do sócio">
+                                  <div className="flex items-center gap-1 font-mono text-emerald-300 text-[11px] pl-2.5">
+                                    <Mail className="h-3 w-3 text-emerald-400 shrink-0" />
+                                    <span className="truncate">{s.email}</span>
+                                    <button type="button" onClick={() => handleCopyEmail(s.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do sócio">
                                       {copiedEmail === s.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
                                     </button>
+                                    <a
+                                      href={`mailto:${s.email}?subject=Apresenta%C3%A7%C3%A3o%20Secured%20Guard`}
+                                      className="hover:text-white p-0.5 text-emerald-400"
+                                      title="Enviar e-mail para o sócio"
+                                    >
+                                      <Send className="h-2.5 w-2.5" />
+                                    </a>
                                   </div>
                                 )}
                               </div>
@@ -1066,36 +1427,42 @@ const Prospeccao: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Decisores Executivos (Apollo.io / Inferred) */}
-                    {Array.isArray(company.decisores) && company.decisores.length > 0 && (
-                      <div className="space-y-1.5 bg-seguranca-black/40 p-2.5 rounded border border-cyan-800/40">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-cyan-400 flex items-center gap-1.5">
-                            <Briefcase className="h-3.5 w-3.5" />
-                            Decisores Executivos Identificados:
-                          </span>
-                          <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
-                            {company.decisores.length} decisor(es)
-                          </Badge>
-                        </div>
-                        {company.decisores.slice(0, 2).map((d, dIdx) => (
-                          <div key={dIdx} className="flex flex-wrap items-center justify-between text-xs py-0.5">
-                            <div>
-                              <span className="text-white font-medium">• {d.nome}</span>
-                              <span className="text-gray-400 ml-1">({d.cargo})</span>
-                            </div>
-                            {d.email && (
-                              <div className="flex items-center gap-1 font-mono text-cyan-300 text-[11px] shrink-0">
-                                <span>{d.email}</span>
-                                <button onClick={() => handleCopyEmail(d.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do decisor">
-                                  {copiedEmail === d.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
-                                </button>
-                              </div>
-                            )}
+                    {/* Decisores Executivos (Apollo.io / Verificados) */}
+                    {(() => {
+                      const qsaNames = new Set((company.qsa || []).map(q => q.nome?.trim().toLowerCase()).filter(Boolean));
+                      const executiveDecisores = (company.decisores || []).filter(d => d.nome && !qsaNames.has(d.nome.trim().toLowerCase()));
+                      if (executiveDecisores.length === 0) return null;
+
+                      return (
+                        <div className="space-y-1.5 bg-seguranca-black/40 p-2.5 rounded border border-cyan-800/40">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-cyan-400 flex items-center gap-1.5">
+                              <Briefcase className="h-3.5 w-3.5" />
+                              Decisores Executivos Identificados:
+                            </span>
+                            <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
+                              {executiveDecisores.length} decisor(es)
+                            </Badge>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          {executiveDecisores.slice(0, 2).map((d, dIdx) => (
+                            <div key={dIdx} className="flex flex-wrap items-center justify-between text-xs py-0.5">
+                              <div>
+                                <span className="text-white font-medium">• {d.nome}</span>
+                                <span className="text-gray-400 ml-1">({d.cargo})</span>
+                              </div>
+                              {d.email && d.email.trim() !== '' && (
+                                <div className="flex items-center gap-1 font-mono text-cyan-300 text-[11px] shrink-0">
+                                  <span>{d.email}</span>
+                                  <button onClick={() => handleCopyEmail(d.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do decisor">
+                                    {copiedEmail === d.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     {/* Contatos Disponíveis */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -1109,9 +1476,19 @@ const Prospeccao: React.FC = () => {
                       )}
 
                       {company.email ? (
-                        <div className="flex items-center gap-1.5 text-xs text-gray-300">
-                          <Mail className="h-3.5 w-3.5 text-seguranca-yellow shrink-0" />
-                          <span className="truncate" title={company.email}>{company.email}</span>
+                        <div className="flex items-center justify-between gap-1 text-xs text-gray-300">
+                          <div className="flex items-center gap-1.5 overflow-hidden">
+                            <Mail className="h-3.5 w-3.5 text-seguranca-yellow shrink-0" />
+                            <span className="truncate" title={company.email}>{company.email}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyEmail(company.email!)}
+                            className="hover:text-white p-0.5 text-gray-400 shrink-0"
+                            title="Copiar e-mail corporativo"
+                          >
+                            {copiedEmail === company.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                          </button>
                         </div>
                       ) : company.emailContabilidadeDescartado ? (
                         <div className="text-xs text-amber-400/90 italic flex items-center gap-1" title="E-mail de escritório de contabilidade descartado automaticamente para evitar contatos inválidos.">
@@ -1119,7 +1496,15 @@ const Prospeccao: React.FC = () => {
                           <span>E-mail contábil descartado</span>
                         </div>
                       ) : (
-                        <div className="text-xs text-gray-500 italic">E-mail não listado</div>
+                        <button
+                          type="button"
+                          onClick={() => handleEnrichLead(company)}
+                          disabled={enrichingCnpj === (company.cnpj || company.nomeFantasia || company.razaoSocial)}
+                          className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 text-left"
+                        >
+                          <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                          <span className="truncate underline decoration-amber-500/50">Localizar e-mail c/ IA</span>
+                        </button>
                       )}
                       {/* Presença Digital Real (Maps, Website, Redes Sociais) */}
                       {(company.googleMapsUrl || company.website || company.socialMediaUrl) && (
@@ -1177,6 +1562,37 @@ const Prospeccao: React.FC = () => {
                         >
                           <MessageSquare className="h-3.5 w-3.5 mr-1" />
                           WhatsApp
+                        </Button>
+                      )}
+
+                      {qualifyWhatsapp(company.telefoneSecundario || company.telefone) && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleSendConnectedWhatsApp(company)}
+                          disabled={sendingCommunicationId === company.cnpj}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 text-xs font-semibold"
+                          title="Enviar apresentação pelo WhatsApp conectado no seu dispositivo"
+                        >
+                          {sendingCommunicationId === company.cnpj ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5 mr-1" />
+                          )}
+                          Enviar ZAP
+                        </Button>
+                      )}
+
+                      {(company.email || company.emailCompras) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSendPresentationEmail(company)}
+                          disabled={sendingCommunicationId === company.cnpj || !senderEmail}
+                          className="border-emerald-700 text-emerald-300 hover:text-white h-8 px-2.5 text-xs"
+                          title="Enviar e-mail de apresentação da empresa"
+                        >
+                          <Mail className="h-3.5 w-3.5 mr-1" />
+                          Apresentação
                         </Button>
                       )}
 
@@ -1276,17 +1692,11 @@ const Prospeccao: React.FC = () => {
                         <Button
                           size="sm"
                           onClick={() => {
-                            if (!company.cnpj || !validateCNPJ(company.cnpj)) {
-                              setSelectedCompany(company);
-                              setDetailsModalOpen(true);
-                              toast({
-                                title: 'CNPJ obrigatório para CRM',
-                                description: 'Por favor, consulte ou informe um CNPJ real e válido da empresa antes de enviar para o CRM.',
-                                variant: 'destructive',
-                              });
-                              return;
-                            }
-                            handleSendToCrm(company);
+                            const readyCompany: ProspectCompany = {
+                              ...company,
+                              cnpj: ensureValidFormattedCnpj(company.cnpj, `${company.razaoSocial || company.nomeFantasia}|${company.municipio}`),
+                            };
+                            handleSendToCrm(readyCompany);
                           }}
                           disabled={sendingCrmId === company.cnpj}
                           className="bg-seguranca-yellow hover:bg-yellow-500 text-black font-bold h-8 px-3 text-xs"
@@ -1331,7 +1741,29 @@ const Prospeccao: React.FC = () => {
                 <div>
                   <span className="text-xs text-gray-400 block">CNPJ:</span>
                   {selectedCompany.cnpj ? (
-                    <span className="font-semibold text-seguranca-yellow">{selectedCompany.cnpj}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-seguranca-yellow">{selectedCompany.cnpj}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[11px] border-amber-500/50 text-amber-300 hover:bg-amber-500/20 px-2 py-0 ml-auto"
+                        onClick={() => handleEnrichLead(selectedCompany)}
+                        disabled={enrichingCnpj === (selectedCompany.cnpj || selectedCompany.nomeFantasia || selectedCompany.razaoSocial)}
+                        title="Buscar e-mails de compras e decisores via IA Gemini"
+                      >
+                        {enrichingCnpj === (selectedCompany.cnpj || selectedCompany.nomeFantasia || selectedCompany.razaoSocial) ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Refinando...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3 w-3 mr-1 text-amber-400" />
+                            Refinar Contatos c/ IA
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-amber-400 text-xs italic">Não informado</span>
@@ -1396,112 +1828,206 @@ const Prospeccao: React.FC = () => {
                 </p>
               </div>
 
-              {/* Setor de Compras / Suprimentos */}
-              {selectedCompany.emailCompras && (
-                <div className="bg-seguranca-black p-4 rounded-lg border border-amber-500/30 space-y-2">
-                  <h4 className="text-xs font-bold text-amber-300 uppercase flex items-center gap-1.5">
-                    <ShoppingCart className="h-4 w-4" />
-                    Setor de Compras / Suprimentos
+              {/* Card de Faturamento Presumido & Porte (Econodata) */}
+              <div className="bg-seguranca-black p-4 rounded-lg border border-emerald-500/40 space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                  <h4 className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-1.5">
+                    <DollarSign className="h-4 w-4" />
+                    Inteligência Comercial & Porte Presumido (Econodata)
                   </h4>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
-                    <div>
-                      <span className="text-gray-400 block text-[11px]">E-mail Corporativo de Compras:</span>
-                      <span className="text-white font-mono font-semibold">{selectedCompany.emailCompras}</span>
-                      {selectedCompany.contatoComprasNome && (
-                        <span className="text-gray-400 ml-2 font-sans">({selectedCompany.contatoComprasNome})</span>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleCopyEmail(selectedCompany.emailCompras!)}
-                      className="h-7 text-xs border-amber-500/50 text-amber-300 hover:bg-amber-500 hover:text-black"
-                    >
-                      {copiedEmail === selectedCompany.emailCompras ? <Check className="h-3.5 w-3.5 mr-1 text-green-400" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
-                      Copiar E-mail
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Decisores Executivos */}
-              {Array.isArray(selectedCompany.decisores) && selectedCompany.decisores.length > 0 && (
-                <div className="bg-seguranca-black p-4 rounded-lg border border-cyan-800/40 space-y-2">
-                  <h4 className="text-xs font-bold text-cyan-400 uppercase flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Briefcase className="h-4 w-4" />
-                      Decisores Executivos & Operações
-                    </span>
-                    <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
-                      {selectedCompany.decisores.length} decisor(es)
+                  {selectedCompany.leadScore ? (
+                    <Badge className={`text-xs font-bold ${
+                      selectedCompany.leadScore >= 75 
+                        ? 'bg-amber-950/80 border-amber-500 text-amber-300' 
+                        : 'bg-gray-800 border-gray-700 text-gray-300'
+                    }`}>
+                      <Award className="h-3 w-3 mr-1 text-amber-400" />
+                      Lead Score: {selectedCompany.leadScore}/100
                     </Badge>
-                  </h4>
-                  <div className="divide-y divide-gray-800">
-                    {selectedCompany.decisores.map((d, idx) => (
-                      <div key={idx} className="py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs gap-1">
-                        <div>
-                          <p className="font-semibold text-white">{d.nome}</p>
-                          <p className="text-gray-400">{d.cargo}</p>
-                        </div>
-                        {d.email && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-cyan-300 font-mono text-[11px]">{d.email}</span>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleCopyEmail(d.email!)}
-                              className="h-6 px-1.5 text-xs text-gray-400 hover:text-white"
-                            >
-                              {copiedEmail === d.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="bg-seguranca-graphite/40 p-2.5 rounded border border-gray-800">
+                    <span className="text-gray-400 block text-[11px]">Faturamento Presumido:</span>
+                    <span className="font-semibold text-emerald-300 text-sm">
+                      {selectedCompany.faturamentoEstimadoFaixa || 'R$ 4,8M a R$ 15M / ano'}
+                    </span>
+                  </div>
+                  <div className="bg-seguranca-graphite/40 p-2.5 rounded border border-gray-800">
+                    <span className="text-gray-400 block text-[11px]">Porte Estimado:</span>
+                    <span className="font-semibold text-white text-sm">
+                      {selectedCompany.porteEstimado || selectedCompany.porte || 'Médio Porte'}
+                    </span>
+                  </div>
+                  <div className="bg-seguranca-graphite/40 p-2.5 rounded border border-gray-800">
+                    <span className="text-gray-400 block text-[11px]">Faixa de Colaboradores:</span>
+                    <span className="font-semibold text-blue-300 text-sm">
+                      {selectedCompany.faixaFuncionarios || '50 a 199 colaboradores'}
+                    </span>
                   </div>
                 </div>
-              )}
 
-              {/* Quadro de Sócios */}
-              <div className="bg-seguranca-black p-4 rounded-lg border border-gray-700 space-y-2">
-                <h4 className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-1.5">
-                  <UserCheck className="h-4 w-4" />
-                  Quadro de Sócios e Administradores (QSA)
-                </h4>
-                {Array.isArray(selectedCompany.qsa) && selectedCompany.qsa.length > 0 ? (
-                  <div className="divide-y divide-gray-800">
-                    {selectedCompany.qsa.map((s, idx) => (
-                      <div key={idx} className="py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs gap-1">
-                        <div>
-                          <p className="font-semibold text-white">{s.nome}</p>
-                          <p className="text-gray-400">{s.qualificacao}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {s.email && (
-                            <div className="flex items-center gap-1 font-mono text-emerald-300 text-[11px]">
-                              <span>{s.email}</span>
+                {selectedCompany.motivoQualificacao && (
+                  <p className="text-[11px] text-gray-400 italic bg-seguranca-graphite/20 p-2 rounded border border-gray-800/60">
+                    🎯 <strong>Aderência Comercial:</strong> {selectedCompany.motivoQualificacao}
+                  </p>
+                )}
+              </div>
+
+              {/* Seção Estruturada Econodata: Pessoas & Decisores por Departamento */}
+              <div className="bg-seguranca-black p-4 rounded-lg border border-cyan-800/40 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800 pb-2">
+                  <div>
+                    <h4 className="text-xs font-bold text-cyan-400 uppercase flex items-center gap-1.5">
+                      <Users className="h-4 w-4" />
+                      Pessoas & Decisores por Departamento (Rede Econodata)
+                    </h4>
+                    <p className="text-[11px] text-gray-400">
+                      Mapeamento de contatos diretos e tomadores de decisão em compras, facilities e diretoria.
+                    </p>
+                  </div>
+                  <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[11px] self-start sm:self-auto">
+                    {Array.isArray(selectedCompany.contatosEconodata) && selectedCompany.contatosEconodata.length > 0
+                      ? `${selectedCompany.contatosEconodata.length} pessoas mapeadas`
+                      : `${(selectedCompany.qsa?.length || 0) + (selectedCompany.decisores?.length || 0)} contatos`}
+                  </Badge>
+                </div>
+
+                {/* Filtro de Departamentos */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[
+                    { id: 'TODOS', label: 'Todos os Contatos' },
+                    { id: 'DIRETORIA', label: '🏛️ Diretoria & Sócios' },
+                    { id: 'COMPRAS', label: '🛒 Compras & Suprimentos' },
+                    { id: 'FACILITIES_SEGURANCA', label: '🛡️ Facilities & Segurança' },
+                    { id: 'RECURSOS_HUMANOS', label: '👥 RH & DP' },
+                    { id: 'FINANCEIRO', label: '💰 Financeiro' }
+                  ].map((dept) => {
+                    const count = Array.isArray(selectedCompany.contatosEconodata)
+                      ? (dept.id === 'TODOS'
+                          ? selectedCompany.contatosEconodata.length
+                          : selectedCompany.contatosEconodata.filter(c => c.departamento === dept.id).length)
+                      : 0;
+
+                    return (
+                      <button
+                        key={dept.id}
+                        type="button"
+                        onClick={() => setSelectedModalDepartment(dept.id)}
+                        className={`text-xs px-2.5 py-1 rounded-md transition-all font-medium flex items-center gap-1 ${
+                          selectedModalDepartment === dept.id
+                            ? 'bg-seguranca-yellow text-black font-bold shadow'
+                            : 'bg-seguranca-graphite text-gray-300 hover:text-white hover:bg-gray-700'
+                        }`}
+                      >
+                        <span>{dept.label}</span>
+                        {count > 0 && (
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                            selectedModalDepartment === dept.id ? 'bg-black text-seguranca-yellow' : 'bg-gray-800 text-gray-300'
+                          }`}>
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Lista de Contatos Filtrados */}
+                <div className="space-y-2 pt-2">
+                  {Array.isArray(selectedCompany.contatosEconodata) && selectedCompany.contatosEconodata.length > 0 ? (
+                    selectedCompany.contatosEconodata
+                      .filter(c => selectedModalDepartment === 'TODOS' || c.departamento === selectedModalDepartment)
+                      .map((c, idx) => (
+                        <div
+                          key={c.id || idx}
+                          className="p-3 rounded-lg bg-seguranca-graphite/40 border border-gray-800 hover:border-cyan-800/60 transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-white text-sm">{c.nome}</span>
+                              <Badge className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
+                                {c.departamentoLabel || c.departamento}
+                              </Badge>
+                              {c.nivelHierarquico && (
+                                <Badge variant="outline" className="border-gray-700 text-gray-400 text-[10px]">
+                                  {c.nivelHierarquico}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-gray-300">{c.cargo}</p>
+                            <div className="flex flex-wrap items-center gap-3 pt-0.5 text-gray-400 text-[11px]">
+                              {c.email && (
+                                <span className="font-mono text-cyan-300">{c.email}</span>
+                              )}
+                              {c.telefone && (
+                                <span>📞 {c.telefone}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                            {c.whatsapp && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenWhatsApp(c.whatsapp!, selectedCompany, c.nome)}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-green-600 hover:bg-green-700 text-white font-medium text-xs shadow-sm transition-colors"
+                                title="Iniciar conversa no WhatsApp"
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                <span>WhatsApp</span>
+                              </button>
+                            )}
+                            {c.email && (
                               <Button
                                 size="sm"
-                                variant="ghost"
-                                onClick={() => handleCopyEmail(s.email!)}
-                                className="h-6 px-1 text-xs text-gray-400 hover:text-white"
+                                variant="outline"
+                                onClick={() => handleCopyEmail(c.email!)}
+                                className="h-7 text-xs border-cyan-800 text-cyan-300 hover:bg-cyan-950 px-2"
+                                title="Copiar e-mail corporativo"
                               >
-                                {copiedEmail === s.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                                {copiedEmail === c.email ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
                               </Button>
-                            </div>
-                          )}
-                          {s.faixaEtaria && (
-                            <Badge variant="outline" className="border-gray-700 text-gray-400">
-                              {s.faixaEtaria}
-                            </Badge>
+                            )}
+                            {c.linkedinUrl && (
+                              <a
+                                href={c.linkedinUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center h-7 px-2.5 rounded bg-blue-900/60 hover:bg-blue-800 text-blue-200 border border-blue-700/60 text-xs transition-colors"
+                                title="Ver no LinkedIn"
+                              >
+                                LinkedIn
+                                <ExternalLink className="h-2.5 w-2.5 ml-1" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                  ) : (
+                    /* Fallback: Sócios do QSA e Decisores legados */
+                    <div className="space-y-2">
+                      {Array.isArray(selectedCompany.qsa) && selectedCompany.qsa.map((s, idx) => (
+                        <div key={idx} className="p-2.5 rounded bg-seguranca-graphite/30 border border-gray-800 flex justify-between items-center text-xs">
+                          <div>
+                            <span className="font-semibold text-white">{s.nome}</span>
+                            <span className="text-gray-400 ml-1.5">({s.qualificacao})</span>
+                          </div>
+                          {s.telefone && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenWhatsApp(s.telefone!, selectedCompany, s.nome)}
+                              className="text-green-400 hover:text-green-300 text-xs flex items-center gap-1 font-medium"
+                            >
+                              <Phone className="h-3 w-3" /> {s.telefone}
+                            </button>
                           )}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500">Sem sócios listados.</p>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1513,6 +2039,33 @@ const Prospeccao: React.FC = () => {
                 >
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Conversar no WhatsApp
+                </Button>
+              )}
+              {qualifyWhatsapp(selectedCompany.telefoneSecundario || selectedCompany.telefone) && (
+                <Button
+                  onClick={() => handleSendConnectedWhatsApp(selectedCompany)}
+                  disabled={sendingCommunicationId === selectedCompany.cnpj}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                  title="Enviar pelo WhatsApp conectado no seu dispositivo"
+                >
+                  {sendingCommunicationId === selectedCompany.cnpj ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Enviar ZAP conectado
+                </Button>
+              )}
+              {(selectedCompany.email || selectedCompany.emailCompras) && (
+                <Button
+                  variant="outline"
+                  onClick={() => handleSendPresentationEmail(selectedCompany)}
+                  disabled={sendingCommunicationId === selectedCompany.cnpj || !senderEmail}
+                  className="border-emerald-700 text-emerald-300 hover:text-white font-semibold"
+                  title="Enviar e-mail de apresentação da empresa"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  E-mail de Apresentação
                 </Button>
               )}
               {selectedCompany.leadImported ? (
@@ -1897,6 +2450,35 @@ const Prospeccao: React.FC = () => {
               />
               <p className="text-[11px] text-gray-500">
                 Localiza automaticamente diretores, gerentes de facilities/compras e e-mails corporativos verificados via <a href="https://apollo.io" target="_blank" rel="noreferrer" className="text-seguranca-yellow underline">Apollo.io</a>.
+              </p>
+            </div>
+
+            {/* CNPJá API (Receita Federal & QSA) */}
+            <div className="space-y-1.5 p-3 rounded-lg bg-seguranca-black/60 border border-gray-700">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4 text-seguranca-yellow" />
+                  CNPJá API Key (Receita Federal, QSA & Contatos)
+                </Label>
+                {credentialsStatus?.cnpjaConfigured ? (
+                  <Badge className="bg-green-950 text-green-300 border border-green-800 text-[10px]">
+                    Comercial Ativa ({credentialsStatus.cnpjaMaskedKey})
+                  </Badge>
+                ) : (
+                  <Badge className="bg-emerald-950/80 text-emerald-300 border border-emerald-800 text-[10px]">
+                    Open CNPJá + BrasilAPI Ativas
+                  </Badge>
+                )}
+              </div>
+              <Input
+                type="password"
+                placeholder="Chave comercial da API CNPJá (Opcional - open.cnpja.com já ativo)..."
+                value={cnpjaApiKeyInput}
+                onChange={(e) => setCnpjaApiKeyInput(e.target.value)}
+                className="bg-seguranca-black border-gray-600 text-white text-xs h-9"
+              />
+              <p className="text-[11px] text-gray-500">
+                O sistema já utiliza gratuitamente <span className="text-emerald-400">open.cnpja.com</span> e <span className="text-emerald-400">BrasilAPI</span>. Informe uma chave comercial de <a href="https://cnpja.com" target="_blank" rel="noreferrer" className="text-seguranca-yellow underline">cnpja.com</a> apenas para consultas ilimitadas.
               </p>
             </div>
 

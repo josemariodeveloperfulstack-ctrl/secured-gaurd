@@ -190,7 +190,13 @@ export const contractService = {
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
     if (filters.sortDir) params.append('sortDir', filters.sortDir);
     const response = await api.get(`/api/contracts?${params.toString()}`);
-    return response.data;
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    if (response.data && Array.isArray((response.data as { content?: Contract[] }).content)) {
+      return (response.data as { content: Contract[] }).content;
+    }
+    return [];
   },
 
   // Buscar contrato por ID

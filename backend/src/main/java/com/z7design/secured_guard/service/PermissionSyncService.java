@@ -59,7 +59,15 @@ public class PermissionSyncService {
         String actionKey = parts[parts.length - 1];
         String resourceKey = String.join("_", Arrays.copyOf(parts, parts.length - 1));
         String action = actionLabels().getOrDefault(actionKey, humanize(actionKey));
-        String resource = humanize(resourceKey);
+        Map<String, String> resourceLabels = new HashMap<>();
+        resourceLabels.put("PROSPECTION", "Prospecção de Leads");
+        resourceLabels.put("MARKETING", "Campanhas de Marketing");
+        resourceLabels.put("CRM", "CRM Comercial");
+        resourceLabels.put("SUPERVISAO", "Supervisão Operacional");
+        resourceLabels.put("PURCHASES", "Compras e Cotações");
+        resourceLabels.put("FLEET", "Frota de Veículos");
+        resourceLabels.put("CHAT", "Chat Interno");
+        String resource = resourceLabels.getOrDefault(resourceKey, humanize(resourceKey));
         return action + " " + resource;
     }
 

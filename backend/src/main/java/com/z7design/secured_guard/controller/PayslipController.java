@@ -280,27 +280,7 @@ public class PayslipController {
                         throw new IllegalArgumentException("Arquivo está vazio após carregamento");
                     }
                     
-                    // Verificar se o arquivo completo já foi processado anteriormente
-                    log.info("🔍 Verificando se arquivo já foi processado anteriormente...");
-                    boolean alreadyProcessed = payslipService.isFileAlreadyProcessed(fileBytes, originalFilename);
-                    log.info("   Resultado da verificação: {}", alreadyProcessed ? "JÁ PROCESSADO - BLOQUEANDO" : "NÃO PROCESSADO - PERMITINDO");
-                    
-                    if (alreadyProcessed) {
-                        log.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                        log.warn("⚠️ [{}/{}] ARQUIVO JÁ PROCESSADO - BLOQUEANDO PROCESSAMENTO", 
-                            i + 1, validFiles.size());
-                        log.warn("   Arquivo: {}", originalFilename);
-                        log.warn("   Status: Já foi processado anteriormente e não foi excluído do sistema.");
-                        log.warn("   Ação: Arquivo NÃO será processado novamente.");
-                        log.warn("   ℹ️ Se o arquivo foi modificado, o sistema detectará automaticamente e criará uma nova versão.");
-                        log.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                        errors.add("Arquivo " + originalFilename + ": Já foi processado anteriormente. Se houver alterações no conteúdo, uma nova versão será criada automaticamente.");
-                        pagesPerFile.put(originalFilename, 0);
-                        filesBlocked++; // Incrementar contador de arquivos bloqueados
-                        continue; // Pular para o próximo arquivo - NÃO PROCESSAR
-                    }
-                    
-                    log.info("✅ Arquivo não foi processado anteriormente ou foi modificado. Processando...");
+                    log.info("✅ Enviando arquivo para processamento e versionamento inteligente por página...");
                     
                     long startTime = System.currentTimeMillis();
                     

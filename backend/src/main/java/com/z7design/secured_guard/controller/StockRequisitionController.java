@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.AddStockRequisitionItemsRequest;
 import com.z7design.secured_guard.dto.CreateStockRequisitionRequest;
 import com.z7design.secured_guard.dto.DeliverStockRequisitionRequest;
 import com.z7design.secured_guard.dto.StockRequisitionDTO;
@@ -85,6 +86,27 @@ public class StockRequisitionController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Erro ao atualizar requisição: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/items")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'RECURSOS_HUMANOS')")
+    @Operation(summary = "Adicionar mais itens a uma requisição existente", description = "Adiciona novos itens à requisição. Se já aprovada ou entregue, baixa automaticamente o estoque.")
+    public ResponseEntity<?> addItems(
+            @PathVariable UUID id,
+            @Valid @RequestBody AddStockRequisitionItemsRequest body,
+            Authentication auth) {
+        try {
+            UUID userId = resolveUserId(auth);
+            StockRequisitionDTO dto = stockRequisitionService.addItems(id, body.getLines(), userId);
+            return ResponseEntity.ok(dto);
+        } catch (com.z7design.secured_guard.exception.ResourceNotFoundException e) {
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erro ao adicionar itens à requisição: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }

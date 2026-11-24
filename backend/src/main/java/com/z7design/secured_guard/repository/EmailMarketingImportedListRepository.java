@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface EmailMarketingImportedListRepository extends JpaRepository<EmailMarketingImportedList, UUID> {
 
     List<EmailMarketingImportedList> findAllByOrderByUpdatedAtDesc();
+
+    java.util.Optional<EmailMarketingImportedList> findByNameIgnoreCase(String name);
 }

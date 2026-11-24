@@ -380,6 +380,7 @@ public class EmployeeReportPdfService {
         if (status == null) return "-";
         if (EmploymentStatus.ACTIVE.equals(status)) return "Ativo";
         if (EmploymentStatus.TERMINATED.equals(status)) return "Demitido";
+        if (EmploymentStatus.INSS_LEAVE.equals(status)) return "Afastamento INSS";
         return status.name();
     }
 

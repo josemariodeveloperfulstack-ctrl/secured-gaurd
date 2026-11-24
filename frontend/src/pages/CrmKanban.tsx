@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import KanbanBoard from '../components/comercial/KanbanBoard';
 import CrmDashboard from '../components/comercial/CrmDashboard';
 import CommercialDashboard from '../components/comercial/CommercialDashboard';
 import TeamDashboard from '../components/comercial/TeamDashboard';
 import SalesGoalManager from '../components/comercial/SalesGoalManager';
 import { StandardLayout } from '@/components/StandardLayout';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,10 +22,12 @@ import {
   Loader2,
   LineChart as LineChartIcon,
   Trophy,
-  Crosshair
+  Crosshair,
+  ArrowLeft
 } from 'lucide-react';
 
 export default function CrmKanban() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('kanban');
   const { user } = useAuth();
   const { toast } = useToast();
@@ -78,7 +82,27 @@ export default function CrmKanban() {
   };
 
   return (
-    <StandardLayout title="CRM Comercial">
+    <StandardLayout
+      title="CRM Comercial"
+      headerActions={
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (window.history.length > 1 && window.history.state && window.history.state.idx > 0) {
+              navigate(-1);
+            } else {
+              navigate('/comercial/prospeccao');
+            }
+          }}
+          className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow flex items-center gap-1.5 text-xs sm:text-sm font-semibold transition-colors"
+          title="Voltar para a tela anterior"
+        >
+          <ArrowLeft className="h-4 w-4 text-seguranca-yellow" />
+          <span>Voltar</span>
+        </Button>
+      }
+    >
       <div className="space-y-6 w-full min-w-0">
         {/* Header com estatísticas rápidas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

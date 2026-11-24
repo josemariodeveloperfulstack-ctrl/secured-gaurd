@@ -347,6 +347,9 @@ public class StockService {
         StockMovement movement = StockMovementDTO.toEntity(dto);
         movement.setStockItem(item);
         movement.setUser(user);
+        if (movement.getUserName() == null || movement.getUserName().isBlank()) {
+            movement.setUserName(user.getName());
+        }
         movement.setMovementDate(LocalDateTime.now());
         movement.setPreviousQuantity(item.getCurrentQuantity());
 
@@ -371,6 +374,9 @@ public class StockService {
             employee = employeeRepository.findById(dto.getEmployeeId())
                     .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado: " + dto.getEmployeeId()));
             movement.setEmployee(employee);
+            if (movement.getEmployeeName() == null || movement.getEmployeeName().isBlank()) {
+                movement.setEmployeeName(employee.getName());
+            }
         }
 
         // Associar unidade
@@ -1223,6 +1229,24 @@ public class StockService {
     // ===== MÉTODOS AUXILIARES PARA RELATÓRIOS =====
 
     private MovementSummaryDTO convertToMovementSummaryDTO(StockMovement movement) {
+        String empName = movement.getEmployeeName();
+        if ((empName == null || empName.isBlank()) && movement.getEmployee() != null) {
+            empName = movement.getEmployee().getName();
+        }
+        String uName = movement.getUserName();
+        if ((uName == null || uName.isBlank()) && movement.getUser() != null) {
+            uName = movement.getUser().getName();
+        }
+        String iName = movement.getStockItem() != null
+                ? (movement.getStockItem().getFullName() != null && !movement.getStockItem().getFullName().isBlank()
+                        ? movement.getStockItem().getFullName()
+                        : movement.getStockItem().getName())
+                : "-";
+        String iCode = movement.getStockItem() != null ? movement.getStockItem().getCode() : "-";
+        String cat = movement.getStockItem() != null && movement.getStockItem().getCategory() != null
+                ? movement.getStockItem().getCategory().name() : null;
+        String ca = movement.getStockItem() != null ? movement.getStockItem().getCa() : null;
+
         return MovementSummaryDTO.builder()
                 .id(movement.getId())
                 .movementDate(movement.getMovementDate())
@@ -1233,11 +1257,14 @@ public class StockService {
                 .newQuantity(movement.getNewQuantity())
                 .unitCost(movement.getUnitCost())
                 .totalCost(movement.getTotalCost())
-                .employeeName(movement.getEmployeeName())
-                .userName(movement.getUserName())
+                .employeeName(empName)
+                .userName(uName)
                 .documentNumber(movement.getDocumentNumber())
-                .itemName(movement.getStockItem().getName())
-                .itemCode(movement.getStockItem().getCode())
+                .itemName(iName)
+                .itemCode(iCode)
+                .requisitionNumber(movement.getRequisitionNumber())
+                .category(cat)
+                .ca(ca)
                 .build();
     }
 

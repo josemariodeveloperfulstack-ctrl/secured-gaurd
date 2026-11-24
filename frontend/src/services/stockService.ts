@@ -796,6 +796,11 @@ export const stockService = {
     return response.data;
   },
 
+  async addItemsToStockRequisition(id: string, lines: { stockItemId: string; quantity: number }[]): Promise<StockRequisitionDTO> {
+    const response = await api.post(`/api/stock/requisitions/${id}/items`, { lines });
+    return response.data;
+  },
+
   async deleteStockRequisition(id: string): Promise<void> {
     await api.delete(`/api/stock/requisitions/${id}`);
   },
@@ -827,6 +832,13 @@ export const stockService = {
       ? `requisicao_${requisitionNumber.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`
       : `requisicao_estoque_${id.substring(0, 8)}.pdf`;
     this.handleFileDownload(response.data, name);
+  },
+
+  async previewStockRequisitionPdf(id: string): Promise<void> {
+    const response = await api.get(`/api/stock/requisitions/${id}/pdf`, { responseType: 'blob' });
+    const file = new Blob([response.data], { type: 'application/pdf' });
+    const fileURL = URL.createObjectURL(file);
+    window.open(fileURL, '_blank');
   },
 
   async sendRequisition(movementId: string, type: RequisitionSentType, destination?: string): Promise<void> {

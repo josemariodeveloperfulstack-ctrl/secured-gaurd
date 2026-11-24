@@ -466,6 +466,13 @@ const GestaoAtestados: React.FC = () => {
             {label}
           </span>
         );
+      case 'ATESTADO_OBITO':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-800 text-zinc-200 border border-zinc-600 whitespace-nowrap shadow-sm">
+            <FileText className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+            {label}
+          </span>
+        );
       default:
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-500/15 text-slate-300 border border-slate-500/30 whitespace-nowrap shadow-sm">

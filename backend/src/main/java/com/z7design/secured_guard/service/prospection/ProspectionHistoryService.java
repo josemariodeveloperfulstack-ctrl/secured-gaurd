@@ -29,6 +29,11 @@ public class ProspectionHistoryService {
     private final ProspectionContactRepository contactRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private String truncate(String val, int maxLen) {
+        if (val == null) return null;
+        return val.length() <= maxLen ? val : val.substring(0, maxLen);
+    }
+
     /**
      * Salva uma pesquisa completa e todos os seus prospectos e contatos no banco de dados.
      */
@@ -50,11 +55,11 @@ public class ProspectionHistoryService {
                 tipoBusca, cidade, uf, companiesData.size());
 
         ProspectionSearch search = ProspectionSearch.builder()
-                .tipoBusca(tipoBusca != null ? tipoBusca : "SEGMENTO")
-                .termoPesquisa(termoPesquisa)
-                .cidade(cidade)
-                .uf(uf)
-                .segmento(segmento)
+                .tipoBusca(truncate(tipoBusca != null ? tipoBusca : "SEGMENTO", 50))
+                .termoPesquisa(truncate(termoPesquisa, 250))
+                .cidade(truncate(cidade, 95))
+                .uf(truncate(uf, 10))
+                .segmento(truncate(segmento, 95))
                 .totalEncontrados(companiesData.size())
                 .user(currentUser)
                 .build();
@@ -76,16 +81,16 @@ public class ProspectionHistoryService {
 
             ProspectionCompany comp = ProspectionCompany.builder()
                     .search(search)
-                    .cnpj((String) data.get("cnpj"))
-                    .razaoSocial(razao)
-                    .nomeFantasia((String) data.get("nomeFantasia"))
-                    .municipio((String) data.getOrDefault("municipio", cidade))
-                    .uf((String) data.getOrDefault("uf", uf))
-                    .email((String) data.get("email"))
-                    .emailCompras((String) data.get("emailCompras"))
-                    .telefone((String) data.get("telefone"))
-                    .website((String) data.get("website"))
-                    .origem((String) data.getOrDefault("origem", tipoBusca))
+                    .cnpj(truncate((String) data.get("cnpj"), 20))
+                    .razaoSocial(truncate(razao, 250))
+                    .nomeFantasia(truncate((String) data.get("nomeFantasia"), 250))
+                    .municipio(truncate((String) data.getOrDefault("municipio", cidade), 95))
+                    .uf(truncate((String) data.getOrDefault("uf", uf), 10))
+                    .email(truncate((String) data.get("email"), 250))
+                    .emailCompras(truncate((String) data.get("emailCompras"), 250))
+                    .telefone(truncate((String) data.get("telefone"), 48))
+                    .website(truncate((String) data.get("website"), 250))
+                    .origem(truncate((String) data.getOrDefault("origem", tipoBusca), 48))
                     .detalhesJson(detailsJson)
                     .build();
 
@@ -103,15 +108,44 @@ public class ProspectionHistoryService {
 
     private void saveContactsForCompany(ProspectionCompany comp, Map<String, Object> data) {
         List<ProspectionContact> contactsToSave = new ArrayList<>();
+        Set<String> seenNames = new HashSet<>();
 
-        // 1. Sócios do QSA
+        // 0. Contatos Estruturados estilo Econodata (Diretoria, Compras, Facilities, RH, Financeiro)
+        Object econodataObj = data.get("contatosEconodata");
+        if (econodataObj instanceof List<?> econoList) {
+            for (Object item : econoList) {
+                if (item instanceof Map<?, ?> cMap) {
+                    Object nomeObj = cMap.get("nome");
+                    String nome = nomeObj != null ? nomeObj.toString().trim() : null;
+                    if (nome != null && !nome.isBlank() && seenNames.add(nome.toLowerCase())) {
+                        String cargo = cMap.get("cargo") != null ? cMap.get("cargo").toString() : "Gestor / Decisor";
+                        String dep = cMap.get("departamento") != null ? cMap.get("departamento").toString() : "DECISOR";
+                        String email = cMap.get("email") != null ? cMap.get("email").toString() : null;
+                        String tel = cMap.get("telefone") != null ? cMap.get("telefone").toString() : null;
+                        String linkedin = cMap.get("linkedinUrl") != null ? cMap.get("linkedinUrl").toString() : null;
+
+                        contactsToSave.add(ProspectionContact.builder()
+                                .company(comp)
+                                .nome(truncate(nome, 250))
+                                .cargoTipo(truncate(dep, 50))
+                                .cargoDescricao(truncate(cargo, 250))
+                                .email(truncate(email, 250))
+                                .telefone(truncate(tel, 48))
+                                .linkedinUrl(truncate(linkedin, 250))
+                                .build());
+                    }
+                }
+            }
+        }
+
+        // 1. Sócios do QSA (se ainda não salvos via econodata)
         Object qsaObj = data.get("qsa");
         if (qsaObj instanceof List<?> qsaList) {
             for (Object item : qsaList) {
                 if (item instanceof Map<?, ?> socioMap) {
                     Object nomeObj = socioMap.get("nome");
-                    String nome = nomeObj != null ? nomeObj.toString() : null;
-                    if (nome != null && !nome.isBlank()) {
+                    String nome = nomeObj != null ? nomeObj.toString().trim() : null;
+                    if (nome != null && !nome.isBlank() && seenNames.add(nome.toLowerCase())) {
                         Object qualObj = socioMap.get("qualificacao");
                         String qual = qualObj != null ? qualObj.toString() : "Sócio / Administrador";
                         Object emailObj = socioMap.get("email");
@@ -123,12 +157,12 @@ public class ProspectionHistoryService {
 
                         contactsToSave.add(ProspectionContact.builder()
                                 .company(comp)
-                                .nome(nome)
+                                .nome(truncate(nome, 250))
                                 .cargoTipo("SOCIO")
-                                .cargoDescricao(qual)
-                                .email(email)
-                                .telefone(tel)
-                                .linkedinUrl(linkedin)
+                                .cargoDescricao(truncate(qual, 250))
+                                .email(truncate(email, 250))
+                                .telefone(truncate(tel, 48))
+                                .linkedinUrl(truncate(linkedin, 250))
                                 .build());
                     }
                 }
@@ -141,8 +175,8 @@ public class ProspectionHistoryService {
             for (Object item : decList) {
                 if (item instanceof Map<?, ?> decMap) {
                     Object nomeObj = decMap.get("nome");
-                    String nome = nomeObj != null ? nomeObj.toString() : null;
-                    if (nome != null && !nome.isBlank()) {
+                    String nome = nomeObj != null ? nomeObj.toString().trim() : null;
+                    if (nome != null && !nome.isBlank() && seenNames.add(nome.toLowerCase())) {
                         Object cargoObj = decMap.get("cargo");
                         String cargo = cargoObj != null ? cargoObj.toString() : "Tomador de Decisão";
                         Object emailObj = decMap.get("email");
@@ -154,12 +188,12 @@ public class ProspectionHistoryService {
 
                         contactsToSave.add(ProspectionContact.builder()
                                 .company(comp)
-                                .nome(nome)
+                                .nome(truncate(nome, 250))
                                 .cargoTipo("DECISOR")
-                                .cargoDescricao(cargo)
-                                .email(email)
-                                .telefone(tel)
-                                .linkedinUrl(linkedin)
+                                .cargoDescricao(truncate(cargo, 250))
+                                .email(truncate(email, 250))
+                                .telefone(truncate(tel, 48))
+                                .linkedinUrl(truncate(linkedin, 250))
                                 .build());
                     }
                 }
@@ -169,14 +203,14 @@ public class ProspectionHistoryService {
         // 3. Setor de Compras / Suprimentos
         String emailCompras = (String) data.get("emailCompras");
         String comprasNome = (String) data.getOrDefault("contatoComprasNome", "Setor de Compras / Suprimentos");
-        if (emailCompras != null && !emailCompras.isBlank()) {
+        if (emailCompras != null && !emailCompras.isBlank() && seenNames.add(comprasNome.toLowerCase())) {
             contactsToSave.add(ProspectionContact.builder()
                     .company(comp)
-                    .nome(comprasNome)
+                    .nome(truncate(comprasNome, 250))
                     .cargoTipo("COMPRAS")
                     .cargoDescricao("Compras / Procurement / Cotações")
-                    .email(emailCompras)
-                    .telefone((String) data.get("telefoneCompras"))
+                    .email(truncate(emailCompras, 250))
+                    .telefone(truncate((String) data.get("telefoneCompras"), 48))
                     .build());
         }
 
@@ -186,12 +220,30 @@ public class ProspectionHistoryService {
     }
 
     /**
-     * Lista as pesquisas recentes paginadas.
+     * Lista as pesquisas recentes paginadas mapeando para DTO seguro (evita LazyInitializationException).
      */
     @Transactional(readOnly = true)
-    public Page<ProspectionSearch> listRecentSearches(int page, int size) {
-        return searchRepository.findAllByOrderByCreatedAtDesc(
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+    public Page<Map<String, Object>> listRecentSearches(int page, int size) {
+        try {
+            Page<ProspectionSearch> resultPage = searchRepository.findAllByOrderByCreatedAtDesc(
+                    PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+            return resultPage.map(s -> {
+                Map<String, Object> dto = new HashMap<>();
+                dto.put("id", s.getId() != null ? s.getId().toString() : null);
+                dto.put("tipoBusca", s.getTipoBusca());
+                dto.put("tipoPesquisa", s.getTipoBusca());
+                dto.put("termoPesquisa", s.getTermoPesquisa());
+                dto.put("cidade", s.getCidade());
+                dto.put("uf", s.getUf());
+                dto.put("segmento", s.getSegmento());
+                dto.put("totalEncontrados", s.getTotalEncontrados() != null ? s.getTotalEncontrados() : 0);
+                dto.put("createdAt", s.getCreatedAt() != null ? s.getCreatedAt().toString() : null);
+                return dto;
+            });
+        } catch (Exception ex) {
+            log.warn("Erro ao consultar histórico de prospecção: {}", ex.getMessage());
+            return Page.empty();
+        }
     }
 
     /**
@@ -252,8 +304,8 @@ public class ProspectionHistoryService {
                 }
             }
 
-            map.put("qsa", qsaList);
-            map.put("decisores", decisoresList);
+            if (!qsaList.isEmpty()) map.put("qsa", qsaList);
+            if (!decisoresList.isEmpty()) map.put("decisores", decisoresList);
 
             mappedCompanies.add(map);
         }
@@ -266,7 +318,7 @@ public class ProspectionHistoryService {
         response.put("uf", search.getUf());
         response.put("segmento", search.getSegmento());
         response.put("totalEncontrados", search.getTotalEncontrados());
-        response.put("createdAt", search.getCreatedAt());
+        response.put("createdAt", search.getCreatedAt() != null ? search.getCreatedAt().toString() : null);
         response.put("prospects", mappedCompanies);
         response.put("companies", mappedCompanies);
 

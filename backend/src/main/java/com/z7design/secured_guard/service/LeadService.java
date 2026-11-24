@@ -173,6 +173,7 @@ public class LeadService {
         dto.setEmail(lead.getEmail());
         dto.setPhone(lead.getPhone());
         dto.setMobile(lead.getMobile());
+        dto.setWhatsapp(lead.getWhatsapp());
         dto.setCompany(lead.getCompany());
         dto.setPosition(lead.getPosition());
         dto.setStatus(lead.getStatus());
@@ -320,6 +321,7 @@ public class LeadService {
         lead.setName(leadDTO.getName());
         lead.setEmail(leadDTO.getEmail());
         lead.setPhone(leadDTO.getPhone());
+        lead.setWhatsapp(leadDTO.getWhatsapp());
         lead.setCompany(leadDTO.getCompany());
         lead.setPosition(leadDTO.getPosition());
         lead.setSource(leadDTO.getSource() != null ? leadDTO.getSource() : LeadSource.OTHER);
@@ -440,6 +442,7 @@ public class LeadService {
         if (leadDTO.getName() != null) lead.setName(leadDTO.getName());
         if (leadDTO.getEmail() != null) lead.setEmail(leadDTO.getEmail());
         if (leadDTO.getPhone() != null) lead.setPhone(leadDTO.getPhone());
+        if (leadDTO.getWhatsapp() != null) lead.setWhatsapp(leadDTO.getWhatsapp());
         if (leadDTO.getCompany() != null) lead.setCompany(leadDTO.getCompany());
         if (leadDTO.getPosition() != null) lead.setPosition(leadDTO.getPosition());
         if (leadDTO.getSource() != null) lead.setSource(leadDTO.getSource());

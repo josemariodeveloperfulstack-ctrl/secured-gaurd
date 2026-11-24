@@ -28,14 +28,29 @@ public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm
     List<EPIDeliveryForm> findByEmployee(Employee employee);
 
     /**
-     * Busca fichas por ID do funcionário
+     * Busca fichas por ID do funcionário com itens carregados
      */
-    List<EPIDeliveryForm> findByEmployeeId(UUID employeeId);
+    @Query("""
+        SELECT DISTINCT f FROM EPIDeliveryForm f
+        LEFT JOIN FETCH f.items
+        WHERE f.employee.id = :employeeId
+        ORDER BY f.deliveryDate ASC, f.createdAt ASC
+        """)
+    List<EPIDeliveryForm> findByEmployeeId(@Param("employeeId") UUID employeeId);
 
     /**
-     * Busca fichas por ID do funcionário excluindo determinado status
+     * Busca fichas por ID do funcionário excluindo determinado status com itens carregados
      */
-    List<EPIDeliveryForm> findByEmployeeIdAndStatusNot(UUID employeeId, com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status);
+    @Query("""
+        SELECT DISTINCT f FROM EPIDeliveryForm f
+        LEFT JOIN FETCH f.items
+        WHERE f.employee.id = :employeeId
+        AND f.status <> :status
+        ORDER BY f.deliveryDate ASC, f.createdAt ASC
+        """)
+    List<EPIDeliveryForm> findByEmployeeIdAndStatusNot(
+            @Param("employeeId") UUID employeeId,
+            @Param("status") com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status);
 
     /**
      * Busca fichas por empresa

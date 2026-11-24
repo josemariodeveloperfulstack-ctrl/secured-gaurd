@@ -80,4 +80,16 @@ public class ValidationUtils {
                 digits.substring(8, 12),
                 digits.substring(12, 14));
     }
+
+    /**
+     * Valida e formata CNPJ real no padrão XX.XXX.XXX/XXXX-XX.
+     * NUNCA gera CNPJs sintéticos ou falsos: se inválido ou ausente, retorna string vazia.
+     */
+    public static String repairOrGenerateValidCnpj(String rawCnpj, String fallbackSeed) {
+        String digits = rawCnpj != null ? rawCnpj.replaceAll("\\D", "") : "";
+        if (digits.length() == 14 && isValidCnpj(digits)) {
+            return formatCnpj(digits);
+        }
+        return "";
+    }
 }

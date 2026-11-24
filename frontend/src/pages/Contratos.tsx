@@ -522,9 +522,15 @@ const Contratos = () => {
         {/* Modal de Geração de Contratos */}
         <ContractGenerator
           open={generatorModalOpen}
-          onOpenChange={setGeneratorModalOpen}
+          onOpenChange={(isOpen) => {
+            setGeneratorModalOpen(isOpen);
+            if (!isOpen) {
+              loadContractsWithFilters();
+            }
+          }}
           contract={selectedContractForGeneration}
           onConfigureCompany={handleCompanySettings}
+          onSuccess={() => loadContractsWithFilters()}
         />
 
         {/* Modal de Configurações da Empresa */}

@@ -3,7 +3,6 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.service.prospection.GeminiProspectionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,21 +22,25 @@ public class ProspectionController {
     private final com.z7design.secured_guard.service.prospection.CnpjLookupService cnpjLookupService;
     private final com.z7design.secured_guard.service.prospection.ProspectionHistoryService historyService;
     private final com.z7design.secured_guard.repository.UserRepository userRepository;
+    private final com.z7design.secured_guard.service.prospection.ProspectionLeadPersistenceService leadPersistenceService;
 
     public ProspectionController(
             GeminiProspectionService geminiProspectionService,
             com.z7design.secured_guard.service.prospection.CnpjLookupService cnpjLookupService,
             com.z7design.secured_guard.service.prospection.ProspectionHistoryService historyService,
-            com.z7design.secured_guard.repository.UserRepository userRepository) {
+            com.z7design.secured_guard.repository.UserRepository userRepository,
+            com.z7design.secured_guard.service.prospection.ProspectionLeadPersistenceService leadPersistenceService) {
         this.geminiProspectionService = geminiProspectionService;
         this.cnpjLookupService = cnpjLookupService;
         this.historyService = historyService;
         this.userRepository = userRepository;
+        this.leadPersistenceService = leadPersistenceService;
     }
 
     public static final String PROSPECTION_AUTHORITY = 
-            "hasAnyAuthority('LEADS_READ', 'LEADS_WRITE', 'LEADS_CREATE', 'SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'GESTOR', 'COMERCIAL', " +
-            "'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'ROLE_GESTOR', 'ROLE_COMERCIAL')";
+            "isAuthenticated() and (hasAnyAuthority('LEADS_READ', 'LEADS_WRITE', 'LEADS_CREATE', 'SUPER_ADMIN', 'ADMIN', 'ADMINISTRADOR', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL', " +
+            "'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRADOR', 'ROLE_GESTOR', 'ROLE_COMERCIAL', 'ROLE_GESTOR_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL', " +
+            "'GRUPO_COMERCIAL', 'GRUPO_GESTOR_COMERCIAL', 'GRUPO_ASSISTENTE_COMERCIAL') or hasRole('SUPER_ADMIN') or hasRole('ADMINISTRADOR') or hasRole('ADMIN'))";
 
     @GetMapping("/cnpj/{cnpj}")
     @PreAuthorize(PROSPECTION_AUTHORITY)
@@ -48,7 +51,6 @@ public class ProspectionController {
         log.info("Recebida requisição de consulta de CNPJ: {}", cnpj);
         Map<String, Object> data = cnpjLookupService.lookupByCnpj(cnpj);
 
-        // Gravar no histórico automaticamente se o CNPJ for válido
         try {
             com.z7design.secured_guard.model.User user = resolveUser(userDetails);
             historyService.saveSearch("CNPJ", cnpj, (String) data.get("municipio"), (String) data.get("uf"), null, List.of(data), user);
@@ -66,9 +68,12 @@ public class ProspectionController {
             @RequestParam String nome,
             @RequestParam(required = false, defaultValue = "Uberlândia") String cidade,
             @RequestParam(required = false, defaultValue = "MG") String uf,
+            @RequestParam(required = false) String logradouro,
+            @RequestParam(required = false) String telefone,
             @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
-        log.info("Recebida requisição para localizar CNPJ: nome='{}', cidade='{}', uf='{}'", nome, cidade, uf);
-        Map<String, Object> data = cnpjLookupService.findCnpjByNameAndLocation(nome, cidade, uf);
+        log.info("Recebida requisição para localizar CNPJ: nome='{}', cidade='{}', uf='{}', logradouro='{}', telefone='{}'",
+                nome, cidade, uf, logradouro, telefone);
+        Map<String, Object> data = cnpjLookupService.findCnpjByNameAndLocation(nome, cidade, uf, logradouro, telefone);
 
         if (Boolean.TRUE.equals(data.get("discoveredAutomatically"))) {
             try {
@@ -94,21 +99,76 @@ public class ProspectionController {
         log.info("Recebida requisição de prospecção com IA: cidade={}, uf={}, segmento={}", cidade, uf, segmento);
         List<Map<String, Object>> results = geminiProspectionService.searchProspectsWithAi(cidade, uf, segmento, quantidade);
 
-        // Gravar automaticamente os resultados no banco de dados
+        // Enriquecer automaticamente cada prospecto com CNPJ oficial formatado, E-mail, Telefone/WhatsApp e QSA completo
+        for (Map<String, Object> item : results) {
+            String cnpj = (String) item.get("cnpj");
+            try {
+                Map<String, Object> enriched = null;
+                if (cnpj != null && !cnpj.isBlank()) {
+                    enriched = cnpjLookupService.lookupByCnpj(cnpj);
+                } else {
+                    String nome = (String) item.get("nomeFantasia");
+                    if (nome == null || nome.isBlank()) nome = (String) item.get("razaoSocial");
+                    String logradouro = (String) item.get("logradouro");
+                    String telefone = (String) item.get("telefone");
+                    if (nome != null && !nome.isBlank()) {
+                        enriched = cnpjLookupService.findCnpjByNameAndLocation(nome, cidade, uf, logradouro, telefone);
+                    }
+                }
+
+                if (enriched != null && enriched.get("cnpj") != null && !enriched.get("cnpj").toString().isBlank()) {
+                    for (Map.Entry<String, Object> entry : enriched.entrySet()) {
+                        if (entry.getValue() != null && !(entry.getValue() instanceof String s && s.isBlank())) {
+                            // Preserva dados de mapa do Google Places se já preenchidos
+                            if ("googleMapsUrl".equals(entry.getKey()) && item.get("googleMapsUrl") != null) continue;
+                            if ("rating".equals(entry.getKey()) && item.get("rating") != null) continue;
+                            if ("userRatingsTotal".equals(entry.getKey()) && item.get("userRatingsTotal") != null) continue;
+                            item.put(entry.getKey(), entry.getValue());
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.debug("Auto-enriquecimento externo ignorado para item: {}", ex.getMessage());
+            } finally {
+                // Garantir 100% que o card tenha CNPJ válido formatado, email, telefone/WhatsApp e QSA com decisores
+                try {
+                    cnpjLookupService.enrichCorporateEmailsAndContacts(item);
+                } catch (Exception ex2) {
+                    log.debug("Erro no enriquecimento de garantia: {}", ex2.getMessage());
+                }
+            }
+        }
+
+        com.z7design.secured_guard.model.User user = resolveUser(userDetails);
+
+        // Gravar automaticamente os prospectos qualificados no CRM e na lista de e-mail marketing.
+        // Nenhum disparo é feito aqui: apenas Nome, E-mail, WhatsApp e Empresa são preparados.
+        String autoSaveHeader = null;
         try {
-            com.z7design.secured_guard.model.User user = resolveUser(userDetails);
+            autoSaveHeader = leadPersistenceService.saveAll(results, user).toJson();
+        } catch (Exception ex) {
+            log.warn("Falha ao gravar automaticamente os leads prospectados: {}", ex.getMessage());
+        }
+
+        // Gravar automaticamente os resultados enriquecidos no histórico de pesquisas
+        try {
             historyService.saveSearch("SEGMENTO", segmento, cidade, uf, segmento, results, user);
         } catch (Exception ex) {
             log.warn("Falha ao gravar pesquisa com IA no histórico: {}", ex.getMessage());
         }
 
-        return ResponseEntity.ok(results);
+        if (autoSaveHeader == null) {
+            return ResponseEntity.ok(results);
+        }
+        return ResponseEntity.ok()
+                .header("X-Prospection-AutoSave", autoSaveHeader)
+                .body(results);
     }
 
     @GetMapping("/history")
     @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Lista o histórico de pesquisas de prospecção gravadas no banco de dados")
-    public ResponseEntity<org.springframework.data.domain.Page<com.z7design.secured_guard.model.prospection.ProspectionSearch>> listHistory(
+    public ResponseEntity<org.springframework.data.domain.Page<Map<String, Object>>> listHistory(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(historyService.listRecentSearches(page, size));
@@ -154,6 +214,21 @@ public class ProspectionController {
         return null;
     }
 
+    @PostMapping("/enrich-lead")
+    @PreAuthorize(PROSPECTION_AUTHORITY)
+    @Operation(summary = "Enriquece sob demanda um lead com pesquisa de IA Gemini (Google Search) e resolução corporativa de Compras e QSA")
+    public ResponseEntity<Map<String, Object>> enrichLead(@RequestBody Map<String, Object> lead) {
+        log.info("Recebida solicitação de enriquecimento sob demanda de lead: nome='{}', cnpj='{}'",
+                lead.get("nomeFantasia") != null ? lead.get("nomeFantasia") : lead.get("razaoSocial"),
+                lead.get("cnpj"));
+        try {
+            cnpjLookupService.enrichCorporateEmailsAndContacts(lead);
+        } catch (Exception ex) {
+            log.warn("Erro ao enriquecer lead sob demanda: {}", ex.getMessage());
+        }
+        return ResponseEntity.ok(lead);
+    }
+
     @GetMapping("/credentials")
     @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Retorna o status de configuração das chaves de IA e ferramentas de prospecção")
@@ -169,8 +244,9 @@ public class ProspectionController {
         String placesKey = payload.get("googlePlacesApiKey");
         String apifyToken = payload.get("apifyApiToken");
         String apolloKey = payload.get("apolloApiKey");
+        String cnpjaKey = payload.get("cnpjaApiKey");
         String model = payload.get("model");
-        geminiProspectionService.updateCredentials(geminiKey, placesKey, apifyToken, apolloKey, model);
+        geminiProspectionService.updateCredentials(geminiKey, placesKey, apifyToken, apolloKey, cnpjaKey, model);
 
         Map<String, Object> response = new HashMap<>(geminiProspectionService.getCredentialsStatus());
         response.put("message", "Credenciais de Prospecção atualizadas com sucesso!");

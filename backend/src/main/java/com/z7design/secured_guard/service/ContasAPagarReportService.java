@@ -235,7 +235,7 @@ public class ContasAPagarReportService {
             req.setCompanySigla(companySigla);
             req.setStartDate(startDate);
             req.setEndDate(endDate);
-            req.setGroupBy("UNIT_SECTOR");
+            req.setGroupBy("NONE");
             req.setSelectedColumns(Arrays.asList("dueDate", "description", "supplier", "unit", "workSector", "category", "amount", "status"));
 
             return generateCustomPdfDocument(invoices, req);
@@ -308,19 +308,29 @@ public class ContasAPagarReportService {
                 }
                 return true;
             }).sorted((a, b) -> {
-                String uA = a.getUnit() != null && a.getUnit().getName() != null ? a.getUnit().getName() : "";
-                String uB = b.getUnit() != null && b.getUnit().getName() != null ? b.getUnit().getName() : "";
-                int cmpUnit = uA.compareToIgnoreCase(uB);
-                if (cmpUnit != 0) return cmpUnit;
+                LocalDate dA = a.getDueDate();
+                LocalDate dB = b.getDueDate();
+                if ("issueDate".equalsIgnoreCase(req.getDateField())) {
+                    dA = a.getIssueDate();
+                    dB = b.getIssueDate();
+                } else if ("paymentDate".equalsIgnoreCase(req.getDateField())) {
+                    dA = a.getPaymentDate();
+                    dB = b.getPaymentDate();
+                }
+                if (dA == null && dB == null) return 0;
+                if (dA == null) return 1;
+                if (dB == null) return -1;
+                int cmpDate = dA.compareTo(dB);
+                if (cmpDate != 0) return cmpDate;
 
-                String sA = a.getWorkSector() != null ? a.getWorkSector() : "";
-                String sB = b.getWorkSector() != null ? b.getWorkSector() : "";
-                int cmpSector = sA.compareToIgnoreCase(sB);
-                if (cmpSector != 0) return cmpSector;
+                String sA = getFornecedorOuFuncionario(a);
+                String sB = getFornecedorOuFuncionario(b);
+                int cmpSupp = sA.compareToIgnoreCase(sB);
+                if (cmpSupp != 0) return cmpSupp;
 
-                LocalDate dA = a.getDueDate() != null ? a.getDueDate() : LocalDate.MIN;
-                LocalDate dB = b.getDueDate() != null ? b.getDueDate() : LocalDate.MIN;
-                return dA.compareTo(dB);
+                String descA = a.getDescription() != null ? a.getDescription() : "";
+                String descB = b.getDescription() != null ? b.getDescription() : "";
+                return descA.compareToIgnoreCase(descB);
             }).collect(Collectors.toList());
 
             log.info("Contas filtradas para o relatório personalizado: {} de {}", filtered.size(), allInvoices.size());
@@ -419,6 +429,13 @@ public class ContasAPagarReportService {
                     for (Map.Entry<String, List<Invoice>> entry : grouped.entrySet()) {
                         String groupHeader = entry.getKey();
                         List<Invoice> groupInvoices = entry.getValue();
+                        groupInvoices.sort((a, b) -> {
+                            LocalDate dA = a.getDueDate() != null ? a.getDueDate() : LocalDate.MIN;
+                            LocalDate dB = b.getDueDate() != null ? b.getDueDate() : LocalDate.MIN;
+                            int cmp = dA.compareTo(dB);
+                            if (cmp != 0) return cmp;
+                            return getFornecedorOuFuncionario(a).compareToIgnoreCase(getFornecedorOuFuncionario(b));
+                        });
 
                         // Faixa de cabeçalho do grupo
                         Table groupBar = new Table(UnitValue.createPercentArray(new float[]{0.6f, 99.4f})).useAllAvailableWidth();
@@ -882,9 +899,9 @@ public class ContasAPagarReportService {
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
         int numCols = cols.size();
-        float headerFontSize = numCols >= 10 ? 5.2f : (numCols >= 8 ? 5.8f : 6.5f);
-        float dataFontSize = numCols >= 10 ? 5.0f : (numCols >= 8 ? 5.5f : 6.5f);
-        float cellPadding = numCols >= 10 ? 1.0f : (numCols >= 8 ? 1.5f : 2.0f);
+        float headerFontSize = numCols >= 10 ? 6.8f : (numCols >= 8 ? 7.4f : 8.2f);
+        float dataFontSize = numCols >= 10 ? 6.8f : (numCols >= 8 ? 7.2f : 8.0f);
+        float cellPadding = numCols >= 10 ? 1.2f : (numCols >= 8 ? 1.8f : 2.2f);
 
         // Headers
         for (String col : cols) {
@@ -986,25 +1003,25 @@ public class ContasAPagarReportService {
     }
 
     private float getColumnProportionalWidth(String colKey, int totalCols) {
-        // Se houver muitas colunas (8 ou mais), compacta ainda mais as colunas de texto amplo
+        // Se houver muitas colunas (8 ou mais), compacta ainda mais as colunas de texto curto/valores/datas
         boolean compact = totalCols >= 8;
         return switch (colKey) {
-            case "dueDate", "vencimento" -> compact ? 4.8f : 5.5f;
-            case "issueDate", "dataEmissao" -> compact ? 4.8f : 5.5f;
-            case "paymentDate", "dataPagamento" -> compact ? 4.8f : 5.5f;
-            case "description", "descricao" -> compact ? 6.8f : 8.0f; // Bem compactada para não estourar as margens
-            case "supplier", "fornecedor" -> compact ? 6.8f : 8.0f;   // Bem compactada para não estourar as margens
-            case "company", "empresa", "companySigla" -> compact ? 3.8f : 4.5f;
-            case "unit", "unidade" -> compact ? 5.2f : 6.5f;
-            case "workSector", "setor", "setorTrabalho" -> compact ? 5.2f : 6.5f;
-            case "category", "categoria", "conta" -> compact ? 6.2f : 7.5f;
-            case "centroCusto" -> compact ? 5.0f : 6.0f;
-            case "type", "tipo" -> compact ? 4.2f : 5.0f;
-            case "amount", "valor" -> compact ? 5.8f : 6.5f;
-            case "status" -> compact ? 5.2f : 6.0f;
-            case "barcode", "codigoBarras" -> compact ? 5.5f : 6.5f;
+            case "dueDate", "vencimento" -> compact ? 3.2f : 4.0f;
+            case "issueDate", "dataEmissao" -> compact ? 3.2f : 4.0f;
+            case "paymentDate", "dataPagamento" -> compact ? 3.2f : 4.0f;
+            case "description", "descricao" -> compact ? 8.5f : 11.0f; // Ampliada para melhor leitura
+            case "supplier", "fornecedor" -> compact ? 8.8f : 11.5f;   // Ampliada para melhor leitura
+            case "company", "empresa", "companySigla" -> compact ? 2.2f : 3.0f;
+            case "unit", "unidade" -> compact ? 5.0f : 6.5f;
+            case "workSector", "setor", "setorTrabalho" -> compact ? 5.0f : 6.5f;
+            case "category", "categoria", "conta" -> compact ? 6.0f : 7.5f;
+            case "centroCusto" -> compact ? 4.5f : 5.5f;
+            case "type", "tipo" -> compact ? 2.6f : 3.2f;
+            case "amount", "valor" -> compact ? 3.8f : 4.8f;
+            case "status" -> compact ? 2.8f : 3.5f;
+            case "barcode", "codigoBarras" -> compact ? 5.0f : 6.0f;
             case "observations", "observacoes" -> compact ? 5.5f : 6.5f;
-            default -> compact ? 5.0f : 6.0f;
+            default -> compact ? 4.5f : 5.5f;
         };
     }
 
@@ -1038,12 +1055,12 @@ public class ContasAPagarReportService {
             case "paymentDate", "dataPagamento" -> inv.getPaymentDate() != null ? inv.getPaymentDate().format(dateFormatter) : "-";
             case "description", "descricao" -> {
                 String d = inv.getDescription() != null ? inv.getDescription() : "";
-                int maxLen = ultraCompact ? 22 : (compact ? 26 : 38);
+                int maxLen = ultraCompact ? 32 : (compact ? 36 : 48);
                 yield d.length() > maxLen ? d.substring(0, maxLen - 3) + "..." : d;
             }
             case "supplier", "fornecedor" -> {
                 String s = getFornecedorOuFuncionario(inv);
-                int maxLen = ultraCompact ? 22 : (compact ? 26 : 40);
+                int maxLen = ultraCompact ? 32 : (compact ? 36 : 50);
                 yield s.length() > maxLen ? s.substring(0, maxLen - 3) + "..." : s;
             }
             case "company", "empresa", "companySigla" -> inv.getCompanySigla() != null ? inv.getCompanySigla() : "-";
@@ -1227,6 +1244,11 @@ public class ContasAPagarReportService {
         }
 
         List<Map<String, Object>> contasData = invoices.stream()
+                .sorted((a, b) -> {
+                    LocalDate dA = a.getDueDate() != null ? a.getDueDate() : LocalDate.MIN;
+                    LocalDate dB = b.getDueDate() != null ? b.getDueDate() : LocalDate.MIN;
+                    return dA.compareTo(dB);
+                })
                 .map(this::mapInvoiceToReportData)
                 .collect(Collectors.toList());
 
