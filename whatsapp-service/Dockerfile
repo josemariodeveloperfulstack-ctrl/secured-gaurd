@@ -23,4 +23,4 @@ COPY src ./src
 EXPOSE 3333
 ENV NODE_ENV=production
 
-CMD ["node", "src/server.js"]
+CMD ["npm", "start"]
