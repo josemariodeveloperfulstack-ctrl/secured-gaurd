@@ -272,7 +272,7 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
         try {
           setDetailLoading(true);
           const d = await stockService.getStockRequisition(initialRequisitionId);
-          if (initialOpenMode === 'edit' && d.status === StockRequisitionStatus.PENDING) {
+          if (initialOpenMode === 'edit' && d.status !== StockRequisitionStatus.CANCELLED) {
             hydrateFromDetail(d);
             setEditingRequisitionId(d.id);
             setEditMode(true);
@@ -517,7 +517,7 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
       lines: validLines.map((l) => ({ stockItemId: l.stockItemId, quantity: l.quantity })),
     };
 
-    const updateId = editingRequisitionId ?? (editMode && detail?.status === StockRequisitionStatus.PENDING ? detail.id : null);
+    const updateId = editingRequisitionId ?? (editMode && detail?.status !== StockRequisitionStatus.CANCELLED ? detail?.id : null);
 
     try {
       setSaving(true);
@@ -1518,32 +1518,32 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
                   Gerar Requisição em PDF
                 </Button>
 
-                {detail.status === StockRequisitionStatus.PENDING && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-amber-500/50 text-amber-300 hover:bg-amber-950/30 gap-2 min-h-[40px] text-xs sm:text-sm"
-                      onClick={() => {
-                        hydrateFromDetail(detail);
-                        setEditingRequisitionId(detail.id);
-                        setEditMode(true);
-                      }}
-                    >
-                      <Edit className="h-4 w-4" />
-                      Editar
-                    </Button>
+                {detail.status !== StockRequisitionStatus.CANCELLED && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-amber-500/50 text-amber-300 hover:bg-amber-950/30 gap-2 min-h-[40px] text-xs sm:text-sm"
+                    onClick={() => {
+                      hydrateFromDetail(detail);
+                      setEditingRequisitionId(detail.id);
+                      setEditMode(true);
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                    Editar
+                  </Button>
+                )}
 
-                    <Button
-                      type="button"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 min-h-[40px] text-xs sm:text-sm"
-                      onClick={handleApprove}
-                      disabled={saving}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Aprovar Requisição
-                    </Button>
-                  </>
+                {detail.status === StockRequisitionStatus.PENDING && (
+                  <Button
+                    type="button"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 min-h-[40px] text-xs sm:text-sm"
+                    onClick={handleApprove}
+                    disabled={saving}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Aprovar Requisição
+                  </Button>
                 )}
               </div>
             </div>

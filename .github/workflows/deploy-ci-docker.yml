@@ -6,6 +6,15 @@ on:
       - ci
   workflow_dispatch:
 
+# Todos os workflows que sobem containers no ambiente CI devem usar o MESMO grupo.
+# Sem isso, um push em `ci` e outro em `prod` disparam deploys simultaneos na mesma
+# VPS, competindo pelos mesmos nomes de container e morrendo no meio do `up`
+# (ex.: "Conflict. The container name /secured-guard-frontend-ci is already in use").
+# Resultado: nginx/backend fora do ar e o Cloudflare devolve HTTP 521.
+concurrency:
+  group: deploy-ci
+  cancel-in-progress: false
+
 env:
   ENVIRONMENT: ci
   DEPLOY_PATH: /var/www/secured_guard/ci

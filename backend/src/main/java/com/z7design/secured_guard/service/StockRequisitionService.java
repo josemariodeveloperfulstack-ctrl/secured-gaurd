@@ -14,10 +14,12 @@ import com.z7design.secured_guard.model.StockRequisition;
 import com.z7design.secured_guard.model.StockRequisitionLine;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
+import com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus;
 import com.z7design.secured_guard.model.enums.MovementType;
 import com.z7design.secured_guard.model.enums.StockRequisitionStatus;
 import com.z7design.secured_guard.repository.EmployeeChangeHistoryRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.EPIDeliveryFormRepository;
 import com.z7design.secured_guard.repository.StockItemRepository;
 import com.z7design.secured_guard.repository.StockMovementRepository;
 import com.z7design.secured_guard.repository.StockRequisitionRepository;
@@ -52,6 +54,7 @@ public class StockRequisitionService {
     private final StockService stockService;
     private final StockRequisitionPdfService stockRequisitionPdfService;
     private final EPIDeliveryFormService epiDeliveryFormService;
+    private final EPIDeliveryFormRepository epiDeliveryFormRepository;
 
     private String nextRequisitionNumber() {
         return "REQ-EST-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
@@ -116,14 +119,36 @@ public class StockRequisitionService {
     }
 
     /**
-     * Atualiza cabeçalho e linhas. Permitido apenas enquanto {@link StockRequisitionStatus#PENDING}
-     * (antes da baixa no estoque).
+     * Atualiza cabeçalho e linhas da requisição de almoxarifado.
+     * Se a requisição já tiver baixado estoque (aprovada ou entregue), estorna as saídas anteriores
+     * e aplica as novas saídas proporcionalmente.
      */
+    @Transactional
     public StockRequisitionDTO update(UUID id, CreateStockRequisitionRequest req) {
         StockRequisition r = loadFetched(id);
-        if (r.getStatus() != StockRequisitionStatus.PENDING) {
-            throw new IllegalArgumentException("Somente requisições pendentes podem ser alteradas.");
+        if (r.getStatus() == StockRequisitionStatus.CANCELLED) {
+            throw new IllegalArgumentException("Não é possível alterar uma requisição cancelada.");
         }
+
+        boolean wasDeducted = (r.getStatus() == StockRequisitionStatus.APPROVED || r.getStatus() == StockRequisitionStatus.DELIVERED);
+
+        if (wasDeducted && r.getLines() != null) {
+            for (StockRequisitionLine oldLine : r.getLines()) {
+                if (oldLine.getStockItem() != null && oldLine.getQuantity() != null && oldLine.getQuantity() > 0) {
+                    StockItem item = oldLine.getStockItem();
+                    int cur = item.getQuantity() != null ? item.getQuantity() : 0;
+                    item.setQuantity(cur + oldLine.getQuantity());
+                    stockItemRepository.save(item);
+                }
+            }
+            if (r.getRequisitionNumber() != null && !r.getRequisitionNumber().isBlank()) {
+                List<StockMovement> oldMovements = stockMovementRepository.findByRequisitionNumberOrderByMovementDateAsc(r.getRequisitionNumber());
+                if (!oldMovements.isEmpty()) {
+                    stockMovementRepository.deleteAll(oldMovements);
+                }
+            }
+        }
+
         Employee employee = employeeRepository.findWithOrgContextById(req.getEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado: " + req.getEmployeeId()));
         String sectorSnapshot = buildWorkSectorSnapshot(employee);
@@ -144,19 +169,66 @@ public class StockRequisitionService {
             r.addLine(l);
         }
 
+        if (wasDeducted) {
+            UUID actingUserId = r.getApprovedByUser() != null ? r.getApprovedByUser().getId() :
+                    (r.getRequestedByUser() != null ? r.getRequestedByUser().getId() : null);
+            createOutboundMovementsForRequisition(r, actingUserId, "Baixa no estoque por atualização de requisição de almoxarifado");
+            epiDeliveryFormService.ensureDraftEpiFormFromApprovedStockRequisition(r, actingUserId);
+        }
+
         stockRequisitionRepository.save(r);
         return StockRequisitionDTO.fromEntity(loadFetched(id));
     }
 
-    /** Exclui requisição ainda pendente (sem movimentações de estoque). */
+    /**
+     * Exclui requisição de almoxarifado.
+     * Se já estiver aprovada ou entregue, estorna o estoque devolvendo as quantidades e remove as movimentações vinculadas.
+     */
+    @Transactional
     public void delete(UUID id) {
         StockRequisition r = loadFetched(id);
-        if (r.getStatus() != StockRequisitionStatus.PENDING) {
-            throw new IllegalArgumentException("Somente requisições pendentes podem ser excluídas.");
+
+        if (r.getStatus() == StockRequisitionStatus.APPROVED || r.getStatus() == StockRequisitionStatus.DELIVERED) {
+            log.info("↩️ Estornando estoque ao deletar requisição: {}", r.getRequisitionNumber());
+            if (r.getLines() != null) {
+                for (StockRequisitionLine line : r.getLines()) {
+                    if (line.getStockItem() != null && line.getQuantity() != null && line.getQuantity() > 0) {
+                        StockItem item = line.getStockItem();
+                        int oldStock = item.getQuantity() != null ? item.getQuantity() : 0;
+                        item.setQuantity(oldStock + line.getQuantity());
+                        stockItemRepository.save(item);
+                        log.info("Estoque do item {} estornado: {} -> {}", item.getCode(), oldStock, item.getQuantity());
+                    }
+                }
+            }
+
+            if (r.getRequisitionNumber() != null && !r.getRequisitionNumber().isBlank()) {
+                List<StockMovement> movements = stockMovementRepository.findByRequisitionNumberOrderByMovementDateAsc(r.getRequisitionNumber());
+                if (!movements.isEmpty()) {
+                    stockMovementRepository.deleteAll(movements);
+                    log.info("Removidas {} movimentações associadas à requisição {}", movements.size(), r.getRequisitionNumber());
+                }
+            }
+
+            try {
+                epiDeliveryFormRepository.findFirstByStockRequisitionIdOrderByCreatedAtDesc(r.getId()).ifPresent(form -> {
+                    if (form.getStatus() == EPIDeliveryFormStatus.DRAFT) {
+                        epiDeliveryFormRepository.delete(form);
+                    } else {
+                        form.setStockRequisitionId(null);
+                        epiDeliveryFormRepository.save(form);
+                    }
+                });
+            } catch (Exception ex) {
+                log.warn("Erro ao desvincular ficha EPI ao excluir requisição: {}", ex.getMessage());
+            }
         }
+
         stockRequisitionRepository.delete(r);
+        log.info("✅ Requisição {} excluída com sucesso", r.getRequisitionNumber());
     }
 
+    @Transactional
     public void deleteMultiple(List<UUID> ids) {
         if (ids == null || ids.isEmpty()) {
             return;

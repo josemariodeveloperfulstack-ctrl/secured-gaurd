@@ -7,6 +7,11 @@ on:
   #     - ci
   workflow_dispatch:
 
+# Mesmo grupo dos outros workflows que mexem no CI (evita ups simultaneos).
+concurrency:
+  group: deploy-ci
+  cancel-in-progress: false
+
 env:
   ENVIRONMENT: ci
   APP_URL: https://ci.z7botsolutions.com.br
@@ -198,7 +203,7 @@ jobs:
             docker-compose -f docker-compose.ci.yml stop backend-ci frontend-ci nginx-ci whatsapp-service-ci evolution-api-ci 2>&1 || true
             docker-compose -f docker-compose.ci.yml rm -f backend-ci frontend-ci nginx-ci whatsapp-service-ci evolution-api-ci 2>&1 || true
             # Limpar containers órfãos
-            docker ps -a | grep "secured-guard" | grep -v "postgres\|redis" | awk '{print $1}' | xargs -r docker rm -f 2>&1 || true
+            docker ps -a --format '{{.Names}}' | grep -E '^secured-guard-(backend|frontend|nginx|whatsapp)-ci$|^evolution-api-ci$' | xargs -r docker rm -f 2>&1 || true
             echo "✅ Containers antigos parados (PostgreSQL e Redis preservados)!"
           EOF
 

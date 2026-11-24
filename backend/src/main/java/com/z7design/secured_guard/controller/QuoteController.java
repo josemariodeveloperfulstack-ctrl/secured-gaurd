@@ -103,24 +103,29 @@ public class QuoteController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Excluir orçamento", description = "Exclui um orçamento do sistema")
+    @Operation(summary = "Excluir orçamento", description = "Exclui um orçamento do sistema (lógico)")
     public ResponseEntity<Void> deleteQuote(@PathVariable String id) {
-        quoteService.delete(UUID.fromString(id));
+        quoteService.delete(UUID.fromString(id), currentUsername());
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/bulk")
-    @Operation(summary = "Excluir orçamentos em massa", description = "Exclui múltiplos orçamentos do sistema")
+    @Operation(summary = "Excluir orçamentos em massa", description = "Exclui múltiplos orçamentos do sistema (lógico)")
     public ResponseEntity<Void> deleteQuotesBulk(@RequestBody List<UUID> ids) {
-        quoteService.deleteBulk(ids);
+        quoteService.deleteBulk(ids, currentUsername());
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/all")
-    @Operation(summary = "Excluir todos os orçamentos", description = "Exclui todos os orçamentos do sistema")
+    @Operation(summary = "Excluir todos os orçamentos", description = "Exclui todos os orçamentos do sistema (lógico)")
     public ResponseEntity<Void> deleteAllQuotes() {
-        quoteService.deleteAll();
+        quoteService.deleteAll(currentUsername());
         return ResponseEntity.noContent().build();
+    }
+
+    private String currentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null ? authentication.getName() : null;
     }
 
     @GetMapping("/status/{status}")

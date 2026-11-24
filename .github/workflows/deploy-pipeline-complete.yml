@@ -11,6 +11,12 @@ on:
       - develop
   workflow_dispatch:   # Permite execução manual
 
+# Este pipeline tambem sobe os containers *-ci na mesma VPS do deploy-ci-docker.yml.
+# Mesmo grupo de concorrencia para nao haver dois `up` simultaneos (erro 521).
+concurrency:
+  group: deploy-ci
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}

@@ -225,17 +225,51 @@ public class QuoteService {
         return quoteRepository.save(quote);
     }
 
-    public void delete(UUID id) {
+    /**
+     * Exclusao logica: a entidade possui @SQLRestriction("is_deleted = false") e
+     * campos de auditoria, e os itens (quote_items) tem FK NOT NULL para quotes.
+     * Delete fisico (delete/deleteAllById/deleteAllInBatch) estoura a FK ou
+     * conflita com o filtro de soft delete, retornando 500.
+     */
+    public void delete(UUID id, String username) {
         Quote quote = findById(id);
-        quoteRepository.delete(quote);
+        applySoftDelete(List.of(quote), "Exclusão via API", username);
+        quoteRepository.save(quote);
     }
 
-    public void deleteBulk(List<UUID> ids) {
-        quoteRepository.deleteAllById(ids);
+    public void deleteBulk(List<UUID> ids, String username) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        // findAllById respeita @SQLRestriction -> somente orcamentos ativos
+        List<Quote> quotes = quoteRepository.findAllById(ids);
+        if (quotes.isEmpty()) {
+            return;
+        }
+        applySoftDelete(quotes, "Exclusão em massa via API", username);
+        quoteRepository.saveAll(quotes);
     }
 
-    public void deleteAll() {
-        quoteRepository.deleteAllInBatch();
+    public void deleteAll(String username) {
+        List<Quote> quotes = quoteRepository.findAll();
+        applySoftDelete(quotes, "Exclusão total via API", username);
+        quoteRepository.saveAll(quotes);
+    }
+
+    private void applySoftDelete(List<Quote> quotes, String reason, String username) {
+        if (quotes.isEmpty()) {
+            return;
+        }
+        User user = (username == null || username.isBlank())
+                ? null
+                : userRepository.findByUsername(username).orElse(null);
+        LocalDateTime now = LocalDateTime.now();
+        for (Quote quote : quotes) {
+            quote.setDeleted(true);
+            quote.setDeletionReason(reason);
+            quote.setDeletedAt(now);
+            quote.setDeletedBy(user);
+        }
     }
 
     @Transactional(readOnly = true)

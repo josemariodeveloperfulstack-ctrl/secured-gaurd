@@ -10,14 +10,19 @@
 name: Deploy CI
 
 on:
-  push:
-    branches:
-      - prod
+  # DESABILITADO: este workflow usa deploy/docker-compose.env-ci.yml, que cria os
+  # MESMOS nomes de container do deploy-ci-docker.yml porem com rede/DB diferentes.
+  # Rodando junto com o deploy da branch `ci`, ele derrubava o ambiente no meio do
+  # `up` (conflito de nomes -> backend/nginx fora do ar -> Cloudflare 521).
+  # Para sincronizar prod -> CI, execute manualmente (workflow_dispatch).
+  # push:
+  #   branches:
+  #     - prod
   workflow_dispatch:
 
 concurrency:
   group: deploy-ci
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
