@@ -750,7 +750,6 @@ public class EPIDeliveryFormService {
         }
         return c.name().startsWith("UNIFORME");
     }
-    }
 
     private static EPIDeliveryType mapMovementReasonToEpiDeliveryType(MovementReason reason) {
         if (reason == null) {
