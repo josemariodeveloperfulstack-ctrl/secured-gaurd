@@ -451,8 +451,8 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
     );
   };
 
-  // Salvar requisição (com aprovação imediata opcional e baixa automática)
-  const handleSaveRequisition = async () => {
+  // Salvar requisição (com opção de download ou visualização imediata do PDF)
+  const handleSaveRequisition = async (action: 'save' | 'pdf' | 'preview' = 'save') => {
     if (!employeeId) {
       toast({ title: 'Funcionário obrigatório', description: 'Pesquise e selecione o funcionário solicitante.', variant: 'destructive' });
       return;
@@ -485,6 +485,12 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
         setEditingRequisitionId(null);
         onRecorded?.();
         toast({ title: 'Requisição atualizada com sucesso', description: `Nº ${dto.requisitionNumber}` });
+
+        if (action === 'pdf') {
+          await stockService.downloadStockRequisitionPdf(dto.id, dto.requisitionNumber);
+        } else if (action === 'preview') {
+          await stockService.previewStockRequisitionPdf(dto.id);
+        }
       } else {
         // Criação de requisição
         let dto = await stockService.createStockRequisition(payload);
@@ -517,10 +523,33 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
 
         setDetail(dto);
         onRecorded?.();
-        toast({
-          title: autoApprove ? 'Requisição criada e aprovada!' : 'Requisição criada com sucesso!',
-          description: `Nº ${dto.requisitionNumber} — Estoque atualizado no almoxarifado.`,
-        });
+
+        if (action === 'pdf') {
+          try {
+            await stockService.downloadStockRequisitionPdf(dto.id, dto.requisitionNumber);
+            toast({
+              title: 'Requisição criada e PDF gerado!',
+              description: `Nº ${dto.requisitionNumber} — Download do PDF iniciado para impressão.`,
+            });
+          } catch (pdfErr) {
+            console.error('Erro ao baixar PDF:', pdfErr);
+            toast({
+              title: 'Requisição salva com sucesso!',
+              description: `Nº ${dto.requisitionNumber}. Utilize o botão de PDF abaixo para baixar.`,
+            });
+          }
+        } else if (action === 'preview') {
+          try {
+            await stockService.previewStockRequisitionPdf(dto.id);
+          } catch (previewErr) {
+            console.error('Erro ao visualizar PDF:', previewErr);
+          }
+        } else {
+          toast({
+            title: autoApprove ? 'Requisição criada e aprovada!' : 'Requisição criada com sucesso!',
+            description: `Nº ${dto.requisitionNumber} — Estoque atualizado no almoxarifado.`,
+          });
+        }
       }
     } catch (e: any) {
       toast({
@@ -528,6 +557,10 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
         description: e?.response?.data?.error || e?.message || 'Tente novamente.',
         variant: 'destructive',
       });
+    } finally {
+      setSaving(false);
+    }
+  };
     } finally {
       setSaving(false);
     }
@@ -1090,47 +1123,83 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
             </div>
 
             {/* BOTÕES DE AÇÃO */}
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 pt-3 border-t border-zinc-800">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 pt-3 border-t border-zinc-800">
               <Button
                 type="button"
                 variant="outline"
-                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 min-h-[42px]"
+                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 min-h-[42px] px-4"
                 onClick={() => onOpenChange(false)}
               >
                 Fechar
               </Button>
 
-              {editMode && (
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                {editMode && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 min-h-[42px]"
+                    onClick={() => {
+                      setEditMode(false);
+                      setEditingRequisitionId(null);
+                    }}
+                  >
+                    Cancelar Edição
+                  </Button>
+                )}
+
+                {/* Botão de Visualizar Requisição (PDF) */}
                 <Button
                   type="button"
                   variant="outline"
-                  className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 min-h-[42px]"
-                  onClick={() => {
-                    setEditMode(false);
-                    setEditingRequisitionId(null);
-                  }}
+                  className="border-seguranca-yellow/50 text-seguranca-yellow hover:bg-seguranca-yellow/10 min-h-[42px] font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5"
+                  onClick={() => handleSaveRequisition('preview')}
+                  disabled={saving}
+                  title="Visualizar a requisição em PDF"
                 >
-                  Cancelar Edição
+                  <Eye className="h-4 w-4 shrink-0 text-seguranca-yellow" />
+                  <span>Visualizar Requisição (PDF)</span>
                 </Button>
-              )}
 
-              <Button
-                type="button"
-                className="bg-seguranca-red hover:bg-seguranca-darkred text-white min-h-[42px] font-semibold px-6 shadow-lg"
-                onClick={handleSaveRequisition}
-                disabled={saving}
-              >
-                {saving ? (
-                  <span className="flex items-center gap-2">
+                {/* Botão de Gerar Requisição em PDF */}
+                <Button
+                  type="button"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white min-h-[42px] font-semibold text-xs sm:text-sm px-4 shadow-md flex items-center justify-center gap-1.5"
+                  onClick={() => handleSaveRequisition('pdf')}
+                  disabled={saving}
+                  title="Gerar e baixar o PDF da requisição para anexar à ficha física"
+                >
+                  {saving ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Processando...
-                  </span>
-                ) : editMode ? (
-                  'Salvar Alterações'
-                ) : (
-                  'Gerar e Salvar Requisição'
-                )}
-              </Button>
+                  ) : (
+                    <Download className="h-4 w-4 shrink-0" />
+                  )}
+                  <span>Gerar Requisição em PDF</span>
+                </Button>
+
+                {/* Botão Salvar Requisição */}
+                <Button
+                  type="button"
+                  className="bg-seguranca-red hover:bg-seguranca-darkred text-white min-h-[42px] font-semibold text-xs sm:text-sm px-5 shadow-lg flex items-center justify-center gap-1.5"
+                  onClick={() => handleSaveRequisition('save')}
+                  disabled={saving}
+                  title="Salvar requisição no sistema"
+                >
+                  {saving ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Processando...
+                    </span>
+                  ) : editMode ? (
+                    'Salvar Alterações'
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                      <span>Salvar Requisição</span>
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         ) : showDetail && detail ? (
