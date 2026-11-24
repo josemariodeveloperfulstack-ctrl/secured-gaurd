@@ -64,11 +64,19 @@ jobs:
           echo "📋 Verificando estrutura do projeto..."
           ls -la src/main/java/com/z7design/secured_guard/ || echo "⚠️ Diretório src não encontrado"
           
-          # Configurar Maven para usar retry
-          echo "📋 Configurando Maven com retry..."
+          # Configurar Maven para usar retry e mirrors rápidos
+          echo "📋 Configurando Maven com retry e mirrors..."
           mkdir -p ~/.m2
           printf '%s\n' \
             '<settings>' \
+            '  <mirrors>' \
+            '    <mirror>' \
+            '      <id>google-maven-central</id>' \
+            '      <name>Google Maven Central Mirror</name>' \
+            '      <url>https://maven-central.storage-download.googleapis.com/maven2/</url>' \
+            '      <mirrorOf>central</mirrorOf>' \
+            '    </mirror>' \
+            '  </mirrors>' \
             '  <profiles>' \
             '    <profile>' \
             '      <id>retry</id>' \
