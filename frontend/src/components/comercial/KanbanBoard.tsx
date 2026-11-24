@@ -666,7 +666,13 @@ export default function KanbanBoard() {
       }
 
       // 2. Carregar oportunidades
-      const opportunitiesData = await fetchOpportunities();
+      let opportunitiesData: any[] = [];
+      try {
+        opportunitiesData = (await fetchOpportunities()) || [];
+      } catch (oppErr: any) {
+        console.warn('Erro ao buscar oportunidades no servidor:', oppErr);
+        opportunitiesData = [];
+      }
       const usersMap = new Map(users.map(u => [u.id, u.name]));
       
       const mappedOpportunities = (opportunitiesData || []).map((opp: any) => {
@@ -772,14 +778,14 @@ export default function KanbanBoard() {
       }
     } catch (err: any) {
       console.error('Erro crítico ao carregar dados do Kanban:', err);
-      setError(err.message || 'Erro ao carregar dados');
-      setStatuses(mockStatuses);
-      setOpportunities(mockOpportunities || []);
-      setFilteredOpportunities(mockOpportunities || []);
+      setError(err?.response?.data?.message || err.message || 'Falha ao sincronizar dados com o servidor.');
+      setStatuses((prev) => (prev.length > 0 ? prev : mockStatuses));
+      setOpportunities([]);
+      setFilteredOpportunities([]);
       setHasValidStatuses(false);
       toast({
-        title: "Erro",
-        description: "Não foi possível carregar dados do backend. Usando dados de exemplo.",
+        title: "Aviso do CRM",
+        description: "Não foi possível carregar todas as oportunidades do backend. O quadro permanece disponível.",
         variant: "destructive"
       });
     } finally {
@@ -1358,8 +1364,7 @@ export default function KanbanBoard() {
     setActiveId(null);
   };
 
-  if (loading) return <div className="flex items-center justify-center p-8">Carregando Kanban...</div>;
-  if (error) return <div className="text-red-500 p-8">{error}</div>;
+  if (loading) return <div className="flex items-center justify-center p-8 text-seguranca-lightgray">Carregando Kanban...</div>;
 
   return (
     <DndContext
@@ -1369,6 +1374,22 @@ export default function KanbanBoard() {
       onDragCancel={handleDragCancel}
     >
     <div className="space-y-6 w-full min-w-0">
+      {error && (
+        <div className="flex items-center justify-between p-3 rounded-lg bg-red-950/40 border border-red-500/30 text-red-200 text-sm">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+            <span>{error}</span>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={loadData}
+            className="text-red-300 hover:text-white hover:bg-red-900/30 text-xs h-7"
+          >
+            Tentar novamente
+          </Button>
+        </div>
+      )}
       {/* Header com estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-seguranca-graphite border-gray-600">

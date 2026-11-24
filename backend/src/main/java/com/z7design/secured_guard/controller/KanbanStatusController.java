@@ -21,6 +21,8 @@ import com.z7design.secured_guard.dto.KanbanStatusDTO;
 @RequestMapping("/api/kanban-status")
 @Validated
 public class KanbanStatusController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(KanbanStatusController.class);
+
     @Autowired
     private KanbanStatusService kanbanStatusService;
 
@@ -41,7 +43,12 @@ public class KanbanStatusController {
 
     @GetMapping
     public List<KanbanStatusDTO> getAll() {
-        return kanbanStatusService.findAll().stream().map(this::toDTO).collect(Collectors.toList());
+        try {
+            return kanbanStatusService.findAll().stream().map(this::toDTO).collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Erro ao buscar status do Kanban", e);
+            return new java.util.ArrayList<>();
+        }
     }
 
     @GetMapping("/{id}")
