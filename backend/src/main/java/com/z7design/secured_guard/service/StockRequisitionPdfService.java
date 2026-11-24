@@ -29,6 +29,7 @@ import com.z7design.secured_guard.model.StockRequisitionLine;
 import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus;
 import com.z7design.secured_guard.model.enums.MovementReason;
+import com.z7design.secured_guard.model.enums.StockRequisitionStatus;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EPIDeliveryFormRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
@@ -67,6 +68,7 @@ public class StockRequisitionPdfService {
     private static final DeviceRgb RED_PRIMARY = new DeviceRgb(220, 38, 38);     // #dc2626 Vermelho vibrante oficial
     private static final DeviceRgb ORANGE_ACCENT = new DeviceRgb(249, 115, 22);  // #f97316 Laranja degradê
     private static final DeviceRgb YELLOW_ACCENT = new DeviceRgb(234, 179, 8);   // #eab308 Amarelo ouro degradê
+    private static final DeviceRgb BRONZE_HEADER = new DeviceRgb(154, 115, 61); // #9a733d Cabeçalho da tabela de materiais (Imagem 4)
     private static final DeviceRgb TEXT_MUTED = new DeviceRgb(100, 116, 139);    // #64748b Texto secundário / notas
 
     private final StockMovementRepository stockMovementRepository;
@@ -109,35 +111,17 @@ public class StockRequisitionPdfService {
      */
     @Transactional(readOnly = true)
     public byte[] generateMultiLineRequisitionPdf(StockRequisition r) {
-        log.info("📄 Gerando PDF executivo multi-item da requisição: {} no padrão Ficha de EPI", r.getRequisitionNumber());
-
-        // 1. Se existir Ficha de EPI vinculada com itens, tenta gerar diretamente pelo EPIDeliveryStandardPdfService
-        if (r.getId() != null) {
-            try {
-                Optional<EPIDeliveryForm> formOpt = epiDeliveryFormRepository.findFirstByStockRequisitionIdOrderByCreatedAtDesc(r.getId());
-                if (formOpt.isPresent()) {
-                    EPIDeliveryForm form = formOpt.get();
-                    if (form.getItems() != null && !form.getItems().isEmpty()) {
-                        log.info("Encontrada Ficha de EPI vinculada (ID: {}). Delegando geração para EPIDeliveryStandardPdfService.", form.getId());
-                        return epiDeliveryStandardPdfService.generateEPIDeliveryPdfFromForm(form);
-                    }
-                }
-            } catch (Exception ex) {
-                log.warn("Falha ao gerar PDF via ficha EPI vinculada ({}), usando renderizador nativo da requisição.", ex.getMessage());
-            }
-        }
-
-        // 2. Renderização Nativa com a estrutura idêntica da Ficha de EPI
-        return generateNativeEpiStyleRequisitionPdf(r);
+        log.info("📄 Gerando PDF oficial de Requisição de Material Almoxarifado: {}", r.getRequisitionNumber());
+        return generateNativeWarehouseRequisitionPdf(r);
     }
 
     /**
      * Gera PDF de requisição para uma movimentação individual (compatibilidade retroativa)
-     * no formato Retrato A4 seguindo o mesmo layout da Ficha de EPI.
+     * no formato Retrato A4 seguindo o layout oficial da Requisição de Material Almoxarifado.
      */
     @Transactional(readOnly = true)
     public byte[] generateRequisitionPdf(UUID movementId) {
-        log.info("📄 Gerando PDF executivo para movimentação de estoque: {} no padrão Ficha de EPI", movementId);
+        log.info("📄 Gerando PDF executivo para movimentação de estoque: {}", movementId);
 
         StockMovement movement = stockMovementRepository.findById(movementId)
                 .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada: " + movementId));
@@ -149,14 +133,14 @@ public class StockRequisitionPdfService {
             }
         }
 
-        return generateNativeEpiStyleMovementPdf(movement);
+        return generateNativeWarehouseMovementPdf(movement);
     }
 
     /* ========================================================================= */
-    /* RENDERIZAÇÃO NATIVA NO LAYOUT EXATO DA FICHA DE EPI                       */
+    /* RENDERIZAÇÃO NATIVA: REQUISIÇÃO DE MATERIAL ALMOXARIFADO                  */
     /* ========================================================================= */
 
-    private byte[] generateNativeEpiStyleRequisitionPdf(StockRequisition r) {
+    private byte[] generateNativeWarehouseRequisitionPdf(StockRequisition r) {
         Employee emp = r.getEmployee();
         if (emp != null && emp.getId() != null) {
             emp = employeeRepository.findById(emp.getId()).orElse(emp);
@@ -166,220 +150,7 @@ public class StockRequisitionPdfService {
         UUID companyId = company != null ? company.getId() : null;
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DocumentWithPdf docWithPdf = null;
         Document document;
-        com.itextpdf.kernel.pdf.PdfDocument pdfDoc = null;
-
-        try {
-            PdfWriter writer = new PdfWriter(baos);
-            if (company != null && company.getId() != null) {
-                try {
-                    var layoutBuilder = ReportLayoutConfig.builder()
-                            .companyId(companyId)
-                            .reportTitle(null)
-                            .showHeader(false) // Desativa cabeçalho legado com ondas para usar cabeçalho executivo moderno
-                            .showFooterContentSeparator(true)
-                            .showFooterBackgroundLine(false)
-                            .includeEmailInFooter(true)
-                            .showPageNumbers(true)
-                            .landscape(false) // Formato Retrato A4
-                            .topMargin(20f)
-                            .marginExtraTop(0f)
-                            .bottomMargin(52f)
-                            .leftMargin(30f)
-                            .rightMargin(30f);
-
-                    if (emp != null && emp.getId() != null) {
-                        documentDateResolver.applyAdmissionDateFooter(layoutBuilder, emp.getId());
-                    }
-                    ReportLayoutConfig layoutConfig = layoutBuilder.build();
-
-                    docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
-                    document = docWithPdf.getDocument();
-                } catch (Exception layoutEx) {
-                    log.warn("Falha ao inicializar layout padrão ({}), criando documento PDF direto", layoutEx.getMessage());
-                    pdfDoc = new com.itextpdf.kernel.pdf.PdfDocument(writer);
-                    pdfDoc.setDefaultPageSize(com.itextpdf.kernel.geom.PageSize.A4);
-                    document = new Document(pdfDoc, com.itextpdf.kernel.geom.PageSize.A4);
-                    document.setMargins(20f, 30f, 52f, 30f);
-                }
-            } else {
-                pdfDoc = new com.itextpdf.kernel.pdf.PdfDocument(writer);
-                pdfDoc.setDefaultPageSize(com.itextpdf.kernel.geom.PageSize.A4);
-                document = new Document(pdfDoc, com.itextpdf.kernel.geom.PageSize.A4);
-                document.setMargins(20f, 30f, 52f, 30f);
-            }
-
-            // 1. Cabeçalho Executivo Moderno (fundo #0f172a, Logo, CONTROLE DE EPI e Badges)
-            LocalDate deliveryDate = r.getDeliveredAt() != null ? r.getDeliveredAt().toLocalDate()
-                    : (r.getCreatedAt() != null ? r.getCreatedAt().toLocalDate() : LocalDate.now());
-            String deliveryBadge = deliveryDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-            String badgeStatus = (r.getMovementReason() == MovementReason.DEVOLUCAO) ? "DEVOLUÇÃO" : "ENTREGA DE EPI";
-            addExecutiveHeader(document, company, "CONTROLE DE EPI", badgeStatus, deliveryBadge);
-
-            // 2. Seção de Identificação do Colaborador
-            addSectionHeader(document, "IDENTIFICAÇÃO DO COLABORADOR");
-
-            String name = emp != null && emp.getName() != null ? emp.getName().toUpperCase() : "";
-            Table nameTable = new Table(UnitValue.createPercentArray(new float[]{100f})).useAllAvailableWidth();
-            nameTable.addCell(new Cell().add(new Paragraph("NOME DO EMPREGADO: " + name)
-                    .setFontSize(8f).setBold()).setPadding(2f));
-            document.add(nameTable);
-
-            Table infoTable = new Table(UnitValue.createPercentArray(new float[]{40f, 30f, 30f})).useAllAvailableWidth();
-            String position = emp != null && emp.getPosition() != null ? emp.getPosition().getName().toUpperCase() : "";
-            String cpf = emp != null ? CompanyDataFormatter.formatCpf(emp.getCpf() != null ? emp.getCpf() : emp.getDocument()) : "";
-            String rg = buildRg(emp);
-
-            infoTable.addCell(new Cell().add(new Paragraph("FUNÇÃO: " + position).setFontSize(7.5f)).setPadding(2f));
-            infoTable.addCell(new Cell().add(new Paragraph("CPF: " + cpf).setFontSize(7.5f)).setPadding(2f));
-            infoTable.addCell(new Cell().add(new Paragraph("RG: " + rg).setFontSize(7.5f)).setPadding(2f));
-            document.add(infoTable);
-
-            Table secondInfoTable = new Table(UnitValue.createPercentArray(new float[]{35f, 30f, 35f})).useAllAvailableWidth();
-            String hireDate = emp != null ? formatDate(emp.getHireDate()) : "";
-            String terminationDate = emp != null ? formatDate(emp.getTerminationDate()) : "";
-            String sector = r.getEmployeeWorkSector() != null && !r.getEmployeeWorkSector().isBlank()
-                    ? r.getEmployeeWorkSector().toUpperCase()
-                    : (emp != null && emp.getDepartment() != null ? emp.getDepartment().getName().toUpperCase() :
-                    (emp != null && emp.getUnit() != null ? emp.getUnit().getName().toUpperCase() : ""));
-
-            secondInfoTable.addCell(new Cell().add(new Paragraph("ADMISSÃO: " + hireDate).setFontSize(7.5f)).setPadding(2f));
-            secondInfoTable.addCell(new Cell().add(new Paragraph("DEMISSÃO: " + terminationDate).setFontSize(7.5f)).setPadding(2f));
-            secondInfoTable.addCell(new Cell().add(new Paragraph("SETOR: " + sector).setFontSize(7.5f)).setPadding(2f));
-            document.add(secondInfoTable);
-
-            Table respTable = new Table(UnitValue.createPercentArray(new float[]{100f}))
-                    .useAllAvailableWidth().setMarginBottom(2.5f).setMarginTop(1f);
-            String responsibleName = resolveResponsibleName(r);
-            respTable.addCell(new Cell().add(new Paragraph("RESPONSÁVEL PELA ENTREGA: " + responsibleName).setFontSize(8f).setBold()).setPadding(2f));
-            document.add(respTable);
-
-            // 3. Termo e Declaração de Responsabilidade (Art. 158 da CLT)
-            addSectionHeader(document, "TERMO DE RESPONSABILIDADE E RECIBO DE EPI");
-
-            String declarationText = "Recebi da " + (company != null && company.getName() != null ? company.getName() : "Promover Terceirização e Serviços Ltda.")
-                    + "., os EPI's abaixo especificados a serem usados no desempenho de minhas tarefas. Assumo o compromisso de usá-los durante a jornada de trabalho, zelar pela sua conservação, quando necessário solicitar a substituição ou reposição e devolvê-los à Empresa em caso de demissão. Estou ciente também que o não uso desses EPI's implicará em ato faltoso e insubordinação, sujeito a sanções disciplinares previstas no art. 158 CLT.";
-
-            Table decTable = new Table(UnitValue.createPercentArray(new float[]{100f}))
-                    .useAllAvailableWidth().setMarginBottom(1.5f);
-            decTable.addCell(new Cell().add(new Paragraph(declarationText)
-                    .setFontSize(7f).setTextAlignment(TextAlignment.JUSTIFIED)).setPadding(2f));
-            document.add(decTable);
-
-            Table signTable = new Table(UnitValue.createPercentArray(new float[]{35f, 65f}))
-                    .useAllAvailableWidth().setMarginBottom(2.5f);
-
-            signTable.addCell(new Cell().add(new Paragraph("Contagem: " + deliveryBadge).setFontSize(8f)).setPadding(2.5f));
-
-            Cell signatureCell = new Cell().setPadding(2.5f);
-            String digitalSig = r.getDigitalSignature();
-            if (digitalSig != null && !digitalSig.isBlank()) {
-                try {
-                    String base64Data = digitalSig;
-                    if (base64Data.contains(",")) {
-                        base64Data = base64Data.split(",")[1];
-                    }
-                    byte[] imageBytes = Base64.getDecoder().decode(base64Data);
-                    Image img = new Image(ImageDataFactory.create(imageBytes));
-                    img.setMaxHeight(18f);
-                    signatureCell.add(new Paragraph("Assinatura Digital:").setFontSize(6.5f).setItalic().setMarginBottom(1f));
-                    signatureCell.add(img);
-                } catch (Exception e) {
-                    signatureCell.add(new Paragraph("Assinatura: _________________________________________________").setFontSize(8f));
-                }
-            } else if (r.getPhysicalSignatureAck() != null && !r.getPhysicalSignatureAck().isBlank()) {
-                signatureCell.add(new Paragraph("Recebimento Físico Confirmado: " + r.getPhysicalSignatureAck()).setFontSize(7.5f).setItalic());
-            } else {
-                signatureCell.add(new Paragraph("Assinatura: _________________________________________________").setFontSize(8f));
-            }
-            signTable.addCell(signatureCell);
-            document.add(signTable);
-
-            // 4. Detalhamento dos Equipamentos Fornecidos (8 colunas)
-            addSectionHeader(document, "DETALHAMENTO DOS EQUIPAMENTOS FORNECIDOS");
-
-            Table epiTable = new Table(UnitValue.createPercentArray(new float[]{23f, 4f, 7f, 6f, 9f, 13f, 20f, 18f}))
-                    .useAllAvailableWidth();
-
-            epiTable.addHeaderCell(createEpiHeaderCell("EQUIPAMENTO"));
-            epiTable.addHeaderCell(createEpiHeaderCell("Nº"));
-            epiTable.addHeaderCell(createEpiHeaderCell("CA"));
-            epiTable.addHeaderCell(createEpiHeaderCell("QUANTIDADE"));
-            epiTable.addHeaderCell(createEpiHeaderCell("ENTREGA"));
-            if (r.getMovementReason() == MovementReason.DEVOLUCAO) {
-                epiTable.addHeaderCell(createEpiHeaderCell("DEVOLUÇÃO"));
-                epiTable.addHeaderCell(createEpiHeaderCell("MOTIVO DA DEVOLUÇÃO"));
-            } else {
-                epiTable.addHeaderCell(createEpiHeaderCell("SUBSTITUÍDO / DEVOLUÇÃO"));
-                epiTable.addHeaderCell(createEpiHeaderCell("MOTIVO SUBST. / DEVOLUÇÃO"));
-            }
-            epiTable.addHeaderCell(createEpiHeaderCell("ASSINATURA"));
-
-            // Montagem das linhas: histórico do colaborador (se houver) + itens da requisição atual
-            List<EpiMovementRow> movements = buildMovementRowsForRequisition(r, emp, deliveryDate);
-            for (EpiMovementRow m : movements) {
-                epiTable.addCell(createEpiDataCell(m.epiName() != null ? m.epiName().toUpperCase() : ""));
-                epiTable.addCell(createEpiDataCell(m.sizeNumber() != null ? m.sizeNumber() : ""));
-                epiTable.addCell(createEpiDataCell(m.ca() != null ? m.ca() : ""));
-                epiTable.addCell(createEpiDataCell(String.valueOf(m.quantity())));
-                epiTable.addCell(createEpiDataCell(formatDate(m.deliveryDate())));
-                epiTable.addCell(createEpiDataCell(m.substitutionInfo()));
-                epiTable.addCell(createEpiDataCell(m.substitutionReason()));
-                epiTable.addCell(createEpiSignatureCell(m.signatureBase64()));
-            }
-
-            // Preenchimento com linhas vazias até totalizar 27 unidades visuais (garante 1 página preenchida de forma equilibrada)
-            int usedUnits = 0;
-            for (EpiMovementRow m : movements) {
-                int nameLen = m.epiName() != null ? m.epiName().length() : 0;
-                int reasonLen = m.substitutionReason() != null ? m.substitutionReason().length() : 0;
-                int units = 1;
-                if (nameLen > 45 || reasonLen > 35) {
-                    units = 3;
-                } else if (nameLen > 22 || reasonLen > 18) {
-                    units = 2;
-                }
-                usedUnits += units;
-            }
-
-            int targetUnits = 27;
-            int itemsToAdd = Math.max(0, targetUnits - usedUnits);
-            for (int i = 0; i < itemsToAdd; i++) {
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-            }
-
-            document.add(epiTable);
-            document.close();
-
-            log.info("✅ PDF da requisição de estoque gerado com sucesso no layout da Ficha de EPI. Tamanho: {} bytes", baos.size());
-            return baos.toByteArray();
-        } catch (Exception e) {
-            log.error("Erro ao gerar PDF da requisição no padrão Ficha de EPI: {}", e.getMessage(), e);
-            throw new RuntimeException("Erro ao gerar PDF da requisição de estoque: " + e.getMessage(), e);
-        }
-    }
-
-    private byte[] generateNativeEpiStyleMovementPdf(StockMovement movement) {
-        Employee emp = movement.getEmployee();
-        if (emp != null && emp.getId() != null) {
-            emp = employeeRepository.findById(emp.getId()).orElse(emp);
-        }
-
-        Company company = resolveCompany(emp);
-        UUID companyId = company != null ? company.getId() : null;
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DocumentWithPdf docWithPdf = null;
-        Document document;
-        com.itextpdf.kernel.pdf.PdfDocument pdfDoc = null;
 
         try {
             PdfWriter writer = new PdfWriter(baos);
@@ -396,7 +167,7 @@ public class StockRequisitionPdfService {
                             .landscape(false)
                             .topMargin(20f)
                             .marginExtraTop(0f)
-                            .bottomMargin(52f)
+                            .bottomMargin(45f)
                             .leftMargin(30f)
                             .rightMargin(30f);
 
@@ -405,33 +176,35 @@ public class StockRequisitionPdfService {
                     }
                     ReportLayoutConfig layoutConfig = layoutBuilder.build();
 
-                    docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+                    DocumentWithPdf docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
                     document = docWithPdf.getDocument();
                 } catch (Exception layoutEx) {
-                    log.warn("Falha no standardReportLayoutService para movimentação ({}), criando documento direto", layoutEx.getMessage());
-                    pdfDoc = new com.itextpdf.kernel.pdf.PdfDocument(writer);
+                    log.warn("Falha ao inicializar layout padrão ({}), criando documento PDF direto", layoutEx.getMessage());
+                    com.itextpdf.kernel.pdf.PdfDocument pdfDoc = new com.itextpdf.kernel.pdf.PdfDocument(writer);
                     pdfDoc.setDefaultPageSize(com.itextpdf.kernel.geom.PageSize.A4);
                     document = new Document(pdfDoc, com.itextpdf.kernel.geom.PageSize.A4);
-                    document.setMargins(20f, 30f, 52f, 30f);
+                    document.setMargins(20f, 30f, 45f, 30f);
                 }
             } else {
-                pdfDoc = new com.itextpdf.kernel.pdf.PdfDocument(writer);
+                com.itextpdf.kernel.pdf.PdfDocument pdfDoc = new com.itextpdf.kernel.pdf.PdfDocument(writer);
                 pdfDoc.setDefaultPageSize(com.itextpdf.kernel.geom.PageSize.A4);
                 document = new Document(pdfDoc, com.itextpdf.kernel.geom.PageSize.A4);
-                document.setMargins(20f, 30f, 52f, 30f);
+                document.setMargins(20f, 30f, 45f, 30f);
             }
 
-            LocalDate movDate = movement.getMovementDate() != null ? movement.getMovementDate().toLocalDate() : LocalDate.now();
-            String deliveryBadge = movDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-            String badgeStatus = (movement.getReason() == MovementReason.DEVOLUCAO) ? "DEVOLUÇÃO" : "ENTREGA DE EPI";
-            addExecutiveHeader(document, company, "CONTROLE DE EPI", badgeStatus, deliveryBadge);
+            // 1. Cabeçalho Executivo Oficial (REQUISIÇÃO DE MATERIAL ALMOXARIFADO)
+            LocalDate issueDate = r.getDeliveredAt() != null ? r.getDeliveredAt().toLocalDate()
+                    : (r.getCreatedAt() != null ? r.getCreatedAt().toLocalDate() : LocalDate.now());
+            String issueDateStr = issueDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String badgeStatus = (r.getStatus() == StockRequisitionStatus.DELIVERED) ? "ENTREGUE" : "APROVADA";
+            addExecutiveHeader(document, company, "REQUISIÇÃO DE MATERIAL ALMOXARIFADO", badgeStatus, r.getRequisitionNumber());
 
-            addSectionHeader(document, "IDENTIFICAÇÃO DO COLABORADOR");
+            // 2. Seção de Identificação do Colaborador e Solicitante
+            addSectionHeader(document, "IDENTIFICAÇÃO DO COLABORADOR E SOLICITANTE");
 
-            String name = emp != null && emp.getName() != null ? emp.getName().toUpperCase()
-                    : (movement.getEmployeeName() != null ? movement.getEmployeeName().toUpperCase() : "");
+            String name = emp != null && emp.getName() != null ? emp.getName().toUpperCase() : "";
             Table nameTable = new Table(UnitValue.createPercentArray(new float[]{100f})).useAllAvailableWidth();
-            nameTable.addCell(new Cell().add(new Paragraph("NOME DO EMPREGADO: " + name)
+            nameTable.addCell(new Cell().add(new Paragraph("COLABORADOR BENEFICIÁRIO: " + name)
                     .setFontSize(8f).setBold()).setPadding(2f));
             document.add(nameTable);
 
@@ -447,38 +220,325 @@ public class StockRequisitionPdfService {
 
             Table secondInfoTable = new Table(UnitValue.createPercentArray(new float[]{35f, 30f, 35f})).useAllAvailableWidth();
             String hireDate = emp != null ? formatDate(emp.getHireDate()) : "";
-            String terminationDate = emp != null ? formatDate(emp.getTerminationDate()) : "";
-            String sector = emp != null && emp.getDepartment() != null ? emp.getDepartment().getName().toUpperCase() :
-                    (emp != null && emp.getUnit() != null ? emp.getUnit().getName().toUpperCase() : "");
+            String sector = r.getEmployeeWorkSector() != null && !r.getEmployeeWorkSector().isBlank()
+                    ? r.getEmployeeWorkSector().toUpperCase()
+                    : (emp != null && emp.getDepartment() != null ? emp.getDepartment().getName().toUpperCase() :
+                    (emp != null && emp.getUnit() != null ? emp.getUnit().getName().toUpperCase() : ""));
+            String requesterName = r.getRequestedByUser() != null && r.getRequestedByUser().getName() != null
+                    ? r.getRequestedByUser().getName().toUpperCase() : "—";
 
             secondInfoTable.addCell(new Cell().add(new Paragraph("ADMISSÃO: " + hireDate).setFontSize(7.5f)).setPadding(2f));
-            secondInfoTable.addCell(new Cell().add(new Paragraph("DEMISSÃO: " + terminationDate).setFontSize(7.5f)).setPadding(2f));
             secondInfoTable.addCell(new Cell().add(new Paragraph("SETOR: " + sector).setFontSize(7.5f)).setPadding(2f));
+            secondInfoTable.addCell(new Cell().add(new Paragraph("SOLICITADO POR: " + requesterName).setFontSize(7.5f)).setPadding(2f));
             document.add(secondInfoTable);
 
-            Table respTable = new Table(UnitValue.createPercentArray(new float[]{100f}))
-                    .useAllAvailableWidth().setMarginBottom(2.5f).setMarginTop(1f);
-            String respName = movement.getUserName() != null ? movement.getUserName().toUpperCase() :
-                    (movement.getUser() != null ? movement.getUser().getName().toUpperCase() : "ALMOXARIFADO");
-            respTable.addCell(new Cell().add(new Paragraph("RESPONSÁVEL PELA ENTREGA: " + respName).setFontSize(8f).setBold()).setPadding(2f));
-            document.add(respTable);
+            Table thirdInfoTable = new Table(UnitValue.createPercentArray(new float[]{50f, 50f})).useAllAvailableWidth().setMarginBottom(2.5f);
+            String responsibleName = resolveResponsibleName(r);
+            String reasonDesc = r.getMovementReason() != null ? r.getMovementReason().getDescription() : "Saída Almoxarifado";
+            thirdInfoTable.addCell(new Cell().add(new Paragraph("RESPONSÁVEL PELA ENTREGA: " + responsibleName).setFontSize(8f).setBold()).setPadding(2f));
+            thirdInfoTable.addCell(new Cell().add(new Paragraph("MOTIVO DA SAÍDA: " + reasonDesc).setFontSize(7.5f)).setPadding(2f));
+            document.add(thirdInfoTable);
 
-            addSectionHeader(document, "TERMO DE RESPONSABILIDADE E RECIBO DE EPI");
+            if (r.getNotes() != null && !r.getNotes().isBlank()) {
+                Table notesTable = new Table(UnitValue.createPercentArray(new float[]{100f})).useAllAvailableWidth().setMarginBottom(2.5f);
+                notesTable.addCell(new Cell().add(new Paragraph("OBSERVAÇÕES: " + r.getNotes()).setFontSize(7f).setItalic()).setPadding(2f));
+                document.add(notesTable);
+            }
 
-            String declarationText = "Recebi da " + (company != null && company.getName() != null ? company.getName() : "Promover Terceirização e Serviços Ltda.")
-                    + "., os EPI's abaixo especificados a serem usados no desempenho de minhas tarefas. Assumo o compromisso de usá-los durante a jornada de trabalho, zelar pela sua conservação, quando necessário solicitar a substituição ou reposição e devolvê-los à Empresa em caso de demissão. Estou ciente também que o não uso desses EPI's implicará em ato faltoso e insubordinação, sujeito a sanções disciplinares previstas no art. 158 CLT.";
+            // 3. Detalhamento dos Materiais Fornecidos (Tabela no modelo da Imagem 4)
+            addSectionHeader(document, "DETALHAMENTO DOS MATERIAIS FORNECIDOS");
+
+            Table table = new Table(UnitValue.createPercentArray(new float[]{18f, 54f, 10f, 18f}))
+                    .useAllAvailableWidth();
+
+            table.addHeaderCell(createWarehouseHeaderCell("Código", TextAlignment.CENTER));
+            table.addHeaderCell(createWarehouseHeaderCell("Item / Material", TextAlignment.LEFT));
+            table.addHeaderCell(createWarehouseHeaderCell("UN", TextAlignment.CENTER));
+            table.addHeaderCell(createWarehouseHeaderCell("Quant.", TextAlignment.CENTER));
+
+            int totalQty = 0;
+            int rowIdx = 0;
+
+            if (r.getLines() != null && !r.getLines().isEmpty()) {
+                for (StockRequisitionLine line : r.getLines()) {
+                    StockItem item = line.getStockItem();
+                    String code = item != null && item.getCode() != null ? item.getCode() : "—";
+                    String fullName = item != null ? item.getFullName().toUpperCase() : "ITEM ALMOXARIFADO";
+                    if (item != null && item.getCa() != null && !item.getCa().isBlank()) {
+                        fullName += " (CA: " + item.getCa().trim() + ")";
+                    }
+                    int qty = line.getQuantity() != null && line.getQuantity() > 0 ? line.getQuantity() : 1;
+                    totalQty += qty;
+
+                    boolean alt = (rowIdx % 2 != 0);
+                    table.addCell(createWarehouseDataCell(code, TextAlignment.CENTER, alt));
+                    table.addCell(createWarehouseDataCell(fullName, TextAlignment.LEFT, alt));
+                    table.addCell(createWarehouseDataCell("UN", TextAlignment.CENTER, alt));
+                    table.addCell(createWarehouseDataCell(String.format(java.util.Locale.US, "%.2f", (double) qty), TextAlignment.CENTER, alt));
+                    rowIdx++;
+                }
+            }
+
+            // Linhas complementares se a tabela tiver menos de 8 itens (preenchimento harmonioso)
+            while (rowIdx < 8) {
+                boolean alt = (rowIdx % 2 != 0);
+                table.addCell(createWarehouseDataCell("", TextAlignment.CENTER, alt));
+                table.addCell(createWarehouseDataCell("", TextAlignment.LEFT, alt));
+                table.addCell(createWarehouseDataCell("", TextAlignment.CENTER, alt));
+                table.addCell(createWarehouseDataCell("", TextAlignment.CENTER, alt));
+                rowIdx++;
+            }
+
+            // Linha de Totalização
+            Cell totalLabelCell = new Cell(1, 2)
+                    .add(new Paragraph("TOTAL DE ITENS: " + (r.getLines() != null ? r.getLines().size() : 0)).setBold().setFontSize(7.5f))
+                    .setBorder(new SolidBorder(new DeviceRgb(203, 213, 225), 0.8f))
+                    .setBackgroundColor(new DeviceRgb(241, 245, 249))
+                    .setPadding(3f);
+            Cell totalQtyCell = new Cell(1, 2)
+                    .add(new Paragraph("QUANTIDADE TOTAL: " + String.format(java.util.Locale.US, "%.2f", (double) totalQty)).setBold().setFontSize(7.5f).setTextAlignment(TextAlignment.CENTER))
+                    .setBorder(new SolidBorder(new DeviceRgb(203, 213, 225), 0.8f))
+                    .setBackgroundColor(new DeviceRgb(241, 245, 249))
+                    .setPadding(3f);
+            table.addCell(totalLabelCell);
+            table.addCell(totalQtyCell);
+
+            document.add(table);
+
+            // 4. Termo de Recebimento de Materiais (Almoxarifado)
+            addSectionHeader(document, "TERMO DE RECEBIMENTO DE MATERIAIS");
+
+            String compText = company != null && company.getName() != null ? company.getName() : "Promover Terceirização e Serviços Ltda.";
+            String termText = "Declaro que recebi do Almoxarifado da " + compText
+                    + " os materiais/equipamentos acima relacionados em perfeitas condições para execução dos serviços, responsabilizando-me pela sua guarda e uso adequado.";
 
             Table decTable = new Table(UnitValue.createPercentArray(new float[]{100f}))
-                    .useAllAvailableWidth().setMarginBottom(1.5f);
-            decTable.addCell(new Cell().add(new Paragraph(declarationText)
-                    .setFontSize(7f).setTextAlignment(TextAlignment.JUSTIFIED)).setPadding(2f));
+                    .useAllAvailableWidth().setMarginBottom(4f);
+            decTable.addCell(new Cell().add(new Paragraph(termText)
+                    .setFontSize(7.5f).setTextAlignment(TextAlignment.JUSTIFIED)).setPadding(3.5f)
+                    .setBackgroundColor(new DeviceRgb(248, 250, 252))
+                    .setBorder(new SolidBorder(new DeviceRgb(226, 232, 240), 0.8f)));
             document.add(decTable);
 
-            Table signTable = new Table(UnitValue.createPercentArray(new float[]{35f, 65f}))
-                    .useAllAvailableWidth().setMarginBottom(2.5f);
-            signTable.addCell(new Cell().add(new Paragraph("Contagem: " + deliveryBadge).setFontSize(8f)).setPadding(2.5f));
+            // 5. Bloco de Assinaturas (Solicitante/Colaborador e Responsável Almoxarifado)
+            Table signTable = new Table(UnitValue.createPercentArray(new float[]{50f, 50f}))
+                    .useAllAvailableWidth().setMarginTop(12f);
 
-            Cell signatureCell = new Cell().setPadding(2.5f);
+            // Coluna Esquerda: Colaborador / Solicitante
+            Cell empSignCell = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.CENTER).setPadding(4f);
+            String digitalSig = r.getDigitalSignature();
+            if (digitalSig != null && !digitalSig.isBlank()) {
+                try {
+                    String base64Data = digitalSig;
+                    if (base64Data.contains(",")) {
+                        base64Data = base64Data.split(",")[1];
+                    }
+                    byte[] imageBytes = Base64.getDecoder().decode(base64Data);
+                    Image img = new Image(ImageDataFactory.create(imageBytes));
+                    img.setMaxHeight(26f);
+                    img.setMaxWidth(130f);
+                    empSignCell.add(img);
+                    empSignCell.add(new Paragraph("Assinatura Digital Registrada").setFontSize(6.5f).setItalic());
+                } catch (Exception e) {
+                    empSignCell.add(new Paragraph("_________________________________________________").setFontSize(8f));
+                }
+            } else if (r.getPhysicalSignatureAck() != null && !r.getPhysicalSignatureAck().isBlank()) {
+                empSignCell.add(new Paragraph("Recebimento Físico: " + r.getPhysicalSignatureAck()).setFontSize(7f).setItalic());
+                empSignCell.add(new Paragraph("_________________________________________________").setFontSize(8f));
+            } else {
+                empSignCell.add(new Paragraph("_________________________________________________").setFontSize(8f));
+            }
+            empSignCell.add(new Paragraph(name).setFontSize(7.5f).setBold().setMarginTop(2f));
+            empSignCell.add(new Paragraph("Assinatura do Recebedor / Colaborador").setFontSize(6.8f).setFontColor(TEXT_MUTED));
+            empSignCell.add(new Paragraph("Data: " + issueDateStr).setFontSize(6.8f).setFontColor(TEXT_MUTED));
+
+            // Coluna Direita: Responsável pelo Almoxarifado
+            Cell respSignCell = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.CENTER).setPadding(4f);
+            respSignCell.add(new Paragraph("_________________________________________________").setFontSize(8f));
+            respSignCell.add(new Paragraph(responsibleName).setFontSize(7.5f).setBold().setMarginTop(2f));
+            respSignCell.add(new Paragraph("Responsável pela Entrega — Almoxarifado").setFontSize(6.8f).setFontColor(TEXT_MUTED));
+            respSignCell.add(new Paragraph("Data: " + issueDateStr).setFontSize(6.8f).setFontColor(TEXT_MUTED));
+
+            signTable.addCell(empSignCell);
+            signTable.addCell(respSignCell);
+            document.add(signTable);
+
+            document.close();
+            log.info("✅ PDF de Requisição de Material Almoxarifado gerado com sucesso. Nº: {}, Tamanho: {} bytes", r.getRequisitionNumber(), baos.size());
+            return baos.toByteArray();
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de Requisição de Almoxarifado: {}", e.getMessage(), e);
+            throw new RuntimeException("Erro ao gerar PDF de Requisição de Almoxarifado: " + e.getMessage(), e);
+        }
+    }
+
+    private byte[] generateNativeWarehouseMovementPdf(StockMovement movement) {
+        Employee emp = movement.getEmployee();
+        if (emp != null && emp.getId() != null) {
+            emp = employeeRepository.findById(emp.getId()).orElse(emp);
+        }
+
+        Company company = resolveCompany(emp);
+        UUID companyId = company != null ? company.getId() : null;
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Document document;
+
+        try {
+            PdfWriter writer = new PdfWriter(baos);
+            if (company != null && company.getId() != null) {
+                try {
+                    var layoutBuilder = ReportLayoutConfig.builder()
+                            .companyId(companyId)
+                            .reportTitle(null)
+                            .showHeader(false)
+                            .showFooterContentSeparator(true)
+                            .showFooterBackgroundLine(false)
+                            .includeEmailInFooter(true)
+                            .showPageNumbers(true)
+                            .landscape(false)
+                            .topMargin(20f)
+                            .marginExtraTop(0f)
+                            .bottomMargin(45f)
+                            .leftMargin(30f)
+                            .rightMargin(30f);
+
+                    if (emp != null && emp.getId() != null) {
+                        documentDateResolver.applyAdmissionDateFooter(layoutBuilder, emp.getId());
+                    }
+                    ReportLayoutConfig layoutConfig = layoutBuilder.build();
+
+                    DocumentWithPdf docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+                    document = docWithPdf.getDocument();
+                } catch (Exception layoutEx) {
+                    log.warn("Falha no standardReportLayoutService para movimentação ({}), criando documento direto", layoutEx.getMessage());
+                    com.itextpdf.kernel.pdf.PdfDocument pdfDoc = new com.itextpdf.kernel.pdf.PdfDocument(writer);
+                    pdfDoc.setDefaultPageSize(com.itextpdf.kernel.geom.PageSize.A4);
+                    document = new Document(pdfDoc, com.itextpdf.kernel.geom.PageSize.A4);
+                    document.setMargins(20f, 30f, 45f, 30f);
+                }
+            } else {
+                com.itextpdf.kernel.pdf.PdfDocument pdfDoc = new com.itextpdf.kernel.pdf.PdfDocument(writer);
+                pdfDoc.setDefaultPageSize(com.itextpdf.kernel.geom.PageSize.A4);
+                document = new Document(pdfDoc, com.itextpdf.kernel.geom.PageSize.A4);
+                document.setMargins(20f, 30f, 45f, 30f);
+            }
+
+            LocalDate movDate = movement.getMovementDate() != null ? movement.getMovementDate().toLocalDate() : LocalDate.now();
+            String issueDateStr = movDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String reqCode = movement.getRequisitionNumber() != null && !movement.getRequisitionNumber().isBlank()
+                    ? movement.getRequisitionNumber()
+                    : ("MOV-" + (movement.getId() != null ? movement.getId().toString().substring(0, 8).toUpperCase() : ""));
+            addExecutiveHeader(document, company, "REQUISIÇÃO DE MATERIAL ALMOXARIFADO", "ENTREGUE", reqCode);
+
+            addSectionHeader(document, "IDENTIFICAÇÃO DO COLABORADOR E SOLICITANTE");
+
+            String name = emp != null && emp.getName() != null ? emp.getName().toUpperCase()
+                    : (movement.getEmployeeName() != null ? movement.getEmployeeName().toUpperCase() : "");
+            Table nameTable = new Table(UnitValue.createPercentArray(new float[]{100f})).useAllAvailableWidth();
+            nameTable.addCell(new Cell().add(new Paragraph("COLABORADOR BENEFICIÁRIO: " + name)
+                    .setFontSize(8f).setBold()).setPadding(2f));
+            document.add(nameTable);
+
+            Table infoTable = new Table(UnitValue.createPercentArray(new float[]{40f, 30f, 30f})).useAllAvailableWidth();
+            String position = emp != null && emp.getPosition() != null ? emp.getPosition().getName().toUpperCase() : "";
+            String cpf = emp != null ? CompanyDataFormatter.formatCpf(emp.getCpf() != null ? emp.getCpf() : emp.getDocument()) : "";
+            String rg = buildRg(emp);
+
+            infoTable.addCell(new Cell().add(new Paragraph("FUNÇÃO: " + position).setFontSize(7.5f)).setPadding(2f));
+            infoTable.addCell(new Cell().add(new Paragraph("CPF: " + cpf).setFontSize(7.5f)).setPadding(2f));
+            infoTable.addCell(new Cell().add(new Paragraph("RG: " + rg).setFontSize(7.5f)).setPadding(2f));
+            document.add(infoTable);
+
+            Table secondInfoTable = new Table(UnitValue.createPercentArray(new float[]{35f, 30f, 35f})).useAllAvailableWidth();
+            String hireDate = emp != null ? formatDate(emp.getHireDate()) : "";
+            String sector = emp != null && emp.getDepartment() != null ? emp.getDepartment().getName().toUpperCase() :
+                    (emp != null && emp.getUnit() != null ? emp.getUnit().getName().toUpperCase() : "");
+            String respName = movement.getUserName() != null ? movement.getUserName().toUpperCase() :
+                    (movement.getUser() != null ? movement.getUser().getName().toUpperCase() : "ALMOXARIFADO");
+
+            secondInfoTable.addCell(new Cell().add(new Paragraph("ADMISSÃO: " + hireDate).setFontSize(7.5f)).setPadding(2f));
+            secondInfoTable.addCell(new Cell().add(new Paragraph("SETOR: " + sector).setFontSize(7.5f)).setPadding(2f));
+            secondInfoTable.addCell(new Cell().add(new Paragraph("RESPONSÁVEL ENTREGA: " + respName).setFontSize(7.5f)).setPadding(2f));
+            document.add(secondInfoTable);
+
+            String reasonDesc = movement.getReason() != null ? movement.getReason().getDescription() : "Saída Almoxarifado";
+            Table thirdInfoTable = new Table(UnitValue.createPercentArray(new float[]{100f})).useAllAvailableWidth().setMarginBottom(2.5f);
+            thirdInfoTable.addCell(new Cell().add(new Paragraph("MOTIVO DA SAÍDA: " + reasonDesc).setFontSize(7.5f)).setPadding(2f));
+            document.add(thirdInfoTable);
+
+            if (movement.getNotes() != null && !movement.getNotes().isBlank()) {
+                Table notesTable = new Table(UnitValue.createPercentArray(new float[]{100f})).useAllAvailableWidth().setMarginBottom(2.5f);
+                notesTable.addCell(new Cell().add(new Paragraph("OBSERVAÇÕES: " + movement.getNotes()).setFontSize(7f).setItalic()).setPadding(2f));
+                document.add(notesTable);
+            }
+
+            addSectionHeader(document, "DETALHAMENTO DOS MATERIAIS FORNECIDOS");
+
+            Table table = new Table(UnitValue.createPercentArray(new float[]{18f, 54f, 10f, 18f}))
+                    .useAllAvailableWidth();
+
+            table.addHeaderCell(createWarehouseHeaderCell("Código", TextAlignment.CENTER));
+            table.addHeaderCell(createWarehouseHeaderCell("Item / Material", TextAlignment.LEFT));
+            table.addHeaderCell(createWarehouseHeaderCell("UN", TextAlignment.CENTER));
+            table.addHeaderCell(createWarehouseHeaderCell("Quant.", TextAlignment.CENTER));
+
+            StockItem si = movement.getStockItem();
+            String code = si != null && si.getCode() != null ? si.getCode() : "—";
+            String fullName = si != null ? si.getFullName().toUpperCase() : (movement.getNotes() != null ? movement.getNotes().toUpperCase() : "ITEM ALMOXARIFADO");
+            if (si != null && si.getCa() != null && !si.getCa().isBlank()) {
+                fullName += " (CA: " + si.getCa().trim() + ")";
+            }
+            int qty = movement.getQuantity() != null && movement.getQuantity() > 0 ? movement.getQuantity() : 1;
+
+            table.addCell(createWarehouseDataCell(code, TextAlignment.CENTER, false));
+            table.addCell(createWarehouseDataCell(fullName, TextAlignment.LEFT, false));
+            table.addCell(createWarehouseDataCell("UN", TextAlignment.CENTER, false));
+            table.addCell(createWarehouseDataCell(String.format(java.util.Locale.US, "%.2f", (double) qty), TextAlignment.CENTER, false));
+
+            // Linhas complementares pautadas
+            for (int i = 1; i < 8; i++) {
+                boolean alt = (i % 2 != 0);
+                table.addCell(createWarehouseDataCell("", TextAlignment.CENTER, alt));
+                table.addCell(createWarehouseDataCell("", TextAlignment.LEFT, alt));
+                table.addCell(createWarehouseDataCell("", TextAlignment.CENTER, alt));
+                table.addCell(createWarehouseDataCell("", TextAlignment.CENTER, alt));
+            }
+
+            // Totalização
+            Cell totalLabelCell = new Cell(1, 2)
+                    .add(new Paragraph("TOTAL DE ITENS: 1").setBold().setFontSize(7.5f))
+                    .setBorder(new SolidBorder(new DeviceRgb(203, 213, 225), 0.8f))
+                    .setBackgroundColor(new DeviceRgb(241, 245, 249))
+                    .setPadding(3f);
+            Cell totalQtyCell = new Cell(1, 2)
+                    .add(new Paragraph("QUANTIDADE TOTAL: " + String.format(java.util.Locale.US, "%.2f", (double) qty)).setBold().setFontSize(7.5f).setTextAlignment(TextAlignment.CENTER))
+                    .setBorder(new SolidBorder(new DeviceRgb(203, 213, 225), 0.8f))
+                    .setBackgroundColor(new DeviceRgb(241, 245, 249))
+                    .setPadding(3f);
+            table.addCell(totalLabelCell);
+            table.addCell(totalQtyCell);
+
+            document.add(table);
+
+            addSectionHeader(document, "TERMO DE RECEBIMENTO DE MATERIAIS");
+
+            String compText = company != null && company.getName() != null ? company.getName() : "Promover Terceirização e Serviços Ltda.";
+            String termText = "Declaro que recebi do Almoxarifado da " + compText
+                    + " os materiais/equipamentos acima relacionados em perfeitas condições para execução dos serviços, responsabilizando-me pela sua guarda e uso adequado.";
+
+            Table decTable = new Table(UnitValue.createPercentArray(new float[]{100f}))
+                    .useAllAvailableWidth().setMarginBottom(4f);
+            decTable.addCell(new Cell().add(new Paragraph(termText)
+                    .setFontSize(7.5f).setTextAlignment(TextAlignment.JUSTIFIED)).setPadding(3.5f)
+                    .setBackgroundColor(new DeviceRgb(248, 250, 252))
+                    .setBorder(new SolidBorder(new DeviceRgb(226, 232, 240), 0.8f)));
+            document.add(decTable);
+
+            Table signTable = new Table(UnitValue.createPercentArray(new float[]{50f, 50f}))
+                    .useAllAvailableWidth().setMarginTop(12f);
+
+            Cell empSignCell = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.CENTER).setPadding(4f);
             if (movement.getDigitalSignature() != null && !movement.getDigitalSignature().isBlank()) {
                 try {
                     String base64Data = movement.getDigitalSignature();
@@ -487,67 +547,58 @@ public class StockRequisitionPdfService {
                     }
                     byte[] imageBytes = Base64.getDecoder().decode(base64Data);
                     Image img = new Image(ImageDataFactory.create(imageBytes));
-                    img.setMaxHeight(18f);
-                    signatureCell.add(new Paragraph("Assinatura Digital:").setFontSize(6.5f).setItalic().setMarginBottom(1f));
-                    signatureCell.add(img);
+                    img.setMaxHeight(26f);
+                    img.setMaxWidth(130f);
+                    empSignCell.add(img);
+                    empSignCell.add(new Paragraph("Assinatura Digital Registrada").setFontSize(6.5f).setItalic());
                 } catch (Exception e) {
-                    signatureCell.add(new Paragraph("Assinatura: _________________________________________________").setFontSize(8f));
+                    empSignCell.add(new Paragraph("_________________________________________________").setFontSize(8f));
                 }
             } else {
-                signatureCell.add(new Paragraph("Assinatura: _________________________________________________").setFontSize(8f));
+                empSignCell.add(new Paragraph("_________________________________________________").setFontSize(8f));
             }
-            signTable.addCell(signatureCell);
+            empSignCell.add(new Paragraph(name).setFontSize(7.5f).setBold().setMarginTop(2f));
+            empSignCell.add(new Paragraph("Assinatura do Recebedor / Colaborador").setFontSize(6.8f).setFontColor(TEXT_MUTED));
+            empSignCell.add(new Paragraph("Data: " + issueDateStr).setFontSize(6.8f).setFontColor(TEXT_MUTED));
+
+            Cell respSignCell = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.CENTER).setPadding(4f);
+            respSignCell.add(new Paragraph("_________________________________________________").setFontSize(8f));
+            respSignCell.add(new Paragraph(respName).setFontSize(7.5f).setBold().setMarginTop(2f));
+            respSignCell.add(new Paragraph("Responsável pela Entrega — Almoxarifado").setFontSize(6.8f).setFontColor(TEXT_MUTED));
+            respSignCell.add(new Paragraph("Data: " + issueDateStr).setFontSize(6.8f).setFontColor(TEXT_MUTED));
+
+            signTable.addCell(empSignCell);
+            signTable.addCell(respSignCell);
             document.add(signTable);
 
-            addSectionHeader(document, "DETALHAMENTO DOS EQUIPAMENTOS FORNECIDOS");
-
-            Table epiTable = new Table(UnitValue.createPercentArray(new float[]{23f, 4f, 7f, 6f, 9f, 13f, 20f, 18f}))
-                    .useAllAvailableWidth();
-
-            epiTable.addHeaderCell(createEpiHeaderCell("EQUIPAMENTO"));
-            epiTable.addHeaderCell(createEpiHeaderCell("Nº"));
-            epiTable.addHeaderCell(createEpiHeaderCell("CA"));
-            epiTable.addHeaderCell(createEpiHeaderCell("QUANTIDADE"));
-            epiTable.addHeaderCell(createEpiHeaderCell("ENTREGA"));
-            epiTable.addHeaderCell(createEpiHeaderCell("SUBSTITUÍDO / DEVOLUÇÃO"));
-            epiTable.addHeaderCell(createEpiHeaderCell("MOTIVO SUBST. / DEVOLUÇÃO"));
-            epiTable.addHeaderCell(createEpiHeaderCell("ASSINATURA"));
-
-            StockItem si = movement.getStockItem();
-            String epiName = si != null ? si.getFullName().toUpperCase() : (movement.getNotes() != null ? movement.getNotes().toUpperCase() : "");
-            String size = si != null ? resolveDisplaySizeNumber(si) : "";
-            String ca = si != null && si.getCa() != null ? si.getCa() : "";
-            int qty = movement.getQuantity() != null && movement.getQuantity() > 0 ? movement.getQuantity() : 1;
-
-            epiTable.addCell(createEpiDataCell(epiName));
-            epiTable.addCell(createEpiDataCell(size));
-            epiTable.addCell(createEpiDataCell(ca));
-            epiTable.addCell(createEpiDataCell(String.valueOf(qty)));
-            epiTable.addCell(createEpiDataCell(deliveryBadge));
-            epiTable.addCell(createEpiDataCell(""));
-            epiTable.addCell(createEpiDataCell(movement.getReason() != null ? movement.getReason().getDescription() : ""));
-            epiTable.addCell(createEpiSignatureCell(movement.getDigitalSignature()));
-
-            for (int i = 0; i < 26; i++) {
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-                epiTable.addCell(createEpiDataCell(""));
-            }
-
-            document.add(epiTable);
             document.close();
-
-            log.info("✅ PDF de movimentação gerado com sucesso no layout da Ficha de EPI. Tamanho: {} bytes", baos.size());
+            log.info("✅ PDF de Requisição de Material Almoxarifado (movimentação) gerado com sucesso. Tamanho: {} bytes", baos.size());
             return baos.toByteArray();
         } catch (Exception e) {
-            log.error("Erro ao gerar PDF de movimentação: {}", e.getMessage(), e);
+            log.error("Erro ao gerar PDF de movimentação de almoxarifado: {}", e.getMessage(), e);
             throw new RuntimeException("Erro ao gerar PDF de movimentação: " + e.getMessage(), e);
         }
+    }
+
+    private Cell createWarehouseHeaderCell(String text, TextAlignment align) {
+        return new Cell()
+                .add(new Paragraph(text != null ? text : "").setBold().setFontSize(7.5f)
+                        .setFontColor(ColorConstants.WHITE).setTextAlignment(align))
+                .setBackgroundColor(BRONZE_HEADER)
+                .setBorder(new SolidBorder(new DeviceRgb(130, 95, 45), 0.8f))
+                .setPaddingTop(3.5f).setPaddingBottom(3.5f).setPaddingLeft(4f).setPaddingRight(4f);
+    }
+
+    private Cell createWarehouseDataCell(String text, TextAlignment align, boolean alternate) {
+        Cell cell = new Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(7.5f).setTextAlignment(align))
+                .setBorder(new SolidBorder(new DeviceRgb(226, 232, 240), 0.5f))
+                .setPaddingTop(3f).setPaddingBottom(3f).setPaddingLeft(4f).setPaddingRight(4f)
+                .setMinHeight(15f);
+        if (alternate) {
+            cell.setBackgroundColor(new DeviceRgb(248, 250, 252));
+        }
+        return cell;
     }
 
     /* ========================================================================= */

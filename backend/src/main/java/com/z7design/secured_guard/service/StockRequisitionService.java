@@ -72,7 +72,9 @@ public class StockRequisitionService {
                 .movementReason(req.getMovementReason())
                 .notes(req.getNotes())
                 .employeeWorkSector(sectorSnapshot)
-                .status(StockRequisitionStatus.PENDING)
+                .status(StockRequisitionStatus.APPROVED)
+                .approvedByUser(requester)
+                .approvedAt(LocalDateTime.now())
                 .build();
 
         for (CreateStockRequisitionRequest.Line line : req.getLines()) {
@@ -86,6 +88,17 @@ public class StockRequisitionService {
         }
 
         stockRequisitionRepository.save(r);
+
+        // Baixa imediata no estoque para todos os itens da requisição (Opção A)
+        createOutboundMovementsForRequisition(r, userId,
+                "Baixa imediata no estoque na requisição criada por " + requester.getName());
+
+        // Se contiver itens de EPI elegíveis, lança/sincroniza na Ficha de EPI do funcionário
+        try {
+            epiDeliveryFormService.ensureDraftEpiFormFromApprovedStockRequisition(r, userId);
+        } catch (Exception ex) {
+            log.warn("Sincronização de EPI da requisição {}: {}", r.getRequisitionNumber(), ex.getMessage());
+        }
         String historyDetail = String.format(
                 "Nº %s | Motivo: %s | Setor (snapshot): %s | Itens: %s | Solicitante (usuário): %s | Perfis/cargos do solicitante: %s",
                 r.getRequisitionNumber(),
@@ -157,6 +170,9 @@ public class StockRequisitionService {
 
     public StockRequisitionDTO approve(UUID id, UUID approverUserId) {
         StockRequisition r = loadFetched(id);
+        if (r.getStatus() == StockRequisitionStatus.APPROVED || r.getStatus() == StockRequisitionStatus.DELIVERED) {
+            return StockRequisitionDTO.fromEntity(r);
+        }
         if (r.getStatus() != StockRequisitionStatus.PENDING) {
             throw new IllegalArgumentException("Somente requisições pendentes podem ser aprovadas.");
         }

@@ -126,8 +126,12 @@ const EstoqueSimplificado: React.FC = () => {
   };
 
   const loadRequisitionsOnly = async () => {
-    const list = await stockService.listStockRequisitions().catch(() => []);
+    const [list, items] = await Promise.all([
+      stockService.listStockRequisitions().catch(() => []),
+      stockService.getStockItems().catch(() => []),
+    ]);
     setStockRequisitions(Array.isArray(list) ? list : []);
+    setStockItems(Array.isArray(items) ? items : []);
   };
 
   const handleCreateItem = () => {
