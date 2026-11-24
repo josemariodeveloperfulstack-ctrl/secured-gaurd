@@ -190,23 +190,28 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
   const [editMode, setEditMode] = useState(false);
   const [editingRequisitionId, setEditingRequisitionId] = useState<string | null>(null);
 
-  const loadItems = useCallback(async () => {
+  const itemsRef = useRef<StockItem[]>([]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const loadItems = useCallback(async (force = false) => {
+    if (!force && itemsRef.current.length > 0) {
+      return;
+    }
     try {
       setItemsLoading(true);
       const data = await stockService.getAllItems();
-      setItems(data || []);
+      const list = Array.isArray(data) ? data : [];
+      setItems(list);
+      itemsRef.current = list;
     } catch (e: unknown) {
       console.error('Erro ao carregar itens de estoque:', e);
       setItems([]);
-      toast({
-        title: 'Itens de estoque',
-        description: 'Não foi possível carregar a lista de itens do almoxarifado.',
-        variant: 'destructive',
-      });
     } finally {
       setItemsLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   const hydrateFromDetail = useCallback(
     (d: StockRequisitionDTO) => {
@@ -216,7 +221,7 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
       setMovementReason(d.movementReason);
       setNotes(d.notes || '');
       const rehydratedLines: LineRow[] = (d.lines || []).map((l, i) => {
-        const matchingItem = items.find((it) => it.id === l.stockItemId);
+        const matchingItem = itemsRef.current.find((it) => it.id === l.stockItemId);
         return {
           key: l.id || `ln-${i}-${Date.now()}`,
           stockItemId: l.stockItemId,
@@ -226,7 +231,7 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
       });
       setLines(rehydratedLines);
     },
-    [items]
+    []
   );
 
   useEffect(() => {
@@ -237,10 +242,17 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
     }
   }, [open]);
 
+  // Carregar itens do almoxarifado apenas uma vez ao abrir o modal
+  useEffect(() => {
+    if (open) {
+      void loadItems();
+    }
+  }, [open, loadItems]);
+
+  // Inicialização e preenchimento do formulário ao abrir
   useEffect(() => {
     if (!open) return;
 
-    void loadItems();
     setDigitalCaptured(null);
     setPhysicalAck('Item assinado na ficha manual impressa');
     setDeliverSigType(SignatureType.PHYSICAL);
@@ -276,14 +288,13 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
     }
 
     setDetail(null);
-    const p = prefill;
     setEmployeeSuggestions([]);
     setEmployeeDropdownOpen(false);
 
-    if (p) {
-      setEmployeeId(p.employeeId ?? '');
-      if (p.employeeId) {
-        void employeeService.getEmployeeById(p.employeeId).then((emp) => {
+    if (prefill) {
+      setEmployeeId(prefill.employeeId ?? '');
+      if (prefill.employeeId) {
+        void employeeService.getEmployeeById(prefill.employeeId).then((emp) => {
           if (emp) {
             setSelectedEmployee(emp as unknown as SimpleEmployee);
             setEmployeeQuery(emp.name || '');
@@ -295,14 +306,19 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
         setEmployeeQuery('');
         setWorkSectorDisplay('');
       }
-      if (p.lines.length > 0) {
-        setLines(
-          p.lines.map((l, i) => ({
-            key: `prefill-${i}-${Date.now()}`,
-            stockItemId: l.stockItemId,
-            quantity: Math.max(1, l.quantity),
-          }))
-        );
+      if (prefill.lines && prefill.lines.length > 0) {
+        const validPrefillLines = prefill.lines.filter((l) => l.stockItemId);
+        if (validPrefillLines.length > 0) {
+          setLines(
+            validPrefillLines.map((l, i) => ({
+              key: `prefill-${i}-${Date.now()}`,
+              stockItemId: l.stockItemId,
+              quantity: Math.max(1, l.quantity),
+            }))
+          );
+        } else {
+          setLines([]);
+        }
       } else {
         setLines([]);
       }
@@ -318,11 +334,12 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
     setSendToEpiForm(true);
     setSignedOnManualSheet(true);
     setAutoApprove(true);
-  }, [open, initialRequisitionId, initialOpenMode, prefill, loadItems, hydrateFromDetail, toast]);
+  }, [open, initialRequisitionId, initialOpenMode]);
 
   // Busca rápida de funcionário com debounce
   useEffect(() => {
     if (!open) return;
+    if (employeeId) return;
     if (initialRequisitionId && detail && !editMode) return;
     if (detailLoading) return;
 
