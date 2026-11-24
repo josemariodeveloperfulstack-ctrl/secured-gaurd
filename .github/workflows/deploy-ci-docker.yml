@@ -479,6 +479,7 @@ jobs:
             done
 
             echo "🚀 Iniciando frontend e nginx (whatsapp só após backend estável — economiza RAM no boot)..."
+            docker rm -f secured-guard-frontend-ci secured-guard-nginx-ci 2>/dev/null || true
             $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing frontend-ci nginx-ci
             docker stop whatsapp-service-ci 2>/dev/null || true
             docker rm -f whatsapp-service-ci 2>/dev/null || true
