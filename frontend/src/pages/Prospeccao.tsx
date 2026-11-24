@@ -96,6 +96,7 @@ const Prospeccao: React.FC = () => {
   const [sendingCrmId, setSendingCrmId] = useState<string | null>(null);
   const [sendingMarketingId, setSendingMarketingId] = useState<string | null>(null);
   const [sendingCommunicationId, setSendingCommunicationId] = useState<string | null>(null);
+  const [enrichingCnpj, setEnrichingCnpj] = useState<string | null>(null);
 
   // Canais de envio do usuário: WhatsApp conectado no dispositivo e e-mail informado
   const [senderEmail, setSenderEmail] = useState('');
@@ -566,6 +567,48 @@ const Prospeccao: React.FC = () => {
       });
     } finally {
       setSearchingManualCnpj(false);
+    }
+  };
+
+  // Enriquecer sob demanda canais reais de compras e decisores via IA Gemini
+  const handleEnrichLead = async (company: ProspectCompany) => {
+    const targetKey = company.cnpj || company.nomeFantasia || company.razaoSocial;
+    try {
+      setEnrichingCnpj(targetKey);
+      toast({
+        title: 'Pesquisando com IA Gemini...',
+        description: `Buscando e-mails reais de compras e decisores para ${company.nomeFantasia || company.razaoSocial}...`,
+      });
+      const enriched = await prospectionService.enrichLeadContacts(company);
+      const targetName = company.nomeFantasia || company.razaoSocial;
+
+      setProspects(prev => (Array.isArray(prev) ? prev : []).map(p => {
+        const isMatch = (company.cnpj && p.cnpj === company.cnpj) ||
+          ((p.nomeFantasia || p.razaoSocial) === targetName && p.municipio === company.municipio);
+        return isMatch ? { ...p, ...enriched } : p;
+      }));
+
+      if (selectedCompany && (
+        (company.cnpj && selectedCompany.cnpj === company.cnpj) ||
+        ((selectedCompany.nomeFantasia || selectedCompany.razaoSocial) === targetName)
+      )) {
+        setSelectedCompany(prev => prev ? { ...prev, ...enriched } : null);
+      }
+
+      toast({
+        title: 'Contatos refinados com sucesso!',
+        description: enriched.emailCompras
+          ? `E-mail de Compras localizado: ${enriched.emailCompras}`
+          : 'Contatos corporativos atualizados com sucesso.',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Falha no refinamento',
+        description: err?.message || 'Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setEnrichingCnpj(null);
     }
   };
 
@@ -1259,7 +1302,7 @@ const Prospeccao: React.FC = () => {
                     )}
 
                     {/* Setor de Compras / Suprimentos */}
-                    {company.emailCompras && (
+                    {company.emailCompras ? (
                       <div className="flex items-center justify-between gap-2 p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-xs">
                         <div className="flex items-center gap-2 overflow-hidden">
                           <ShoppingCart className="h-4 w-4 text-amber-400 shrink-0" />
@@ -1271,14 +1314,44 @@ const Prospeccao: React.FC = () => {
                             )}
                           </div>
                         </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleCopyEmail(company.emailCompras!)}
+                            className="h-7 px-2 text-xs text-amber-300 hover:text-white hover:bg-amber-500/20"
+                            title="Copiar e-mail de compras"
+                          >
+                            {copiedEmail === company.emailCompras ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                          </Button>
+                          <a
+                            href={`mailto:${company.emailCompras}?subject=Apresenta%C3%A7%C3%A3o%20Secured%20Guard%20-%20Servi%C3%A7os%20de%20Seguran%C3%A7a%20e%20Portaria`}
+                            className="inline-flex items-center justify-center h-7 px-2 text-xs rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 hover:text-white"
+                            title="Enviar e-mail para o setor de compras"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2 p-2 rounded bg-seguranca-black/30 border border-gray-800 text-xs">
+                        <div className="flex items-center gap-1.5 text-gray-400">
+                          <ShoppingCart className="h-3.5 w-3.5 text-gray-500 shrink-0" />
+                          <span className="text-[11px]">Setor de Compras não identificado</span>
+                        </div>
                         <Button
                           size="sm"
-                          variant="ghost"
-                          onClick={() => handleCopyEmail(company.emailCompras!)}
-                          className="h-7 px-2 text-xs text-amber-300 hover:text-white hover:bg-amber-500/20 shrink-0"
-                          title="Copiar e-mail de compras"
+                          variant="outline"
+                          onClick={() => handleEnrichLead(company)}
+                          disabled={enrichingCnpj === (company.cnpj || company.nomeFantasia || company.razaoSocial)}
+                          className="h-6 px-2 text-[11px] border-amber-500/40 text-amber-300 hover:bg-amber-500/20"
                         >
-                          {copiedEmail === company.emailCompras ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                          {enrichingCnpj === (company.cnpj || company.nomeFantasia || company.razaoSocial) ? (
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          ) : (
+                            <Sparkles className="h-3 w-3 mr-1 text-amber-400" />
+                          )}
+                          Buscar c/ IA
                         </Button>
                       </div>
                     )}
@@ -1287,9 +1360,23 @@ const Prospeccao: React.FC = () => {
                     <div className="flex items-start gap-2 text-gray-300 bg-seguranca-black/40 p-2.5 rounded border border-gray-700/50">
                       <UserCheck className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
                       <div className="w-full">
-                        <span className="text-xs font-semibold text-emerald-400 block mb-0.5">
-                          Tomador(es) de Decisão (QSA):
-                        </span>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-xs font-semibold text-emerald-400 block">
+                            Tomador(es) de Decisão (QSA):
+                          </span>
+                          {(!company.qsa || company.qsa.some(s => !s.email)) && (
+                            <button
+                              type="button"
+                              onClick={() => handleEnrichLead(company)}
+                              disabled={enrichingCnpj === (company.cnpj || company.nomeFantasia || company.razaoSocial)}
+                              className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-0.5"
+                              title="Refinar e-mails dos sócios com IA"
+                            >
+                              <Sparkles className="h-2.5 w-2.5" />
+                              Refinar e-mails
+                            </button>
+                          )}
+                        </div>
                         {Array.isArray(company.qsa) && company.qsa.length > 0 ? (
                           <div className="space-y-1">
                             {company.qsa.slice(0, 3).map((s, idx) => (
@@ -1317,6 +1404,13 @@ const Prospeccao: React.FC = () => {
                                     <button type="button" onClick={() => handleCopyEmail(s.email!)} className="hover:text-white p-0.5" title="Copiar e-mail do sócio">
                                       {copiedEmail === s.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
                                     </button>
+                                    <a
+                                      href={`mailto:${s.email}?subject=Apresenta%C3%A7%C3%A3o%20Secured%20Guard`}
+                                      className="hover:text-white p-0.5 text-emerald-400"
+                                      title="Enviar e-mail para o sócio"
+                                    >
+                                      <Send className="h-2.5 w-2.5" />
+                                    </a>
                                   </div>
                                 )}
                               </div>
@@ -1382,9 +1476,19 @@ const Prospeccao: React.FC = () => {
                       )}
 
                       {company.email ? (
-                        <div className="flex items-center gap-1.5 text-xs text-gray-300">
-                          <Mail className="h-3.5 w-3.5 text-seguranca-yellow shrink-0" />
-                          <span className="truncate" title={company.email}>{company.email}</span>
+                        <div className="flex items-center justify-between gap-1 text-xs text-gray-300">
+                          <div className="flex items-center gap-1.5 overflow-hidden">
+                            <Mail className="h-3.5 w-3.5 text-seguranca-yellow shrink-0" />
+                            <span className="truncate" title={company.email}>{company.email}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyEmail(company.email!)}
+                            className="hover:text-white p-0.5 text-gray-400 shrink-0"
+                            title="Copiar e-mail corporativo"
+                          >
+                            {copiedEmail === company.email ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                          </button>
                         </div>
                       ) : company.emailContabilidadeDescartado ? (
                         <div className="text-xs text-amber-400/90 italic flex items-center gap-1" title="E-mail de escritório de contabilidade descartado automaticamente para evitar contatos inválidos.">
@@ -1392,7 +1496,15 @@ const Prospeccao: React.FC = () => {
                           <span>E-mail contábil descartado</span>
                         </div>
                       ) : (
-                        <div className="text-xs text-gray-500 italic">E-mail não listado</div>
+                        <button
+                          type="button"
+                          onClick={() => handleEnrichLead(company)}
+                          disabled={enrichingCnpj === (company.cnpj || company.nomeFantasia || company.razaoSocial)}
+                          className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 text-left"
+                        >
+                          <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                          <span className="truncate underline decoration-amber-500/50">Localizar e-mail c/ IA</span>
+                        </button>
                       )}
                       {/* Presença Digital Real (Maps, Website, Redes Sociais) */}
                       {(company.googleMapsUrl || company.website || company.socialMediaUrl) && (
@@ -1629,7 +1741,29 @@ const Prospeccao: React.FC = () => {
                 <div>
                   <span className="text-xs text-gray-400 block">CNPJ:</span>
                   {selectedCompany.cnpj ? (
-                    <span className="font-semibold text-seguranca-yellow">{selectedCompany.cnpj}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-seguranca-yellow">{selectedCompany.cnpj}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[11px] border-amber-500/50 text-amber-300 hover:bg-amber-500/20 px-2 py-0 ml-auto"
+                        onClick={() => handleEnrichLead(selectedCompany)}
+                        disabled={enrichingCnpj === (selectedCompany.cnpj || selectedCompany.nomeFantasia || selectedCompany.razaoSocial)}
+                        title="Buscar e-mails de compras e decisores via IA Gemini"
+                      >
+                        {enrichingCnpj === (selectedCompany.cnpj || selectedCompany.nomeFantasia || selectedCompany.razaoSocial) ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Refinando...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3 w-3 mr-1 text-amber-400" />
+                            Refinar Contatos c/ IA
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-amber-400 text-xs italic">Não informado</span>

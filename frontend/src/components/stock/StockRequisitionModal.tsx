@@ -190,6 +190,12 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
   const [editMode, setEditMode] = useState(false);
   const [editingRequisitionId, setEditingRequisitionId] = useState<string | null>(null);
 
+  // Inclusão de itens adicionais na tela de detalhe
+  const [showAddMoreItemsInline, setShowAddMoreItemsInline] = useState(false);
+  const [extraItemId, setExtraItemId] = useState('');
+  const [extraItemQty, setExtraItemQty] = useState(1);
+  const [addingExtraItems, setAddingExtraItems] = useState(false);
+
   const itemsRef = useRef<StockItem[]>([]);
   useEffect(() => {
     itemsRef.current = items;
@@ -451,6 +457,42 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
     );
   };
 
+  // Inclusão de itens adicionais diretamente na tela de detalhes
+  const handleAddExtraItemToRequisition = async () => {
+    if (!detail || !extraItemId) {
+      toast({
+        title: 'Selecione um item',
+        description: 'Escolha um item do almoxarifado para incluir na requisição.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const foundItem = items.find((it) => it.id === extraItemId);
+    try {
+      setAddingExtraItems(true);
+      const updated = await stockService.addItemsToStockRequisition(detail.id, [
+        { stockItemId: extraItemId, quantity: Math.max(1, extraItemQty) },
+      ]);
+      setDetail(updated);
+      setExtraItemId('');
+      setExtraItemQty(1);
+      setShowAddMoreItemsInline(false);
+      onRecorded?.();
+      toast({
+        title: 'Item adicionado com sucesso!',
+        description: `${foundItem?.fullName || 'Item'} incluído na requisição. Estoque baixado no almoxarifado.`,
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Erro ao incluir item',
+        description: e?.response?.data?.error || e?.message || 'Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAddingExtraItems(false);
+    }
+  };
+
   // Salvar requisição (com opção de download ou visualização imediata do PDF)
   const handleSaveRequisition = async (action: 'save' | 'pdf' | 'preview' = 'save') => {
     if (!employeeId) {
@@ -557,10 +599,6 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
         description: e?.response?.data?.error || e?.message || 'Tente novamente.',
         variant: 'destructive',
       });
-    } finally {
-      setSaving(false);
-    }
-  };
     } finally {
       setSaving(false);
     }
@@ -951,12 +989,16 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
                   <div className="sm:col-span-2">
                     <Button
                       type="button"
-                      className="w-full bg-seguranca-red hover:bg-seguranca-darkred text-white min-h-[42px] font-semibold text-xs sm:text-sm"
+                      className={`w-full min-h-[42px] font-semibold text-xs sm:text-sm transition-all gap-1 ${
+                        selectedStockItemId
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
+                          : 'bg-seguranca-red/80 hover:bg-seguranca-red text-white'
+                      }`}
                       onClick={handleAddItemToRequisition}
                       disabled={!selectedStockItemId}
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Adicionar
+                      <Plus className="h-4 w-4" />
+                      {lines.length > 0 ? 'Adicionar +' : 'Adicionar'}
                     </Button>
                   </div>
                 </div>
@@ -964,9 +1006,16 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
 
               {/* Lista dos Itens Selecionados */}
               <div className="space-y-2">
-                <Label className="text-xs text-zinc-400 uppercase tracking-wider block">
-                  Itens Selecionados para Esta Requisição ({lines.length}):
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-zinc-300 uppercase tracking-wider font-semibold">
+                    Itens Selecionados para Esta Requisição ({lines.length}):
+                  </Label>
+                  {lines.length > 0 && (
+                    <span className="text-xs text-seguranca-yellow font-medium">
+                      Total: {totalUnits} unidade(s)
+                    </span>
+                  )}
+                </div>
 
                 {lines.length === 0 ? (
                   <div className="text-center py-8 border border-dashed border-zinc-700/80 rounded-xl p-4 text-zinc-500 text-xs sm:text-sm space-y-1">
@@ -1048,6 +1097,16 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {lines.length > 0 && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-zinc-400 px-1 pt-1.5 border-t border-zinc-800/80 gap-1">
+                    <span>Total acumulado: <strong className="text-white font-mono">{totalUnits}</strong> unidade(s)</span>
+                    <span className="text-seguranca-yellow font-medium flex items-center gap-1">
+                      <Plus className="h-3 w-3" />
+                      Para adicionar mais itens, selecione no campo acima e clique em "Adicionar +"
+                    </span>
                   </div>
                 )}
               </div>
@@ -1275,17 +1334,96 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
               )}
             </div>
 
-            {/* Lista dos Itens da Requisição */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs sm:text-sm font-semibold text-zinc-300 flex items-center gap-1.5">
-                  <Package className="h-4 w-4 text-seguranca-red" />
-                  Itens Requisitados ({detail.lines?.length || 0})
-                </span>
-                <span className="text-xs text-zinc-400">
-                  Total: {detail.lines?.reduce((sum, l) => sum + (l.quantity || 1), 0)} unidades
-                </span>
+            {/* Lista dos Itens da Requisição com Ação de Adicionar Mais Itens */}
+            <div className="space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-2">
+                <div>
+                  <span className="text-xs sm:text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
+                    <Package className="h-4 w-4 text-seguranca-red" />
+                    Itens Requisitados ({detail.lines?.length || 0})
+                  </span>
+                  <span className="text-xs text-zinc-400">
+                    Total: {detail.lines?.reduce((sum, l) => sum + (l.quantity || 1), 0)} unidades
+                  </span>
+                </div>
+
+                {detail.status !== StockRequisitionStatus.CANCELLED && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="bg-seguranca-red hover:bg-seguranca-darkred text-white gap-1.5 text-xs font-semibold h-8 self-start sm:self-auto shadow-md"
+                    onClick={() => {
+                      if (items.length === 0) {
+                        loadItems(true);
+                      }
+                      setShowAddMoreItemsInline((prev) => !prev);
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {showAddMoreItemsInline ? 'Fechar Inclusão' : 'Adicionar Mais Itens'}
+                  </Button>
+                )}
               </div>
+
+              {/* Painel Expansível de Inclusão de Novos Itens à Requisição */}
+              {showAddMoreItemsInline && (
+                <div className="rounded-xl border border-seguranca-yellow/50 bg-zinc-900/95 p-3.5 space-y-3 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-seguranca-yellow flex items-center gap-1.5">
+                      <Plus className="h-3.5 w-3.5" />
+                      Incluir Novo Item nesta Requisição ({detail.requisitionNumber}):
+                    </span>
+                    <span className="text-[11px] text-zinc-400">
+                      Baixa automática no almoxarifado
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                    <div className="sm:col-span-8 space-y-1">
+                      <Label className="text-xs text-zinc-300">Item do Almoxarifado / EPI *</Label>
+                      <Select value={extraItemId} onValueChange={setExtraItemId}>
+                        <SelectTrigger className="bg-seguranca-black/80 border-zinc-700 text-white min-h-[38px] text-xs">
+                          <SelectValue placeholder={itemsLoading ? 'Carregando almoxarifado...' : 'Selecione o item para adicionar...'} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-700 text-white max-h-60 max-w-[95vw] sm:max-w-md">
+                          {items.map((it) => (
+                            <SelectItem key={it.id} value={it.id} className="text-white hover:bg-zinc-800 text-xs py-1.5">
+                              <span className="font-semibold text-white">{it.code} — {it.fullName}</span>
+                              <span className="text-[11px] text-zinc-400 block">
+                                Saldo: <strong className={it.currentQuantity > 0 ? 'text-emerald-400' : 'text-red-400'}>{it.currentQuantity}</strong>
+                                {it.ca ? ` · CA: ${it.ca}` : ''}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="sm:col-span-2 space-y-1">
+                      <Label className="text-xs text-zinc-300">Qtd</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={extraItemQty}
+                        onChange={(e) => setExtraItemQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="bg-seguranca-black/80 border-zinc-700 text-white min-h-[38px] text-center font-bold text-xs"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <Button
+                        type="button"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white min-h-[38px] font-semibold text-xs gap-1 shadow-md"
+                        onClick={handleAddExtraItemToRequisition}
+                        disabled={!extraItemId || addingExtraItems}
+                      >
+                        {addingExtraItems ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                        Adicionar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="rounded-xl border border-zinc-700/60 bg-seguranca-black/30 overflow-hidden divide-y divide-zinc-800">
                 {detail.lines?.map((line, idx) => (

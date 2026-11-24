@@ -109,7 +109,9 @@ export function EmployeeCombobox({
       setLoading(true)
       employeeService.searchSimpleEmployees(debouncedSearchTerm.trim())
         .then(result => {
-          setEmployees(result.filter(matchesPositionFilter).filter(matchesCompanyFilter))
+          const list = result.filter(matchesPositionFilter).filter(matchesCompanyFilter);
+          list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }));
+          setEmployees(list);
         })
         .catch(error => {
           console.error('Erro ao buscar funcionários:', error)
@@ -121,7 +123,9 @@ export function EmployeeCombobox({
       setLoading(true)
       employeeService.searchSimpleEmployees("")
         .then(result => {
-          setEmployees(result.filter(matchesPositionFilter).filter(matchesCompanyFilter))
+          const list = result.filter(matchesPositionFilter).filter(matchesCompanyFilter);
+          list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }));
+          setEmployees(list);
         })
         .catch(() => setEmployees([]))
         .finally(() => setLoading(false))

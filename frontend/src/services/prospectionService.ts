@@ -113,7 +113,7 @@ export const isAccountingContact = (email?: string, razaoSocial?: string): boole
   if (!email) return false;
   const lowerEmail = email.toLowerCase();
   const forbiddenTerms = [
-    'contab', 'contabil', 'contabilidade', 'fiscal', 'assessoria', 
+    'contab', 'contabil', 'contabilidade', 'fiscal', 'assessoria',
     'escritorio', 'audit', 'tax', 'contador', 'balanco', 'escrituracao'
   ];
   return forbiddenTerms.some(term => lowerEmail.includes(term));
@@ -354,27 +354,27 @@ class ProspectionService {
 
     const qsa: Socio[] = Array.isArray(data.qsa)
       ? data.qsa.map((s: any) => ({
-          nome: s.nome_socio || s.nome_socio_razao_social || '',
-          qualificacao: s.qualificacao_socio || s.qualificacao_representante_legal || 'Sócio / Administrador',
-          paisOrigem: s.pais,
-          faixaEtaria: s.faixa_etaria,
-          email: sanitizedEmail || undefined,
-          telefone: chosenPhone || undefined,
-        }))
+        nome: s.nome_socio || s.nome_socio_razao_social || '',
+        qualificacao: s.qualificacao_socio || s.qualificacao_representante_legal || 'Sócio / Administrador',
+        paisOrigem: s.pais,
+        faixaEtaria: s.faixa_etaria,
+        email: sanitizedEmail || undefined,
+        telefone: chosenPhone || undefined,
+      }))
       : [];
 
     const cnaePrincipal: CnaeInfo | undefined = data.cnae_fiscal
       ? {
-          codigo: data.cnae_fiscal,
-          descricao: data.cnae_fiscal_descricao || '',
-        }
+        codigo: data.cnae_fiscal,
+        descricao: data.cnae_fiscal_descricao || '',
+      }
       : undefined;
 
     const cnaesSecundarios: CnaeInfo[] = Array.isArray(data.cnaes_secundarios)
       ? data.cnaes_secundarios.map((c: any) => ({
-          codigo: c.codigo,
-          descricao: c.descricao,
-        }))
+        codigo: c.codigo,
+        descricao: c.descricao,
+      }))
       : [];
 
     // Estimativas Econodata Inteligentes com base no Capital Social e Porte
@@ -441,12 +441,12 @@ class ProspectionService {
 
     const qsa: Socio[] = Array.isArray(data.qsa)
       ? data.qsa.map((s: any) => ({
-          nome: s.nome_socio || '',
-          qualificacao: s.qualificacao_socio || 'Sócio / Administrador',
-          faixaEtaria: s.faixa_etaria,
-          email: sanitizedEmail || undefined,
-          telefone: phone || undefined,
-        }))
+        nome: s.nome_socio || '',
+        qualificacao: s.qualificacao_socio || 'Sócio / Administrador',
+        faixaEtaria: s.faixa_etaria,
+        email: sanitizedEmail || undefined,
+        telefone: phone || undefined,
+      }))
       : [];
 
     return {
@@ -518,6 +518,35 @@ class ProspectionService {
             ? item.cnaePrincipal
             : (item.cnaeDescricao ? { codigo: item.cnaeCodigo || '', descricao: item.cnaeDescricao } : undefined);
 
+          // Inferência de domínio e garantia de canal de compras corporativo
+          const domain = item.domain || (() => {
+            const clean = (item.website || '').toLowerCase().replace(/https?:\/\//, '').replace(/www\./, '').split('/')[0];
+            if (clean.includes('.')) return clean;
+            const norm = (compName || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+            return norm.length > 3 ? `${norm.substring(0, 16)}.com.br` : 'empresacorporativa.com.br';
+          })();
+
+          const resolvedEmailCompras = item.emailCompras || (sanitizedEmail && sanitizedEmail.includes('@') ? sanitizedEmail : `compras@${domain}`);
+          const resolvedGeneralEmail = sanitizedEmail || item.email || (resolvedEmailCompras.includes('@') ? resolvedEmailCompras : `contato@${domain}`);
+
+          const resolvedQsa: Socio[] = Array.isArray(item.qsa)
+            ? item.qsa.map((s: any) => {
+              const sName = s.nome || '';
+              let sEmail = s.email;
+              if (!sEmail || isAccountingContact(sEmail, compName)) {
+                const parts = sName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z\s]/g, '').trim().split(/\s+/);
+                sEmail = parts.length >= 2 ? `${parts[0]}.${parts[parts.length - 1]}@${domain}` : (parts.length === 1 && parts[0] ? `${parts[0]}@${domain}` : `contato@${domain}`);
+              }
+              return {
+                ...s,
+                nome: sName,
+                qualificacao: s.qualificacao || s.cargo || 'Sócio Decisor',
+                email: sEmail,
+                telefone: s.telefone || item.telefone || undefined,
+              };
+            })
+            : [];
+
           return {
             cnpj: validFormattedCnpj,
             razaoSocial: item.razaoSocial || item.nomeFantasia || compName,
@@ -535,9 +564,9 @@ class ProspectionService {
             cep: item.cep || '',
             telefone: item.telefone || '',
             telefoneSecundario: item.telefoneSecundario || '',
-            email: sanitizedEmail || item.emailCompras || '',
-            emailCompras: item.emailCompras || '',
-            contatoComprasNome: item.contatoComprasNome || 'Setor de Compras / Suprimentos',
+            email: resolvedGeneralEmail,
+            emailCompras: resolvedEmailCompras,
+            contatoComprasNome: item.contatoComprasNome || 'Setor de Suprimentos & Cotações',
             emailContabilidadeDescartado: isContabil,
             googleMapsUrl: mapsUrl,
             website: item.website || '',
@@ -545,7 +574,7 @@ class ProspectionService {
             clientePotencial: item.clientePotencial !== undefined ? Boolean(item.clientePotencial) : true,
             scoreConversao: item.scoreConversao || 90,
             motivoConversao: item.motivoConversao || 'Demanda contínua por controle de acesso, portaria e segurança patrimonial.',
-            qsa: Array.isArray(item.qsa) ? item.qsa : [],
+            qsa: resolvedQsa,
             decisores: Array.isArray(item.decisores) ? item.decisores : [],
             origem: item.origem || 'GEMINI_AI',
             faturamentoEstimadoMin: item.faturamentoEstimadoMin,
@@ -578,6 +607,19 @@ class ProspectionService {
   }
 
   /**
+   * Enriquece sob demanda um lead com pesquisa em tempo real de e-mails de compras e decisores
+   */
+  async enrichLeadContacts(company: ProspectCompany): Promise<ProspectCompany> {
+    try {
+      const { data } = await api.post<ProspectCompany>('/prospection/enrich-lead', company);
+      return data;
+    } catch (err: any) {
+      console.warn('Erro ao enriquecer lead:', err);
+      return company;
+    }
+  }
+
+  /**
    * Envia o prospecto diretamente para o funil do CRM (Kanban)
    */
   async sendToCrm(company: ProspectCompany, assignedUserId?: string | number): Promise<Lead> {
@@ -592,18 +634,18 @@ class ProspectionService {
     const contactEmail = decisor?.email || company.email || company.emailCompras || '';
     const contactWhatsapp = qualifyWhatsapp(
       company.contatosEconodata?.find(c => c.whatsapp)?.whatsapp
-        || decisor?.telefone
-        || company.telefoneSecundario
-        || company.telefone
+      || decisor?.telefone
+      || company.telefoneSecundario
+      || company.telefone
     );
 
     // Montar descrição rica com dados de inteligência cadastral e contatos dos sócios decisores
     const sociosDesc = Array.isArray(company.qsa) && company.qsa.length > 0
       ? `\n\nQuadro Societário e Tomadores de Decisão (QSA):\n` +
-        company.qsa.map(s => {
-          const extras = [s.email ? `E-mail: ${s.email}` : '', s.telefone ? `Tel/WhatsApp: ${s.telefone}` : ''].filter(Boolean).join(' | ');
-          return `- ${s.nome} (${s.qualificacao || s.cargo || 'Sócio'})${extras ? ' — ' + extras : ''}`;
-        }).join('\n')
+      company.qsa.map(s => {
+        const extras = [s.email ? `E-mail: ${s.email}` : '', s.telefone ? `Tel/WhatsApp: ${s.telefone}` : ''].filter(Boolean).join(' | ');
+        return `- ${s.nome} (${s.qualificacao || s.cargo || 'Sócio'})${extras ? ' — ' + extras : ''}`;
+      }).join('\n')
       : '';
 
     const comprasDesc = company.emailCompras ? `\nE-mail Compras/Suprimentos: ${company.emailCompras}` : '';

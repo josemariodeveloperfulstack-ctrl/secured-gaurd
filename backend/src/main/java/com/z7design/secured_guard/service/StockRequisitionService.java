@@ -33,6 +33,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -253,6 +254,87 @@ public class StockRequisitionService {
     }
 
     /**
+     * Adiciona itens adicionais a uma requisição existente (pendente, aprovada ou entregue).
+     * Se já estiver aprovada ou entregue, baixa automaticamente o estoque dos novos itens.
+     */
+    @Transactional
+    public StockRequisitionDTO addItems(UUID id, List<CreateStockRequisitionRequest.Line> newLines, UUID actingUserId) {
+        StockRequisition r = loadFetched(id);
+        if (r.getStatus() == StockRequisitionStatus.CANCELLED) {
+            throw new IllegalArgumentException("Não é possível adicionar itens a uma requisição cancelada.");
+        }
+        if (newLines == null || newLines.isEmpty()) {
+            throw new IllegalArgumentException("Informe ao menos um item para adicionar.");
+        }
+
+        List<StockRequisitionLine> newlyAddedLines = new ArrayList<>();
+        for (CreateStockRequisitionRequest.Line lineReq : newLines) {
+            StockItem item = stockItemRepository.findById(lineReq.getStockItemId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Item de estoque não encontrado: " + lineReq.getStockItemId()));
+
+            Optional<StockRequisitionLine> existingLineOpt = r.getLines().stream()
+                    .filter(l -> l.getStockItem().getId().equals(item.getId()))
+                    .findFirst();
+
+            if (existingLineOpt.isPresent()) {
+                StockRequisitionLine targetLine = existingLineOpt.get();
+                targetLine.setQuantity(targetLine.getQuantity() + lineReq.getQuantity());
+            } else {
+                StockRequisitionLine targetLine = StockRequisitionLine.builder()
+                        .stockItem(item)
+                        .quantity(lineReq.getQuantity())
+                        .build();
+                r.addLine(targetLine);
+            }
+
+            newlyAddedLines.add(StockRequisitionLine.builder()
+                    .stockItem(item)
+                    .quantity(lineReq.getQuantity())
+                    .build());
+        }
+
+        // Se a requisição já tiver sido aprovada ou entregue, baixa imediatamente o estoque dos novos itens
+        if (r.getStatus() == StockRequisitionStatus.APPROVED || r.getStatus() == StockRequisitionStatus.DELIVERED) {
+            String reqNum = r.getRequisitionNumber();
+            UUID empId = r.getEmployee().getId();
+            var reason = r.getMovementReason();
+            String note = "Item adicional incluído na requisição " + reqNum;
+
+            for (StockRequisitionLine line : newlyAddedLines) {
+                StockMovementDTO mov = new StockMovementDTO();
+                mov.setStockItemId(line.getStockItem().getId());
+                mov.setMovementType(MovementType.SAIDA);
+                mov.setReason(reason);
+                mov.setQuantity(line.getQuantity());
+                mov.setEmployeeId(empId);
+                mov.setEmployeeName(r.getEmployee() != null ? r.getEmployee().getName() : null);
+                mov.setRequisitionNumber(reqNum);
+                mov.setNotes(note);
+                mov.setSkipEpiDeliveryFormAutoRecord(true);
+                stockService.createMovement(mov, actingUserId);
+            }
+
+            // Registra no histórico do colaborador
+            User actingUser = userRepository.findById(actingUserId).orElse(null);
+            String actingName = actingUser != null ? actingUser.getName() : "Almoxarifado";
+            recordHistory(r.getEmployee().getId(), actingUser, "REQUISICAO_ESTOQUE_ITENS_ADICIONADOS",
+                    "Itens adicionais incluídos na requisição de estoque",
+                    "Nº " + r.getRequisitionNumber() + " — " + newlyAddedLines.size() + " novo(s) item(ns) incluído(s) por " + actingName,
+                    null);
+
+            // Garante sincronização com ficha de EPI se aplicável
+            try {
+                epiDeliveryFormService.ensureDraftEpiFormFromApprovedStockRequisition(loadFetched(id), actingUserId);
+            } catch (Exception ex) {
+                log.warn("Sincronização com ficha de EPI para novos itens: {}", ex.getMessage());
+            }
+        }
+
+        stockRequisitionRepository.save(r);
+        return StockRequisitionDTO.fromEntity(loadFetched(id));
+    }
+
+    /**
      * Cria saídas de estoque (uma movimentação por linha). Usado na aprovação; na entrega legado se não houver movimentos.
      */
     private void createOutboundMovementsForRequisition(StockRequisition r, UUID actingUserId, String extraNote) {
@@ -269,6 +351,7 @@ public class StockRequisitionService {
             mov.setReason(reason);
             mov.setQuantity(line.getQuantity());
             mov.setEmployeeId(empId);
+            mov.setEmployeeName(r.getEmployee() != null ? r.getEmployee().getName() : null);
             mov.setRequisitionNumber(reqNum);
             mov.setNotes(fullNotes);
             mov.setSkipEpiDeliveryFormAutoRecord(true);

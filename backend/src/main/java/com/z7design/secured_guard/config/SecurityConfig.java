@@ -351,21 +351,22 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/user-terms-consent/**")
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN")
-                                                // Endpoints de contratos - requerem permissões específicas (Comercial
-                                                // também
-                                                // precisa ver contratos)
-                                                .requestMatchers("/api/contracts/**")
+                                                // Endpoints de contratos - requerem permissões específicas (Comercial também precisa ver contratos)
+                                                .requestMatchers("/api/contracts", "/api/contracts/**")
                                                 .hasAnyAuthority("CONTRACTS_READ", "CONTRACTS_WRITE",
                                                                 "CONTRACTS_CREATE", "CONTRACTS_DELETE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_GESTOR",
-                                                                "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL")
-                                                // Templates (minutas) de contrato com 14 cláusulas - mesmas permissões
-                                                // de contratos
-                                                .requestMatchers("/api/company-contract-templates/**")
+                                                                "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
+                                                                "SUPER_ADMIN", "ADMIN", "ADMINISTRADOR", "GESTOR",
+                                                                "COMERCIAL", "GESTOR_COMERCIAL", "ASSISTENTE_COMERCIAL")
+                                                // Templates (minutas) de contrato com 14 cláusulas - mesmas permissões de contratos
+                                                .requestMatchers("/api/company-contract-templates", "/api/company-contract-templates/**")
                                                 .hasAnyAuthority("CONTRACTS_READ", "CONTRACTS_WRITE",
                                                                 "CONTRACTS_CREATE", "CONTRACTS_DELETE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_GESTOR",
-                                                                "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL")
+                                                                "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
+                                                                "SUPER_ADMIN", "ADMIN", "ADMINISTRADOR", "GESTOR",
+                                                                "COMERCIAL", "GESTOR_COMERCIAL", "ASSISTENTE_COMERCIAL")
                                                 // Endpoints de estoque - requerem permissões específicas ou
                                                 // autenticação
                                                 .requestMatchers("/api/stock/**")
@@ -661,9 +662,12 @@ public class SecurityConfig {
                                                                 "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de funcionários, unidades, empresas e cargos - requerem
                                                 // permissões de RH, admin ou financeiro (empresas usadas em Contas a Pagar)
-                                                .requestMatchers("/api/employees/**", "/api/units/**",
-                                                                "/api/companies/**", "/api/positions/**",
-                                                                "/api/doctors/**", "/api/work-posts/**")
+                                                .requestMatchers("/api/employees", "/api/employees/**",
+                                                                "/api/units", "/api/units/**",
+                                                                "/api/companies", "/api/companies/**",
+                                                                "/api/positions", "/api/positions/**",
+                                                                "/api/doctors", "/api/doctors/**",
+                                                                "/api/work-posts", "/api/work-posts/**")
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "RH", "DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_RH",
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
@@ -677,7 +681,7 @@ public class SecurityConfig {
                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de clientes - temporariamente públicos para debug
-                                                .requestMatchers("/api/clients/**").permitAll()
+                                                .requestMatchers("/api/clients", "/api/clients/**").permitAll()
                                                 // Documentos de RH - restritos a RH e Admins
                                                 .requestMatchers("/api/documents/**")
                                                 .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "RH", "ADMIN", "SUPER_ADMIN")

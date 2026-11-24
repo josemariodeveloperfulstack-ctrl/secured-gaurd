@@ -214,6 +214,21 @@ public class ProspectionController {
         return null;
     }
 
+    @PostMapping("/enrich-lead")
+    @PreAuthorize(PROSPECTION_AUTHORITY)
+    @Operation(summary = "Enriquece sob demanda um lead com pesquisa de IA Gemini (Google Search) e resolução corporativa de Compras e QSA")
+    public ResponseEntity<Map<String, Object>> enrichLead(@RequestBody Map<String, Object> lead) {
+        log.info("Recebida solicitação de enriquecimento sob demanda de lead: nome='{}', cnpj='{}'",
+                lead.get("nomeFantasia") != null ? lead.get("nomeFantasia") : lead.get("razaoSocial"),
+                lead.get("cnpj"));
+        try {
+            cnpjLookupService.enrichCorporateEmailsAndContacts(lead);
+        } catch (Exception ex) {
+            log.warn("Erro ao enriquecer lead sob demanda: {}", ex.getMessage());
+        }
+        return ResponseEntity.ok(lead);
+    }
+
     @GetMapping("/credentials")
     @PreAuthorize(PROSPECTION_AUTHORITY)
     @Operation(summary = "Retorna o status de configuração das chaves de IA e ferramentas de prospecção")

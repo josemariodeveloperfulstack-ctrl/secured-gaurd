@@ -229,6 +229,10 @@ public class User implements UserDetails {
         return active;
     }
 
+    public Boolean getActive() {
+        return active;
+    }
+
     public void setActive(boolean active) {
         this.active = active;
     }

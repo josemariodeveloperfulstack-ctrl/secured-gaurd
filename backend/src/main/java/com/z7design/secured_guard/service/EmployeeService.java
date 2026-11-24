@@ -115,12 +115,12 @@ public class EmployeeService {
     private static String orderClauseForBasicData(String sortBy, String sortDir) {
         String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
         if (sortBy != null && "hireDate".equalsIgnoreCase(sortBy.trim())) {
-            return "ORDER BY e.hire_date " + dir + " NULLS LAST, e.name ASC ";
+            return "ORDER BY e.hire_date " + dir + " NULLS LAST, UPPER(e.name) ASC ";
         }
         if (sortBy != null && "terminationDate".equalsIgnoreCase(sortBy.trim())) {
-            return "ORDER BY COALESCE(e.data_rescisao, e.termination_date) " + dir + " NULLS LAST, e.name ASC ";
+            return "ORDER BY COALESCE(e.data_rescisao, e.termination_date) " + dir + " NULLS LAST, UPPER(e.name) ASC ";
         }
-        return "ORDER BY e.name ASC ";
+        return "ORDER BY UPPER(e.name) " + dir + ", e.name " + dir + " ";
     }
 
     @SuppressWarnings("unchecked")

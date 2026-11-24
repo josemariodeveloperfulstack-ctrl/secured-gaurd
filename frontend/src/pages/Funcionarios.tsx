@@ -195,36 +195,40 @@ const Funcionarios: React.FC = () => {
       }
     });
 
-    return Array.from(namesSet).sort().map(name => ({
-      value: name,
-      label: name
-    }));
+    return Array.from(namesSet)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }))
+      .map(name => ({
+        value: name,
+        label: name
+      }));
   }, [filterWorkPosts, filterSectors, employees]);
 
-  // Opções para multi-select
+  // Opções para multi-select ordenadas em ordem alfabética
   const statusOptions = React.useMemo(() => [
-    { value: "ACTIVE", label: "✅ Ativo" },
-    { value: "INACTIVE", label: "⭕ Inativo" },
-    { value: "VACATION", label: "🏖️ Férias" },
-    { value: "MATERNITY_LEAVE", label: "👶 Licença Maternidade" },
-    { value: "MEDICAL_CERTIFICATE", label: "🩺 Atestado" },
     { value: "INSS_LEAVE", label: "🏥 Afastamento INSS" },
+    { value: "MEDICAL_CERTIFICATE", label: "🩺 Atestado" },
+    { value: "ACTIVE", label: "✅ Ativo" },
     { value: "TERMINATED", label: "❌ Demitido" },
-    { value: "SUSPENDED", label: "⏸️ Suspenso" },
+    { value: "VACATION", label: "🏖️ Férias" },
+    { value: "INACTIVE", label: "⭕ Inativo" },
+    { value: "MATERNITY_LEAVE", label: "👶 Licença Maternidade" },
     { value: "SUB_JUDICE", label: "⚖️ Sub Júdice / Judicial" },
+    { value: "SUSPENDED", label: "⏸️ Suspenso" },
   ], []);
 
   const companyOptions = React.useMemo(() => {
-    return filterCompanies.map(c => ({
-      value: String(c.id),
-      label: c.sigla ? `${c.sigla} - ${c.name}` : (c.name || 'Sem nome')
-    }));
+    return filterCompanies
+      .map(c => ({
+        value: String(c.id),
+        label: c.sigla ? `${c.sigla} - ${c.name}` : (c.name || 'Sem nome')
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base' }));
   }, [filterCompanies]);
 
   const positionOptions = React.useMemo(() => {
     return filterPositions
       .map(p => ({ value: p.name, label: p.name }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base' }));
   }, [filterPositions]);
 
   const [statsFromApi, setStatsFromApi] = useState<{
@@ -257,7 +261,7 @@ const Funcionarios: React.FC = () => {
       terminationDateFrom: terminationDateFrom || undefined,
       terminationDateTo: terminationDateTo || undefined,
     };
-    if (sortKey === 'hireDate' || sortKey === 'terminationDate') {
+    if (sortKey) {
       base.sortBy = sortKey;
       base.sortDir = sortDir;
     }
@@ -745,20 +749,49 @@ const Funcionarios: React.FC = () => {
     const dir = sortDir === 'asc' ? 1 : -1;
     const getString = (e: Employee, k: SortKey) => {
       switch (k) {
-        case 'name': return e.name || '';
-        case 'position': return e.position?.name || '';
-        case 'company': return (e.company as any)?.sigla || (e.company as any)?.name || '';
-        case 'workPost': return (e.workPost as any)?.name || (e as any).department?.name || (e as any).unit?.name || '';
-        case 'status': return e.status || '';
-        case 'escalaTrabalho': return e.escalaTrabalho || '';
-        case 'horarioTrabalho': return e.horarioTrabalho || '';
+        case 'name': return (e.name || '').trim();
+        case 'position': return (e.position?.name || '').trim();
+        case 'company': return ((e.company as any)?.sigla || (e.company as any)?.name || '').trim();
+        case 'workPost': {
+          const wp = (e.workPost as any)?.name;
+          const wps = (e as any)?.workPosts;
+          if (Array.isArray(wps) && wps.length) {
+            const names = wps.map((x: any) => x?.name).filter(Boolean);
+            if (names.length) return names.join(', ').trim();
+          }
+          if (wp) return wp.trim();
+          return ((e.department as any)?.name || (e.unit as any)?.name || (e as any).employeeWorkSector || '').trim();
+        }
+        case 'status': {
+          const statusLabels: Record<string, string> = {
+            ACTIVE: 'Ativo',
+            INACTIVE: 'Inativo',
+            VACATION: 'Férias',
+            MATERNITY_LEAVE: 'Licença Maternidade',
+            MEDICAL_CERTIFICATE: 'Atestado',
+            INSS_LEAVE: 'Afastamento INSS',
+            TERMINATED: 'Demitido',
+            SUSPENDED: 'Suspenso',
+            SUB_JUDICE: 'Sub Júdice',
+            UNEXCUSED_ABSENCE: 'Abandono / Falta',
+          };
+          const effectiveStatus = (e.dataRescisao || e.terminationDate) ? 'TERMINATED' : (e.status || 'INACTIVE');
+          return statusLabels[effectiveStatus] || effectiveStatus;
+        }
+        case 'escalaTrabalho': return (e.escalaTrabalho || '').trim();
+        case 'horarioTrabalho': return (e.horarioTrabalho || '').trim();
         default: return '';
       }
     };
 
-    return [...filteredEmployees].sort((a, b) =>
-      getString(a, sortKey).localeCompare(getString(b, sortKey), 'pt-BR', { sensitivity: 'base' }) * dir
-    );
+    return [...filteredEmployees].sort((a, b) => {
+      const valA = getString(a, sortKey);
+      const valB = getString(b, sortKey);
+      if (!valA && !valB) return 0;
+      if (!valA) return 1;
+      if (!valB) return -1;
+      return valA.localeCompare(valB, 'pt-BR', { sensitivity: 'base' }) * dir;
+    });
   }, [filteredEmployees, sortKey, sortDir]);
 
   // Limpar filtros

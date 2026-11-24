@@ -12,6 +12,7 @@ export type MedicalDocumentType =
   | 'LICENCA_GALA_MATRIMONIAL'
   | 'TESTEMUNHA_JUDICIAL'
   | 'PROCESSO_TRABALHISTA'
+  | 'ATESTADO_OBITO'
   | 'DECLARACAO_MEDICA'
   | 'CAT'
   | 'AFASTAMENTO';
@@ -28,6 +29,7 @@ export const MEDICAL_FORM_TYPES: { value: MedicalDocumentType; label: string }[]
   { value: 'LICENCA_GALA_MATRIMONIAL', label: 'Licença Gala ou Matrimonial' },
   { value: 'TESTEMUNHA_JUDICIAL', label: 'Afastamento como Testemunha Judicial' },
   { value: 'PROCESSO_TRABALHISTA', label: 'Processo Trabalhista' },
+  { value: 'ATESTADO_OBITO', label: 'Atestado de Óbito' },
 ];
 
 export const MEDICAL_TYPE_LABELS: Record<MedicalDocumentType, string> = {
@@ -42,6 +44,7 @@ export const MEDICAL_TYPE_LABELS: Record<MedicalDocumentType, string> = {
   LICENCA_GALA_MATRIMONIAL: 'Licença Gala ou Matrimonial',
   TESTEMUNHA_JUDICIAL: 'Afastamento como Testemunha Judicial',
   PROCESSO_TRABALHISTA: 'Processo Trabalhista',
+  ATESTADO_OBITO: 'Atestado de Óbito',
   DECLARACAO_MEDICA: 'Declaração Médica',
   CAT: 'CAT',
   AFASTAMENTO: 'Afastamento',

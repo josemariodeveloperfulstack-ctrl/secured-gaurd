@@ -420,34 +420,46 @@ public class StockReportService {
             document.add(new Paragraph("Nenhuma movimentação no período.").setItalic());
             return;
         }
-        Table table = new Table(UnitValue.createPercentArray(new float[] { 18, 14, 12, 34, 22 }))
+        Table table = new Table(UnitValue.createPercentArray(new float[] { 14, 15, 33, 8, 16, 14 }))
                 .useAllAvailableWidth()
-                .setMarginTop(20);
+                .setMarginTop(12);
 
-        table.addHeaderCell(layoutService.createHeaderCell("Data"));
-        table.addHeaderCell(layoutService.createHeaderCell("Tipo"));
+        table.addHeaderCell(layoutService.createHeaderCell("Data/Hora"));
+        table.addHeaderCell(layoutService.createHeaderCell("Tipo / Motivo"));
+        table.addHeaderCell(layoutService.createHeaderCell("Item / Material"));
         table.addHeaderCell(layoutService.createHeaderCell("Qtd"));
-        table.addHeaderCell(layoutService.createHeaderCell("Item"));
-        table.addHeaderCell(layoutService.createHeaderCell("Responsável / Destino"));
+        table.addHeaderCell(layoutService.createHeaderCell("Destinatário / Req."));
+        table.addHeaderCell(layoutService.createHeaderCell("Responsável"));
 
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
         for (StockMovementDTO movement : movements) {
             String responsavel = movement.getUserName() != null ? movement.getUserName() : "-";
-            String destino = movement.getUnitName() != null
-                    ? movement.getUnitName()
-                    : (movement.getEmployeeName() != null ? movement.getEmployeeName() : null);
-            String respDestino = destino != null && !destino.equals(responsavel)
-                    ? responsavel + " / " + destino
-                    : responsavel;
+            String destino = movement.getEmployeeName() != null && !movement.getEmployeeName().isBlank()
+                    ? movement.getEmployeeName()
+                    : (movement.getUnitName() != null ? movement.getUnitName() : "-");
+
+            if (movement.getRequisitionNumber() != null && !movement.getRequisitionNumber().isBlank()) {
+                destino += "\n(Req: " + movement.getRequisitionNumber() + ")";
+            }
+
+            String tipoMotivo = (movement.getMovementType() != null ? movement.getMovementType().getDescription() : "-");
+            if (movement.getReason() != null) {
+                tipoMotivo += "\n" + movement.getReason().getDescription();
+            }
+
+            String itemName = movement.getStockItemName() != null ? movement.getStockItemName() : "-";
+            if (movement.getStockItemCode() != null && !movement.getStockItemCode().isBlank()) {
+                itemName = "[" + movement.getStockItemCode() + "] " + itemName;
+            }
 
             table.addCell(layoutService.createDataCell(
                     movement.getMovementDate() != null ? movement.getMovementDate().format(dtf) : "N/A"));
-            table.addCell(layoutService.createDataCell(
-                    movement.getMovementType() != null ? movement.getMovementType().getDescription() : "N/A"));
+            table.addCell(layoutService.createDataCell(tipoMotivo));
+            table.addCell(layoutService.createDataCell(itemName));
             table.addCell(layoutService.createDataCell(String.valueOf(movement.getQuantity())));
-            table.addCell(layoutService.createDataCell(movement.getStockItemName()));
-            table.addCell(layoutService.createDataCell(respDestino));
+            table.addCell(layoutService.createDataCell(destino));
+            table.addCell(layoutService.createDataCell(responsavel));
         }
 
         document.add(table);

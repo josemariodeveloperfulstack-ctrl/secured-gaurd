@@ -68,29 +68,30 @@ public class ContractService {
 
     @Transactional(readOnly = true)
     public List<Contract> findAllForCurrentUser() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof User) {
-            User currentUser = (User) auth.getPrincipal();
-            boolean isComercial = currentUser.getRoles().stream()
-                    .anyMatch(r -> r.getName() != null && 
-                            (r.getName().equals("COMERCIAL") || r.getName().equals("ROLE_COMERCIAL")));
-            if (isComercial) {
-                List<Contract> contracts = contractRepository.findByResponsibleCommercialIdWithClient(currentUser.getId());
-                initializeClientForContracts(contracts);
-                return contracts;
-            }
+        // Usuários do módulo Comercial e gestores acessam a listagem de todos os contratos cadastrados e gerados
+        List<Contract> contracts = null;
+        try {
+            contracts = contractRepository.findAllWithClient();
+        } catch (Exception ex) {
+            log.warn("Falha ao buscar contratos com findAllWithClient (cliente órfão ou erro de join: {}). Utilizando fallback findAll()", ex.getMessage());
+            contracts = contractRepository.findAll();
         }
-        List<Contract> contracts = contractRepository.findAllWithClient();
+        if (contracts == null || contracts.isEmpty()) {
+            contracts = contractRepository.findAll();
+        }
         initializeClientForContracts(contracts);
-        return contracts;
+        log.info("📋 Listando contratos: {} encontrados no banco", contracts != null ? contracts.size() : 0);
+        return contracts != null ? contracts : List.of();
     }
 
     private void initializeClientForContracts(List<Contract> contracts) {
+        if (contracts == null) return;
         for (Contract contract : contracts) {
             if (contract.getClient() != null) {
                 try {
                     contract.getClient().getName(); // Força inicialização
-                } catch (org.hibernate.LazyInitializationException | jakarta.persistence.EntityNotFoundException e) {
+                } catch (Exception e) {
+                    log.warn("Cliente órfão ou inacessível no contrato {}: {}", contract.getId(), e.getMessage());
                     contract.setClient(null);
                 }
             }
@@ -164,18 +165,7 @@ public class ContractService {
     }
     
     public Page<Contract> findByFilters(UUID clientId, ContractStatus status, String searchTerm, Pageable pageable) {
-        UUID responsibleCommercialId = null;
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof User) {
-            User currentUser = (User) auth.getPrincipal();
-            boolean isComercial = currentUser.getRoles().stream()
-                    .anyMatch(r -> r.getName() != null && 
-                            (r.getName().equals("COMERCIAL") || r.getName().equals("ROLE_COMERCIAL")));
-            if (isComercial) {
-                responsibleCommercialId = currentUser.getId();
-            }
-        }
-        return contractRepository.findByFilters(clientId, status, responsibleCommercialId, searchTerm, pageable);
+        return contractRepository.findByFilters(clientId, status, null, searchTerm, pageable);
     }
     
     public Contract createContract(ContractDTO contractDTO) {

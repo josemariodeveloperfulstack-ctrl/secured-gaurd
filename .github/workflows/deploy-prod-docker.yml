@@ -135,7 +135,7 @@ jobs:
 
           # Create deployment archive locally including the health check script
           chmod +x scripts/health-check-prod.sh scripts/fix-404-prod.sh scripts/diagnostico-502-prod.sh scripts/bootstrap-prod-vps.sh scripts/fix-backend-prod-unhealthy.sh
-          tar -czf prod-deploy.tar.gz .prod.env deploy/docker-compose.prod.yml deploy/nginx/nginx-prod.conf scripts/fix-404-prod.sh scripts/health-check-prod.sh scripts/diagnostico-502-prod.sh scripts/bootstrap-prod-vps.sh scripts/fix-backend-prod-unhealthy.sh traefik-dynamic-prod.yml backend/src/main/resources/db/migration
+          tar -czf prod-deploy.tar.gz .prod.env deploy/docker-compose.prod.yml deploy/nginx/nginx-prod.conf scripts/fix-404-prod.sh scripts/health-check-prod.sh scripts/diagnostico-502-prod.sh scripts/bootstrap-prod-vps.sh scripts/fix-backend-prod-unhealthy.sh scripts/fix-prod-ssl-staging.sh traefik-dynamic-prod.yml docker-compose.traefik.yml backend/src/main/resources/db/migration
 
           # Encode archive in base64 to safely pass it into the heredoc
           B64_TAR=$(base64 -w 0 prod-deploy.tar.gz)
@@ -192,7 +192,9 @@ jobs:
             mv /tmp/scripts/diagnostico-502-prod.sh \$SCRIPT_DIR/
             mv /tmp/scripts/bootstrap-prod-vps.sh \$SCRIPT_DIR/
             mv /tmp/scripts/fix-backend-prod-unhealthy.sh \$SCRIPT_DIR/
+            mv /tmp/scripts/fix-prod-ssl-staging.sh \$SCRIPT_DIR/
             mv /tmp/traefik-dynamic-prod.yml \$TRAEFIK_DIR/prod.yml
+            mv /tmp/docker-compose.traefik.yml /var/www/secured_guard/docker-compose.traefik.yml
             
             mkdir -p /var/www/secured_guard/prod/backend
             if [ -d /tmp/backend ]; then
@@ -224,7 +226,12 @@ jobs:
               cd \$DEPLOY_DIR
               sleep 10
             fi
-            
+
+            echo "🔐 Garantindo certificado TLS de produção (sem ACME de staging)..."
+            if [ -f \$SCRIPT_DIR/fix-prod-ssl-staging.sh ]; then
+              bash \$SCRIPT_DIR/fix-prod-ssl-staging.sh || echo "⚠️ Falha ao corrigir certificado TLS (ver logs do Traefik)"
+            fi
+
             echo "📥 Pull imagens PROD (Docker Hub)..."
             for img in z7design/secured-guard-backend:prod z7design/secured-guard-frontend:prod z7design/secured-guard-whatsapp:prod; do
               for attempt in 1 2 3 4 5; do

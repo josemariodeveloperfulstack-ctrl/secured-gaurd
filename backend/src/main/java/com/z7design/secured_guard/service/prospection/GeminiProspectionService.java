@@ -664,4 +664,109 @@ public class GeminiProspectionService {
         }
         return null;
     }
+
+    /**
+     * Pesquisa na internet (com Google Search Grounding da IA Gemini) canais reais de contato
+     * do Setor de Compras / Suprimentos e dos Sócios / Decisores do QSA.
+     */
+    public Map<String, Object> discoverPurchasingAndDecisionMakerContacts(
+            String companyName, String cnpj, String city, String uf, String address, String phone, String website, List<String> partnerNames) {
+        if (!isConfigured()) {
+            return Collections.emptyMap();
+        }
+
+        try {
+            StringBuilder promptBuilder = new StringBuilder();
+            promptBuilder.append("Você é um especialista em inteligência de vendas B2B e enriquecimento de contatos corporativos no Brasil.\n");
+            promptBuilder.append("Pesquise na internet e identifique canais de contato reais, comerciais e atualizados para o setor de COMPRAS, SUPRIMENTOS e DECISORES da seguinte empresa:\n");
+            promptBuilder.append(String.format("Empresa: \"%s\"\n", companyName));
+            if (cnpj != null && !cnpj.isBlank()) promptBuilder.append(String.format("CNPJ: \"%s\"\n", cnpj));
+            promptBuilder.append(String.format("Cidade / UF: \"%s - %s\"\n", city, uf));
+            if (address != null && !address.isBlank()) promptBuilder.append(String.format("Endereço: \"%s\"\n", address));
+            if (phone != null && !phone.isBlank()) promptBuilder.append(String.format("Telefone registrado: \"%s\"\n", phone));
+            if (website != null && !website.isBlank()) promptBuilder.append(String.format("Website informado: \"%s\"\n", website));
+            if (partnerNames != null && !partnerNames.isEmpty()) {
+                promptBuilder.append(String.format("Sócios / Decisores da Receita Federal (QSA): %s\n", String.join(", ", partnerNames)));
+            }
+
+            promptBuilder.append("\nINSTRUÇÕES DE PESQUISA:\n");
+            promptBuilder.append("1. Localize o e-mail do setor de Compras, Suprimentos, Cotações ou Comercial para envio de propostas de serviços (ex: compras@..., suprimentos@..., cotacao@..., comercial@..., orcamento@..., contato@...).\n");
+            promptBuilder.append("2. Localize o e-mail corporativo ou contato profissional dos sócios/decisores listados no QSA.\n");
+            promptBuilder.append("3. Descubra o website oficial verificado ou domínio institucional da empresa.\n");
+            promptBuilder.append("4. Descubra telefone comercial ou WhatsApp do setor de compras/comercial.\n");
+            promptBuilder.append("\nResponda ESTRITAMENTE em formato JSON:\n");
+            promptBuilder.append("{\n");
+            promptBuilder.append("  \"website\": \"url oficial ou null\",\n");
+            promptBuilder.append("  \"emailGeral\": \"email corporativo ou null\",\n");
+            promptBuilder.append("  \"emailCompras\": \"email para compras/suprimentos/propostas ou null\",\n");
+            promptBuilder.append("  \"contatoComprasNome\": \"Nome do comprador/responsável ou 'Setor de Suprimentos & Compras'\",\n");
+            promptBuilder.append("  \"telefoneCompras\": \"telefone/whatsapp comercial ou null\",\n");
+            promptBuilder.append("  \"socios\": [\n");
+            promptBuilder.append("    {\"nome\": \"Nome Exato\", \"email\": \"email corporativo\", \"telefone\": \"tel ou null\"}\n");
+            promptBuilder.append("  ]\n");
+            promptBuilder.append("}\n");
+
+            String prompt = promptBuilder.toString();
+            Map<String, Object> body = new HashMap<>();
+            Map<String, Object> content = new HashMap<>();
+            content.put("parts", List.of(Map.of("text", prompt)));
+            body.put("contents", List.of(content));
+
+            List<String> modelsToTry = new ArrayList<>();
+            String preferred = (model != null && !model.isBlank()) ? model.trim() : "gemini-2.0-flash";
+            modelsToTry.add(preferred);
+            if (!preferred.contains("gemini-2.0-flash")) modelsToTry.add("gemini-2.0-flash");
+            if (!preferred.contains("gemini-1.5-flash")) modelsToTry.add("gemini-1.5-flash");
+
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .connectTimeout(Duration.ofSeconds(6))
+                    .build();
+
+            for (String tryModel : modelsToTry) {
+                String cleanModel = tryModel.replace("models/", "");
+                String endpoint = apiUrl + "/models/" + cleanModel + ":generateContent?key=" + apiKey;
+
+                List<Map<String, Object>> requestBodies = new ArrayList<>();
+                Map<String, Object> searchBody = new HashMap<>(body);
+                searchBody.put("tools", List.of(Map.of("google_search", Collections.emptyMap())));
+                requestBodies.add(searchBody);
+                requestBodies.add(body);
+
+                for (Map<String, Object> currentBody : requestBodies) {
+                    try {
+                        String bodyJson = objectMapper.writeValueAsString(currentBody);
+                        HttpRequest req = HttpRequest.newBuilder()
+                                .uri(URI.create(endpoint))
+                                .header("Content-Type", "application/json")
+                                .timeout(Duration.ofSeconds(15))
+                                .POST(HttpRequest.BodyPublishers.ofString(bodyJson, StandardCharsets.UTF_8))
+                                .build();
+
+                        HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+                        if (resp.statusCode() == 200) {
+                            JsonNode response = objectMapper.readTree(resp.body());
+                            if (response.has("candidates")) {
+                                JsonNode textNode = response.path("candidates").get(0)
+                                        .path("content").path("parts").get(0).path("text");
+                                if (!textNode.isMissingNode()) {
+                                    String clean = cleanJsonOutput(textNode.asText());
+                                    JsonNode parsed = objectMapper.readTree(clean);
+                                    if (parsed.isObject()) {
+                                        return objectMapper.convertValue(parsed, Map.class);
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    } catch (Exception ex) {
+                        log.debug("Tentativa de consulta Gemini para Compras de '{}': {}", companyName, ex.getMessage());
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Falha geral ao buscar canais de compras com Gemini: {}", ex.getMessage());
+        }
+        return Collections.emptyMap();
+    }
 }

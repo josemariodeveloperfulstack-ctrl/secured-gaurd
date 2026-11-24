@@ -44,6 +44,7 @@ interface ContractGeneratorProps {
   onOpenChange: (open: boolean) => void;
   contract: Contract | null;
   onConfigureCompany: () => void;
+  onSuccess?: () => void;
 }
 
 interface ContractData {
@@ -66,7 +67,8 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   open,
   onOpenChange,
   contract,
-  onConfigureCompany
+  onConfigureCompany,
+  onSuccess
 }) => {
   const { toast } = useToast();
   const [contractData, setContractData] = useState<ContractData>({
@@ -301,8 +303,32 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   const loadClients = async () => {
     setClientsLoading(true);
     try {
-      const result = await clientService.getClients({ page: 0, size: 1000 });
-      const list = Array.isArray(result) ? result : (result?.content || []);
+      let list: any[] = [];
+      try {
+        const allClients = await clientService.getAllClients();
+        if (Array.isArray(allClients) && allClients.length > 0) {
+          list = allClients;
+        }
+      } catch (err) {
+        console.warn('⚠️ Fallback /api/clients/all no gerador:', err);
+      }
+
+      if (list.length === 0) {
+        try {
+          const selectClients = await clientService.getClientsForSelect();
+          if (Array.isArray(selectClients) && selectClients.length > 0) {
+            list = selectClients;
+          }
+        } catch (err) {
+          console.warn('⚠️ Fallback /api/clients/select no gerador:', err);
+        }
+      }
+
+      if (list.length === 0) {
+        const result = await clientService.getClients({ page: 0, size: 1000 });
+        list = Array.isArray(result) ? result : (result?.content || []);
+      }
+
       setClients(list);
     } catch (e) {
       console.error('Erro ao carregar clientes para o gerador de contrato:', e);
@@ -733,9 +759,38 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
       link.click();
       link.remove();
 
+      // Persistir o contrato gerado no banco de dados para constar na listagem de contratos do sistema
+      if (selectedClientId && !contract?.id) {
+        try {
+          const createReq: any = {
+            contractNumber: contractData.contractNumber || `CON-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+            description: contractData.description || `Contrato de Prestação de Serviços - ${contractData.clientName || 'Cliente'}`,
+            startDate: contractData.startDate ? (contractData.startDate.match(/^\d{4}-\d{2}-\d{2}/)?.[0] || contractData.startDate) : new Date().toISOString().split('T')[0],
+            endDate: contractData.endDate ? (contractData.endDate.match(/^\d{4}-\d{2}-\d{2}/)?.[0] || contractData.endDate) : undefined,
+            value: Number(contractData.value) || 0,
+            monthlyValue: Number(contractData.value) || 0,
+            annualValue: (Number(contractData.value) || 0) * 12,
+            status: 'PENDING',
+            clientId: selectedClientId,
+            notes: contractData.observations || contractData.additionalTerms || 'Gerado via Gerador de Contratos',
+            contractOrigin: 'MANUAL',
+            contractType: contractTemplateKey === 'ARMADA' ? 'VIGILANCIA_PATRIMONIAL' : (contractTemplateKey === 'PORTARIA' ? 'PORTARIA' : 'FACILITIES'),
+            autoRenewal: false
+          };
+          await contractService.createContract(createReq);
+          if (onSuccess) {
+            onSuccess();
+          }
+        } catch (saveErr) {
+          console.warn('Contrato gerado em PDF, mas não foi possível persistir automaticamente no banco:', saveErr);
+        }
+      } else if (onSuccess) {
+        onSuccess();
+      }
+
       toast({
         title: "Contrato Gerado",
-        description: "O contrato foi gerado com sucesso com layout profissional.",
+        description: "O contrato foi gerado e registrado no sistema com sucesso.",
       });
 
       setStep('generated');

@@ -76,17 +76,26 @@ public class StockMovementDTO {
 
         if (entity.getStockItem() != null) {
             dto.setStockItemId(entity.getStockItem().getId());
-            dto.setStockItemName(entity.getStockItem().getName());
+            String dispName = entity.getStockItem().getFullName() != null && !entity.getStockItem().getFullName().isBlank()
+                    ? entity.getStockItem().getFullName()
+                    : entity.getStockItem().getName();
+            dto.setStockItemName(dispName);
             dto.setStockItemCode(entity.getStockItem().getCode());
             dto.setStockItemFullName(entity.getStockItem().getFullName());
         }
 
         if (entity.getEmployee() != null) {
             dto.setEmployeeId(entity.getEmployee().getId());
+            if (dto.getEmployeeName() == null || dto.getEmployeeName().isBlank()) {
+                dto.setEmployeeName(entity.getEmployee().getName());
+            }
         }
 
         if (entity.getUser() != null) {
             dto.setUserId(entity.getUser().getId());
+            if (dto.getUserName() == null || dto.getUserName().isBlank()) {
+                dto.setUserName(entity.getUser().getName());
+            }
         }
 
         if (entity.getUnit() != null) {

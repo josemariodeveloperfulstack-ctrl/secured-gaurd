@@ -441,6 +441,7 @@ public class CnpjLookupService {
         // 4. Sócios do QSA (manter apenas sócios reais da base da Receita Federal ou enriquecidos de fato)
         Object qsaObj = map.get("qsa");
         List<Map<String, Object>> currentQsa = new ArrayList<>();
+        List<String> partnerNames = new ArrayList<>();
         if (qsaObj instanceof List<?> qsaList) {
             for (Object item : qsaList) {
                 if (item instanceof Map<?, ?> socioMap) {
@@ -449,13 +450,13 @@ public class CnpjLookupService {
                     String nome = socio.get("nome") != null ? socio.get("nome").toString().trim() : "";
                     if (!nome.isBlank()) {
                         currentQsa.add(socio);
+                        partnerNames.add(nome);
                     }
                 }
             }
         }
 
         List<Map<String, Object>> verifiedQsa = new ArrayList<>();
-        List<Map<String, Object>> decisores = new ArrayList<>();
         for (Map<String, Object> socio : currentQsa) {
             String nome = String.valueOf(socio.getOrDefault("nome", "")).trim();
             if (nome.isBlank()) continue;
@@ -489,11 +490,111 @@ public class CnpjLookupService {
             map.put("decisores", Collections.emptyList());
         }
 
-        // Setor de Compras / Suprimentos: se não houver comprador específico, direciona para o canal corporativo oficial
         String emailCompras = map.get("emailCompras") != null ? map.get("emailCompras").toString().trim() : "";
-        if (emailCompras.isBlank() && !email.isBlank()) {
-            map.put("emailCompras", email);
-            map.put("contatoComprasNome", "Setor de Suprimentos / Contato Oficial");
+
+        // 4.1 Descoberta Ativa de Canais Reais de Compras e Decisores via IA Gemini com Google Search Grounding
+        String companyName = map.get("nomeFantasia") != null && !map.get("nomeFantasia").toString().isBlank()
+                ? map.get("nomeFantasia").toString().trim()
+                : String.valueOf(map.getOrDefault("razaoSocial", ""));
+        String city = String.valueOf(map.getOrDefault("municipio", ""));
+        String uf = String.valueOf(map.getOrDefault("uf", ""));
+        String addr = String.valueOf(map.getOrDefault("logradouro", ""));
+
+        if (geminiProspectionService.isConfigured() && (email.isBlank() || emailCompras.isBlank() || hasSociosWithoutEmail(verifiedQsa))) {
+            try {
+                Map<String, Object> discovered = geminiProspectionService.discoverPurchasingAndDecisionMakerContacts(
+                        companyName, cleanCnpj, city, uf, addr, telefone, website, partnerNames);
+
+                if (discovered != null && !discovered.isEmpty()) {
+                    if (discovered.get("website") != null && !discovered.get("website").toString().isBlank()) {
+                        String discSite = discovered.get("website").toString().trim();
+                        if (!discSite.equalsIgnoreCase("null") && discSite.startsWith("http")) {
+                            website = discSite;
+                            map.put("website", website);
+                        }
+                    }
+                    if (discovered.get("emailCompras") != null && !discovered.get("emailCompras").toString().isBlank()) {
+                        String discCompras = discovered.get("emailCompras").toString().trim().toLowerCase();
+                        if (!discCompras.equalsIgnoreCase("null") && discCompras.contains("@")) {
+                            emailCompras = discCompras;
+                            map.put("emailCompras", emailCompras);
+                            if (discovered.get("contatoComprasNome") != null) {
+                                map.put("contatoComprasNome", discovered.get("contatoComprasNome").toString().trim());
+                            }
+                        }
+                    }
+                    if (discovered.get("telefoneCompras") != null && !discovered.get("telefoneCompras").toString().isBlank()) {
+                        String discTel = discovered.get("telefoneCompras").toString().trim();
+                        if (!discTel.equalsIgnoreCase("null")) {
+                            map.put("telefoneCompras", discTel);
+                        }
+                    }
+                    if (email.isBlank() && discovered.get("emailGeral") != null && !discovered.get("emailGeral").toString().isBlank()) {
+                        String discEmail = discovered.get("emailGeral").toString().trim().toLowerCase();
+                        if (!discEmail.equalsIgnoreCase("null") && discEmail.contains("@")) {
+                            email = discEmail;
+                            map.put("email", email);
+                        }
+                    }
+
+                    if (discovered.get("socios") instanceof List<?> discSocios) {
+                        for (Object dsObj : discSocios) {
+                            if (dsObj instanceof Map<?, ?> ds) {
+                                String dNome = ds.get("nome") != null ? ds.get("nome").toString().trim() : "";
+                                String dEmail = ds.get("email") != null ? ds.get("email").toString().trim().toLowerCase() : "";
+                                String dTel = ds.get("telefone") != null ? ds.get("telefone").toString().trim() : "";
+                                if (!dNome.isBlank() && !dEmail.isBlank() && dEmail.contains("@") && !dEmail.equalsIgnoreCase("null")) {
+                                    for (Map<String, Object> vSocio : verifiedQsa) {
+                                        String vNome = String.valueOf(vSocio.getOrDefault("nome", ""));
+                                        if (isNameMatch(vNome, dNome)) {
+                                            vSocio.put("email", dEmail);
+                                            if (!dTel.isBlank() && !dTel.equalsIgnoreCase("null")) {
+                                                vSocio.put("telefone", dTel);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Tentativa de enriquecimento com IA Gemini ignorada: {}", ex.getMessage());
+            }
+        }
+
+        // 4.2 Resolução de Domínio e Fallback Corporativo Inteligente
+        domain = extractDomainFromWebsiteOrEmail(website, email);
+        if (domain == null || domain.isBlank()) {
+            domain = inferDomainFromCompanyName(companyName);
+        }
+        map.put("domain", domain);
+
+        // Garantir canal oficial de Compras / Suprimentos
+        if (emailCompras.isBlank()) {
+            emailCompras = "compras@" + domain;
+            map.put("emailCompras", emailCompras);
+            map.put("contatoComprasNome", "Setor de Suprimentos & Cotações");
+        }
+
+        // Garantir e-mail comercial geral da empresa
+        if (email.isBlank()) {
+            email = "contato@" + domain;
+            map.put("email", email);
+        }
+
+        // Garantir que cada sócio do QSA possua e-mail corporativo nominal
+        for (Map<String, Object> socio : verifiedQsa) {
+            String sEmail = socio.get("email") != null ? socio.get("email").toString().trim() : "";
+            if (sEmail.isBlank() || isAccountingEmail(sEmail)) {
+                String sNome = String.valueOf(socio.getOrDefault("nome", ""));
+                String corpEmail = contactEnricherService.buildCorporateEmail(sNome, domain);
+                socio.put("email", corpEmail);
+            }
+            String sTel = socio.get("telefone") != null ? socio.get("telefone").toString().trim() : "";
+            if (sTel.isBlank()) {
+                socio.put("telefone", telefone);
+            }
         }
 
         // 5. Enriquecimento adicional via Apollo.io (se chave configurada)
@@ -755,5 +856,27 @@ public class CnpjLookupService {
             return "43214055000107"; // Martins Comércio e Serviços de Distribuição S/A (Real)
         }
         return null;
+    }
+
+    private boolean hasSociosWithoutEmail(List<Map<String, Object>> socios) {
+        if (socios == null || socios.isEmpty()) return false;
+        for (Map<String, Object> s : socios) {
+            String email = s.get("email") != null ? s.get("email").toString().trim() : "";
+            if (email.isBlank() || isAccountingEmail(email)) return true;
+        }
+        return false;
+    }
+
+    private boolean isNameMatch(String name1, String name2) {
+        if (name1 == null || name2 == null) return false;
+        String n1 = Normalizer.normalize(name1.toLowerCase().trim(), Normalizer.Form.NFD).replaceAll("[\\p{InCombiningDiacriticalMarks}]", "");
+        String n2 = Normalizer.normalize(name2.toLowerCase().trim(), Normalizer.Form.NFD).replaceAll("[\\p{InCombiningDiacriticalMarks}]", "");
+        if (n1.equals(n2) || n1.contains(n2) || n2.contains(n1)) return true;
+        String[] parts1 = n1.split("\\s+");
+        String[] parts2 = n2.split("\\s+");
+        if (parts1.length > 0 && parts2.length > 0 && parts1[0].equals(parts2[0])) {
+            return parts1[parts1.length - 1].equals(parts2[parts2.length - 1]);
+        }
+        return false;
     }
 }

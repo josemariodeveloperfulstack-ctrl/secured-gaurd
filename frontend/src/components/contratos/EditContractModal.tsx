@@ -108,8 +108,33 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
   const loadClients = async () => {
     setLoadingClients(true);
     try {
-      const clientsData = await clientService.getClients();
-      setClients(Array.isArray(clientsData) ? clientsData : clientsData.content || []);
+      let list: any[] = [];
+      try {
+        const allClients = await clientService.getAllClients();
+        if (Array.isArray(allClients) && allClients.length > 0) {
+          list = allClients;
+        }
+      } catch (err) {
+        console.warn('⚠️ Fallback /api/clients/all na edição de contrato:', err);
+      }
+
+      if (list.length === 0) {
+        try {
+          const selectClients = await clientService.getClientsForSelect();
+          if (Array.isArray(selectClients) && selectClients.length > 0) {
+            list = selectClients;
+          }
+        } catch (err) {
+          console.warn('⚠️ Fallback /api/clients/select na edição de contrato:', err);
+        }
+      }
+
+      if (list.length === 0) {
+        const clientsData = await clientService.getClients();
+        list = Array.isArray(clientsData) ? clientsData : (clientsData?.content || []);
+      }
+
+      setClients(list);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
       toast({

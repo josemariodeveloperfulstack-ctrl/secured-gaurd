@@ -796,6 +796,11 @@ export const stockService = {
     return response.data;
   },
 
+  async addItemsToStockRequisition(id: string, lines: { stockItemId: string; quantity: number }[]): Promise<StockRequisitionDTO> {
+    const response = await api.post(`/api/stock/requisitions/${id}/items`, { lines });
+    return response.data;
+  },
+
   async deleteStockRequisition(id: string): Promise<void> {
     await api.delete(`/api/stock/requisitions/${id}`);
   },

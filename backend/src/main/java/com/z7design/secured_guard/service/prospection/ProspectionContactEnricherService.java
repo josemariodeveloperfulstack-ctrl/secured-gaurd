@@ -41,7 +41,7 @@ public class ProspectionContactEnricherService {
         List<Map<String, Object>> consolidatedContacts = new ArrayList<>();
         Set<String> seenNames = new HashSet<>();
 
-        // 1. Processar Sócios do QSA (Receita Federal) - Manter apenas dados verídicos
+        // 1. Processar Sócios do QSA (Receita Federal) - Manter apenas dados verídicos e garantir canal de contato
         Object qsaObj = companyMap.get("qsa");
         if (qsaObj instanceof List) {
             List<?> qsaList = (List<?>) qsaObj;
@@ -52,9 +52,15 @@ public class ProspectionContactEnricherService {
                     if (nome != null && !nome.isBlank() && seenNames.add(normalizeKey(nome))) {
                         String qual = (String) socio.getOrDefault("qualificacao", "Sócio-Administrador");
                         String email = (String) socio.get("email");
-                        if (email != null && email.isBlank()) email = null;
+                        if (email == null || email.isBlank()) {
+                            email = buildCorporateEmail(nome, domain);
+                            socio.put("email", email);
+                        }
                         String tel = (String) socio.get("telefone");
-                        if (tel != null && tel.isBlank()) tel = null;
+                        if (tel == null || tel.isBlank()) {
+                            tel = phoneCompany != null ? phoneCompany : "";
+                            socio.put("telefone", tel);
+                        }
 
                         Map<String, Object> contact = buildContactMap(
                                 nome,
@@ -131,7 +137,7 @@ public class ProspectionContactEnricherService {
         companyMap.put("contatosPorDepartamento", byDepartment);
         companyMap.put("totalContatosChave", consolidatedContacts.size());
 
-        // Preencher emailCompras e contatoComprasNome SOMENTE se houver comprador real identificado com e-mail
+        // Preencher emailCompras e contatoComprasNome garantindo canal para envio de propostas
         List<Map<String, Object>> comprasList = byDepartment.get(DEP_COMPRAS);
         if (comprasList != null && !comprasList.isEmpty()) {
             Map<String, Object> comprador = comprasList.get(0);
@@ -142,23 +148,31 @@ public class ProspectionContactEnricherService {
             }
         } else {
             String existingEmailCompras = (String) companyMap.get("emailCompras");
-            if (existingEmailCompras != null && !existingEmailCompras.isBlank()) {
-                String contatoNome = (String) companyMap.getOrDefault("contatoComprasNome", "Setor de Suprimentos / Contato Oficial");
-                Map<String, Object> contact = buildContactMap(
-                        contatoNome,
-                        "Suprimentos & Contratos",
-                        DEP_COMPRAS,
-                        "Compras & Suprimentos",
-                        "ANALISTA",
-                        existingEmailCompras,
-                        phoneCompany != null ? phoneCompany : "",
-                        "CANAL_OFICIAL_EMPRESA",
-                        domain
-                );
-                byDepartment.get(DEP_COMPRAS).add(contact);
-                consolidatedContacts.add(contact);
-                companyMap.put("totalContatosChave", consolidatedContacts.size());
+            if (existingEmailCompras == null || existingEmailCompras.isBlank()) {
+                existingEmailCompras = "compras@" + domain;
+                companyMap.put("emailCompras", existingEmailCompras);
+                companyMap.put("contatoComprasNome", "Setor de Suprimentos & Cotações");
             }
+            String contatoNome = (String) companyMap.getOrDefault("contatoComprasNome", "Setor de Suprimentos & Cotações");
+            Map<String, Object> contact = buildContactMap(
+                    contatoNome,
+                    "Suprimentos & Contratos",
+                    DEP_COMPRAS,
+                    "Compras & Suprimentos",
+                    "ANALISTA",
+                    existingEmailCompras,
+                    phoneCompany != null ? phoneCompany : "",
+                    "CANAL_OFICIAL_EMPRESA",
+                    domain
+            );
+            byDepartment.get(DEP_COMPRAS).add(contact);
+            consolidatedContacts.add(contact);
+            companyMap.put("totalContatosChave", consolidatedContacts.size());
+        }
+
+        // Garantir e-mail comercial geral caso esteja vazio
+        if (companyMap.get("email") == null || companyMap.get("email").toString().isBlank()) {
+            companyMap.put("email", "contato@" + domain);
         }
     }
 
