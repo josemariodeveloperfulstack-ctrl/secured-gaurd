@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ClipboardList, Edit, Eye, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { ClipboardList, Edit, Eye, Loader2, RefreshCw, Trash2, FileText, Download } from 'lucide-react';
 import { StockRequisitionListItem, StockRequisitionStatus } from '@/types/stock';
 import StockRequisitionModal from '@/components/stock/StockRequisitionModal';
 import CreateWarehouseRequisitionButton from '@/components/stock/CreateWarehouseRequisitionButton';
@@ -261,9 +261,21 @@ const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, 
                               size="sm"
                               className="text-seguranca-yellow hover:text-white"
                               onClick={() => openView(row.id)}
+                              title="Visualizar Detalhes e Documento"
                             >
                               <Eye className="h-4 w-4 mr-1" />
                               Abrir
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30"
+                              onClick={() => stockService.downloadStockRequisitionPdf(row.id, row.requisitionNumber)}
+                              title="Gerar e Baixar Requisição em PDF"
+                            >
+                              <Download className="h-4 w-4 mr-1" />
+                              PDF
                             </Button>
                             {pending && (
                               <Button
