@@ -34,6 +34,7 @@ import com.z7design.secured_guard.repository.EPIDeliveryFormRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.StockItemRepository;
 import com.z7design.secured_guard.repository.StockMovementRepository;
+import com.z7design.secured_guard.repository.StockRequisitionRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
 import com.z7design.secured_guard.util.EmployeeDocumentDateResolver;
@@ -69,6 +70,7 @@ public class StockRequisitionPdfService {
     private static final DeviceRgb TEXT_MUTED = new DeviceRgb(100, 116, 139);    // #64748b Texto secundário / notas
 
     private final StockMovementRepository stockMovementRepository;
+    private final StockRequisitionRepository stockRequisitionRepository;
     private final CompanyRepository companyRepository;
     private final EmployeeRepository employeeRepository;
     private final EPIDeliveryFormRepository epiDeliveryFormRepository;
@@ -82,6 +84,7 @@ public class StockRequisitionPdfService {
 
     public StockRequisitionPdfService(
             StockMovementRepository stockMovementRepository,
+            StockRequisitionRepository stockRequisitionRepository,
             CompanyRepository companyRepository,
             EmployeeRepository employeeRepository,
             EPIDeliveryFormRepository epiDeliveryFormRepository,
@@ -90,6 +93,7 @@ public class StockRequisitionPdfService {
             StandardReportLayoutService standardReportLayoutService,
             EmployeeDocumentDateResolver documentDateResolver) {
         this.stockMovementRepository = stockMovementRepository;
+        this.stockRequisitionRepository = stockRequisitionRepository;
         this.companyRepository = companyRepository;
         this.employeeRepository = employeeRepository;
         this.epiDeliveryFormRepository = epiDeliveryFormRepository;
@@ -138,8 +142,11 @@ public class StockRequisitionPdfService {
         StockMovement movement = stockMovementRepository.findById(movementId)
                 .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada: " + movementId));
 
-        if (movement.getStockRequisition() != null) {
-            return generateMultiLineRequisitionPdf(movement.getStockRequisition());
+        if (movement.getRequisitionNumber() != null && !movement.getRequisitionNumber().isBlank()) {
+            Optional<StockRequisition> reqOpt = stockRequisitionRepository.findByRequisitionNumber(movement.getRequisitionNumber());
+            if (reqOpt.isPresent()) {
+                return generateMultiLineRequisitionPdf(reqOpt.get());
+            }
         }
 
         return generateNativeEpiStyleMovementPdf(movement);
@@ -507,7 +514,7 @@ public class StockRequisitionPdfService {
             epiTable.addHeaderCell(createEpiHeaderCell("ASSINATURA"));
 
             StockItem si = movement.getStockItem();
-            String epiName = si != null ? si.getFullName().toUpperCase() : (movement.getItemName() != null ? movement.getItemName().toUpperCase() : "");
+            String epiName = si != null ? si.getFullName().toUpperCase() : (movement.getNotes() != null ? movement.getNotes().toUpperCase() : "");
             String size = si != null ? resolveDisplaySizeNumber(si) : "";
             String ca = si != null && si.getCa() != null ? si.getCa() : "";
             int qty = movement.getQuantity() != null && movement.getQuantity() > 0 ? movement.getQuantity() : 1;
@@ -582,7 +589,7 @@ public class StockRequisitionPdfService {
         if (r.getLines() != null) {
             for (StockRequisitionLine line : r.getLines()) {
                 StockItem item = line.getStockItem();
-                String name = item != null ? item.getFullName() : (line.getNotes() != null ? line.getNotes() : "");
+                String name = item != null ? item.getFullName() : "";
                 String size = item != null ? resolveDisplaySizeNumber(item) : "";
                 String ca = item != null && item.getCa() != null ? item.getCa() : "";
                 int qty = line.getQuantity() != null && line.getQuantity() > 0 ? line.getQuantity() : 1;
@@ -1097,7 +1104,7 @@ public class StockRequisitionPdfService {
             return emp.getCompany();
         }
         try {
-            List<Company> list = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            List<Company> list = companyRepository.findByStatus(Company.CompanyStatus.ACTIVE);
             if (!list.isEmpty()) {
                 return list.get(0);
             }
