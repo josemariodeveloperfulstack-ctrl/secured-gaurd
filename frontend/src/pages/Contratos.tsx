@@ -395,7 +395,7 @@ const Contratos = () => {
               />
             </div>
             <Button
-              onClick={() => setModalOpen(true)}
+              onClick={() => handleGenerateContract()}
               className="bg-seguranca-red hover:bg-seguranca-darkred h-10 flex-shrink-0 whitespace-nowrap shadow-md shadow-seguranca-red/20"
             >
               <Plus className="h-4 w-4 mr-2" />

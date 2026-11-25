@@ -39,7 +39,15 @@ jobs:
         run: |
           cd backend
           chmod +x mvnw
-          ./mvnw clean package -DskipTests
+          # O wrapper as vezes falha ao baixar a distribuicao do Maven
+          # (wget: Failed to fetch repo1.maven.org). Usa o mvn do runner como fallback.
+          if ./mvnw -v >/dev/null 2>&1; then
+            MVN_CMD=./mvnw
+          else
+            MVN_CMD=mvn
+            echo "Maven Wrapper indisponivel - usando mvn do sistema: $(mvn -v | head -1)"
+          fi
+          $MVN_CMD clean package -DskipTests
           echo "✅ Backend compilado com sucesso!"
           ls -lh target/*.jar
 

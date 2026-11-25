@@ -31,7 +31,14 @@ jobs:
         run: |
           echo "🔨 Testando build do backend..."
           chmod +x mvnw
-          ./mvnw clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci || {
+          # Fallback para o mvn do runner se o wrapper nao conseguir baixar o Maven
+          if ./mvnw -v >/dev/null 2>&1; then
+            MVN_CMD=./mvnw
+          else
+            MVN_CMD=mvn
+            echo "Maven Wrapper indisponivel - usando mvn do sistema: $(mvn -v | head -1)"
+          fi
+          $MVN_CMD clean package -Dmaven.test.skip=true -Dspring.profiles.active=ci || {
             echo "❌ Build do backend falhou"
             echo "build_status=failed" >> $GITHUB_OUTPUT
             exit 1
