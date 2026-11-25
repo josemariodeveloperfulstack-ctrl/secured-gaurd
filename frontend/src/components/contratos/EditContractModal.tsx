@@ -7,9 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, X, FileText, TrendingUp, FolderOpen, MapPin } from 'lucide-react';
+import { Loader2, Save, X, FileText, TrendingUp, FolderOpen, MapPin, Download } from 'lucide-react';
 import { Contract, contractService, UpdateContractRequest } from '@/services/contractService';
 import { clientService, Client } from '@/services/clientService';
+import { workPostService } from '@/services/workPostService';
 import { ContractAmendmentsTab } from './ContractAmendmentsTab';
 import { ContractAdjustmentsTab } from './ContractAdjustmentsTab';
 import { ContractDocumentsTab } from './ContractDocumentsTab';
@@ -30,6 +31,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [loadingClients, setLoadingClients] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [formData, setFormData] = useState<UpdateContractRequest & Record<string, any>>({
@@ -211,6 +213,103 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveAndGeneratePdf = async () => {
+    if (!formData.contractNumber || !formData.description || !formData.clientId || 
+        !formData.startDate || formData.value <= 0) {
+      toast({
+        title: "Dados Incompletos",
+        description: "Por favor, preencha todos os campos obrigatórios antes de gerar.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setGeneratingPdf(true);
+    try {
+      await contractService.updateContract(formData.id, {
+        contractNumber: formData.contractNumber,
+        description: formData.description,
+        startDate: formData.startDate,
+        endDate: formData.endDate || undefined,
+        value: formData.value,
+        status: formData.status,
+        clientId: formData.clientId,
+        notes: formData.notes || undefined,
+        contractOrigin: formData.contractOrigin,
+        contractType: formData.contractType,
+        responsibleCommercialId: formData.responsibleCommercialId,
+        responsibleManagerId: formData.responsibleManagerId,
+        monthlyValue: formData.monthlyValue,
+        annualValue: formData.annualValue,
+        adjustmentType: formData.adjustmentType,
+        nextAdjustmentDate: formData.nextAdjustmentDate,
+        autoRenewal: formData.autoRenewal,
+        replacementTimeHours: formData.replacementTimeHours,
+        maxAbsenceMinutes: formData.maxAbsenceMinutes,
+        patrolFrequency: formData.patrolFrequency || undefined,
+        reportsRequired: formData.reportsRequired || undefined,
+        obligationsContractor: formData.obligationsContractor || undefined,
+        obligationsContracted: formData.obligationsContracted || undefined,
+        penalties: formData.penalties || undefined
+      });
+
+      const client = clients.find(c => c.id === formData.clientId);
+      const linkedPosts = await workPostService.getWorkPostsByContract(formData.id);
+
+      const contractPayload = {
+        contractNumber: formData.contractNumber,
+        clientName: client?.name || contract?.clientName || '',
+        clientDocument: client?.cnpj || '',
+        clientAddress: [client?.address, client?.city, client?.state].filter(Boolean).join(', '),
+        clientPhone: client?.phone || client?.mobile || '',
+        clientEmail: client?.email || '',
+        description: formData.description,
+        value: formData.value,
+        startDate: formData.startDate,
+        endDate: formData.endDate || '',
+        paymentTerms: 'Pagamento mensal até o dia 10 de cada mês',
+        observations: formData.notes || '',
+        workPostIds: linkedPosts.map(p => p.id),
+        workPosts: linkedPosts.map(p => ({
+          name: p.name,
+          postCode: p.postCode,
+          type: p.type,
+          city: p.city,
+          state: p.state,
+          workSchedule: p.workSchedule,
+          shiftStart: p.shiftStart,
+          shiftEnd: p.shiftEnd
+        }))
+      };
+
+      const pdfBlob = await contractService.generateContractPdf(contractPayload);
+      const url = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `contrato_${formData.contractNumber || 'atualizado'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Sucesso!",
+        description: `Contrato atualizado e novo PDF gerado com sucesso!`,
+      });
+
+      onSuccess();
+    } catch (err: any) {
+      console.error('Erro ao salvar e gerar PDF:', err);
+      toast({
+        title: "Erro ao gerar PDF",
+        description: err.message || "Não foi possível gerar o PDF do contrato.",
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingPdf(false);
     }
   };
 
@@ -490,21 +589,42 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
           </div>
 
           {/* Botões */}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
-              disabled={loading}
+              disabled={loading || generatingPdf}
               className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
             >
               <X className="h-4 w-4 mr-2" />
               Cancelar
             </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading || generatingPdf}
+              onClick={handleSaveAndGeneratePdf}
+              className="border-emerald-600/60 text-emerald-400 hover:bg-emerald-950/30"
+              title="Salva todas as alterações e faz o download imediato do novo PDF do contrato"
+            >
+              {generatingPdf ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Gerando PDF...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Salvar e Gerar Novamente (PDF)
+                </>
+              )}
+            </Button>
             
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || generatingPdf}
               className="bg-seguranca-red hover:bg-seguranca-darkred text-white"
             >
               {loading ? (
@@ -539,6 +659,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
             <ContractPostosTab
               contractId={contract.id}
               clientId={formData.clientId || contract.clientId || ''}
+              clientName={contract?.clientName || ''}
               onPostosChange={onSuccess}
             />
           </TabsContent>

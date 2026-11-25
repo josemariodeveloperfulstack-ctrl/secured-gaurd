@@ -48,9 +48,12 @@ public class ClientController {
                     searchTerm, status, pageable.getPageNumber(), pageable.getPageSize());
             
             Page<ClientDTO> result;
-            if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+            if (searchTerm != null && !searchTerm.trim().isEmpty() && status != null) {
+                log.info("Executando busca por termo e status: {} / {}", searchTerm, status);
+                result = clientService.getClientsByStatus(status, searchTerm.trim(), pageable);
+            } else if (searchTerm != null && !searchTerm.trim().isEmpty()) {
                 log.info("Executando busca por termo: {}", searchTerm);
-                result = clientService.searchClients(searchTerm, pageable);
+                result = clientService.searchClients(searchTerm.trim(), pageable);
             } else if (status != null) {
                 log.info("Executando busca por status: {}", status);
                 result = clientService.getClientsByStatus(status, pageable);

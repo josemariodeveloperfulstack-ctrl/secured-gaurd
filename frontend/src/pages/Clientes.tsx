@@ -53,15 +53,40 @@ const Clientes: React.FC = () => {
     }
   };
 
-  // Load clients on mount
+  // Debounce search so typing immediately filters
   useEffect(() => {
-    loadClients();
-  }, []);
+    const handler = setTimeout(() => {
+      setCurrentPage(0);
+      loadClients({
+        searchTerm: searchTerm.trim() || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        page: 0
+      });
+    }, 350);
+
+    return () => clearTimeout(handler);
+  }, [searchTerm, statusFilter]);
+
+  // Client-side instant filter for instantaneous UI feedback
+  const displayedClients = useMemo(() => {
+    if (!searchTerm.trim()) return clients;
+    const term = searchTerm.trim().toLowerCase();
+    const cleanDigits = term.replace(/\D/g, '');
+    return clients.filter((c) => {
+      const nameMatch = (c.name || '').toLowerCase().includes(term);
+      const emailMatch = (c.email || '').toLowerCase().includes(term);
+      const contactMatch = (c.contactName || '').toLowerCase().includes(term);
+      const cnpjRaw = (c.cnpj || '').toLowerCase();
+      const cnpjClean = cnpjRaw.replace(/\D/g, '');
+      const cnpjMatch = cnpjRaw.includes(term) || (cleanDigits.length >= 2 && cnpjClean.includes(cleanDigits));
+      return nameMatch || emailMatch || contactMatch || cnpjMatch;
+    });
+  }, [clients, searchTerm]);
 
   // Handle search
   const handleSearch = () => {
     setCurrentPage(0);
-    loadClients({ searchTerm, status: statusFilter === 'all' ? undefined : statusFilter, page: 0 });
+    loadClients({ searchTerm: searchTerm.trim() || undefined, status: statusFilter === 'all' ? undefined : statusFilter, page: 0 });
   };
 
   // Handle status filter
@@ -406,12 +431,22 @@ const Clientes: React.FC = () => {
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <Input
-                placeholder="Digite o nome, CNPJ ou email do cliente..."
+                placeholder="Digite a razão social, nome fantasia, CNPJ ou email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-12 pr-4 py-3 bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 rounded-xl"
+                className="pl-12 pr-10 py-3 bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 rounded-xl"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white p-1"
+                  title="Limpar busca"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
 
             <Select value={statusFilter} onValueChange={handleStatusFilter}>
@@ -451,7 +486,7 @@ const Clientes: React.FC = () => {
         {/* Clients Table */}
         <Card className="bg-gradient-to-br from-seguranca-graphite/80 to-seguranca-black/60 border-gray-600/30 p-8 shadow-2xl backdrop-blur-sm mt-6" data-animate="fadeUp">
           <ClientsTable
-            clients={clients}
+            clients={displayedClients}
             onEdit={handleEditClient}
             onDelete={handleDeleteClient}
             onView={handleViewClient}

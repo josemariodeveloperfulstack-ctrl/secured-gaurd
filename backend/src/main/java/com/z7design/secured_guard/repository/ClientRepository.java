@@ -39,7 +39,8 @@ public interface ClientRepository extends JpaRepository<Client, java.util.UUID>,
     
     @Query("SELECT c FROM Client c WHERE " +
            "(c.name IS NOT NULL AND LOWER(c.name) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
-           "(c.cnpj IS NOT NULL AND LOWER(c.cnpj) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
+           "(c.cnpj IS NOT NULL AND (LOWER(c.cnpj) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "REPLACE(REPLACE(REPLACE(c.cnpj, '.', ''), '/', ''), '-', '') LIKE CONCAT('%', :searchTerm, '%'))) OR " +
            "(c.email IS NOT NULL AND LOWER(c.email) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
            "(c.contactName IS NOT NULL AND LOWER(c.contactName) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
     Page<Client> findBySearchTerm(@Param("searchTerm") String searchTerm, Pageable pageable);
@@ -47,7 +48,8 @@ public interface ClientRepository extends JpaRepository<Client, java.util.UUID>,
     @Query("SELECT c FROM Client c WHERE " +
            "(:status IS NULL OR c.status = :status) AND (" +
            "(c.name IS NOT NULL AND LOWER(c.name) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
-           "(c.cnpj IS NOT NULL AND LOWER(c.cnpj) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
+           "(c.cnpj IS NOT NULL AND (LOWER(c.cnpj) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "REPLACE(REPLACE(REPLACE(c.cnpj, '.', ''), '/', ''), '-', '') LIKE CONCAT('%', :searchTerm, '%'))) OR " +
            "(c.email IS NOT NULL AND LOWER(c.email) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
            "(c.contactName IS NOT NULL AND LOWER(c.contactName) LIKE LOWER(CONCAT('%', :searchTerm, '%'))))")
     Page<Client> findByStatusAndSearchTerm(@Param("status") ClientStatus status, 

@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Building2, Mail, Phone, MapPin, User, Hash,
   FileText, Save, X, Smartphone, Home, CreditCard, CheckCircle,
-  Briefcase, Plus, Edit, Trash2, Eye
+  Briefcase, Plus, Edit, Trash2, Eye, Power, RefreshCw
 } from 'lucide-react';
 import { Client, ClientFormData, ClientStatus } from '@/types/client';
 import { clientService } from '@/services/clientService';
@@ -17,6 +17,7 @@ import { workPostService, WorkPost } from '@/services/workPostService';
 import { companyService, DEFAULT_GROUP_COMPANIES } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import WorkPostFormModal from '@/components/postos/WorkPostFormModal';
+import WorkPostViewModal from '@/components/postos/WorkPostViewModal';
 import WorkPostDeleteDialog from '@/components/postos/WorkPostDeleteDialog';
 import {
   Table,
@@ -134,12 +135,32 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [isPostDeleteDialogOpen, setIsPostDeleteDialogOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<WorkPost | null>(null);
   const [editingPost, setEditingPost] = useState<WorkPost | null>(null);
+  const [viewingPost, setViewingPost] = useState<WorkPost | null>(null);
+  const [isViewPostModalOpen, setIsViewPostModalOpen] = useState(false);
   const [selectedPostIds, setSelectedPostIds] = useState<string[]>([]);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [loadingCep, setLoadingCep] = useState(false);
   const [companies, setCompanies] = useState<Array<{ id: string; name: string; sigla?: string }>>([]);
+
+  const handleTogglePostStatus = async (post: WorkPost) => {
+    const newStatus = post.status === 'ATIVO' ? 'INATIVO' : 'ATIVO';
+    try {
+      await workPostService.updateWorkPostStatus(post.id, newStatus);
+      toast({
+        title: "Status Atualizado",
+        description: `Setor "${post.name}" alterado para ${newStatus}.`,
+      });
+      loadWorkPosts();
+    } catch (err: any) {
+      toast({
+        title: "Erro ao alterar status",
+        description: err.response?.data?.message || "Não foi possível alterar o status do setor.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleToggleSelectAllPosts = (checked: boolean) => {
     if (checked) {
@@ -986,17 +1007,31 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                       </p>
                     </div>
                     {activeClient?.id && (
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setEditingPost(null);
-                          setIsPostFormOpen(true);
-                        }}
-                        className="w-full bg-seguranca-red hover:bg-seguranca-darkred sm:w-auto"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Novo Setor de Trabalho
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => loadWorkPosts()}
+                          disabled={loadingPosts}
+                          className="border-gray-600 text-gray-300 hover:text-white"
+                          title="Atualizar lista de setores de trabalho"
+                        >
+                          <RefreshCw className={`h-4 w-4 mr-1.5 ${loadingPosts ? 'animate-spin' : ''}`} />
+                          Atualizar
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setEditingPost(null);
+                            setIsPostFormOpen(true);
+                          }}
+                          className="w-full bg-seguranca-red hover:bg-seguranca-darkred sm:w-auto"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Novo Setor de Trabalho
+                        </Button>
+                      </div>
                     )}
                   </div>
 
@@ -1106,7 +1141,36 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                                     </Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <div className="flex justify-end gap-2">
+                                    <div className="flex justify-end gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-gray-400 hover:text-white"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setViewingPost(post);
+                                          setIsViewPostModalOpen(true);
+                                        }}
+                                        title="Visualizar Setor de Trabalho"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className={`h-8 w-8 ${post.status === 'ATIVO' ? 'text-green-400 hover:text-yellow-400' : 'text-gray-400 hover:text-green-400'}`}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handleTogglePostStatus(post);
+                                        }}
+                                        title={post.status === 'ATIVO' ? "Desativar Setor" : "Ativar Setor"}
+                                      >
+                                        <Power className="h-4 w-4" />
+                                      </Button>
                                       <Button
                                         type="button"
                                         variant="ghost"
@@ -1200,6 +1264,28 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
               defaultCity={formData.city}
               defaultState={formData.state}
               defaultZipCode={formData.zipCode}
+            />
+
+            <WorkPostViewModal
+              open={isViewPostModalOpen}
+              onOpenChange={setIsViewPostModalOpen}
+              workPost={viewingPost}
+              onStatusChange={async (postId, newStatus) => {
+                try {
+                  await workPostService.updateWorkPostStatus(postId, newStatus);
+                  loadWorkPosts();
+                  toast({
+                    title: "Status Atualizado",
+                    description: `Status do setor alterado para ${newStatus}.`,
+                  });
+                } catch (e: any) {
+                  toast({
+                    title: "Erro ao atualizar status",
+                    description: e.response?.data?.message || "Não foi possível alterar o status.",
+                    variant: "destructive"
+                  });
+                }
+              }}
             />
 
             <WorkPostDeleteDialog

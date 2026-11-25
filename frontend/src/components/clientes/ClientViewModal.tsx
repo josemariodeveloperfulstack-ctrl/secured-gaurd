@@ -5,8 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Client, ClientStatus } from '@/types/client';
-import { MapPin, Phone, Mail, User, Building, Calendar, Shield, ExternalLink, Plus } from 'lucide-react';
+import { MapPin, Phone, Mail, User, Building, Calendar, Shield, ExternalLink, Plus, Edit, Trash2, Eye, Power, RefreshCw } from 'lucide-react';
 import { workPostService, WorkPost } from '@/services/workPostService';
+import { useToast } from '@/hooks/use-toast';
+import WorkPostViewModal from '@/components/postos/WorkPostViewModal';
+import WorkPostFormModal from '@/components/postos/WorkPostFormModal';
+import WorkPostDeleteDialog from '@/components/postos/WorkPostDeleteDialog';
 
 interface ClientViewModalProps {
   isOpen: boolean;
@@ -20,35 +24,65 @@ export const ClientViewModal: React.FC<ClientViewModalProps> = ({
   client
 }) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [viewingPost, setViewingPost] = useState<WorkPost | null>(null);
+  const [isViewPostModalOpen, setIsViewPostModalOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<WorkPost | null>(null);
+  const [isEditPostModalOpen, setIsEditPostModalOpen] = useState(false);
+  const [deletingPost, setDeletingPost] = useState<WorkPost | null>(null);
+  const [isDeletePostModalOpen, setIsDeletePostModalOpen] = useState(false);
+
+  const loadPosts = () => {
+    if (!client?.id) return;
+    setLoadingPosts(true);
+    workPostService.getAllWorkPosts()
+      .then((posts) => {
+        const INVALID_SECTOR_KEYWORDS = [
+          'ENSINO FUNDAMENTAL', 'ENSINO MÉDIO', 'ENSINO MEDIO',
+          'EDUCAÇÃO SUPERIOR', 'EDUCACAO SUPERIOR', 'PÓS-GRADUAÇÃO',
+          'POS-GRADUACAO', 'MESTRADO', 'DOUTORADO', 'ANALFABETO',
+          'PRETA', 'BRANCA', 'PARDA', 'AMARELA', 'INDÍGENA', 'INDIGENA'
+        ];
+        const isValidSector = (p: WorkPost) => {
+          const nameUpper = (p.name || '').trim().toUpperCase();
+          const codeUpper = (p.postCode || '').trim().toUpperCase();
+          return !INVALID_SECTOR_KEYWORDS.some(kw => nameUpper === kw || codeUpper === kw || (kw.length > 5 && nameUpper.includes(kw)));
+        };
+
+        const clientPosts = posts.filter(
+          (p) => isValidSector(p) && (p.clientId === client.id || (p.clientName && p.clientName.trim().toLowerCase() === client.name.trim().toLowerCase()))
+        );
+        setWorkPosts(clientPosts);
+      })
+      .catch((err) => console.error('Erro ao buscar postos do cliente:', err))
+      .finally(() => setLoadingPosts(false));
+  };
 
   useEffect(() => {
     if (isOpen && client?.id) {
-      setLoadingPosts(true);
-      workPostService.getAllWorkPosts()
-        .then((posts) => {
-          const INVALID_SECTOR_KEYWORDS = [
-            'ENSINO FUNDAMENTAL', 'ENSINO MÉDIO', 'ENSINO MEDIO',
-            'EDUCAÇÃO SUPERIOR', 'EDUCACAO SUPERIOR', 'PÓS-GRADUAÇÃO',
-            'POS-GRADUACAO', 'MESTRADO', 'DOUTORADO', 'ANALFABETO',
-            'PRETA', 'BRANCA', 'PARDA', 'AMARELA', 'INDÍGENA', 'INDIGENA'
-          ];
-          const isValidSector = (p: WorkPost) => {
-            const nameUpper = (p.name || '').trim().toUpperCase();
-            const codeUpper = (p.postCode || '').trim().toUpperCase();
-            return !INVALID_SECTOR_KEYWORDS.some(kw => nameUpper === kw || codeUpper === kw || (kw.length > 5 && nameUpper.includes(kw)));
-          };
-
-          const clientPosts = posts.filter(
-            (p) => isValidSector(p) && (p.clientId === client.id || (p.clientName && p.clientName.trim().toLowerCase() === client.name.trim().toLowerCase()))
-          );
-          setWorkPosts(clientPosts);
-        })
-        .catch((err) => console.error('Erro ao buscar postos do cliente:', err))
-        .finally(() => setLoadingPosts(false));
+      loadPosts();
     }
   }, [isOpen, client]);
+
+  const handleTogglePostStatus = async (post: WorkPost) => {
+    const newStatus = post.status === 'ATIVO' ? 'INATIVO' : 'ATIVO';
+    try {
+      await workPostService.updateWorkPostStatus(post.id, newStatus);
+      toast({
+        title: "Status Atualizado",
+        description: `Setor "${post.name}" alterado para ${newStatus}.`,
+      });
+      loadPosts();
+    } catch (err: any) {
+      toast({
+        title: "Erro ao alterar status",
+        description: err.response?.data?.message || "Não foi possível alterar o status do setor.",
+        variant: "destructive"
+      });
+    }
+  };
 
   if (!client) return null;
 
@@ -206,23 +240,49 @@ export const ClientViewModal: React.FC<ClientViewModalProps> = ({
 
           {/* Setores e Postos de Trabalho do Cliente */}
           <Card className="border-primary/20 bg-muted/10">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 gap-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Shield className="h-5 w-5 text-primary" />
                 Setores e Postos de Trabalho do Cliente ({workPosts.length})
               </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 text-xs"
-                onClick={() => {
-                  onClose();
-                  navigate(`/postos?clientSearch=${encodeURIComponent(client.name)}`);
-                }}
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Gerenciar na Tela de Postos
-              </Button>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 text-xs"
+                  onClick={loadPosts}
+                  disabled={loadingPosts}
+                  title="Atualizar lista de setores"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingPosts ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="gap-1 text-xs bg-seguranca-red hover:bg-seguranca-darkred"
+                  onClick={() => {
+                    setEditingPost(null);
+                    setIsEditPostModalOpen(true);
+                  }}
+                  title="Cadastrar Novo Setor de Trabalho"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Novo Setor
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 text-xs"
+                  onClick={() => {
+                    onClose();
+                    navigate(`/postos?clientSearch=${encodeURIComponent(client.name)}`);
+                  }}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Gerenciar na Tela de Postos
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loadingPosts ? (
@@ -234,10 +294,10 @@ export const ClientViewModal: React.FC<ClientViewModalProps> = ({
                   <Button
                     variant="default"
                     size="sm"
-                    className="mt-3 gap-1"
+                    className="mt-3 gap-1 bg-seguranca-red hover:bg-seguranca-darkred"
                     onClick={() => {
-                      onClose();
-                      navigate(`/postos?clientSearch=${encodeURIComponent(client.name)}`);
+                      setEditingPost(null);
+                      setIsEditPostModalOpen(true);
                     }}
                   >
                     <Plus className="h-4 w-4" />
@@ -275,18 +335,69 @@ export const ClientViewModal: React.FC<ClientViewModalProps> = ({
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
                           {sector.posts.map((post) => (
-                            <div key={post.id} className="p-2 border rounded bg-background flex flex-col justify-between">
+                            <div key={post.id} className="p-2.5 border rounded bg-background flex flex-col justify-between gap-2 shadow-sm">
                               <div>
                                 <span className="font-medium text-foreground">{post.name}</span>
                                 <div className="text-muted-foreground text-[11px] mt-0.5">
                                   {post.city ? `${post.city}, ${post.state}` : post.address}
                                 </div>
                               </div>
-                              <div className="flex items-center justify-between mt-2 pt-1 border-t text-[11px]">
+                              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1.5 border-t text-[11px]">
                                 <span className="text-muted-foreground">{post.workSchedule || '12x36'} • {post.requiredVigilantes || 1} vig.</span>
-                                <Badge variant="outline" className="text-[10px]">
-                                  {post.status || 'ATIVO'}
-                                </Badge>
+                                <div className="flex items-center gap-1">
+                                  <Badge variant="outline" className={`text-[10px] ${post.status === 'ATIVO' ? 'border-green-600/40 text-green-400' : 'border-yellow-600/40 text-yellow-400'}`}>
+                                    {post.status || 'ATIVO'}
+                                  </Badge>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-gray-400 hover:text-white"
+                                    onClick={() => {
+                                      setViewingPost(post);
+                                      setIsViewPostModalOpen(true);
+                                    }}
+                                    title="Visualizar Setor"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className={`h-6 w-6 ${post.status === 'ATIVO' ? 'text-green-400 hover:text-yellow-400' : 'text-gray-400 hover:text-green-400'}`}
+                                    onClick={() => handleTogglePostStatus(post)}
+                                    title={post.status === 'ATIVO' ? "Desativar Setor" : "Ativar Setor"}
+                                  >
+                                    <Power className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-gray-400 hover:text-white"
+                                    onClick={() => {
+                                      setEditingPost(post);
+                                      setIsEditPostModalOpen(true);
+                                    }}
+                                    title="Editar Setor"
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-gray-400 hover:text-red-400"
+                                    onClick={() => {
+                                      setDeletingPost(post);
+                                      setIsDeletePostModalOpen(true);
+                                    }}
+                                    title="Excluir Setor"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -339,6 +450,70 @@ export const ClientViewModal: React.FC<ClientViewModalProps> = ({
             Fechar
           </Button>
         </div>
+
+        {viewingPost && (
+          <WorkPostViewModal
+            open={isViewPostModalOpen}
+            onOpenChange={setIsViewPostModalOpen}
+            workPost={viewingPost}
+            onStatusChange={async (postId, newStatus) => {
+              try {
+                await workPostService.updateWorkPostStatus(postId, newStatus);
+                loadPosts();
+                toast({
+                  title: "Status Atualizado",
+                  description: `Status do setor alterado para ${newStatus}.`,
+                });
+              } catch (e: any) {
+                toast({
+                  title: "Erro ao atualizar status",
+                  description: e.response?.data?.message || "Não foi possível alterar o status.",
+                  variant: "destructive"
+                });
+              }
+            }}
+          />
+        )}
+
+        <WorkPostFormModal
+          open={isEditPostModalOpen}
+          onOpenChange={setIsEditPostModalOpen}
+          workPost={editingPost}
+          clients={client ? [client] : []}
+          onSubmit={() => {
+            setIsEditPostModalOpen(false);
+            loadPosts();
+          }}
+          forcedClientId={client?.id}
+          defaultAddress={client?.address}
+          defaultCity={client?.city}
+          defaultState={client?.state}
+          defaultZipCode={client?.zipCode}
+        />
+
+        <WorkPostDeleteDialog
+          open={isDeletePostModalOpen}
+          onOpenChange={setIsDeletePostModalOpen}
+          workPost={deletingPost}
+          onConfirm={async () => {
+            if (!deletingPost) return;
+            try {
+              await workPostService.deleteWorkPost(deletingPost.id);
+              loadPosts();
+              setIsDeletePostModalOpen(false);
+              toast({
+                title: "✅ Setor de trabalho removido",
+                description: `O setor "${deletingPost.name}" foi excluído com sucesso.`,
+              });
+            } catch (error) {
+              toast({
+                title: "❌ Erro",
+                description: "Erro ao excluir setor de trabalho.",
+                variant: "destructive",
+              });
+            }
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

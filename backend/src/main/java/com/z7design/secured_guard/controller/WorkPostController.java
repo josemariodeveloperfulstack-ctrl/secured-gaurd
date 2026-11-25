@@ -317,7 +317,7 @@ public class WorkPostController {
         return ResponseEntity.ok(workPostDTOs);
     }
     
-    @PatchMapping("/{id}/status")
+    @RequestMapping(value = "/{id}/status", method = {RequestMethod.PATCH, RequestMethod.PUT})
     @Operation(summary = "Atualizar status do posto", description = "Atualiza apenas o status de um posto")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Status atualizado com sucesso"),
