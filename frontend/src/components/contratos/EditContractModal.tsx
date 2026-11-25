@@ -7,10 +7,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, X, FileText, TrendingUp, FolderOpen, MapPin, Download } from 'lucide-react';
+import { Loader2, Save, X, FileText, TrendingUp, FolderOpen, MapPin, Download, Building2, ScrollText, RefreshCw, Sparkles } from 'lucide-react';
 import { Contract, contractService, UpdateContractRequest } from '@/services/contractService';
 import { clientService, Client } from '@/services/clientService';
 import { workPostService } from '@/services/workPostService';
+import { companyService } from '@/services/companyService';
+import { companyConfigService } from '@/services/companyConfigService';
+import {
+  companyContractTemplateService,
+  CONTRACT_TEMPLATE_LABELS,
+  ContractTemplateKey,
+  getAllowedTemplateKeysForCompany,
+} from '@/services/companyContractTemplateService';
 import { ContractAmendmentsTab } from './ContractAmendmentsTab';
 import { ContractAdjustmentsTab } from './ContractAdjustmentsTab';
 import { ContractDocumentsTab } from './ContractDocumentsTab';
@@ -34,6 +42,20 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [loadingClients, setLoadingClients] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
+
+  // Empresa executora e configuração de minuta (TERC, VIG, ADM)
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState<ContractTemplateKey>('ARMADA');
+  const [allowedTemplateKeys, setAllowedTemplateKeys] = useState<ContractTemplateKey[]>(['ARMADA', 'DESARMADA']);
+  const [headerText, setHeaderText] = useState('CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE SEGURANÇA');
+  const [footerText, setFooterText] = useState('Este contrato é regido pelas leis brasileiras e foro da cidade de Contagem/MG.');
+  const [contractTerms, setContractTerms] = useState<string>('');
+  const [representativeName, setRepresentativeName] = useState<string>('');
+  const [representativeCpf, setRepresentativeCpf] = useState<string>('');
+  const [loadingCompanyConfig, setLoadingCompanyConfig] = useState(false);
+
   const [formData, setFormData] = useState<UpdateContractRequest & Record<string, any>>({
     id: '',
     contractNumber: '',
@@ -65,6 +87,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
   useEffect(() => {
     if (!open) return;
     loadClients();
+    loadCompanies();
     if (!contract) return;
 
     const applyContractToForm = (c: Contract) => {
@@ -95,6 +118,22 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
         obligationsContracted: c.obligationsContracted || '',
         penalties: c.penalties || ''
       });
+
+      if (c.notes) {
+        setContractTerms(c.notes);
+      }
+      if ((c as any).representativeName) {
+        setRepresentativeName((c as any).representativeName);
+      }
+      if ((c as any).representativeCpf) {
+        setRepresentativeCpf((c as any).representativeCpf);
+      }
+      if ((c as any).companyId) {
+        setSelectedCompanyId((c as any).companyId);
+      }
+      if ((c as any).contractTemplateKey) {
+        setSelectedTemplateKey((c as any).contractTemplateKey);
+      }
     };
 
     // Se a lista veio sem clientId (ex.: lazy não carregou), buscar contrato completo por ID
@@ -106,6 +145,87 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
       applyContractToForm(contract);
     }
   }, [open, contract]);
+
+  const loadCompanies = async () => {
+    try {
+      setLoadingCompanies(true);
+      const comps = await companyService.getAllCompanies();
+      const list = Array.isArray(comps) ? comps : [];
+      setCompanies(list);
+      if (list.length > 0) {
+        const found = selectedCompanyId ? list.find(c => c.id === selectedCompanyId) : list[0];
+        const activeComp = found || list[0];
+        if (!selectedCompanyId) {
+          setSelectedCompanyId(activeComp.id);
+        }
+        const allowed = getAllowedTemplateKeysForCompany(activeComp);
+        setAllowedTemplateKeys(allowed);
+        if (allowed.length > 0 && !allowed.includes(selectedTemplateKey)) {
+          setSelectedTemplateKey(allowed[0]);
+        }
+        try {
+          const cfg = await companyConfigService.getConfig(activeComp.id);
+          if (cfg) {
+            if (cfg.headerText) setHeaderText(cfg.headerText);
+            if (cfg.footerText) setFooterText(cfg.footerText);
+            if (cfg.contractTerms && !contractTerms) setContractTerms(cfg.contractTerms);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar empresas:', err);
+    } finally {
+      setLoadingCompanies(false);
+    }
+  };
+
+  const handleCompanyChange = async (companyId: string) => {
+    setSelectedCompanyId(companyId);
+    const comp = companies.find(c => c.id === companyId);
+    const allowed = getAllowedTemplateKeysForCompany(comp);
+    setAllowedTemplateKeys(allowed);
+    if (allowed.length > 0 && !allowed.includes(selectedTemplateKey)) {
+      setSelectedTemplateKey(allowed[0]);
+    }
+    try {
+      setLoadingCompanyConfig(true);
+      const cfg = await companyConfigService.getConfig(companyId);
+      if (cfg) {
+        if (cfg.headerText) setHeaderText(cfg.headerText);
+        if (cfg.footerText) setFooterText(cfg.footerText);
+        if (cfg.contractTerms) setContractTerms(cfg.contractTerms);
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar config da empresa:', err);
+    } finally {
+      setLoadingCompanyConfig(false);
+    }
+  };
+
+  const handleReloadCompanyClauses = async () => {
+    if (!selectedCompanyId) return;
+    try {
+      setLoadingCompanyConfig(true);
+      const cfg = await companyConfigService.getConfig(selectedCompanyId);
+      if (cfg?.contractTerms) {
+        setContractTerms(cfg.contractTerms);
+        toast({
+          title: 'Cláusulas recarregadas',
+          description: 'Termos atualizados conforme a configuração da empresa selecionada.',
+        });
+      }
+    } catch (err) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar as cláusulas da empresa.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingCompanyConfig(false);
+    }
+  };
 
   const loadClients = async () => {
     setLoadingClients(true);
@@ -174,9 +294,9 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
         value: formData.value,
         status: formData.status,
         clientId: formData.clientId,
-        notes: formData.notes || undefined,
+        notes: contractTerms || formData.notes || undefined,
         contractOrigin: formData.contractOrigin,
-        contractType: formData.contractType,
+        contractType: selectedTemplateKey === 'ARMADA' ? 'VIGILANCIA_PATRIMONIAL' : formData.contractType,
         responsibleCommercialId: formData.responsibleCommercialId,
         responsibleManagerId: formData.responsibleManagerId,
         monthlyValue: formData.monthlyValue,
@@ -237,9 +357,9 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
         value: formData.value,
         status: formData.status,
         clientId: formData.clientId,
-        notes: formData.notes || undefined,
+        notes: contractTerms || formData.notes || undefined,
         contractOrigin: formData.contractOrigin,
-        contractType: formData.contractType,
+        contractType: selectedTemplateKey === 'ARMADA' ? 'VIGILANCIA_PATRIMONIAL' : formData.contractType,
         responsibleCommercialId: formData.responsibleCommercialId,
         responsibleManagerId: formData.responsibleManagerId,
         monthlyValue: formData.monthlyValue,
@@ -260,6 +380,13 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
       const linkedPosts = await workPostService.getWorkPostsByContract(formData.id);
 
       const contractPayload = {
+        companyId: selectedCompanyId || undefined,
+        contractTemplateKey: selectedTemplateKey,
+        representativeName: representativeName || undefined,
+        representativeCpf: representativeCpf || undefined,
+        additionalTerms: contractTerms || undefined,
+        headerText: headerText || undefined,
+        footerText: footerText || undefined,
         contractNumber: formData.contractNumber,
         clientName: client?.name || contract?.clientName || '',
         clientDocument: client?.cnpj || '',
@@ -271,7 +398,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
         startDate: formData.startDate,
         endDate: formData.endDate || '',
         paymentTerms: 'Pagamento mensal até o dia 10 de cada mês',
-        observations: formData.notes || '',
+        observations: contractTerms || formData.notes || '',
         workPostIds: linkedPosts.map(p => p.id),
         workPosts: linkedPosts.map(p => ({
           name: p.name,
@@ -352,16 +479,20 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-seguranca-graphite border-gray-600 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl bg-seguranca-graphite border-gray-600 max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-seguranca-lightgray">
-            Editar Contrato - {contract.contractNumber}
+          <DialogTitle className="text-seguranca-lightgray flex items-center justify-between">
+            <span>Editar Contrato - {contract.contractNumber}</span>
           </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="dados" className="w-full">
-          <TabsList className="bg-seguranca-black border border-gray-600">
+          <TabsList className="bg-seguranca-black border border-gray-600 flex flex-wrap h-auto p-1 gap-1">
             <TabsTrigger value="dados" className="data-[state=active]:bg-seguranca-graphite">Dados</TabsTrigger>
+            <TabsTrigger value="minuta" className="data-[state=active]:bg-seguranca-graphite">
+              <ScrollText className="h-4 w-4 mr-1" />
+              Minuta & Cláusulas
+            </TabsTrigger>
             <TabsTrigger value="aditivos" className="data-[state=active]:bg-seguranca-graphite">
               <FileText className="h-4 w-4 mr-1" />
               Aditivos
@@ -382,6 +513,76 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
 
           <TabsContent value="dados">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Filial Executora & Modelo da Minuta (Configuração da Empresa) */}
+          <div className="p-4 rounded-xl border border-gray-600/80 bg-seguranca-black/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-seguranca-yellow flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Filial Contratada & Modelo da Minuta (Configuração da Empresa)
+              </h3>
+              {loadingCompanyConfig && (
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin text-seguranca-yellow" />
+                  Carregando configurações...
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs text-seguranca-lightgray uppercase tracking-wider font-semibold">
+                  Empresa Executora (Cabeçalho, Rodapé e Cláusulas) *
+                </Label>
+                {loadingCompanies ? (
+                  <div className="flex items-center gap-2 p-2 bg-seguranca-black border border-gray-600 rounded mt-1">
+                    <Loader2 className="h-4 w-4 animate-spin text-seguranca-yellow" />
+                    <span className="text-xs text-seguranca-lightgray">Carregando empresas...</span>
+                  </div>
+                ) : (
+                  <Select
+                    value={selectedCompanyId}
+                    onValueChange={(val) => handleCompanyChange(val)}
+                  >
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray mt-1">
+                      <SelectValue placeholder="Selecione a empresa executora" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-graphite border-gray-600">
+                      {companies.map(comp => (
+                        <SelectItem key={comp.id} value={comp.id}>
+                          {comp.name || comp.razaoSocial} ({comp.sigla || 'EMP'}) - {comp.cnpj || 'Sem CNPJ'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-xs text-seguranca-lightgray uppercase tracking-wider font-semibold">
+                  Modelo do Contrato (Minuta Oficial) *
+                </Label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {allowedTemplateKeys.map(key => (
+                    <Button
+                      key={key}
+                      type="button"
+                      size="sm"
+                      variant={selectedTemplateKey === key ? 'default' : 'outline'}
+                      onClick={() => setSelectedTemplateKey(key)}
+                      className={selectedTemplateKey === key
+                        ? 'bg-seguranca-yellow text-black font-semibold hover:bg-amber-400'
+                        : 'border-gray-600 text-gray-300 hover:bg-zinc-800'
+                      }
+                    >
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      {CONTRACT_TEMPLATE_LABELS[key] || key}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Informações Básicas */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-seguranca-lightgray">
@@ -447,6 +648,28 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
                   </SelectContent>
                 </Select>
               )}
+            </div>
+
+            {/* Representante Legal do Cliente */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-seguranca-lightgray">Representante Legal do Cliente (Signatário)</Label>
+                <Input
+                  value={representativeName}
+                  onChange={(e) => setRepresentativeName(e.target.value)}
+                  placeholder="Nome do representante legal"
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+              <div>
+                <Label className="text-seguranca-lightgray">CPF do Representante</Label>
+                <Input
+                  value={representativeCpf}
+                  onChange={(e) => setRepresentativeCpf(e.target.value)}
+                  placeholder="000.000.000-00"
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
             </div>
 
             <div>
@@ -641,6 +864,123 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
             </Button>
           </div>
         </form>
+          </TabsContent>
+
+          <TabsContent value="minuta" className="space-y-4">
+            <div className="p-4 rounded-xl border border-gray-600/80 bg-seguranca-black/60 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-700 pb-3">
+                <div>
+                  <h3 className="text-base font-semibold text-seguranca-lightgray flex items-center gap-2">
+                    <ScrollText className="h-5 w-5 text-seguranca-yellow" />
+                    Template do Contrato & Cláusulas Personalizadas
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Ajuste o cabeçalho, rodapé e as cláusulas específicas que constarão na minuta oficial deste contrato.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReloadCompanyClauses}
+                  disabled={loadingCompanyConfig}
+                  className="border-seguranca-yellow/50 text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black text-xs self-start sm:self-auto"
+                >
+                  {loadingCompanyConfig ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  Restaurar Cláusulas da Empresa
+                </Button>
+              </div>
+
+              <div>
+                <Label className="text-xs text-seguranca-lightgray uppercase tracking-wider font-semibold">
+                  Título do Cabeçalho do Contrato
+                </Label>
+                <Input
+                  value={headerText}
+                  onChange={(e) => setHeaderText(e.target.value)}
+                  placeholder="Ex: CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE SEGURANÇA"
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs text-seguranca-lightgray uppercase tracking-wider font-semibold">
+                  Texto do Rodapé do Contrato (Foro e Legislação)
+                </Label>
+                <Textarea
+                  value={footerText}
+                  onChange={(e) => setFooterText(e.target.value)}
+                  placeholder="Texto do rodapé com foro e referências legais..."
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray mt-1"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-xs text-seguranca-lightgray uppercase tracking-wider font-semibold">
+                    Cláusulas e Condições do Contrato
+                  </Label>
+                  <span className="text-[11px] text-gray-400">
+                    Edite livremente ou restaure os termos da empresa selecionada
+                  </span>
+                </div>
+                <Textarea
+                  value={contractTerms}
+                  onChange={(e) => setContractTerms(e.target.value)}
+                  placeholder="Cláusulas e condições específicas deste contrato..."
+                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray font-mono text-xs leading-relaxed"
+                  rows={14}
+                />
+              </div>
+
+              {/* Botões de ação rápida na aba de minuta */}
+              <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-gray-700">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loading || generatingPdf}
+                  onClick={handleSaveAndGeneratePdf}
+                  className="border-emerald-600/60 text-emerald-400 hover:bg-emerald-950/30"
+                  title="Salva todas as alterações e faz o download imediato do novo PDF do contrato"
+                >
+                  {generatingPdf ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Gerando PDF...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Salvar e Gerar Novamente (PDF)
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={loading || generatingPdf}
+                  className="bg-seguranca-red hover:bg-seguranca-darkred text-white"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Salvar Alterações
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="aditivos">
