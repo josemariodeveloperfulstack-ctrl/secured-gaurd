@@ -57,6 +57,7 @@ import {
   Printer,
   ChevronRight,
   ShieldAlert,
+  RefreshCw,
 } from 'lucide-react';
 
 function formatRequesterContext(u: User | null): string {
@@ -929,9 +930,23 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
 
               {/* Seletor & Adicionador de Itens */}
               <div className="bg-seguranca-black/50 p-3 sm:p-4 rounded-xl border border-zinc-700/60 space-y-3">
-                <Label className="text-xs sm:text-sm font-medium text-zinc-300">
-                  Buscar Item no Almoxarifado para Adicionar:
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs sm:text-sm font-medium text-zinc-300">
+                    Buscar Item no Almoxarifado para Adicionar:
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => loadItems(true)}
+                    disabled={itemsLoading}
+                    className="h-6 px-2 text-[11px] text-zinc-400 hover:text-white"
+                    title="Recarregar itens do almoxarifado"
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${itemsLoading ? 'animate-spin' : ''}`} />
+                    {itemsLoading ? 'Carregando...' : 'Recarregar Estoque'}
+                  </Button>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                   {/* Select do Item */}
@@ -939,6 +954,11 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
                     <Select
                       value={selectedStockItemId}
                       onValueChange={(v) => setSelectedStockItemId(v)}
+                      onOpenChange={(isOpen) => {
+                        if (isOpen && items.length === 0) {
+                          loadItems(true);
+                        }
+                      }}
                     >
                       <SelectTrigger className="bg-zinc-900 border-zinc-700 text-white min-h-[42px] truncate">
                         <SelectValue placeholder={itemsLoading ? 'Carregando almoxarifado...' : 'Selecione o item de estoque / EPI'} />
@@ -955,7 +975,21 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
                           />
                         </div>
                         {filteredStockItems.length === 0 ? (
-                          <div className="p-4 text-xs text-zinc-400 text-center">Nenhum item encontrado.</div>
+                          <div className="p-4 text-xs text-zinc-400 text-center flex flex-col items-center gap-2">
+                            <span>{itemsLoading ? 'Carregando itens de estoque...' : 'Nenhum item encontrado no almoxarifado.'}</span>
+                            {!itemsLoading && items.length === 0 && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => loadItems(true)}
+                                className="h-7 text-xs border-zinc-700 text-white"
+                              >
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                Tentar Carregar Novamente
+                              </Button>
+                            )}
+                          </div>
                         ) : (
                           filteredStockItems.map((it) => (
                             <SelectItem key={it.id} value={it.id} className="text-white hover:bg-zinc-800 text-xs py-2">
@@ -1423,7 +1457,15 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
                     <div className="sm:col-span-8 space-y-1">
                       <Label className="text-xs text-zinc-300">Item do Almoxarifado / EPI *</Label>
-                      <Select value={extraItemId} onValueChange={setExtraItemId}>
+                      <Select
+                        value={extraItemId}
+                        onValueChange={setExtraItemId}
+                        onOpenChange={(isOpen) => {
+                          if (isOpen && items.length === 0) {
+                            loadItems(true);
+                          }
+                        }}
+                      >
                         <SelectTrigger className="bg-seguranca-black/80 border-zinc-700 text-white min-h-[38px] text-xs">
                           <SelectValue placeholder={itemsLoading ? 'Carregando almoxarifado...' : 'Selecione o item para adicionar...'} />
                         </SelectTrigger>
