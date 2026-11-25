@@ -136,8 +136,8 @@ public class StockRequisitionService {
             for (StockRequisitionLine oldLine : r.getLines()) {
                 if (oldLine.getStockItem() != null && oldLine.getQuantity() != null && oldLine.getQuantity() > 0) {
                     StockItem item = oldLine.getStockItem();
-                    int cur = item.getQuantity() != null ? item.getQuantity() : 0;
-                    item.setQuantity(cur + oldLine.getQuantity());
+                    int cur = item.getCurrentQuantity() != null ? item.getCurrentQuantity() : 0;
+                    item.setCurrentQuantity(cur + oldLine.getQuantity());
                     stockItemRepository.save(item);
                 }
             }
@@ -194,10 +194,10 @@ public class StockRequisitionService {
                 for (StockRequisitionLine line : r.getLines()) {
                     if (line.getStockItem() != null && line.getQuantity() != null && line.getQuantity() > 0) {
                         StockItem item = line.getStockItem();
-                        int oldStock = item.getQuantity() != null ? item.getQuantity() : 0;
-                        item.setQuantity(oldStock + line.getQuantity());
+                        int oldStock = item.getCurrentQuantity() != null ? item.getCurrentQuantity() : 0;
+                        item.setCurrentQuantity(oldStock + line.getQuantity());
                         stockItemRepository.save(item);
-                        log.info("Estoque do item {} estornado: {} -> {}", item.getCode(), oldStock, item.getQuantity());
+                        log.info("Estoque do item {} estornado: {} -> {}", item.getCode(), oldStock, item.getCurrentQuantity());
                     }
                 }
             }

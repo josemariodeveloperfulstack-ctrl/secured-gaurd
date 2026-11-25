@@ -4,6 +4,7 @@ import com.z7design.secured_guard.dto.QuoteDTO;
 import com.z7design.secured_guard.dto.QuoteItemDTO;
 import com.z7design.secured_guard.model.Quote;
 import com.z7design.secured_guard.model.QuoteItem;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.QuoteStatus;
 import com.z7design.secured_guard.repository.QuoteRepository;
 import com.z7design.secured_guard.repository.QuoteItemRepository;
