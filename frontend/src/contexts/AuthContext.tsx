@@ -119,16 +119,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('👤 User data valid:', !!userData.id, userData.name, userData.role);
 
           // Gerar permissões a partir do role principal
+          const isSuperUser = ['SUPER_ADMIN', 'ROLE_SUPER_ADMIN'].includes(userData.role) ||
+            (Array.isArray(userData.roles) && userData.roles.some((r: string) => ['SUPER_ADMIN', 'ROLE_SUPER_ADMIN'].includes(r)));
+          const firstAccessCompleted = isSuperUser ? true : (userData.firstAccessCompleted ?? true);
+
           const rolePermissions = generatePermissions(userData.role);
           const userWithPermissions = {
             ...userData,
             permissions: rolePermissions,
-            firstAccessCompleted: userData.firstAccessCompleted ?? false
+            firstAccessCompleted
           };
 
           setUser(userWithPermissions);
           localStorage.setItem(userKey, JSON.stringify(userWithPermissions));
           setRefreshToken(token);
+          if (!localStorage.getItem('refreshToken')) {
+            localStorage.setItem('refreshToken', token);
+          }
 
           console.log('✅ Session restored successfully');
 
@@ -138,7 +145,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
 
           // Verificar se precisa redirecionar para primeiro acesso
-          if (!userWithPermissions.firstAccessCompleted) {
+          if (!userWithPermissions.firstAccessCompleted && !isSuperUser) {
             const currentPath = window.location.pathname;
             const firstAccessPaths = ['/first-access/change-password', '/first-access/activate-2fa'];
             if (!firstAccessPaths.includes(currentPath)) {
@@ -391,6 +398,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('Permissões combinadas:', combinedPermissions);
       }
 
+      const isSuperUser = ['SUPER_ADMIN', 'ROLE_SUPER_ADMIN'].includes(userRole) ||
+        userRoles.some(r => ['SUPER_ADMIN', 'ROLE_SUPER_ADMIN'].includes(r));
+      const firstAccessCompleted = isSuperUser
+        ? true
+        : (response.data.user?.firstAccessCompleted ?? response.data.firstAccessCompleted ?? true);
+
       const userData: User = {
         id: response.data.user?.id || '',
         name: response.data.user?.fullName || response.data.user?.name || 'Usuário Teste',
@@ -404,7 +417,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         department: response.data.user?.department,
         position: response.data.user?.position,
         employeeCode: response.data.user?.employeeCode,
-        firstAccessCompleted: response.data.user?.firstAccessCompleted ?? response.data.firstAccessCompleted ?? false,
+        firstAccessCompleted,
         lgpdAccepted: !(response.data?.requiresLgpdConsent === true),
       };
 
@@ -423,6 +436,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         console.error('❌ Token não encontrado na resposta do login!');
         throw new Error('Token não encontrado na resposta do login');
+      }
+      if (response.data.refreshToken) {
+        localStorage.setItem('refreshToken', response.data.refreshToken);
+      } else if (response.data.token) {
+        localStorage.setItem('refreshToken', response.data.token);
       }
       localStorage.setItem('user', JSON.stringify(userData));
 
@@ -444,7 +462,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Verificar se precisa de mudança de senha ou primeiro acesso
       const requiresPasswordChange = response.data?.requiresPasswordChange === true;
-      const firstAccessCompleted = response.data?.firstAccessCompleted === true;
       const requires2FA = response.data?.requires2FA === true;
       const requiresLgpdConsent = response.data?.requiresLgpdConsent === true;
 
@@ -464,7 +481,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Redirecionar baseado nos requisitos
-      if (requiresPasswordChange || !firstAccessCompleted) {
+      if ((requiresPasswordChange || !firstAccessCompleted) && !isSuperUser) {
         console.log('🚀 Redirecionando para primeiro acesso (mudança de senha)');
         navigate('/first-access/change-password');
       } else if (requires2FA) {

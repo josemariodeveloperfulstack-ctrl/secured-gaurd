@@ -248,6 +248,13 @@ api.interceptors.response.use(
       if (isPublicAuthRequest(originalRequest.url)) {
         return Promise.reject(error);
       }
+
+      // Se a requisição for em segundo plano (silent: polling, notificações), não derrubar a sessão do usuário
+      if (silent) {
+        console.warn('⚠️ Requisição em segundo plano retornou 401. Não redirecionando para login:', originalRequest.url);
+        return Promise.reject(error);
+      }
+
       const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'token';
       const refreshTokenKey = import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken';
       const userKey = import.meta.env.VITE_USER_KEY || 'user';
@@ -280,7 +287,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem(refreshTokenKey) || localStorage.getItem('refreshToken');
+        const refreshToken = localStorage.getItem(refreshTokenKey) || localStorage.getItem('refreshToken') || token;
         
         if (!refreshToken) {
           console.error('❌ Refresh token não encontrado. Fazendo logout...');

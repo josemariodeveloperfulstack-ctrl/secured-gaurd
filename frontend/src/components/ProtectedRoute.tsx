@@ -48,9 +48,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   debugLog('🔒 ProtectedRoute: Usuário autenticado:', user.name, 'Role:', user.role);
 
+  const currentRole = normalizeRole(user.role);
+  const isSuper = hasFullSystemAccess(user) || currentRole === 'SUPER_ADMIN' || user.roles?.some(r => normalizeRole(r) === 'SUPER_ADMIN');
+
   // Verificar se o usuário precisa completar o primeiro acesso
-  // Exceto se estiver na própria página de primeiro acesso ou se allowWithoutFirstAccess for true
-  if (!allowWithoutFirstAccess && !user.firstAccessCompleted) {
+  // Exceto se for super admin, se estiver na própria página de primeiro acesso ou se allowWithoutFirstAccess for true
+  if (!allowWithoutFirstAccess && !user.firstAccessCompleted && !isSuper) {
     // Permitir acesso apenas às páginas de primeiro acesso
     const firstAccessPaths = ['/first-access/change-password', '/first-access/activate-2fa'];
     if (!firstAccessPaths.includes(location.pathname)) {
@@ -58,8 +61,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       return <Navigate to="/first-access/change-password" replace />;
     }
   }
-
-  const currentRole = normalizeRole(user.role);
 
   // 🔒 Bloqueio explícito por role (avaliado ANTES de qualquer outra verificação positiva)
   // Caso de uso: SUPERVISOR não pode acessar Financeiro / Comercial mesmo que alguma

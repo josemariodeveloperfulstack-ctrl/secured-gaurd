@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.service;
 
+import com.itextpdf.io.image.ImageData;
+import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.pdf.PdfDocument;
@@ -8,10 +10,12 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.Border;
 import com.itextpdf.layout.borders.SolidBorder;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import com.itextpdf.layout.properties.VerticalAlignment;
 import com.z7design.secured_guard.dto.StockRequisitionAnalyticsDTO;
 import com.z7design.secured_guard.dto.StockRequisitionAnalyticsDTO.*;
 import com.z7design.secured_guard.dto.StockRequisitionAnalyticsFilterDTO;
@@ -528,15 +532,37 @@ public class StockRequisitionAnalyticsService {
         Table headerTable = new Table(UnitValue.createPercentArray(new float[]{65f, 35f})).useAllAvailableWidth();
         headerTable.setBackgroundColor(DARK_NAVY).setPadding(6f);
 
-        Cell leftCell = new Cell().setBorder(Border.NO_BORDER).setPadding(6f);
+        Cell leftCell = new Cell().setBorder(Border.NO_BORDER).setPadding(4f).setVerticalAlignment(VerticalAlignment.MIDDLE);
+        Image logoImg = loadCompanyLogoImage(company);
         String compName = company != null && company.getName() != null ? company.getName().toUpperCase() : "PROMOVER GESTÃO INTEGRADA";
-        leftCell.add(new Paragraph(compName).setFontSize(11f).setBold().setFontColor(new DeviceRgb(255, 255, 255)));
-        leftCell.add(new Paragraph("RELATÓRIO GERENCIAL DE CONSUMO E REQUISIÇÕES DO ALMOXARIFADO").setFontSize(8.5f).setFontColor(new DeviceRgb(254, 240, 138)));
+
+        if (logoImg != null) {
+            Table compBox = new Table(UnitValue.createPercentArray(new float[]{12f, 88f})).useAllAvailableWidth();
+            compBox.setBorder(Border.NO_BORDER);
+
+            Cell logoCell = new Cell()
+                    .setBorder(Border.NO_BORDER)
+                    .setPadding(0f)
+                    .setTextAlignment(TextAlignment.LEFT)
+                    .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                    .add(logoImg);
+
+            Cell infoCell = new Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE).setPaddingLeft(8f);
+            infoCell.add(new Paragraph(compName).setFontSize(10.5f).setBold().setFontColor(new DeviceRgb(255, 255, 255)).setMarginBottom(1f));
+            infoCell.add(new Paragraph("RELATÓRIO GERENCIAL DE CONSUMO E REQUISIÇÕES DO ALMOXARIFADO").setFontSize(8f).setFontColor(new DeviceRgb(254, 240, 138)));
+
+            compBox.addCell(logoCell);
+            compBox.addCell(infoCell);
+            leftCell.add(compBox);
+        } else {
+            leftCell.add(new Paragraph(compName).setFontSize(11f).setBold().setFontColor(new DeviceRgb(255, 255, 255)));
+            leftCell.add(new Paragraph("RELATÓRIO GERENCIAL DE CONSUMO E REQUISIÇÕES DO ALMOXARIFADO").setFontSize(8.5f).setFontColor(new DeviceRgb(254, 240, 138)));
+        }
         headerTable.addCell(leftCell);
 
-        Cell rightCell = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT).setPadding(6f);
+        Cell rightCell = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT).setPadding(6f).setVerticalAlignment(VerticalAlignment.MIDDLE);
         rightCell.add(new Paragraph("PAINEL DE AUDITORIA & REPOSIÇÃO").setFontSize(9f).setBold().setFontColor(BRAND_RED));
-        rightCell.add(new Paragraph("Emissão: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).setFontSize(7f).setFontColor(new DeviceRgb(203, 213, 225)));
+        rightCell.add(new Paragraph("Emissão: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).setFontSize(7.5f).setFontColor(new DeviceRgb(203, 213, 225)));
         headerTable.addCell(rightCell);
         document.add(headerTable);
 
@@ -660,6 +686,104 @@ public class StockRequisitionAnalyticsService {
             List<Company> list = companyRepository.findByStatus(Company.CompanyStatus.ACTIVE);
             if (!list.isEmpty()) return list.get(0);
         } catch (Exception ignored) {}
+        return null;
+    }
+
+    private Image loadCompanyLogoImage(Company company) {
+        String logoUrl = company != null ? company.getLogoUrl() : null;
+        try {
+            ImageData imageData = null;
+
+            if (logoUrl != null && !logoUrl.isBlank()) {
+                if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+                    try {
+                        imageData = ImageDataFactory.create(logoUrl);
+                    } catch (Exception ex) {
+                        log.debug("Falha ao carregar logo por URL remota: {}", ex.getMessage());
+                    }
+                }
+
+                if (imageData == null) {
+                    String clean = logoUrl.replace("/api/uploads/companies/logos/", "")
+                            .replace("api/uploads/companies/logos/", "")
+                            .replace("/uploads/companies/logos/", "")
+                            .replace("uploads/companies/logos/", "");
+
+                    java.nio.file.Path[] uploadCandidates = new java.nio.file.Path[]{
+                            java.nio.file.Paths.get(logoUrl),
+                            java.nio.file.Paths.get("backend", "uploads", "companies", "logos", clean),
+                            java.nio.file.Paths.get("uploads", "companies", "logos", clean),
+                            java.nio.file.Paths.get("c:/dev/secured-guard/backend/uploads/companies/logos", clean),
+                            java.nio.file.Paths.get("c:/dev/secured-guard/uploads/companies/logos", clean)
+                    };
+
+                    for (java.nio.file.Path p : uploadCandidates) {
+                        if (java.nio.file.Files.exists(p)) {
+                            try {
+                                imageData = ImageDataFactory.create(java.nio.file.Files.readAllBytes(p));
+                                break;
+                            } catch (Exception ignored) {
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (imageData == null) {
+                String[] classpathResources = new String[]{
+                        "static/certificates/nr06/promover-logo.png",
+                        "static/email-marketing/promover-logomarca.png",
+                        "static/email-marketing/promover-logo.png"
+                };
+
+                for (String cpRes : classpathResources) {
+                    try {
+                        org.springframework.core.io.ClassPathResource cpr = new org.springframework.core.io.ClassPathResource(cpRes);
+                        if (cpr.exists()) {
+                            try (java.io.InputStream is = cpr.getInputStream()) {
+                                byte[] bytes = is.readAllBytes();
+                                if (bytes.length > 0) {
+                                    imageData = ImageDataFactory.create(bytes);
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+
+            if (imageData == null) {
+                java.nio.file.Path[] fileCandidates = new java.nio.file.Path[]{
+                        java.nio.file.Paths.get("c:/dev/secured-guard/backend/src/main/resources/static/certificates/nr06/promover-logo.png"),
+                        java.nio.file.Paths.get("backend/src/main/resources/static/certificates/nr06/promover-logo.png"),
+                        java.nio.file.Paths.get("src/main/resources/static/certificates/nr06/promover-logo.png"),
+                        java.nio.file.Paths.get("c:/dev/secured-guard/frontend/public/promover-logo.png"),
+                        java.nio.file.Paths.get("frontend/public/promover-logo.png"),
+                        java.nio.file.Paths.get("c:/dev/secured-guard/frontend/public/logo-sistema.png")
+                };
+
+                for (java.nio.file.Path p : fileCandidates) {
+                    if (java.nio.file.Files.exists(p)) {
+                        try {
+                            imageData = ImageDataFactory.create(java.nio.file.Files.readAllBytes(p));
+                            break;
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+            }
+
+            if (imageData != null) {
+                Image img = new Image(imageData);
+                img.setMaxWidth(56f);
+                img.setMaxHeight(34f);
+                img.setAutoScale(true);
+                return img;
+            }
+        } catch (Exception e) {
+            log.warn("Não foi possível carregar logo da empresa: {}", e.getMessage());
+        }
         return null;
     }
 
