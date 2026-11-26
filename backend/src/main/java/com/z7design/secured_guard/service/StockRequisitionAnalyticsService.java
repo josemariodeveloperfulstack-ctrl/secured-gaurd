@@ -609,7 +609,7 @@ public class StockRequisitionAnalyticsService {
 
     private boolean isItemEpi(StockItem item) {
         if (item == null) return false;
-        if (item.getCategory() == StockCategory.EPI || item.getCategory() == StockCategory.UNIFORME) {
+        if (item.getCategory() == StockCategory.EPI) {
             return true;
         }
         if (Boolean.TRUE.equals(item.getRequiresCa())) {

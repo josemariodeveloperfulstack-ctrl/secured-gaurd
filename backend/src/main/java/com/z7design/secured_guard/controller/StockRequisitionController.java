@@ -215,7 +215,7 @@ public class StockRequisitionController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS', 'FINANCEIRO')")
     @Operation(summary = "Exportar relatório analítico de consumo e reposição de estoque em Excel")
     public ResponseEntity<byte[]> exportAnalyticsExcel(
-            @ModelAttribute StockRequisitionAnalyticsFilterDTO filter) {
+            @ModelAttribute StockRequisitionAnalyticsFilterDTO filter) throws java.io.IOException {
         byte[] bytes = stockRequisitionAnalyticsService.generateExcelReport(filter);
         String filename = "relatorio-consumo-estoque-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".xlsx";
         return ResponseEntity.ok()
@@ -228,7 +228,7 @@ public class StockRequisitionController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS', 'FINANCEIRO')")
     @Operation(summary = "Exportar relatório executivo de consumo e ciclo de EPIs em PDF")
     public ResponseEntity<byte[]> exportAnalyticsPdf(
-            @ModelAttribute StockRequisitionAnalyticsFilterDTO filter) {
+            @ModelAttribute StockRequisitionAnalyticsFilterDTO filter) throws java.io.IOException {
         byte[] bytes = stockRequisitionAnalyticsService.generatePdfReport(filter);
         String filename = "relatorio-executivo-consumo-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
         return ResponseEntity.ok()
