@@ -173,8 +173,8 @@ export const StockRequisitionAnalyticsModal: React.FC<StockRequisitionAnalyticsM
   };
 
   const summary = analyticsData?.summary;
-  const topItems = analyticsData?.topConsumedItems || [];
-  const sectorList = analyticsData?.sectorConsumption || [];
+  const topItems = (analyticsData?.topConsumedItems || []) as any[];
+  const sectorList = ((analyticsData as any)?.consumptionBySector || (analyticsData as any)?.sectorConsumption || []) as any[];
   const detailedRows = analyticsData?.detailedRows || [];
 
   return (
@@ -363,14 +363,14 @@ export const StockRequisitionAnalyticsModal: React.FC<StockRequisitionAnalyticsM
                   className="data-[state=checked]:bg-seguranca-red"
                 />
                 <Label htmlFor="only-epi-switch" className="text-xs text-gray-300 font-medium cursor-pointer">
-                  Apenas EPIs (Foco Vida Útil)
+                  Apenas EPIs
                 </Label>
               </div>
             </div>
           </div>
 
           {/* CARDS DE INDICADORES / KPIS */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-gray-900/60 border border-gray-700/60 rounded-xl p-4 flex flex-col justify-between">
               <div className="flex items-center justify-between text-gray-400 text-xs">
                 <span>Total de Requisições</span>
@@ -410,25 +410,6 @@ export const StockRequisitionAnalyticsModal: React.FC<StockRequisitionAnalyticsM
                 Funcionários com materiais registrados
               </div>
             </div>
-
-            <div className="bg-gray-900/60 border border-seguranca-red/30 bg-seguranca-red/5 rounded-xl p-4 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-red-300 text-xs">
-                <span className="font-semibold">Média Ciclo de Uso de EPI</span>
-                <Clock className="h-4 w-4 text-seguranca-red" />
-              </div>
-              <div className="text-2xl font-bold text-seguranca-yellow mt-2">
-                {loading ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
-                ) : summary?.averageEpiLifespanDays != null ? (
-                  `${summary.averageEpiLifespanDays} dias`
-                ) : (
-                  'N/D'
-                )}
-              </div>
-              <div className="text-[11px] text-gray-400 mt-1">
-                Intervalo médio entre reposições de EPI
-              </div>
-            </div>
           </div>
 
           {/* GRÁFICOS / PAINÉIS DE REPOSIÇÃO E CONSUMO */}
@@ -451,12 +432,15 @@ export const StockRequisitionAnalyticsModal: React.FC<StockRequisitionAnalyticsM
                 <p className="text-xs text-gray-400 py-6 text-center">Nenhum item consumido no período selecionado.</p>
               ) : (
                 <div className="space-y-3">
-                  {topItems.slice(0, 6).map((item) => {
-                    const maxQty = topItems[0]?.totalQuantityConsumed || 1;
-                    const percent = Math.min(100, Math.round((item.totalQuantityConsumed / maxQty) * 100));
+                  {topItems.slice(0, 6).map((item: any, idx: number) => {
+                    const firstQty = topItems[0]?.totalQuantity || topItems[0]?.totalQuantityConsumed || 1;
+                    const itemQty = item.totalQuantity || item.totalQuantityConsumed || 0;
+                    const itemName = item.name || item.itemName || 'Material';
+                    const isAlert = item.isLowStock || item.replenishmentAlert;
+                    const percent = Math.min(100, Math.round((itemQty / firstQty) * 100));
 
                     return (
-                      <div key={item.stockItemId} className="bg-gray-800/40 border border-gray-700/40 rounded-lg p-2.5">
+                      <div key={item.stockItemId || idx} className="bg-gray-800/40 border border-gray-700/40 rounded-lg p-2.5">
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span className="font-medium text-gray-200 flex items-center gap-1.5">
                             {item.isEpi && (
@@ -464,24 +448,24 @@ export const StockRequisitionAnalyticsModal: React.FC<StockRequisitionAnalyticsM
                                 EPI
                               </Badge>
                             )}
-                            {item.itemName}
+                            {itemName}
                           </span>
                           <span className="font-semibold text-seguranca-yellow">
-                            {item.totalQuantityConsumed} un. retiradas
+                            {itemQty} un. retiradas
                           </span>
                         </div>
 
                         {/* Barra de progresso visual */}
                         <div className="w-full bg-gray-700/50 rounded-full h-1.5 overflow-hidden my-1">
                           <div
-                            className={`h-full rounded-full ${item.replenishmentAlert ? 'bg-seguranca-red' : 'bg-seguranca-yellow'}`}
+                            className={`h-full rounded-full ${isAlert ? 'bg-seguranca-red' : 'bg-seguranca-yellow'}`}
                             style={{ width: `${percent}%` }}
                           />
                         </div>
 
                         <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
-                          <span>Estoque atual: <strong className="text-gray-200">{item.currentStock}</strong> (Mín: {item.minimumStock})</span>
-                          {item.replenishmentAlert ? (
+                          <span>Estoque atual: <strong className="text-gray-200">{item.currentStock ?? 0}</strong> (Mín: {item.minimumStock ?? 0})</span>
+                          {isAlert ? (
                             <span className="text-red-400 flex items-center gap-1 font-semibold">
                               <AlertTriangle className="h-3 w-3" /> Reposição urgente necessária
                             </span>
@@ -547,11 +531,11 @@ export const StockRequisitionAnalyticsModal: React.FC<StockRequisitionAnalyticsM
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-seguranca-red" />
-                  Detalhamento Analítico: Quem Pegou, Solicitou & Tempo de Uso de EPI
+                  <Package className="h-4 w-4 text-seguranca-yellow" />
+                  Detalhamento Analítico: Quem Pegou, Solicitou & Materiais Entregues
                 </h3>
                 <p className="text-xs text-gray-400">
-                  Histórico de entregas com identificação de empresa, setor e ciclo de vida útil decorrido desde a última entrega de cada EPI.
+                  Histórico de entregas com identificação de empresa, setor de trabalho e todos os itens fornecidos por requisição.
                 </p>
               </div>
               <span className="text-xs text-gray-400 font-medium">
@@ -569,26 +553,25 @@ export const StockRequisitionAnalyticsModal: React.FC<StockRequisitionAnalyticsM
                     <TableHead className="text-seguranca-yellow text-xs font-semibold">Empresa & Unidade</TableHead>
                     <TableHead className="text-seguranca-yellow text-xs font-semibold">Setor / Posto</TableHead>
                     <TableHead className="text-seguranca-yellow text-xs font-semibold">Itens Fornecidos</TableHead>
-                    <TableHead className="text-seguranca-yellow text-xs font-semibold">Tempo de Uso do EPI</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-12 text-center text-gray-400">
+                      <TableCell colSpan={6} className="py-12 text-center text-gray-400">
                         <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-seguranca-yellow" />
                         Carregando registros analíticos...
                       </TableCell>
                     </TableRow>
                   ) : detailedRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-gray-400 text-xs">
+                      <TableCell colSpan={6} className="py-10 text-center text-gray-400 text-xs">
                         Nenhuma requisição atende aos filtros selecionados.
                       </TableCell>
                     </TableRow>
                   ) : (
                     detailedRows.map((row) => (
-                      <TableRow key={row.requisitionId} className="border-gray-700/50 hover:bg-gray-800/40 text-xs">
+                      <TableRow key={row.id || row.requisitionId} className="border-gray-700/50 hover:bg-gray-800/40 text-xs">
                         {/* Requisição & Data */}
                         <TableCell className="align-top py-2.5">
                           <span className="font-semibold text-gray-200 block">{row.requisitionNumber}</span>
@@ -629,57 +612,44 @@ export const StockRequisitionAnalyticsModal: React.FC<StockRequisitionAnalyticsM
 
                         {/* Setor / Posto */}
                         <TableCell className="align-top py-2.5 text-gray-300">
-                          {row.departmentName || '—'}
+                          <span className="text-gray-200 block">{row.workSector || row.departmentName || '—'}</span>
                         </TableCell>
 
-                        {/* Itens */}
+                        {/* Itens Fornecidos - Lista todos os itens da requisição para o colaborador */}
                         <TableCell className="align-top py-2.5">
-                          <div className="space-y-1">
-                            {row.lines && row.lines.length > 0 ? (
-                              row.lines.map((l) => (
-                                <div key={l.lineId} className="text-[11px] text-gray-300">
-                                  <strong className="text-white">{l.quantity}x</strong> {l.itemName}{' '}
-                                  {l.isEpi && (
-                                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[9px] px-1 py-0 ml-1">
-                                      EPI {l.caNumber ? `CA ${l.caNumber}` : ''}
+                          <div className="space-y-1.5">
+                            {row.items && row.items.length > 0 ? (
+                              row.items.map((it, idx) => (
+                                <div key={idx} className="flex flex-wrap items-center gap-1.5 text-xs text-gray-200">
+                                  <span className="font-bold text-seguranca-yellow font-mono text-[11px] bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">
+                                    {it.quantity}x
+                                  </span>
+                                  <span className="font-medium text-white">{it.name || (it as any).itemName}</span>
+                                  {it.ca && (
+                                    <span className="text-[10px] text-gray-300 bg-gray-800/80 px-1 py-0.5 rounded border border-gray-700">
+                                      CA {it.ca}
+                                    </span>
+                                  )}
+                                  {it.isEpi && (
+                                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[9px] px-1 py-0">
+                                      EPI
                                     </Badge>
                                   )}
                                 </div>
                               ))
+                            ) : row.summaryItemsText ? (
+                              <div className="space-y-1 text-xs text-gray-200">
+                                {row.summaryItemsText.split(', ').map((itemStr, idx) => (
+                                  <div key={idx} className="flex items-center gap-1.5">
+                                    <span className="text-seguranca-yellow font-bold">•</span>
+                                    <span>{itemStr}</span>
+                                  </div>
+                                ))}
+                              </div>
                             ) : (
-                              <span className="text-gray-400">{row.itemsSummary || '—'}</span>
+                              <span className="text-gray-400">—</span>
                             )}
                           </div>
-                        </TableCell>
-
-                        {/* Tempo de Uso de EPI */}
-                        <TableCell className="align-top py-2.5">
-                          {row.lines && row.lines.some((l) => l.isEpi) ? (
-                            <div className="space-y-1">
-                              {row.lines
-                                .filter((l) => l.isEpi)
-                                .map((l) => {
-                                  const hasDays = l.daysSincePreviousDelivery != null;
-                                  return (
-                                    <div key={l.lineId} className="flex flex-col text-[11px]">
-                                      <span className="text-gray-400">{l.itemName}:</span>
-                                      {hasDays ? (
-                                        <Badge className="bg-seguranca-red/20 text-red-300 border-seguranca-red/40 text-[10px] px-1.5 py-0.5 w-fit mt-0.5 flex items-center gap-1 font-semibold">
-                                          <Clock className="h-3 w-3 text-seguranca-red" />
-                                          {l.usageText || `${l.daysSincePreviousDelivery} dias de uso`}
-                                        </Badge>
-                                      ) : (
-                                        <Badge className="bg-gray-700/60 text-gray-300 border-gray-600 text-[10px] px-1.5 py-0.5 w-fit mt-0.5">
-                                          1ª entrega registrada
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          ) : (
-                            <span className="text-gray-500 text-[11px] italic">Sem itens EPI</span>
-                          )}
                         </TableCell>
                       </TableRow>
                     ))

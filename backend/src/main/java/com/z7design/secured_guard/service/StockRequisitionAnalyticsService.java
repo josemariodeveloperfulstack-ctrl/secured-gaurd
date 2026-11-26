@@ -427,7 +427,7 @@ public class StockRequisitionAnalyticsService {
             infoRow.createCell(0).setCellValue("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
                     + " | Total de Requisições: " + data.getSummary().getTotalRequisitions()
                     + " | Total de Itens: " + data.getSummary().getTotalItemsDelivered()
-                    + (data.getSummary().getAverageEpiLifespanDays() != null ? " | Tempo Médio de Uso de EPI: " + data.getSummary().getAverageEpiLifespanDays() + " dias" : ""));
+                    + " | Colaboradores Atendidos: " + data.getSummary().getDistinctEmployeesCount());
 
             rIdx++; // Linha em branco
 
@@ -435,7 +435,7 @@ public class StockRequisitionAnalyticsService {
                     "Número", "Data/Hora", "Status", "Beneficiário (Quem Pegou)",
                     "Empresa", "Unidade / Filial", "Setor / Posto de Trabalho",
                     "Solicitante (Quem Pediu)", "Responsável Entrega", "Motivo",
-                    "Itens Entregues", "Qtd Total", "Tempo de Uso do EPI (Ciclo de Reposição)"
+                    "Itens Entregues", "Qtd Total"
             };
 
             Row hRow = sheet1.createRow(rIdx++);
@@ -461,7 +461,6 @@ public class StockRequisitionAnalyticsService {
                 dRow.createCell(9).setCellValue(row.getMovementReason());
                 dRow.createCell(10).setCellValue(row.getSummaryItemsText());
                 dRow.createCell(11).setCellValue(row.getTotalQuantity());
-                dRow.createCell(12).setCellValue(row.getEpiUsageEstimate());
             }
 
             for (int i = 0; i < headers.length; i++) {
@@ -542,25 +541,20 @@ public class StockRequisitionAnalyticsService {
         document.add(headerTable);
 
         // 2. Quadro de Indicadores (KPIs)
-        Table kpiTable = new Table(UnitValue.createPercentArray(new float[]{25f, 25f, 25f, 25f})).useAllAvailableWidth().setMarginTop(8f).setMarginBottom(8f);
+        Table kpiTable = new Table(UnitValue.createPercentArray(new float[]{33.33f, 33.33f, 33.34f})).useAllAvailableWidth().setMarginTop(8f).setMarginBottom(8f);
         kpiTable.addCell(createKpiCell("TOTAL DE REQUISIÇÕES", String.valueOf(data.getSummary().getTotalRequisitions())));
         kpiTable.addCell(createKpiCell("UNIDADES ENTREGUES", String.valueOf(data.getSummary().getTotalItemsDelivered())));
         kpiTable.addCell(createKpiCell("COLABORADORES ATENDIDOS", String.valueOf(data.getSummary().getDistinctEmployeesCount())));
-        String avgText = data.getSummary().getAverageEpiLifespanDays() != null
-                ? data.getSummary().getAverageEpiLifespanDays() + " dias"
-                : "Sem histórico anterior";
-        kpiTable.addCell(createKpiCell("TEMPO MÉDIO USO EPI", avgText));
         document.add(kpiTable);
 
         // 3. Tabela Analítica de Consumo
-        Table table = new Table(UnitValue.createPercentArray(new float[]{11f, 9f, 15f, 15f, 13f, 22f, 15f})).useAllAvailableWidth();
+        Table table = new Table(UnitValue.createPercentArray(new float[]{14f, 10f, 20f, 17f, 15f, 24f})).useAllAvailableWidth();
         table.addHeaderCell(createPdfHeaderCell("Nº Requisição", TextAlignment.CENTER));
         table.addHeaderCell(createPdfHeaderCell("Data", TextAlignment.CENTER));
         table.addHeaderCell(createPdfHeaderCell("Quem Pegou (Beneficiário)", TextAlignment.LEFT));
         table.addHeaderCell(createPdfHeaderCell("Setor / Posto", TextAlignment.LEFT));
         table.addHeaderCell(createPdfHeaderCell("Solicitante", TextAlignment.LEFT));
         table.addHeaderCell(createPdfHeaderCell("Materiais Entregues", TextAlignment.LEFT));
-        table.addHeaderCell(createPdfHeaderCell("Tempo de Uso EPI", TextAlignment.LEFT));
 
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         int rIdx = 0;
@@ -573,7 +567,6 @@ public class StockRequisitionAnalyticsService {
             table.addCell(createPdfDataCell(row.getWorkSector(), TextAlignment.LEFT, alt));
             table.addCell(createPdfDataCell(row.getRequestedByName(), TextAlignment.LEFT, alt));
             table.addCell(createPdfDataCell(row.getSummaryItemsText(), TextAlignment.LEFT, alt));
-            table.addCell(createPdfDataCell(row.getEpiUsageEstimate(), TextAlignment.LEFT, alt));
             rIdx++;
         }
 

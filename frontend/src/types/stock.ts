@@ -420,21 +420,37 @@ export interface StockRequisitionAnalyticsDTO {
     requisitionsCount: number;
   }[];
   detailedRows: {
-    requisitionId: string;
+    id?: string;
+    requisitionId?: string;
     requisitionNumber: string;
     date: string;
     status: string;
+    statusLabel?: string;
     employeeName: string;
-    employeeCpf: string;
+    employeeCpf?: string;
     companyName: string;
-    unitName: string;
-    departmentName: string;
+    unitName?: string;
+    workSector?: string;
+    departmentName?: string;
     requestedByName: string;
     deliveredByName: string;
-    reason: string;
-    itemsSummary: string;
+    reason?: string;
+    movementReason?: string;
+    itemsSummary?: string;
+    summaryItemsText?: string;
+    totalQuantity?: number;
     epiUsageEstimate?: string;
-    lines: {
+    items?: {
+      stockItemId?: string;
+      code?: string;
+      name?: string;
+      itemName?: string;
+      ca?: string;
+      caNumber?: string;
+      isEpi?: boolean;
+      quantity: number;
+    }[];
+    lines?: {
       lineId: string;
       stockItemId: string;
       itemName: string;
