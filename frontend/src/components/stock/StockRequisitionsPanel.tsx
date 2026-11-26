@@ -20,9 +20,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ClipboardList, Edit, Eye, Loader2, RefreshCw, Trash2, FileText, Download } from 'lucide-react';
+import { ClipboardList, Edit, Eye, Loader2, RefreshCw, Trash2, FileText, Download, BarChart3 } from 'lucide-react';
 import { StockRequisitionListItem, StockRequisitionStatus } from '@/types/stock';
 import StockRequisitionModal from '@/components/stock/StockRequisitionModal';
+import StockRequisitionAnalyticsModal from '@/components/stock/StockRequisitionAnalyticsModal';
 import CreateWarehouseRequisitionButton from '@/components/stock/CreateWarehouseRequisitionButton';
 import { stockService } from '@/services/stockService';
 import { useToast } from '@/hooks/use-toast';
@@ -62,6 +63,7 @@ const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, 
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [singleDeleteRow, setSingleDeleteRow] = useState<StockRequisitionListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
 
   const allIds = useMemo(() => items.map((r) => r.id), [items]);
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -160,6 +162,16 @@ const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, 
               >
                 {refreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                 Atualizar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-seguranca-yellow/50 bg-amber-500/10 text-seguranca-yellow hover:bg-amber-500/20 hover:text-white"
+                onClick={() => setAnalyticsModalOpen(true)}
+              >
+                <BarChart3 className="h-4 w-4 mr-2 text-seguranca-yellow" />
+                Relatórios & Indicadores
               </Button>
               <Button
                 type="button"
@@ -309,6 +321,11 @@ const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, 
         initialRequisitionId={viewId}
         initialOpenMode={modalOpenMode}
         onRecorded={() => void onRefresh()}
+      />
+
+      <StockRequisitionAnalyticsModal
+        isOpen={analyticsModalOpen}
+        onClose={() => setAnalyticsModalOpen(false)}
       />
 
       <AlertDialog open={bulkDeleteOpen} onOpenChange={(o) => !deleting && setBulkDeleteOpen(o)}>

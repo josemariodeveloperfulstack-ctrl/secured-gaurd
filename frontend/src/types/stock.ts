@@ -364,4 +364,89 @@ export interface StockDashboardDTO {
   consolidatedRequisitionsCount: number;
   movementsChart: StockMovementChartDTO[];
   stockStatusDistribution: Record<string, number>;
-}
+}
+
+export interface StockRequisitionAnalyticsFilters {
+  companyId?: string;
+  unitId?: string;
+  departmentId?: string;
+  employeeId?: string;
+  requestedByUserId?: string;
+  periodType?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM' | string;
+  startDate?: string;
+  endDate?: string;
+  onlyEpi?: boolean;
+  search?: string;
+}
+
+export interface StockRequisitionAnalyticsDTO {
+  summary: {
+    totalRequisitions: number;
+    totalItemsDelivered: number;
+    pendingRequisitions: number;
+    approvedRequisitions: number;
+    deliveredRequisitions: number;
+    distinctEmployeesCount: number;
+    distinctItemsCount: number;
+    averageEpiLifespanDays: number | null;
+  };
+  periodMetrics: {
+    periodLabel: string;
+    totalRequisitions: number;
+    totalItems: number;
+  }[];
+  topConsumedItems: {
+    stockItemId: string;
+    itemCode: string;
+    itemName: string;
+    category: string;
+    isEpi: boolean;
+    caNumber?: string;
+    totalQuantityConsumed: number;
+    currentStock: number;
+    minimumStock: number;
+    replenishmentAlert: boolean;
+  }[];
+  sectorConsumption: {
+    sectorId: string;
+    sectorName: string;
+    totalQuantity: number;
+    requisitionsCount: number;
+  }[];
+  companyConsumption: {
+    companyId: string;
+    companyName: string;
+    totalQuantity: number;
+    requisitionsCount: number;
+  }[];
+  detailedRows: {
+    requisitionId: string;
+    requisitionNumber: string;
+    date: string;
+    status: string;
+    employeeName: string;
+    employeeCpf: string;
+    companyName: string;
+    unitName: string;
+    departmentName: string;
+    requestedByName: string;
+    deliveredByName: string;
+    reason: string;
+    itemsSummary: string;
+    epiUsageEstimate?: string;
+    lines: {
+      lineId: string;
+      stockItemId: string;
+      itemName: string;
+      itemCode: string;
+      category: string;
+      isEpi: boolean;
+      caNumber?: string;
+      quantity: number;
+      daysSincePreviousDelivery?: number;
+      previousDeliveryDate?: string;
+      usageText?: string;
+    }[];
+  }[];
+}
+

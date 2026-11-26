@@ -21,7 +21,9 @@ import {
   CreateStockRequisitionPayload,
   DeliverStockRequisitionPayload,
   StockRequisitionListItem,
-  LocationStockSummaryRow
+  LocationStockSummaryRow,
+  StockRequisitionAnalyticsFilters,
+  StockRequisitionAnalyticsDTO
 } from '@/types/stock';
 
 function parseNumberField(v: unknown): number {
@@ -852,6 +854,65 @@ export const stockService = {
       console.error('Erro ao enviar requisição:', error);
       throw new Error('Falha ao enviar requisição');
     }
+  },
+
+  async getStockRequisitionAnalytics(filters?: StockRequisitionAnalyticsFilters): Promise<StockRequisitionAnalyticsDTO> {
+    const params = new URLSearchParams();
+    if (filters?.companyId) params.append('companyId', filters.companyId);
+    if (filters?.unitId) params.append('unitId', filters.unitId);
+    if (filters?.departmentId) params.append('departmentId', filters.departmentId);
+    if (filters?.employeeId) params.append('employeeId', filters.employeeId);
+    if (filters?.requestedByUserId) params.append('requestedByUserId', filters.requestedByUserId);
+    if (filters?.periodType) params.append('periodType', filters.periodType);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.onlyEpi !== undefined) params.append('onlyEpi', String(filters.onlyEpi));
+    if (filters?.search) params.append('search', filters.search);
+
+    const queryString = params.toString();
+    const url = queryString ? `/api/stock/requisitions/analytics?${queryString}` : '/api/stock/requisitions/analytics';
+    const response = await api.get<StockRequisitionAnalyticsDTO>(url);
+    return response.data;
+  },
+
+  async downloadStockRequisitionAnalyticsExcel(filters?: StockRequisitionAnalyticsFilters): Promise<void> {
+    const params = new URLSearchParams();
+    if (filters?.companyId) params.append('companyId', filters.companyId);
+    if (filters?.unitId) params.append('unitId', filters.unitId);
+    if (filters?.departmentId) params.append('departmentId', filters.departmentId);
+    if (filters?.employeeId) params.append('employeeId', filters.employeeId);
+    if (filters?.requestedByUserId) params.append('requestedByUserId', filters.requestedByUserId);
+    if (filters?.periodType) params.append('periodType', filters.periodType);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.onlyEpi !== undefined) params.append('onlyEpi', String(filters.onlyEpi));
+    if (filters?.search) params.append('search', filters.search);
+
+    const queryString = params.toString();
+    const url = queryString ? `/api/stock/requisitions/analytics/excel?${queryString}` : '/api/stock/requisitions/analytics/excel';
+    const response = await api.get(url, { responseType: 'blob' });
+    const filename = `relatorio-requisicoes-consumo-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    this.handleFileDownload(response.data, filename);
+  },
+
+  async downloadStockRequisitionAnalyticsPdf(filters?: StockRequisitionAnalyticsFilters): Promise<void> {
+    const params = new URLSearchParams();
+    if (filters?.companyId) params.append('companyId', filters.companyId);
+    if (filters?.unitId) params.append('unitId', filters.unitId);
+    if (filters?.departmentId) params.append('departmentId', filters.departmentId);
+    if (filters?.employeeId) params.append('employeeId', filters.employeeId);
+    if (filters?.requestedByUserId) params.append('requestedByUserId', filters.requestedByUserId);
+    if (filters?.periodType) params.append('periodType', filters.periodType);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.onlyEpi !== undefined) params.append('onlyEpi', String(filters.onlyEpi));
+    if (filters?.search) params.append('search', filters.search);
+
+    const queryString = params.toString();
+    const url = queryString ? `/api/stock/requisitions/analytics/pdf?${queryString}` : '/api/stock/requisitions/analytics/pdf';
+    const response = await api.get(url, { responseType: 'blob' });
+    const filename = `relatorio-executivo-consumo-${new Date().toISOString().slice(0, 10)}.pdf`;
+    this.handleFileDownload(response.data, filename);
   },
 
   handleFileDownload(data: Blob, filename: string): void {

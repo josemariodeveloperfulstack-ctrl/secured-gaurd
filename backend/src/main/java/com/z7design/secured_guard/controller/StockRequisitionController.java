@@ -3,9 +3,12 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.AddStockRequisitionItemsRequest;
 import com.z7design.secured_guard.dto.CreateStockRequisitionRequest;
 import com.z7design.secured_guard.dto.DeliverStockRequisitionRequest;
+import com.z7design.secured_guard.dto.StockRequisitionAnalyticsDTO;
+import com.z7design.secured_guard.dto.StockRequisitionAnalyticsFilterDTO;
 import com.z7design.secured_guard.dto.StockRequisitionDTO;
 import com.z7design.secured_guard.dto.StockRequisitionListItemDTO;
 import com.z7design.secured_guard.repository.UserRepository;
+import com.z7design.secured_guard.service.StockRequisitionAnalyticsService;
 import com.z7design.secured_guard.service.StockRequisitionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +22,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,6 +37,7 @@ import java.util.UUID;
 public class StockRequisitionController {
 
     private final StockRequisitionService stockRequisitionService;
+    private final StockRequisitionAnalyticsService stockRequisitionAnalyticsService;
     private final UserRepository userRepository;
 
     @GetMapping
@@ -195,6 +201,40 @@ public class StockRequisitionController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    @GetMapping("/analytics")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS', 'FINANCEIRO')")
+    @Operation(summary = "Dados analíticos e indicadores de requisições de estoque e tempo de uso de EPI")
+    public ResponseEntity<StockRequisitionAnalyticsDTO> getAnalytics(
+            @ModelAttribute StockRequisitionAnalyticsFilterDTO filter) {
+        return ResponseEntity.ok(stockRequisitionAnalyticsService.getAnalytics(filter));
+    }
+
+    @GetMapping(value = "/analytics/excel", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS', 'FINANCEIRO')")
+    @Operation(summary = "Exportar relatório analítico de consumo e reposição de estoque em Excel")
+    public ResponseEntity<byte[]> exportAnalyticsExcel(
+            @ModelAttribute StockRequisitionAnalyticsFilterDTO filter) {
+        byte[] bytes = stockRequisitionAnalyticsService.generateExcelReport(filter);
+        String filename = "relatorio-consumo-estoque-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".xlsx";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    @GetMapping(value = "/analytics/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS', 'FINANCEIRO')")
+    @Operation(summary = "Exportar relatório executivo de consumo e ciclo de EPIs em PDF")
+    public ResponseEntity<byte[]> exportAnalyticsPdf(
+            @ModelAttribute StockRequisitionAnalyticsFilterDTO filter) {
+        byte[] bytes = stockRequisitionAnalyticsService.generatePdfReport(filter);
+        String filename = "relatorio-executivo-consumo-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(bytes);
     }
 
     private UUID resolveUserId(Authentication authentication) {

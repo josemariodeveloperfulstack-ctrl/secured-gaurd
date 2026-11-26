@@ -57,5 +57,22 @@ public interface StockRequisitionRepository extends JpaRepository<StockRequisiti
             """)
     Optional<StockRequisition> findByIdFetched(@Param("id") UUID id);
 
+    @Query("""
+            SELECT DISTINCT r FROM StockRequisition r
+            LEFT JOIN FETCH r.lines l
+            LEFT JOIN FETCH l.stockItem si
+            LEFT JOIN FETCH si.unit
+            LEFT JOIN FETCH r.employee e
+            LEFT JOIN FETCH e.company
+            LEFT JOIN FETCH e.unit
+            LEFT JOIN FETCH e.department
+            LEFT JOIN FETCH e.workPost
+            LEFT JOIN FETCH r.requestedByUser
+            LEFT JOIN FETCH r.approvedByUser
+            LEFT JOIN FETCH r.deliveredByUser
+            ORDER BY r.createdAt ASC
+            """)
+    List<StockRequisition> findAllWithFullDetailsAsc();
+
     long countByStatus(com.z7design.secured_guard.model.enums.StockRequisitionStatus status);
 }
